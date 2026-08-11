@@ -60,8 +60,8 @@ public class TemporalTimeline {
         return commit;
     }
 
-    public TemporalCommit addSnapshot(long gameTime, List<ChunkDelta> chunkDeltas) {
-        TemporalCommit commit = TemporalCommit.snapshot(nextId++, headId, gameTime, chunkDeltas);
+    public TemporalCommit addSnapshot(long gameTime, List<ChunkSnapshot> chunkSnapshots) {
+        TemporalCommit commit = TemporalCommit.snapshot(nextId++, headId, gameTime, chunkSnapshots);
         registerCommit(commit);
         return commit;
     }
@@ -98,6 +98,11 @@ public class TemporalTimeline {
         }
         for (ChunkDelta cd : commit.getChunkDeltas()) {
             long chunkKey = cd.getChunkPos().toLong();
+            long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
+            indexChunkTouch(chunkKey, commit.getId(), localParent);
+        }
+        for (ChunkSnapshot snapshot : commit.getChunkSnapshots()) {
+            long chunkKey = snapshot.getChunkPos().toLong();
             long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
             indexChunkTouch(chunkKey, commit.getId(), localParent);
         }
@@ -168,6 +173,18 @@ public class TemporalTimeline {
     }
 
     public boolean isEmpty() { return commits.isEmpty(); }
+
+    /** How many commits chunkPos's head is past its nearest snapshot ancestor (inclusive of the
+     * snapshot itself) — reuses ancestryChain's own bounded walk, so this stays cheap regardless
+     * of how deep the chunk's full history actually is. Used to decide when a fresh
+     * {@link ChunkSnapshot} is due (see the block entities' periodic re-snapshot check). */
+    public int getCommitsSinceSnapshot(ChunkPos chunkPos) {
+        List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
+        if (chunkCommits.isEmpty()) return 0;
+        long headId = getChunkHeadId(chunkPos);
+        Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
+        return TemporalCommit.ancestryChain(chunkCommits, localParents, headId).size();
+    }
 
     // -------------------------------------------------------------------------
     // World application

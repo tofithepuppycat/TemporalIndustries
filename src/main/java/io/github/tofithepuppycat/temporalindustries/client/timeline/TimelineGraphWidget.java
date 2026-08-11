@@ -483,10 +483,10 @@ public final class TimelineGraphWidget {
                 Component.literal("Commit: " + commit.getShortHash()),
                 Component.literal("Recorded: " + formatGameDayTime(commit.getGameTime()))
         ));
-        if (commit.getType() == TemporalCommit.Type.BRANCH) {
-            tooltip.add(Component.literal("Branch point"));
-        } else {
-            tooltip.add(Component.literal("Changes: " + commit.getTotalChangeCount()));
+        switch (commit.getType()) {
+            case BRANCH -> tooltip.add(Component.literal("Branch point"));
+            case SNAPSHOT -> tooltip.add(Component.literal("Full snapshot"));
+            case DELTA -> tooltip.add(Component.literal("Changes: " + commit.getTotalChangeCount()));
         }
         OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.getId());
         if (jumpCost.isPresent()) {

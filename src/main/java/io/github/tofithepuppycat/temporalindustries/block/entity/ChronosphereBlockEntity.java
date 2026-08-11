@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
@@ -134,16 +135,30 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     public void onLoad() {
         super.onLoad();
 
-        if (level != null && !level.isClientSide) {
-            MinecraftServer server = level.getServer();
+        if (level instanceof ServerLevel serverLevel) {
+            MinecraftServer server = serverLevel.getServer();
             if (server != null) {
                 TemporalWorldData worldData = TemporalWorldData.get(server);
+                TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+
                 worldData.trackChunk(getHomeChunkPos());
+                ensureSnapshotted(worldData, timeline, serverLevel, getHomeChunkPos());
                 for (long key : additionalChunks) {
-                    worldData.trackChunk(new ChunkPos(key));
+                    ChunkPos chunk = new ChunkPos(key);
+                    worldData.trackChunk(chunk);
+                    ensureSnapshotted(worldData, timeline, serverLevel, chunk);
                 }
             }
         }
+    }
+
+    /** A chunk with no commits yet (freshly claimed, or claimed-but-never-touched across a
+     * restart) gets a full baseline instead of waiting for its first delta — see ChunkSnapshot's
+     * class doc for why ancestryChain needs one of these to exist. */
+    private static void ensureSnapshotted(TemporalWorldData worldData, TemporalTimeline timeline, ServerLevel serverLevel, ChunkPos chunkPos) {
+        if (!timeline.getCommitsForChunk(chunkPos).isEmpty()) return;
+        timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
+        worldData.setDirty();
     }
 
     @Override
@@ -171,6 +186,28 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (be.selectedGameTime < be.placedGameTime || be.selectedGameTime > now) {
             be.selectedGameTime = Math.max(be.placedGameTime, Math.min(now, be.selectedGameTime));
             be.setChanged();
+        }
+
+        if (level instanceof ServerLevel serverLevel && now % SNAPSHOT_CHECK_INTERVAL_TICKS == 0) {
+            be.maybeResnapshot(serverLevel);
+        }
+    }
+
+    /** Trades a bounded once-a-minute-per-chunk full read for keeping every other history walk
+     * across all claimed chunks cheap for the rest of that minute — see ChunkSnapshot's class doc. */
+    private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
+    private static final int SNAPSHOT_COMMIT_THRESHOLD = 50;
+
+    private void maybeResnapshot(ServerLevel serverLevel) {
+        MinecraftServer server = serverLevel.getServer();
+        if (server == null) return;
+
+        TemporalWorldData worldData = TemporalWorldData.get(server);
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(serverLevel.dimension().location());
+        for (ChunkPos chunkPos : getAllChunks()) {
+            if (timeline.getCommitsSinceSnapshot(chunkPos) < SNAPSHOT_COMMIT_THRESHOLD) continue;
+            timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
+            worldData.setDirty();
         }
     }
 
@@ -211,7 +248,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     public ToggleResult toggleChunk(ChunkPos pos, boolean add) {
-        if (level == null || level.isClientSide || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
 
         ChunkPos home = getHomeChunkPos();
         if (pos.equals(home)) return ToggleResult.IS_HOME;
@@ -227,6 +264,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
             worldData.trackChunk(pos);
             additionalChunks.add(key);
+            ensureSnapshotted(worldData, worldData.getOrCreateTimeline(level.dimension().location()), serverLevel, pos);
             setChanged();
             return ToggleResult.ADDED;
         } else {
