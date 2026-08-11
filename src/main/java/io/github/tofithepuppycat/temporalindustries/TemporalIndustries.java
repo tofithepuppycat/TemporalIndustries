@@ -36,6 +36,7 @@ public class TemporalIndustries
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onBlockBreak);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onRightClickBlock);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onEntityPlace);
+        NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onLivingDamage);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onContainerOpen);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onContainerClose);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onPlayerLoggedOut);

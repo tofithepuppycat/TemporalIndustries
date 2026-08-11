@@ -148,9 +148,9 @@ public class ChronoRecorderItem extends Item {
     }
 
     private static final DustParticleOptions START_MARKER_PARTICLE =
-            new DustParticleOptions(new Vector3f(0.45F, 0.85F, 1.0F), 1.3F);
+            new DustParticleOptions(new Vector3f(0.6F, 0.1F, 0.95F), 1.3F);
 
-    /** Hovers a small marker of particles above wherever the current recording started, for as long
+    /** Marks wherever the current recording started with particles at ground level, for as long
      * as it's actively being recorded — a visual reminder of where to return to so the loop closes
      * cleanly, in the same dimension it was recorded in. */
     private void spawnStartMarker(CompoundTag data, ServerLevel serverLevel) {
@@ -160,9 +160,9 @@ public class ChronoRecorderItem extends Item {
         if (dimension == null || !dimension.equals(serverLevel.dimension().location())) return;
 
         double x = data.getDouble("StartX");
-        double y = data.getDouble("StartY") + 1.2 + 0.15 * Math.sin(serverLevel.getGameTime() / 10.0);
+        double y = data.getDouble("StartY") + 0.1 + 0.05 * Math.sin(serverLevel.getGameTime() / 10.0);
         double z = data.getDouble("StartZ");
-        serverLevel.sendParticles(START_MARKER_PARTICLE, x, y, z, 2, 0.15, 0.15, 0.15, 0.0);
+        serverLevel.sendParticles(START_MARKER_PARTICLE, x, y, z, 8, 0.25, 0.1, 0.25, 0.0);
     }
 
     @Override

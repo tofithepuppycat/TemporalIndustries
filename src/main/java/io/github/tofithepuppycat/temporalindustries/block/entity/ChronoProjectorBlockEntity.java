@@ -17,6 +17,10 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.Containers;
+import io.github.tofithepuppycat.temporalindustries.device.ModDamageTypes;
+import net.minecraft.world.damagesource.DamageSource;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -25,6 +29,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.phys.AABB;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -204,6 +209,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
                 case MODIFY -> executeModify(level, pos, action.blockState(), action.blockEntity());
                 case INSERT -> executeInsert(level, pos, action.item(), action.count());
                 case EXTRACT -> executeExtract(level, pos, action.item(), action.count());
+                case ATTACK -> executeAttack(level, pos, action.targetEntityType(), action.damage());
             }
         }
     }
@@ -320,6 +326,30 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
                 Containers.dropItemStack(level, pos.getX(), pos.getY(), pos.getZ(), leftover);
             }
         }
+    }
+
+    /** Reproduces a recorded melee hit by directly reapplying its final recorded damage, rather than
+     * tracking the original target's identity — it may no longer exist, or be a different instance,
+     * by the time the loop replays. Instead this looks for the nearest living entity of the recorded
+     * type near the recorded position, same as PLACE/MODIFY re-anchor to a position rather than an
+     * object. Uses a damage type that bypasses armor since the recorded amount is already the final
+     * post-reduction damage — applying armor again would double it up. Silently does nothing if no
+     * matching entity is nearby, per the same "missing target just skips this cycle" design as
+     * executeInsert/executeExtract. */
+    private void executeAttack(ServerLevel level, BlockPos pos, @Nullable ResourceLocation targetEntityTypeId, float damage) {
+        if (targetEntityTypeId == null || damage <= 0F) return;
+
+        EntityType<?> targetType = BuiltInRegistries.ENTITY_TYPE.get(targetEntityTypeId);
+        LivingEntity target = level.getEntitiesOfClass(LivingEntity.class, new AABB(pos).inflate(1.5),
+                        e -> !(e instanceof Player) && e.getType() == targetType)
+                .stream()
+                .min((a, b) -> Double.compare(a.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5),
+                        b.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)))
+                .orElse(null);
+        if (target == null) return;
+
+        DamageSource source = level.damageSources().source(ModDamageTypes.CHRONO_ECHO);
+        target.hurt(source, damage);
     }
 
     /** Removes up to `max` of `item` from the internal inventory, returning how many were actually
