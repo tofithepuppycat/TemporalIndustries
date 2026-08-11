@@ -2,8 +2,10 @@ package io.github.tofithepuppycat.temporalindustries;
 
 import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID;
 import io.github.tofithepuppycat.temporalindustries.block.ChronoProjector;
+import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.TimeMachine;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRecorderItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
@@ -54,11 +56,20 @@ public class Registration {
     public static final DeferredItem<Item> CHRONO_RECORDER_ITEM = ITEMS.register("chrono_recorder",
             () -> new ChronoRecorderItem(new Item.Properties().stacksTo(1)));
 
+    public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
+            () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> CHRONODIAL_ITEM = ITEMS.register("chronodial",
+            () -> new BlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TimeMachineBlockEntity>> TIME_MACHINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("time_machine",
             () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronoProjectorBlockEntity>> CHRONO_PROJECTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("chrono_projector",
             () -> BlockEntityType.Builder.of(ChronoProjectorBlockEntity::new, CHRONO_PROJECTOR_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronodialBlockEntity>> CHRONODIAL_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronodial",
+            () -> BlockEntityType.Builder.of(ChronodialBlockEntity::new, CHRONODIAL_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<TimeMachineMenu>> TIME_MACHINE_MENU = MENUS.register("time_machine",
             () -> IMenuTypeExtension.create(TimeMachineMenu::new));
@@ -80,6 +91,7 @@ public class Registration {
         }
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(CHRONO_PROJECTOR_ITEM);
+            event.accept(CHRONODIAL_ITEM);
         }
     }
 
@@ -90,6 +102,8 @@ public class Registration {
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CHRONO_PROJECTOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONODIAL_BLOCK_ENTITY.get(),
+                (be, side) -> be.getEnergyStorage());
     }
 
 }
