@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -31,8 +32,11 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -44,7 +48,7 @@ import java.util.Set;
  * (unlike the Time Machine, which is one energy pool per chunk).
  */
 @SuppressWarnings("null")
-public class ChronosphereBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
+public class ChronosphereBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider, TimelineViewProvider {
     /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. a 5x5 box. */
     public static final int MAX_RADIUS = 2;
     /** Home chunk plus up to this many additional chunks = 25 chunks, a full 5x5 box. */
@@ -309,9 +313,57 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     // -------------------------------------------------------------------------
+    // TimelineViewProvider — the home chunk's own commit graph is what's displayed, but jump()
+    // above still moves every claimed chunk together, and getChunkJumpCosts() below prices each
+    // node by the total cost across the whole claim, not just the home chunk's share of it.
+
+    @Override
+    public List<TemporalCommit> getChunkCommits() {
+        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return Collections.emptyList();
+        return timeline.getCommitsForChunk(getHomeChunkPos());
+    }
+
+    @Override
+    public Map<Long, Long> getChunkLocalParents() {
+        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return Collections.emptyMap();
+        return timeline.getLocalParentsForChunk(getHomeChunkPos());
+    }
+
+    @Override
+    public long getChunkHeadId() {
+        if (level == null || level.isClientSide || level.getServer() == null) return -1L;
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return -1L;
+        return timeline.getChunkHeadId(getHomeChunkPos());
+    }
+
+    @Override
+    public long getSelectedCommitId() {
+        return TemporalCommit.resolveNearest(getChunkCommits(), selectedGameTime);
+    }
+
+    @Override
+    public Map<Long, Long> getChunkJumpCosts() {
+        Map<Long, Long> costs = new HashMap<>();
+        for (TemporalCommit commit : getChunkCommits()) {
+            costs.put(commit.getId(), computeTotalJumpCost(commit.getGameTime()));
+        }
+        return costs;
+    }
+
+    // -------------------------------------------------------------------------
     // Accessors for menus / packets
 
+    @Override
     public long getPlacedGameTime()   { return placedGameTime; }
+    @Override
     public long getSelectedGameTime() { return selectedGameTime; }
 
     // -------------------------------------------------------------------------

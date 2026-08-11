@@ -30,7 +30,10 @@
 	"block.temporalindustries.chronodial.insufficient_energy": "Not enough energy to jump",
 	"block.temporalindustries.chronosphere": "Chronosphere",
 	"container.temporalindustries.chronosphere": "Chronosphere",
-	"block.temporalindustries.chronosphere.out_of_bounds": "That chunk is outside the 5x5 range",
+	"block.temporalindustries.chronosphere.out_of_bounds": "That chunk is outside the claimable range",
 	"block.temporalindustries.chronosphere.already_tracked": "That chunk is already claimed by another machine",
-	"block.temporalindustries.chronosphere.limit_reached": "This Chronosphere has claimed the maximum of 25 chunks"
+	"block.temporalindustries.chronosphere.limit_reached": "This Chronosphere has claimed the maximum number of chunks",
+	"gui.temporalindustries.chronosphere.map_title": "Claim Chunks",
+	"gui.temporalindustries.chronosphere.map_hint": "Click a chunk to claim or release it",
+	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map"
 }

@@ -80,10 +80,8 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
             }
         }
 
-        long totalCost = machine.computeTotalJumpCost(machine.getSelectedGameTime());
-
         PacketDistributor.sendToPlayer(sender, new ChronosphereStateSyncPacket(
-                machinePos, new ArrayList<>(selected), blocked, totalCost));
+                machinePos, new ArrayList<>(selected), blocked));
     }
 
     @Override

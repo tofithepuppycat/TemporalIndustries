@@ -14,8 +14,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Server -> client: a Chronosphere's current claimed/blocked chunk sets plus the jump-cost preview
- * for its currently persisted selected time, for {@link ChronosphereClientState}. */
+/** Server -> client: a Chronosphere's current claimed/blocked chunk sets, for
+ * {@link ChronosphereClientState}. Jump-cost preview is handled separately by the reused
+ * Time Machine timeline packets (see TimelinePreviewSyncPacket), since the graph already shows a
+ * cost per node. */
 public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     public static final Type<ChronosphereStateSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_state_sync"));
@@ -26,14 +28,12 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final BlockPos machinePos;
     private final List<Long> selectedChunkKeys;
     private final List<Long> blockedChunkKeys;
-    private final long totalJumpCost;
 
     public ChronosphereStateSyncPacket(BlockPos machinePos, List<Long> selectedChunkKeys,
-                                       List<Long> blockedChunkKeys, long totalJumpCost) {
+                                       List<Long> blockedChunkKeys) {
         this.machinePos = machinePos;
         this.selectedChunkKeys = selectedChunkKeys;
         this.blockedChunkKeys = blockedChunkKeys;
-        this.totalJumpCost = totalJumpCost;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereStateSyncPacket packet) {
@@ -42,7 +42,6 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         for (long key : packet.selectedChunkKeys) buf.writeLong(key);
         buf.writeVarInt(packet.blockedChunkKeys.size());
         for (long key : packet.blockedChunkKeys) buf.writeLong(key);
-        buf.writeVarLong(packet.totalJumpCost);
     }
 
     public static ChronosphereStateSyncPacket decode(RegistryFriendlyByteBuf buf) {
@@ -53,15 +52,14 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         int blockedCount = buf.readVarInt();
         List<Long> blocked = new ArrayList<>(blockedCount);
         for (int i = 0; i < blockedCount; i++) blocked.add(buf.readLong());
-        long totalJumpCost = buf.readVarLong();
-        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, totalJumpCost);
+        return new ChronosphereStateSyncPacket(machinePos, selected, blocked);
     }
 
     public static void handle(ChronosphereStateSyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             Set<Long> selected = new HashSet<>(packet.selectedChunkKeys);
             Set<Long> blocked = new HashSet<>(packet.blockedChunkKeys);
-            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked, packet.totalJumpCost);
+            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked);
         });
     }
 

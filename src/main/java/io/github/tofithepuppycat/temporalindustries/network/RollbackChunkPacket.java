@@ -1,18 +1,16 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: jump a Time Machine's chunk to targetGameTime. */
+/** Client -> server: jump a timeline-view machine (Time Machine or Chronosphere) to targetGameTime. */
 public class RollbackChunkPacket implements CustomPacketPayload {
     public static final Type<RollbackChunkPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "rollback_chunk"));
@@ -43,10 +41,9 @@ public class RollbackChunkPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof TimeMachineMenu)) {
+            if (!(sender.containerMenu instanceof TimelineViewMenu menu)) {
                 return;
             }
-            TimeMachineMenu menu = (TimeMachineMenu) sender.containerMenu;
 
             if (!menu.getBlockPos().equals(packet.machinePos)) {
                 return;
@@ -56,11 +53,7 @@ public class RollbackChunkPacket implements CustomPacketPayload {
                 return;
             }
 
-            BlockEntity blockEntity = sender.level().getBlockEntity(packet.machinePos);
-            if (blockEntity instanceof TimeMachineBlockEntity) {
-                TimeMachineBlockEntity timeMachineBlockEntity = (TimeMachineBlockEntity) blockEntity;
-                timeMachineBlockEntity.jump(packet.targetGameTime);
-            }
+            menu.getTimelineProvider().jump(packet.targetGameTime);
         });
     }
 
