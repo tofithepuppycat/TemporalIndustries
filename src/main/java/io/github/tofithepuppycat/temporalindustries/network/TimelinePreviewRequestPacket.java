@@ -1,15 +1,14 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
+import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -44,11 +43,10 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof TimeMachineMenu menu)) return;
+            if (!(sender.containerMenu instanceof TimelineViewMenu menu)) return;
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
 
-            BlockEntity be = sender.level().getBlockEntity(packet.machinePos);
-            if (!(be instanceof TimeMachineBlockEntity machine)) return;
+            TimelineViewProvider machine = menu.getTimelineProvider();
 
             // The chunk's head id changes whenever any commit relevant to it is created (see
             // TemporalTimeline#indexChunkTouch), so it's a cheap fingerprint for "has this

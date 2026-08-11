@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -17,7 +18,7 @@ import org.jetbrains.annotations.NotNull;
  * the client via {@link ContainerData}. Chunk-set state is synced separately (see
  * ChronosphereStateSyncPacket) since it's a variable-size set rather than a fixed set of ints. */
 @SuppressWarnings("null")
-public class ChronosphereMenu extends AbstractContainerMenu {
+public class ChronosphereMenu extends AbstractContainerMenu implements TimelineViewMenu {
     private final ChronosphereBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
@@ -88,7 +89,13 @@ public class ChronosphereMenu extends AbstractContainerMenu {
         return blockEntity;
     }
 
+    @Override
     public BlockPos getBlockPos() {
         return blockPos;
+    }
+
+    @Override
+    public TimelineViewProvider getTimelineProvider() {
+        return blockEntity;
     }
 }

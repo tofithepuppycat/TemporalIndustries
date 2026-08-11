@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -16,7 +17,7 @@ import org.jetbrains.annotations.NotNull;
 /** Container menu for the Time Machine GUI; exposes the block entity's energy/time state to
  * the client via {@link ContainerData}. */
 @SuppressWarnings("null")
-public class TimeMachineMenu extends AbstractContainerMenu {
+public class TimeMachineMenu extends AbstractContainerMenu implements TimelineViewMenu {
     private final TimeMachineBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
@@ -87,7 +88,13 @@ public class TimeMachineMenu extends AbstractContainerMenu {
         return blockEntity;
     }
 
+    @Override
     public BlockPos getBlockPos() {
         return blockPos;
+    }
+
+    @Override
+    public TimelineViewProvider getTimelineProvider() {
+        return blockEntity;
     }
 }

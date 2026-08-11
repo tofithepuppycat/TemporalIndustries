@@ -35,16 +35,6 @@ public class NetworkHandler {
                 ChronosphereToggleChunkPacket::handle);
 
         registrar.playToServer(
-                UpdateChronosphereTimePacket.TYPE,
-                UpdateChronosphereTimePacket.STREAM_CODEC,
-                UpdateChronosphereTimePacket::handle);
-
-        registrar.playToServer(
-                ChronosphereJumpPacket.TYPE,
-                ChronosphereJumpPacket.STREAM_CODEC,
-                ChronosphereJumpPacket::handle);
-
-        registrar.playToServer(
                 ChronosphereStateRequestPacket.TYPE,
                 ChronosphereStateRequestPacket.STREAM_CODEC,
                 ChronosphereStateRequestPacket::handle);

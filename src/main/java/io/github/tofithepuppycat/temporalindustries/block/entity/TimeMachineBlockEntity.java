@@ -37,7 +37,7 @@ import java.util.Objects;
 /** Block entity for the Time Machine: holds per-machine energy/time state and reads/writes
  * the shared {@link TemporalTimeline} for its chunk. */
 @SuppressWarnings("null")
-public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider {
+public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider, TimelineViewProvider {
     private static final int ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000;
     private static final long UNSET_TIME = -1L;
