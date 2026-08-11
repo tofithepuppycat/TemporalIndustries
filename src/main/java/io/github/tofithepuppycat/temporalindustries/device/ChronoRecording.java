@@ -41,8 +41,13 @@ public final class ChronoRecording {
      * shovel-pathing, honeycomb-waxing, applying a Create casing to a shaft, and anything similar
      * from any mod. Detected generically as a before/after blockstate diff (see ChronoActionRecorder)
      * rather than special-cased per interaction, so it isn't limited to vanilla tool abilities.
+     * <p>
+     * ATTACK covers the player melee-damaging a living, non-player entity. The exact final damage
+     * dealt (post armor/enchantments/criticals) is recorded and reapplied directly on replay rather
+     * than recomputed, matching how PLACE/MODIFY reapply their recorded end state instead of
+     * recomputing it.
      */
-    public enum ActionType { BREAK, PLACE, INSERT, EXTRACT, MODIFY }
+    public enum ActionType { BREAK, PLACE, INSERT, EXTRACT, MODIFY, ATTACK }
 
     /**
      * {@code item} is the block placed (PLACE) or the item transferred (INSERT/EXTRACT); the item
@@ -53,10 +58,15 @@ public final class ChronoRecording {
      * modded blocks (machines, pipes, ...) reproduce faithfully rather than just "some instance of
      * this block". {@code tool} (BREAK only) is the item the player was holding when they broke the
      * block, replayed as a phantom tool purely so the drop calculation respects "requires correct
-     * tool" blocks — it's never pulled from the projector's inventory.
+     * tool" blocks — it's never pulled from the projector's inventory. {@code targetEntityType} and
+     * {@code damage} (ATTACK only) are the entity type attacked and the exact final damage dealt to
+     * it; replay looks for the nearest living entity of that type near the recorded position rather
+     * than tracking the original entity's identity, since it may not even be the same instance by
+     * the time the loop replays.
      */
     public record Action(int dx, int dy, int dz, ActionType type, @Nullable ResourceLocation item, int count,
-                          @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity, @Nullable ResourceLocation tool) {}
+                          @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity, @Nullable ResourceLocation tool,
+                          @Nullable ResourceLocation targetEntityType, float damage) {}
 
     private final UUID ownerId;
     private final String ownerName;
@@ -166,8 +176,10 @@ public final class ChronoRecording {
             CompoundTag blockState = a.contains("BlockState") ? a.getCompound("BlockState") : null;
             CompoundTag blockEntity = a.contains("BlockEntity") ? a.getCompound("BlockEntity") : null;
             ResourceLocation tool = a.contains("Tool") ? ResourceLocation.tryParse(a.getString("Tool")) : null;
+            ResourceLocation targetEntityType = a.contains("TargetType") ? ResourceLocation.tryParse(a.getString("TargetType")) : null;
+            float damage = a.getFloat("Damage");
             Action action = new Action(a.getInt("DX"), a.getInt("DY"), a.getInt("DZ"), type, item, count,
-                    blockState, blockEntity, tool);
+                    blockState, blockEntity, tool, targetEntityType, damage);
             actionsByTick.computeIfAbsent(tick, k -> new ArrayList<>()).add(action);
         }
 
