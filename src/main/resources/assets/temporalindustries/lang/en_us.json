@@ -22,5 +22,10 @@
 	"item.temporalindustries.chrono_recorder.limit_reached": "Recording length limit reached - saved automatically",
 	"item.temporalindustries.chrono_recorder.tooltip": "Right-click to start recording your movements.",
 	"item.temporalindustries.chrono_recorder.tooltip_recording": "Recording... (%s s) - right-click to stop",
-	"item.temporalindustries.chrono_recorder.tooltip_saved": "Recording saved (%s s) - insert into a Chrono Loop Projector"
+	"item.temporalindustries.chrono_recorder.tooltip_saved": "Recording saved (%s s) - insert into a Chrono Loop Projector",
+	"block.temporalindustries.chronodial": "Chronodial",
+	"block.temporalindustries.chronodial.marker_set": "Marker set",
+	"block.temporalindustries.chronodial.already_at_marker": "Already at the marker",
+	"block.temporalindustries.chronodial.no_marker": "No marker set - sneak and right-click to set one",
+	"block.temporalindustries.chronodial.insufficient_energy": "Not enough energy to jump"
 }

@@ -1,0 +1,30 @@
+{
+  "variants": {
+    "facing=down": {
+      "model": "temporalindustries:block/chronodial",
+      "x": 180
+    },
+    "facing=up": {
+      "model": "temporalindustries:block/chronodial"
+    },
+    "facing=north": {
+      "model": "temporalindustries:block/chronodial",
+      "x": 90
+    },
+    "facing=south": {
+      "model": "temporalindustries:block/chronodial",
+      "x": 90,
+      "y": 180
+    },
+    "facing=west": {
+      "model": "temporalindustries:block/chronodial",
+      "x": 90,
+      "y": 270
+    },
+    "facing=east": {
+      "model": "temporalindustries:block/chronodial",
+      "x": 90,
+      "y": 90
+    }
+  }
+}
