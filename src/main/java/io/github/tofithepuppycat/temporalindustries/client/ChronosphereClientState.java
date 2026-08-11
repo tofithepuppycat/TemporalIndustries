@@ -21,10 +21,16 @@ public final class ChronosphereClientState {
 
     public static void clearActiveMachine(BlockPos machinePos) {
         if (activeMachinePos != null && activeMachinePos.equals(machinePos)) {
-            activeMachinePos = null;
-            selectedChunks = new HashSet<>();
-            blockedChunks = new HashSet<>();
+            clearAll();
         }
+    }
+
+    /** Unconditionally drops all client-side state — see {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager#clearAll()}
+     * for why this needs to happen on world/server disconnect rather than only per-machine. */
+    public static void clearAll() {
+        activeMachinePos = null;
+        selectedChunks = new HashSet<>();
+        blockedChunks = new HashSet<>();
     }
 
     public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked) {

@@ -62,13 +62,22 @@ public final class TimelineProjectionManager {
 
     public static void clearActiveMachine(BlockPos machinePos) {
         if (activeMachinePos != null && activeMachinePos.equals(machinePos)) {
-            activeMachinePos = null;
-            commits = new ArrayList<>();
-            localParents = new HashMap<>();
-            headCommitId = -1L;
-            selectedCommitId = -1L;
-            jumpCosts = new HashMap<>();
+            clearAll();
         }
+    }
+
+    /** Unconditionally drops all client-side state, regardless of which machine (if any) is
+     * active. Used when the BlockPos itself stops being meaningful — e.g. leaving a world/server,
+     * where a stale activeMachinePos would otherwise keep matching the same coordinates in
+     * whatever world is joined next and project a ghost preview from data that no longer applies. */
+    public static void clearAll() {
+        activeMachinePos = null;
+        commits = new ArrayList<>();
+        localParents = new HashMap<>();
+        headCommitId = -1L;
+        selectedCommitId = -1L;
+        jumpCosts = new HashMap<>();
+        showChangesEnabled = false;
     }
 
     public static boolean hasSelection() {
