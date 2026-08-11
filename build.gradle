@@ -120,6 +120,10 @@ dependencies {
     // so it's localRuntime rather than implementation -- no dependency is published on it.
     localRuntime "mekanism:Mekanism:${mekanism_version}"
 
+    testImplementation platform('org.junit:junit-bom:5.10.2')
+    testImplementation 'org.junit.jupiter:junit-jupiter'
+    testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
@@ -172,6 +176,20 @@ publishing {
             url "file://${project.projectDir}/repo"
         }
     }
+}
+
+tasks.named('test') {
+    useJUnitPlatform()
+}
+
+// Benchmarks the chunk history storage strategies and writes CSVs to build/benchmark;
+// benchmarks/plot_results.py turns them into figures.
+tasks.register('storageBenchmark', JavaExec) {
+    group = 'verification'
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'io.github.tofithepuppycat.temporalindustries.storage.bench.StorageBenchmark'
+    maxHeapSize = '4g'
+    args layout.buildDirectory.dir('benchmark').get().asFile.absolutePath
 }
 
 tasks.withType(JavaCompile).configureEach {
