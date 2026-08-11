@@ -10,12 +10,15 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.event.entity.living.LivingDamageEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerContainerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -163,6 +166,30 @@ public final class ChronoActionRecorder {
                 player.level().getGameTime(), blockStateTag, blockEntityTag, null);
     }
 
+    /**
+     * Records the player melee-damaging a living entity, keyed off the final post-reduction damage
+     * (armor, enchantments, criticals all already applied) rather than the raw hit, so replay can
+     * just reapply that same number instead of recreating the whole combat calculation — see
+     * {@link ChronoRecording.ActionType#ATTACK}.
+     * <p>
+     * Only direct melee hits count ({@code getDirectEntity() == player}); projectiles and other
+     * indirect damage aren't attributed to an "attack" here. Players are excluded as targets so a
+     * replaying loop can never be used to automate PvP against someone who wasn't there when it was
+     * recorded.
+     */
+    public static void onLivingDamage(LivingDamageEvent.Post event) {
+        if (!(event.getSource().getDirectEntity() instanceof ServerPlayer player)) return;
+        LivingEntity target = event.getEntity();
+        if (target instanceof Player || event.getNewDamage() <= 0F) return;
+
+        ItemStack weapon = player.getMainHandItem();
+        ResourceLocation weaponId = weapon.isEmpty() ? null : BuiltInRegistries.ITEM.getKey(weapon.getItem());
+        ResourceLocation targetType = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
+
+        recordAction(player, target.blockPosition(), ChronoRecording.ActionType.ATTACK, null, 1,
+                player.level().getGameTime(), null, null, weaponId, targetType, event.getNewDamage());
+    }
+
     public static void onContainerOpen(PlayerContainerEvent.Open event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
 
@@ -223,6 +250,14 @@ public final class ChronoActionRecorder {
                                       @Nullable ResourceLocation item, int count, long gameTime,
                                       @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity,
                                       @Nullable ResourceLocation tool) {
+        recordAction(player, pos, type, item, count, gameTime, blockState, blockEntity, tool, null, 0F);
+    }
+
+    private static void recordAction(ServerPlayer player, BlockPos pos, ChronoRecording.ActionType type,
+                                      @Nullable ResourceLocation item, int count, long gameTime,
+                                      @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity,
+                                      @Nullable ResourceLocation tool, @Nullable ResourceLocation targetEntityType,
+                                      float damage) {
         ItemStack recorder = findRecordingRecorder(player);
         if (recorder == null) return;
 
@@ -246,6 +281,8 @@ public final class ChronoActionRecorder {
         if (blockState != null) action.put("BlockState", blockState);
         if (blockEntity != null) action.put("BlockEntity", blockEntity);
         if (tool != null) action.putString("Tool", tool.toString());
+        if (targetEntityType != null) action.putString("TargetType", targetEntityType.toString());
+        if (damage != 0F) action.putFloat("Damage", damage);
 
         ListTag actions = data.getList("Actions", Tag.TAG_COMPOUND);
         actions.add(action);
