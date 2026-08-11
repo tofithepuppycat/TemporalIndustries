@@ -27,5 +27,7 @@
 	"block.temporalindustries.chronodial.marker_set": "Marker set",
 	"block.temporalindustries.chronodial.already_at_marker": "Already at the marker",
 	"block.temporalindustries.chronodial.no_marker": "No marker set - sneak and right-click to set one",
-	"block.temporalindustries.chronodial.insufficient_energy": "Not enough energy to jump"
+	"block.temporalindustries.chronodial.insufficient_energy": "Not enough energy to jump",
+	"block.temporalindustries.chronosphere": "Chronosphere",
+	"container.temporalindustries.chronosphere": "Chronosphere"
 }
