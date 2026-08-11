@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 
 import java.util.List;
@@ -30,6 +31,12 @@ public interface TimelineViewProvider {
      * to the displayed chunk. For a Chronosphere this is the total cost across every claimed
      * chunk, not just the displayed one. */
     Map<Long, Long> getChunkJumpCosts();
+
+    /** One commit-graph snapshot per chunk that should show the in-world ghost preview when
+     * "Show Changes" is on — for a Time Machine just its own chunk (the same data as
+     * getChunkCommits() etc., wrapped with its ChunkPos); for a Chronosphere, every chunk
+     * currently claimed, since jump() moves all of them together. */
+    List<ChunkTimelineSnapshot> getPreviewChunkSnapshots();
 
     long getPlacedGameTime();
     long getSelectedGameTime();

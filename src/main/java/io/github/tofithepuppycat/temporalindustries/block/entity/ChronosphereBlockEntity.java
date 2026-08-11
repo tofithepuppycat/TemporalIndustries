@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
@@ -349,13 +350,46 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         return TemporalCommit.resolveNearest(getChunkCommits(), selectedGameTime);
     }
 
+    /**
+     * Total cost is only priced for the currently selected node, not every node in the graph.
+     * computeTotalJumpCost() walks every claimed chunk's own ancestry chain, so pricing it for
+     * each of the home chunk's H commits costs O(H x claimedChunks x avgChunkHistory) — with 13
+     * chunks claimed and history that only ever grows over a session, that quadratic blowup was
+     * enough to stall the server tick on every 20-tick GUI poll. One commit's worth of that same
+     * O(claimedChunks x avgChunkHistory) work, computed only on an actual selection change, costs
+     * the same as a real jump — which nobody has needed to bound. Un-selected nodes simply render
+     * without a jump-cost line (see TimelineGraphWidget's tooltip).
+     */
     @Override
     public Map<Long, Long> getChunkJumpCosts() {
-        Map<Long, Long> costs = new HashMap<>();
+        long selectedId = getSelectedCommitId();
+        if (selectedId == -1L) return Collections.emptyMap();
+
         for (TemporalCommit commit : getChunkCommits()) {
-            costs.put(commit.getId(), computeTotalJumpCost(commit.getGameTime()));
+            if (commit.getId() == selectedId) {
+                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime()));
+            }
         }
-        return costs;
+        return Collections.emptyMap();
+    }
+
+    /** One snapshot per claimed chunk (not just the home chunk getChunkCommits() shows), so the
+     * in-world ghost preview covers everything a jump would actually touch. */
+    @Override
+    public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
+        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return Collections.emptyList();
+
+        List<ChunkTimelineSnapshot> snapshots = new ArrayList<>();
+        for (ChunkPos chunk : getAllChunks()) {
+            snapshots.add(new ChunkTimelineSnapshot(chunk,
+                    timeline.getCommitsForChunk(chunk),
+                    timeline.getLocalParentsForChunk(chunk),
+                    timeline.getChunkHeadId(chunk)));
+        }
+        return snapshots;
     }
 
     // -------------------------------------------------------------------------
