@@ -28,5 +28,30 @@ public class NetworkHandler {
                 AnchorStatusPacket.TYPE,
                 AnchorStatusPacket.STREAM_CODEC,
                 AnchorStatusPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereToggleChunkPacket.TYPE,
+                ChronosphereToggleChunkPacket.STREAM_CODEC,
+                ChronosphereToggleChunkPacket::handle);
+
+        registrar.playToServer(
+                UpdateChronosphereTimePacket.TYPE,
+                UpdateChronosphereTimePacket.STREAM_CODEC,
+                UpdateChronosphereTimePacket::handle);
+
+        registrar.playToServer(
+                ChronosphereJumpPacket.TYPE,
+                ChronosphereJumpPacket.STREAM_CODEC,
+                ChronosphereJumpPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereStateRequestPacket.TYPE,
+                ChronosphereStateRequestPacket.STREAM_CODEC,
+                ChronosphereStateRequestPacket::handle);
+
+        registrar.playToClient(
+                ChronosphereStateSyncPacket.TYPE,
+                ChronosphereStateSyncPacket.STREAM_CODEC,
+                ChronosphereStateSyncPacket::handle);
     }
 }
