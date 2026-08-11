@@ -71,6 +71,7 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
         int radius = ChronosphereBlockEntity.MAX_RADIUS;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
+                if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue;
                 ChunkPos pos = new ChunkPos(home.x + dx, home.z + dz);
                 long key = pos.toLong();
                 if (!selected.contains(key) && worldData.isTracked(pos)) {

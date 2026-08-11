@@ -178,7 +178,15 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
     public boolean isWithinBounds(ChunkPos pos) {
         ChunkPos home = getHomeChunkPos();
-        return Math.abs(pos.x - home.x) <= MAX_RADIUS && Math.abs(pos.z - home.z) <= MAX_RADIUS;
+        return isWithinRadius(pos.x - home.x, pos.z - home.z);
+    }
+
+    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable circle —
+     * shared with {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}
+     * and {@link io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket}
+     * so the map's drawn shape, click hit-testing, and the server's actual rule always agree. */
+    public static boolean isWithinRadius(int dx, int dz) {
+        return dx * dx + dz * dz <= MAX_RADIUS * MAX_RADIUS;
     }
 
     /** Every chunk this machine currently controls, home chunk first. */

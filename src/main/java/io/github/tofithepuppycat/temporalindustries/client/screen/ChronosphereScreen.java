@@ -17,20 +17,24 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** GUI for the Chronosphere block: a 5x5 map of chunks around it to claim/release, plus a shared
- * time scrubber and Jump button that moves every claimed chunk together, paid from one energy pool. */
+/** GUI for the Chronosphere block: a circular map of chunks around it to claim/release, plus a
+ * shared time scrubber and Jump button that moves every claimed chunk together, paid from one
+ * energy pool. The map is laid out on a square grid, but only cells within
+ * {@link ChronosphereBlockEntity#isWithinRadius} are drawn or clickable, giving it a round shape. */
 @SuppressWarnings("null")
 public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu> {
     private static final int RADIUS = ChronosphereBlockEntity.MAX_RADIUS;
     private static final int GRID_SIZE = RADIUS * 2 + 1;
-    private static final int CELL_SIZE = 20;
-    private static final int CELL_GAP = 2;
+    private static final int CELL_SIZE = 32;
+    private static final int CELL_GAP = 3;
     private static final int GRID_PIXELS = GRID_SIZE * CELL_SIZE + (GRID_SIZE - 1) * CELL_GAP;
+    /** How many of the GRID_SIZE x GRID_SIZE cells actually fall within the circle. */
+    private static final int TOTAL_CLAIMABLE = countClaimableCells();
 
-    private static final int ENERGY_BAR_WIDTH = 160;
-    private static final int ENERGY_BAR_HEIGHT = 8;
-    private static final int SCRUBBER_WIDTH = 176;
-    private static final int SCRUBBER_HEIGHT = 10;
+    private static final int ENERGY_BAR_WIDTH = 220;
+    private static final int ENERGY_BAR_HEIGHT = 12;
+    private static final int SCRUBBER_WIDTH = 240;
+    private static final int SCRUBBER_HEIGHT = 14;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
@@ -51,12 +55,23 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int energyBarY;
     private int scrubberX;
     private int scrubberY;
+    private int labelStartY;
 
     public ChronosphereScreen(ChronosphereMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        imageWidth = 200;
-        imageHeight = 246;
+        imageWidth = 268;
+        imageHeight = 396;
         inventoryLabelY = imageHeight + 100; // Push off-screen to hide inventory
+    }
+
+    private static int countClaimableCells() {
+        int count = 0;
+        for (int dx = -RADIUS; dx <= RADIUS; dx++) {
+            for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+                if (ChronosphereBlockEntity.isWithinRadius(dx, dz)) count++;
+            }
+        }
+        return count;
     }
 
     @Override
@@ -64,18 +79,19 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         super.init();
 
         gridX = leftPos + (imageWidth - GRID_PIXELS) / 2;
-        gridY = topPos + 22;
+        gridY = topPos + 34;
         energyBarX = leftPos + (imageWidth - ENERGY_BAR_WIDTH) / 2;
-        energyBarY = gridY + GRID_PIXELS + 10;
+        energyBarY = gridY + GRID_PIXELS + 16;
         scrubberX = leftPos + (imageWidth - SCRUBBER_WIDTH) / 2;
-        scrubberY = energyBarY + 28;
+        scrubberY = energyBarY + 34;
+        labelStartY = scrubberY + 22;
 
         previewSelectedGameTime = menu.getSelectedGameTime();
 
-        int buttonWidth = 100;
+        int buttonWidth = 140;
         jumpButton = Button.builder(Component.translatable("gui.temporalindustries.time_machine.jump"), btn -> jumpAndClose())
-                .pos(leftPos + (imageWidth - buttonWidth) / 2, scrubberY + 56)
-                .size(buttonWidth, 20)
+                .pos(leftPos + (imageWidth - buttonWidth) / 2, labelStartY + 60)
+                .size(buttonWidth, 24)
                 .build();
         addRenderableWidget(jumpButton);
 
@@ -118,6 +134,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             for (int col = 0; col < GRID_SIZE; col++) {
                 int dx = col - RADIUS;
                 int dz = row - RADIUS;
+                if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue; // outside the circle: leave blank
+
                 int cellX = gridX + col * (CELL_SIZE + CELL_GAP);
                 int cellY = gridY + row * (CELL_SIZE + CELL_GAP);
 
@@ -159,35 +177,35 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         long current = getCurrentGameTime();
         long range = Math.max(1L, current - placed);
         double fraction = Math.max(0.0D, Math.min(1.0D, (previewSelectedGameTime - placed) / (double) range));
-        int handleX = scrubberX + (int) Math.round(fraction * (SCRUBBER_WIDTH - 4));
+        int handleX = scrubberX + (int) Math.round(fraction * (SCRUBBER_WIDTH - 5));
 
         guiGraphics.fill(scrubberX + 1, scrubberY + 1, scrubberX + SCRUBBER_WIDTH - 1, scrubberY + SCRUBBER_HEIGHT - 1, 0xFF2A2A2A);
-        guiGraphics.fill(handleX, scrubberY, handleX + 4, scrubberY + SCRUBBER_HEIGHT, 0xFFFFFFFF);
+        guiGraphics.fill(handleX, scrubberY, handleX + 5, scrubberY + SCRUBBER_HEIGHT, 0xFFFFFFFF);
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), leftPos + 8, topPos + 8, 0xFFFFFF, false);
+        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), leftPos + 10, topPos + 12, 0xFFFFFF, false);
 
-        int labelY = scrubberY + 16;
+        int labelY = labelStartY;
         guiGraphics.drawString(font, Component.literal(
-                menu.getBlockEntity().getChunkCount() + " / " + (GRID_SIZE * GRID_SIZE) + " chunks claimed"),
-                leftPos + 8, labelY, 0xFFBFBFBF, false);
-        labelY += 10;
+                menu.getBlockEntity().getChunkCount() + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
+                leftPos + 10, labelY, 0xFFBFBFBF, false);
+        labelY += 12;
 
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.time_machine.preview_current", formatGameDayTime(getCurrentGameTime())),
-                leftPos + 8, labelY, 0xFFFFFF, false);
-        labelY += 10;
+                leftPos + 10, labelY, 0xFFFFFF, false);
+        labelY += 12;
 
         long diff = previewSelectedGameTime - getCurrentGameTime();
         String direction = diff <= 0L
                 ? "gui.temporalindustries.time_machine.preview_past"
                 : "gui.temporalindustries.time_machine.preview_future";
-        guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), leftPos + 8, labelY, 0xFFFFFF, false);
-        labelY += 10;
+        guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), leftPos + 10, labelY, 0xFFFFFF, false);
+        labelY += 12;
 
         guiGraphics.drawString(font, Component.literal("Jump cost: " + ChronosphereClientState.getTotalJumpCost() + " FE"),
-                leftPos + 8, labelY, 0xFFBFBFBF, false);
+                leftPos + 10, labelY, 0xFFBFBFBF, false);
     }
 
     @Override
@@ -281,8 +299,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (cellLocalX > CELL_SIZE || cellLocalY > CELL_SIZE) return null; // clicked in the gap
         if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) return null;
 
+        int dx = col - RADIUS;
+        int dz = row - RADIUS;
+        if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) return null; // outside the circle: not drawn, not clickable
+
         ChunkPos home = new ChunkPos(menu.getBlockPos());
-        return new ChunkPos(home.x + (col - RADIUS), home.z + (row - RADIUS));
+        return new ChunkPos(home.x + dx, home.z + dz);
     }
 
     /** Formats an absolute game time as "Day {day} | {HH:MM}". Day 1 starts at game time 0; a
