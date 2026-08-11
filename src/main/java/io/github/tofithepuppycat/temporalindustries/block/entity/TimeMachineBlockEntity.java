@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
@@ -225,6 +226,11 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
             costs.put(commit.getId(), timeline.computeJumpCost(chunkPos, commit.getGameTime(), headId, level, TimeMachineBlockEntity::costOf));
         }
         return costs;
+    }
+
+    @Override
+    public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
+        return List.of(new ChunkTimelineSnapshot(new ChunkPos(worldPosition), getChunkCommits(), getChunkLocalParents(), getChunkHeadId()));
     }
 
     // -------------------------------------------------------------------------

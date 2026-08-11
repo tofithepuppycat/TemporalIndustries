@@ -2,9 +2,9 @@ package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -51,6 +51,10 @@ public final class TimelineProjectionManager {
     /** commitId -> energy cost of jumping there from the chunk's current head, as last reported
      * by the server (see TimeMachineBlockEntity#getChunkJumpCosts). */
     private static Map<Long, Long> jumpCosts = new HashMap<>();
+    /** One commit-graph snapshot per chunk the ghost preview should cover — just the graph's own
+     * chunk for a Time Machine, but every claimed chunk for a Chronosphere (see
+     * TimelineViewProvider#getPreviewChunkSnapshots()), since a jump moves all of them together. */
+    private static List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>();
     /** Whether the in-world block-diff preview is toggled on via the "Show Changes" button. */
     private static boolean showChangesEnabled = false;
 
@@ -77,6 +81,7 @@ public final class TimelineProjectionManager {
         headCommitId = -1L;
         selectedCommitId = -1L;
         jumpCosts = new HashMap<>();
+        previewChunkSnapshots = new ArrayList<>();
         showChangesEnabled = false;
     }
 
@@ -99,7 +104,8 @@ public final class TimelineProjectionManager {
     /** Refreshes commits/head from a fresh server snapshot. Does not touch the current selection. */
     public static void updateFromServer(BlockPos machinePos, long placed, long current,
                                         List<TemporalCommit> serverCommits, Map<Long, Long> serverLocalParents,
-                                        long serverHeadCommitId, Map<Long, Long> serverJumpCosts) {
+                                        long serverHeadCommitId, Map<Long, Long> serverJumpCosts,
+                                        List<ChunkTimelineSnapshot> serverPreviewChunkSnapshots) {
         activeMachinePos = machinePos;
         placedGameTime = Math.max(0L, placed);
         currentGameTime = Math.max(placedGameTime, current);
@@ -107,6 +113,7 @@ public final class TimelineProjectionManager {
         localParents = new HashMap<>(serverLocalParents);
         headCommitId = serverHeadCommitId;
         jumpCosts = new HashMap<>(serverJumpCosts);
+        previewChunkSnapshots = new ArrayList<>(serverPreviewChunkSnapshots);
     }
 
     private static TemporalCommit findCommit(long id) {
@@ -146,17 +153,29 @@ public final class TimelineProjectionManager {
         selectedGameTime = clampSelected(selectedGameTime);
     }
 
-    /** Computes which blocks differ from their live world state at selectedGameTime, mirroring
+    /** Computes which blocks differ from their live world state at selectedGameTime, across every
+     * chunk in previewChunkSnapshots (not just whichever chunk the graph is displaying) — mirroring
      * {@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline#applyChunkAtTime}
-     * so the preview matches what Jump will actually do. */
+     * per chunk so the preview matches what Jump will actually do everywhere it does it. */
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 
-        ChunkPos chunkPos = new ChunkPos(activeMachinePos);
-        long targetCommitId = TemporalCommit.resolveNearest(commits, selectedGameTime);
+        List<ProjectionEntry> entries = new ArrayList<>();
+        for (ChunkTimelineSnapshot snapshot : previewChunkSnapshots) {
+            appendProjectionEntries(level, snapshot, entries);
+        }
+        return entries;
+    }
 
-        List<TemporalCommit> liveChain = TemporalCommit.ancestryChain(commits, localParents, headCommitId);
-        List<TemporalCommit> targetChain = TemporalCommit.ancestryChain(commits, localParents, targetCommitId);
+    private static void appendProjectionEntries(Level level, ChunkTimelineSnapshot snapshot, List<ProjectionEntry> out) {
+        List<TemporalCommit> chunkCommits = snapshot.commits();
+        if (chunkCommits.isEmpty()) return;
+
+        Map<Long, Long> chunkLocalParents = snapshot.localParents();
+        long targetCommitId = TemporalCommit.resolveNearest(chunkCommits, selectedGameTime);
+
+        List<TemporalCommit> liveChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, snapshot.headId());
+        List<TemporalCommit> targetChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, targetCommitId);
 
         int commonPrefixLen = 0;
         int maxCommon = Math.min(liveChain.size(), targetChain.size());
@@ -169,7 +188,7 @@ public final class TimelineProjectionManager {
 
         for (int i = liveChain.size() - 1; i >= commonPrefixLen; i--) {
             for (ChunkDelta cd : liveChain.get(i).getChunkDeltas()) {
-                if (!cd.getChunkPos().equals(chunkPos)) continue;
+                if (!cd.getChunkPos().equals(snapshot.chunkPos())) continue;
                 for (BlockChangeDelta change : cd.getBlockChanges()) {
                     desiredStates.put(change.getPos(), change.getPreviousState());
                 }
@@ -178,14 +197,13 @@ public final class TimelineProjectionManager {
 
         for (int i = commonPrefixLen; i < targetChain.size(); i++) {
             for (ChunkDelta cd : targetChain.get(i).getChunkDeltas()) {
-                if (!cd.getChunkPos().equals(chunkPos)) continue;
+                if (!cd.getChunkPos().equals(snapshot.chunkPos())) continue;
                 for (BlockChangeDelta change : cd.getBlockChanges()) {
                     desiredStates.put(change.getPos(), change.getNewState());
                 }
             }
         }
 
-        List<ProjectionEntry> entries = new ArrayList<>();
         for (Map.Entry<BlockPos, BlockState> entry : desiredStates.entrySet()) {
             BlockPos pos = entry.getKey();
             BlockState targetState = entry.getValue();
@@ -200,10 +218,9 @@ public final class TimelineProjectionManager {
                 } else {
                     type = ProjectionType.CHANGE;
                 }
-                entries.add(new ProjectionEntry(pos, currentState, targetState, type));
+                out.add(new ProjectionEntry(pos, currentState, targetState, type));
             }
         }
-        return entries;
     }
 
     private static long clampSelected(long selected) {

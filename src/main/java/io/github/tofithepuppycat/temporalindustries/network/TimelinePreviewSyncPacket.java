@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
@@ -36,11 +37,15 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     private final long selectedCommitId;
     /** commitId -> energy cost of jumping there from the chunk's current head. */
     private final Map<Long, Long> jumpCosts;
+    /** One commit-graph snapshot per chunk the in-world ghost preview should cover — for a Time
+     * Machine just its own chunk (duplicating the fields above), for a Chronosphere every chunk
+     * it has claimed. See TimelineViewProvider#getPreviewChunkSnapshots(). */
+    private final List<ChunkTimelineSnapshot> previewChunkSnapshots;
 
     public TimelinePreviewSyncPacket(BlockPos machinePos, long placedGameTime, long selectedGameTime,
                                      long currentGameTime, List<TemporalCommit> commits,
                                      Map<Long, Long> localParents, long headCommitId, long selectedCommitId,
-                                     Map<Long, Long> jumpCosts) {
+                                     Map<Long, Long> jumpCosts, List<ChunkTimelineSnapshot> previewChunkSnapshots) {
         this.machinePos = machinePos;
         this.placedGameTime = placedGameTime;
         this.selectedGameTime = selectedGameTime;
@@ -50,6 +55,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         this.headCommitId = headCommitId;
         this.selectedCommitId = selectedCommitId;
         this.jumpCosts = jumpCosts;
+        this.previewChunkSnapshots = previewChunkSnapshots;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, TimelinePreviewSyncPacket packet) {
@@ -75,6 +81,9 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             body.writeLong(entry.getKey());
             body.writeLong(entry.getValue());
         }
+        body.writeVarInt(packet.previewChunkSnapshots.size());
+        for (ChunkTimelineSnapshot snapshot : packet.previewChunkSnapshots) ChunkTimelineSnapshot.encode(snapshot, body);
+
         byte[] rawBody = new byte[body.readableBytes()];
         body.readBytes(rawBody);
         body.release();
@@ -117,12 +126,15 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             long cost = body.readLong();
             jumpCosts.put(commitId, cost);
         }
+        int previewChunkCount = body.readVarInt();
+        List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>(previewChunkCount);
+        for (int i = 0; i < previewChunkCount; i++) previewChunkSnapshots.add(ChunkTimelineSnapshot.decode(body));
         body.release();
 
         long headCommitId = buf.readLong();
         long selectedCommitId = buf.readLong();
         return new TimelinePreviewSyncPacket(machinePos, placedGameTime, selectedGameTime,
-                currentGameTime, commits, localParents, headCommitId, selectedCommitId, jumpCosts);
+                currentGameTime, commits, localParents, headCommitId, selectedCommitId, jumpCosts, previewChunkSnapshots);
     }
 
     public static void handle(TimelinePreviewSyncPacket packet, IPayloadContext context) {
@@ -133,7 +145,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                 packet.commits,
                 packet.localParents,
                 packet.headCommitId,
-                packet.jumpCosts));
+                packet.jumpCosts,
+                packet.previewChunkSnapshots));
     }
 
     @Override

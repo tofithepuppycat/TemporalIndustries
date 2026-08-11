@@ -65,7 +65,8 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
                     machine.getChunkLocalParents(),
                     headCommitId,
                     machine.getSelectedCommitId(),
-                    machine.getChunkJumpCosts());
+                    machine.getChunkJumpCosts(),
+                    machine.getPreviewChunkSnapshots());
 
             PacketDistributor.sendToPlayer(sender, syncPacket);
         });
