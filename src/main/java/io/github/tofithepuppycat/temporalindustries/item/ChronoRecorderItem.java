@@ -2,10 +2,13 @@ package io.github.tofithepuppycat.temporalindustries.item;
 
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -18,6 +21,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
+import org.joml.Vector3f;
 
 import java.util.List;
 
@@ -47,6 +51,12 @@ public class ChronoRecorderItem extends Item {
         CompoundTag data = readData(stack);
         if (data.getBoolean("Recording")) {
             stopRecording(stack, data, player, level);
+        } else if (data.getBoolean("Saved")) {
+            if (player.isCrouching()) {
+                clearRecording(stack, data, player, level);
+            } else {
+                player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.clear_hint"), true);
+            }
         } else {
             startRecording(stack, data, player, level);
         }
@@ -88,16 +98,31 @@ public class ChronoRecorderItem extends Item {
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.7F);
     }
 
+    /** Discards a saved-but-not-yet-inserted recording so the recorder can be reused. Only reachable
+     * via crouch right-click (see use()) so a normal right-click on a saved recorder never destroys
+     * it by accident. */
+    private void clearRecording(ItemStack stack, CompoundTag data, Player player, Level level) {
+        data.putBoolean("Saved", false);
+        data.put("Frames", new ListTag());
+        data.put("Actions", new ListTag());
+        writeData(stack, data);
+
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.cleared"), true);
+        level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 1.0F);
+    }
+
     @Override
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
         // Deliberately NOT gated on isSelected: recording must keep sampling movement even while
         // the player is wielding a different tool to mine/place (see ChronoActionRecorder), as
         // long as the Chrono Recorder itself is still somewhere in their inventory.
-        if (level.isClientSide || !(entity instanceof ServerPlayer player)) return;
+        if (!(level instanceof ServerLevel serverLevel) || !(entity instanceof ServerPlayer player)) return;
 
         CompoundTag data = readData(stack);
-        if (!data.getBoolean("Recording")) return;
+        boolean recording = data.getBoolean("Recording");
+        if (recording) spawnStartMarker(data, serverLevel);
+        if (!recording) return;
 
         ListTag frames = data.getList("Frames", Tag.TAG_COMPOUND);
         if (frames.size() >= MAX_FRAMES) {
@@ -120,6 +145,24 @@ public class ChronoRecorderItem extends Item {
         frames.add(frame);
         data.put("Frames", frames);
         writeData(stack, data);
+    }
+
+    private static final DustParticleOptions START_MARKER_PARTICLE =
+            new DustParticleOptions(new Vector3f(0.45F, 0.85F, 1.0F), 1.3F);
+
+    /** Hovers a small marker of particles above wherever the current recording started, for as long
+     * as it's actively being recorded — a visual reminder of where to return to so the loop closes
+     * cleanly, in the same dimension it was recorded in. */
+    private void spawnStartMarker(CompoundTag data, ServerLevel serverLevel) {
+        if (serverLevel.getGameTime() % 10 != 0) return;
+
+        ResourceLocation dimension = ResourceLocation.tryParse(data.getString("StartDimension"));
+        if (dimension == null || !dimension.equals(serverLevel.dimension().location())) return;
+
+        double x = data.getDouble("StartX");
+        double y = data.getDouble("StartY") + 1.2 + 0.15 * Math.sin(serverLevel.getGameTime() / 10.0);
+        double z = data.getDouble("StartZ");
+        serverLevel.sendParticles(START_MARKER_PARTICLE, x, y, z, 2, 0.15, 0.15, 0.15, 0.0);
     }
 
     @Override
