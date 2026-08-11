@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
@@ -112,23 +113,29 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
     public void onLoad() {
         super.onLoad();
 
-        if (level != null && !level.isClientSide) {
-            MinecraftServer server = level.getServer();
+        if (level instanceof ServerLevel serverLevel) {
+            MinecraftServer server = serverLevel.getServer();
             if (server != null) {
                 TemporalWorldData worldData = TemporalWorldData.get(server);
                 ChunkPos chunkPos = new ChunkPos(worldPosition);
                 worldData.trackChunk(chunkPos);
 
+                TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+                // A chunk with no commits yet (freshly tracked, or tracked-but-never-touched
+                // across a restart) gets a full baseline instead of waiting for its first delta —
+                // see ChunkSnapshot's class doc for why ancestryChain needs one of these to exist.
+                if (timeline.getCommitsForChunk(chunkPos).isEmpty()) {
+                    timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
+                    worldData.setDirty();
+                }
+
                 // Restore placedGameTime from the timeline if this is a reload
                 if (placedGameTime == UNSET_TIME) {
-                    TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
-                    if (timeline != null) {
-                        long earliest = timeline.getEarliestGameTimeForChunk(chunkPos);
-                        if (earliest != -1L) {
-                            placedGameTime  = earliest;
-                            selectedGameTime = Math.max(placedGameTime, selectedGameTime == UNSET_TIME ? placedGameTime : selectedGameTime);
-                            setChanged();
-                        }
+                    long earliest = timeline.getEarliestGameTimeForChunk(chunkPos);
+                    if (earliest != -1L) {
+                        placedGameTime  = earliest;
+                        selectedGameTime = Math.max(placedGameTime, selectedGameTime == UNSET_TIME ? placedGameTime : selectedGameTime);
+                        setChanged();
                     }
                 }
             }
@@ -148,7 +155,15 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
     }
 
     // -------------------------------------------------------------------------
-    // Tick — only handles first-placement initialisation, no block scanning
+    // Tick — normally just first-placement initialisation, no block scanning; the one deliberate
+    // exception is the rare re-snapshot check below, which trades a bounded once-a-minute full
+    // chunk read for keeping every other history walk cheap for the rest of that minute.
+
+    /** How often to check whether this chunk's history has drifted far enough from its last
+     * snapshot to be worth refreshing. */
+    private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
+    /** Commits since the last snapshot before a fresh one is taken — see ChunkSnapshot's class doc. */
+    private static final int SNAPSHOT_COMMIT_THRESHOLD = 50;
 
     public static void tick(Level level, BlockPos pos, BlockState state, TimeMachineBlockEntity be) {
         if (level.isClientSide) return;
@@ -165,6 +180,23 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
             be.selectedGameTime = Math.max(be.placedGameTime, Math.min(now, be.selectedGameTime));
             be.setChanged();
         }
+
+        if (level instanceof ServerLevel serverLevel && now % SNAPSHOT_CHECK_INTERVAL_TICKS == 0) {
+            be.maybeResnapshot(serverLevel);
+        }
+    }
+
+    private void maybeResnapshot(ServerLevel serverLevel) {
+        MinecraftServer server = serverLevel.getServer();
+        if (server == null) return;
+
+        TemporalWorldData worldData = TemporalWorldData.get(server);
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(serverLevel.dimension().location());
+        ChunkPos chunkPos = new ChunkPos(worldPosition);
+        if (timeline.getCommitsSinceSnapshot(chunkPos) < SNAPSHOT_COMMIT_THRESHOLD) return;
+
+        timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
+        worldData.setDirty();
     }
 
     // -------------------------------------------------------------------------
