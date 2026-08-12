@@ -1,6 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.device;
 
-import io.github.tofithepuppycat.temporalindustries.item.ChronoRecorderItem;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -33,9 +33,9 @@ import java.util.UUID;
 
 /**
  * Watches for a recording player's own block breaks/places and container item transfers, and
- * appends them to whichever of their Chrono Recorders (see {@link ChronoRecorderItem}) is
+ * appends them to whichever of their Chrono Records (see {@link ChronoRecordItem}) is
  * currently recording — regardless of which item is actually in hand, since
- * {@link ChronoRecorderItem#inventoryTick} keeps sampling movement even while a pickaxe/hoe/etc.
+ * {@link ChronoRecordItem#inventoryTick} keeps sampling movement even while a pickaxe/hoe/etc.
  * is wielded.
  *
  * PLACE is captured via {@link BlockEvent.EntityPlaceEvent} rather than the right-click itself,
@@ -54,7 +54,7 @@ import java.util.UUID;
  * ordering relative to inventoryTick within the same server tick doesn't matter.
  */
 public final class ChronoActionRecorder {
-    /** Mirrors ChronoRecorderItem's own cap so an action can never reference a tick beyond what
+    /** Mirrors ChronoRecordItem's own cap so an action can never reference a tick beyond what
      * the recording could possibly retain. */
     private static final int MAX_FRAMES = 20 * 60;
 
@@ -268,7 +268,7 @@ public final class ChronoActionRecorder {
         ItemStack recorder = findRecordingRecorder(player);
         if (recorder == null) return;
 
-        CompoundTag data = ChronoRecorderItem.readData(recorder);
+        CompoundTag data = ChronoRecordItem.readData(recorder);
         long startGameTime = data.getLong("StartGameTime");
         long tick = gameTime - startGameTime;
         if (tick < 0 || tick >= MAX_FRAMES) return;
@@ -297,16 +297,16 @@ public final class ChronoActionRecorder {
         ListTag actions = data.getList("Actions", Tag.TAG_COMPOUND);
         actions.add(action);
         data.put("Actions", actions);
-        ChronoRecorderItem.writeData(recorder, data);
+        ChronoRecordItem.writeData(recorder, data);
     }
 
     @Nullable
     private static ItemStack findRecordingRecorder(ServerPlayer player) {
         for (ItemStack stack : player.getInventory().items) {
-            if (ChronoRecorderItem.isRecording(stack)) return stack;
+            if (ChronoRecordItem.isRecording(stack)) return stack;
         }
         for (ItemStack stack : player.getInventory().offhand) {
-            if (ChronoRecorderItem.isRecording(stack)) return stack;
+            if (ChronoRecordItem.isRecording(stack)) return stack;
         }
         return null;
     }

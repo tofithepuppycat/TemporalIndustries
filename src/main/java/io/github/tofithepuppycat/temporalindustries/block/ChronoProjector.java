@@ -4,7 +4,7 @@ import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoRecording;
-import io.github.tofithepuppycat.temporalindustries.item.ChronoRecorderItem;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -28,10 +28,10 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Consumes energy to endlessly replay whatever Chrono Recorder is inserted into it (see
+ * Consumes energy to endlessly replay whatever Chrono Record is inserted into it (see
  * {@link ChronoProjectorBlockEntity}), rendered client-side as a translucent ghost (purple by
  * default; right-click with a dye to recolor it). Interaction otherwise mirrors a jukebox:
- * right-click with a recorded Chrono Recorder to insert it, right-click empty handed to take it
+ * right-click with a recorded Chrono Record to insert it, right-click empty handed to take it
  * back out.
  */
 @SuppressWarnings("null")
@@ -60,7 +60,7 @@ public class ChronoProjector extends BaseEntityBlock {
             return dyeGhost(dye, level, pos, player, stack);
         }
 
-        if (!(stack.getItem() instanceof ChronoRecorderItem)) {
+        if (!(stack.getItem() instanceof ChronoRecordItem)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (level.isClientSide) {

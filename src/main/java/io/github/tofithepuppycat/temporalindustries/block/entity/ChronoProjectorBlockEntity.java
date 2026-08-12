@@ -44,7 +44,7 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Block entity for the Chrono Loop Projector: holds one Chrono Recorder and, while it has a
+ * Block entity for the Chrono Loop Projector: holds one Chrono Record and, while it has a
  * saved recording and enough stored energy, endlessly replays it via {@link #getCachedRecording()}
  * / {@link #computePlaybackProgress}, consumed client-side by the ghost renderer.
  *

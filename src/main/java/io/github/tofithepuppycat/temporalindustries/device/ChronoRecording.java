@@ -17,8 +17,8 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Read-only view of a finished Chrono Recorder recording, parsed once from the item's
- * {@link DataComponents#CUSTOM_DATA} tag (see ChronoRecorderItem) and reused by the Chrono
+ * Read-only view of a finished Chrono Record recording, parsed once from the item's
+ * {@link DataComponents#CUSTOM_DATA} tag (see ChronoRecordItem) and reused by the Chrono
  * Loop Projector for playback instead of re-reading NBT every tick/frame.
  *
  * Frame positions are stored relative to the position the recording started at, so playback
