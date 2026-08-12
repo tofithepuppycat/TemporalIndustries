@@ -31,6 +31,11 @@ repositories {
         name = "modmaven"
         url = "https://modmaven.dev"
     }
+    // JEI's maven, used below to pull it into the dev/test environment only.
+    maven {
+        name = "blamejared"
+        url = "https://maven.blamejared.com"
+    }
     // Modrinth's maven, used below to pull Jade into the dev/test environment and as an API
     // dependency for the Jade integration (see client/jade). Restricted to maven.modrinth so it
     // doesn't shadow other repos' artifacts of the same name.
@@ -122,12 +127,11 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    // Example optional mod dependency with JEI
-    // The JEI API is declared for compile time use, while the full JEI artifact is used at runtime
-    // compileOnly "mezz.jei:jei-${mc_version}-common-api:${jei_version}"
-    // compileOnly "mezz.jei:jei-${mc_version}-neoforge-api:${jei_version}"
-    // We add the full version to localRuntime, not runtimeOnly, so that we do not publish a dependency on it
-    // localRuntime "mezz.jei:jei-${mc_version}-neoforge:${jei_version}"
+    // JEI, for the dev/test environment only: no integration is implemented against it (unlike
+    // Jade below), it's just available in-game via runClient/runServer for browsing recipes while
+    // testing. Not compiled against, so it's localRuntime rather than implementation -- no
+    // dependency is published on it with the built mod.
+    localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 
     // Mekanism, for the dev/test environment only: gives the energy cost system real modded
     // recipes to derive costs from when running via runClient/runServer. Not compiled against,
