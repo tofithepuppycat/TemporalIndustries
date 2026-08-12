@@ -81,7 +81,7 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
         }
 
         PacketDistributor.sendToPlayer(sender, new ChronosphereStateSyncPacket(
-                machinePos, new ArrayList<>(selected), blocked));
+                machinePos, new ArrayList<>(selected), blocked, machine.isAutoTrackingEnabled()));
     }
 
     @Override

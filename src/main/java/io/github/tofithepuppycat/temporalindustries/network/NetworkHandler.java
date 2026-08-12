@@ -43,5 +43,10 @@ public class NetworkHandler {
                 ChronosphereStateSyncPacket.TYPE,
                 ChronosphereStateSyncPacket.STREAM_CODEC,
                 ChronosphereStateSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereToggleAutoTrackPacket.TYPE,
+                ChronosphereToggleAutoTrackPacket.STREAM_CODEC,
+                ChronosphereToggleAutoTrackPacket::handle);
     }
 }
