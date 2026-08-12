@@ -14,6 +14,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.DyeItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -28,9 +29,10 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Consumes energy to endlessly replay whatever Chrono Recorder is inserted into it (see
- * {@link ChronoProjectorBlockEntity}), rendered client-side as a translucent cyan ghost. Interaction
- * mirrors a jukebox: right-click with a recorded Chrono Recorder to insert it, right-click empty
- * handed to take it back out.
+ * {@link ChronoProjectorBlockEntity}), rendered client-side as a translucent ghost (purple by
+ * default; right-click with a dye to recolor it). Interaction otherwise mirrors a jukebox:
+ * right-click with a recorded Chrono Recorder to insert it, right-click empty handed to take it
+ * back out.
  */
 @SuppressWarnings("null")
 public class ChronoProjector extends BaseEntityBlock {
@@ -54,6 +56,10 @@ public class ChronoProjector extends BaseEntityBlock {
     protected ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState state, @NotNull Level level,
                                                @NotNull BlockPos pos, @NotNull Player player,
                                                @NotNull InteractionHand hand, @NotNull BlockHitResult hitResult) {
+        if (stack.getItem() instanceof DyeItem dye) {
+            return dyeGhost(dye, level, pos, player, stack);
+        }
+
         if (!(stack.getItem() instanceof ChronoRecorderItem)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
@@ -75,6 +81,24 @@ public class ChronoProjector extends BaseEntityBlock {
         stack.shrink(1);
         projector.insertRecorder(toInsert);
         level.playSound(null, pos, SoundEvents.ITEM_FRAME_ADD_ITEM, SoundSource.BLOCKS, 1.0F, 1.2F);
+        return ItemInteractionResult.CONSUME;
+    }
+
+    /** Right-clicking with a dye recolors the ghost render rather than doing the usual jukebox-style
+     * insert, consuming one dye in survival like dyeing a sign or leather armor. */
+    private ItemInteractionResult dyeGhost(DyeItem dye, Level level, BlockPos pos, Player player, ItemStack stack) {
+        if (level.isClientSide) {
+            return ItemInteractionResult.SUCCESS;
+        }
+        if (!(level.getBlockEntity(pos) instanceof ChronoProjectorBlockEntity projector)) {
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
+        }
+
+        projector.setGhostTint(dye.getDyeColor().getFireworkColor());
+        if (!player.hasInfiniteMaterials()) {
+            stack.shrink(1);
+        }
+        level.playSound(null, pos, SoundEvents.DYE_USE, SoundSource.BLOCKS, 1.0F, 1.0F);
         return ItemInteractionResult.CONSUME;
     }
 
