@@ -51,7 +51,7 @@ public final class ChronoRecording {
 
     /** Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
      * any recorded actions on top. */
-    public static final int ENERGY_PER_TICK = 4;
+    public static final int ENERGY_PER_TICK = 5;
 
     /** Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
      * {@link #ENERGY_PER_TICK} — see {@link #averageEnergyPerTick()}. ATTACK is priced highest since

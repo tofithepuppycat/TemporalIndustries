@@ -20,7 +20,6 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.client.resources.PlayerSkin;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.Pose;
 import net.minecraft.world.phys.Vec3;
@@ -38,12 +37,13 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Draws a translucent cyan "ghost" of whatever a Chrono Loop Projector is replaying, using the
+ * Draws a translucent "ghost" of whatever a Chrono Loop Projector is replaying, using the
  * recording owner's own skin (resolved the same way vanilla resolves any other player's skin —
  * instantly if they're online in this world, otherwise via the skin manager, which serves a
  * default skin immediately and swaps in the real one once it's fetched). Purely client-side and
  * purely visual: it never touches the server, it just reads the block entity's synced playback
- * state (see {@link ChronoProjectorBlockEntity#computePlaybackProgress}).
+ * state (see {@link ChronoProjectorBlockEntity#computePlaybackProgress}) and tint (see
+ * {@link ChronoProjectorBlockEntity#getGhostColor()}, dyeable purple by default).
  *
  * The ghost isn't rendered through the normal player renderer; instead a plain {@link PlayerModel}
  * is drawn directly with a forced translucent render type so the tint/alpha apply reliably
@@ -53,8 +53,6 @@ import java.util.concurrent.ConcurrentHashMap;
 public final class ChronoGhostRenderer {
     private static final Set<ChronoProjectorBlockEntity> ACTIVE = ConcurrentHashMap.newKeySet();
     private static final UUID UNKNOWN_OWNER = new UUID(0L, 0L);
-
-    private static final int GHOST_COLOR = FastColor.ARGB32.color(150, 70, 235, 255);
 
     private static PlayerModel<LivingEntity> wideModel;
     private static PlayerModel<LivingEntity> slimModel;
@@ -150,7 +148,7 @@ public final class ChronoGhostRenderer {
             poseStack.translate(0.0F, -1.501F, 0.0F);
 
             VertexConsumer vertexConsumer = bufferSource.getBuffer(RenderType.entityTranslucent(skin.texture()));
-            playerModel.renderToBuffer(poseStack, vertexConsumer, packedLight, OverlayTexture.NO_OVERLAY, GHOST_COLOR);
+            playerModel.renderToBuffer(poseStack, vertexConsumer, packedLight, OverlayTexture.NO_OVERLAY, projector.getGhostColor());
 
             poseStack.popPose();
             renderedAny = true;
