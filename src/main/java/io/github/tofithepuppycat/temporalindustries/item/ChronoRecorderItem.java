@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
+import io.github.tofithepuppycat.temporalindustries.device.ChronoRecording;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -175,6 +176,10 @@ public class ChronoRecorderItem extends Item {
         } else if (data.getBoolean("Saved")) {
             tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip_saved",
                     String.format("%.1f", frameCount / 20.0)).withStyle(ChatFormatting.AQUA));
+            ChronoRecording.fromStack(stack).ifPresent(recording ->
+                    tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip_energy",
+                            String.format("%.1f", recording.averageEnergyPerTick()), recording.peakEnergyPerTick())
+                            .withStyle(ChatFormatting.GRAY)));
         } else {
             tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip").withStyle(ChatFormatting.GRAY));
         }

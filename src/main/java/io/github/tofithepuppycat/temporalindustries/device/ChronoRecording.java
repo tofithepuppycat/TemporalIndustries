@@ -49,6 +49,29 @@ public final class ChronoRecording {
      */
     public enum ActionType { BREAK, PLACE, INSERT, EXTRACT, MODIFY, ATTACK }
 
+    /** Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
+     * any recorded actions on top. */
+    public static final int ENERGY_PER_TICK = 4;
+
+    /** Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
+     * {@link #ENERGY_PER_TICK} — see {@link #averageEnergyPerTick()}. ATTACK is priced highest since
+     * it's the only action type that harms mobs rather than just moving blocks/items around. Lives
+     * here rather than on the projector so recordings can report their own cost (e.g. in a tooltip)
+     * without needing a live projector instance. */
+    public static int actionEnergyCost(ActionType type) {
+        return switch (type) {
+            case ATTACK -> 15;
+            case BREAK, PLACE, MODIFY -> 6;
+            case INSERT, EXTRACT -> 3;
+        };
+    }
+
+    /** Hard ceiling on what any single tick can cost, regardless of how many actions land on it —
+     * without this, a tick recording something like a sweeping-edge swing through a whole mob farm
+     * could demand hundreds of FE in one instant and stall the loop indefinitely even with a
+     * healthy average power supply. See {@link #energyCostAt(int)}. */
+    public static final int MAX_ENERGY_PER_TICK = 200;
+
     /**
      * {@code item} is the block placed (PLACE) or the item transferred (INSERT/EXTRACT); the item
      * held during the interaction (MODIFY, informational only — never consumed on replay); null for
@@ -58,15 +81,16 @@ public final class ChronoRecording {
      * modded blocks (machines, pipes, ...) reproduce faithfully rather than just "some instance of
      * this block". {@code tool} (BREAK only) is the item the player was holding when they broke the
      * block, replayed as a phantom tool purely so the drop calculation respects "requires correct
-     * tool" blocks — it's never pulled from the projector's inventory. {@code targetEntityType} and
-     * {@code damage} (ATTACK only) are the entity type attacked and the exact final damage dealt to
-     * it; replay looks for the nearest living entity of that type near the recorded position rather
-     * than tracking the original entity's identity, since it may not even be the same instance by
-     * the time the loop replays.
+     * tool" blocks — it's never pulled from the projector's inventory. {@code targetEntityType},
+     * {@code targetBaby} and {@code damage} (ATTACK only) are the entity type attacked, whether that
+     * entity was a baby, and the exact final damage dealt to it; replay looks for the nearest living
+     * entity of that type (and baby/adult state) near the recorded position rather than tracking the
+     * original entity's identity, since it may not even be the same instance by the time the loop
+     * replays.
      */
     public record Action(int dx, int dy, int dz, ActionType type, @Nullable ResourceLocation item, int count,
                           @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity, @Nullable ResourceLocation tool,
-                          @Nullable ResourceLocation targetEntityType, float damage) {}
+                          @Nullable ResourceLocation targetEntityType, boolean targetBaby, float damage) {}
 
     private final UUID ownerId;
     private final String ownerName;
@@ -143,6 +167,47 @@ public final class ChronoRecording {
         return actionsByTick.getOrDefault(tick, Collections.emptyList());
     }
 
+    /** What the Chrono Loop Projector actually charges for replaying loop-tick {@code tick}:
+     * {@link #ENERGY_PER_TICK} plus that tick's recorded actions, clamped to
+     * {@link #MAX_ENERGY_PER_TICK}. The single source of truth for per-tick cost, used both by
+     * {@code ChronoProjectorBlockEntity.tick} to charge energy and by {@link #averageEnergyPerTick()}
+     * to report it, so the two can never drift apart. */
+    public int energyCostAt(int tick) {
+        int actionsCost = 0;
+        for (Action action : actionsAt(tick)) {
+            actionsCost += actionEnergyCost(action.type());
+        }
+        return Math.min(ENERGY_PER_TICK + actionsCost, MAX_ENERGY_PER_TICK);
+    }
+
+    /** This recording's total per-tick cost (see {@link #energyCostAt(int)}) spread evenly across
+     * the loop's length — i.e. what the Chrono Loop Projector spends per tick on average while
+     * replaying it, matching how {@code ChronoProjectorBlockEntity.tick} actually charges energy
+     * tick-by-tick (a burst of several actions on one tick, then none for a while). */
+    public double averageEnergyPerTick() {
+        if (frames.isEmpty()) return 0.0;
+
+        long total = 0;
+        for (int tick : actionsByTick.keySet()) {
+            total += energyCostAt(tick);
+        }
+        int ticksWithoutActions = frames.size() - actionsByTick.size();
+        total += (long) ticksWithoutActions * ENERGY_PER_TICK;
+        return (double) total / frames.size();
+    }
+
+    /** The single most expensive tick in this recording (see {@link #energyCostAt(int)}) — e.g. the
+     * tick a sweeping-edge swing hit a crowd of mobs. Already clamped to
+     * {@link #MAX_ENERGY_PER_TICK}, so this is also the most the projector will ever demand in one
+     * instant while replaying it. */
+    public int peakEnergyPerTick() {
+        int peak = ENERGY_PER_TICK;
+        for (int tick : actionsByTick.keySet()) {
+            peak = Math.max(peak, energyCostAt(tick));
+        }
+        return peak;
+    }
+
     public static boolean hasSavedRecording(ItemStack stack) {
         return fromStack(stack).isPresent();
     }
@@ -177,9 +242,10 @@ public final class ChronoRecording {
             CompoundTag blockEntity = a.contains("BlockEntity") ? a.getCompound("BlockEntity") : null;
             ResourceLocation tool = a.contains("Tool") ? ResourceLocation.tryParse(a.getString("Tool")) : null;
             ResourceLocation targetEntityType = a.contains("TargetType") ? ResourceLocation.tryParse(a.getString("TargetType")) : null;
+            boolean targetBaby = a.getBoolean("TargetBaby");
             float damage = a.getFloat("Damage");
             Action action = new Action(a.getInt("DX"), a.getInt("DY"), a.getInt("DZ"), type, item, count,
-                    blockState, blockEntity, tool, targetEntityType, damage);
+                    blockState, blockEntity, tool, targetEntityType, targetBaby, damage);
             actionsByTick.computeIfAbsent(tick, k -> new ArrayList<>()).add(action);
         }
 
