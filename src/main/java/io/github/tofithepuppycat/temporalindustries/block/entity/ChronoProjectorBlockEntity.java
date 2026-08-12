@@ -30,6 +30,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.util.FastColor;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -85,6 +86,12 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     private final NonNullList<ItemStack> items = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
+    /** ARGB tint for this projector's ghost render — see {@code ChronoGhostRenderer}. Right-clicking
+     * the projector with a dye recolors it (RGB only; the alpha is fixed so the ghost always stays
+     * translucent regardless of dye). */
+    public static final int DEFAULT_GHOST_COLOR = FastColor.ARGB32.color(150, 70, 235, 255);
+    private int ghostColor = DEFAULT_GHOST_COLOR;
+
     private ItemStack recorderStack = ItemStack.EMPTY;
     @Nullable private ChronoRecording cachedRecording = null;
     private boolean active = false;
@@ -104,6 +111,19 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     public IItemHandler getItemHandler() {
         return inventory;
+    }
+
+    public int getGhostColor() {
+        return ghostColor;
+    }
+
+    /** Recolors this projector's ghost render, keeping the translucent alpha fixed and only taking
+     * the dye's RGB — see {@link #DEFAULT_GHOST_COLOR}. */
+    public void setGhostTint(int rgb) {
+        ghostColor = FastColor.ARGB32.color(FastColor.ARGB32.alpha(DEFAULT_GHOST_COLOR),
+                FastColor.ARGB32.red(rgb), FastColor.ARGB32.green(rgb), FastColor.ARGB32.blue(rgb));
+        setChanged();
+        syncToClients();
     }
 
     // -------------------------------------------------------------------------
@@ -469,6 +489,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         tag.putLong("LoopEpoch", loopEpoch);
         tag.putInt("PausedTick", pausedTick);
         tag.put("Energy", energyStorage.serializeNBT(registries));
+        if (ghostColor != DEFAULT_GHOST_COLOR) tag.putInt("GhostColor", ghostColor);
         ContainerHelper.saveAllItems(tag, items, registries);
     }
 
@@ -483,6 +504,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         loopEpoch = tag.getLong("LoopEpoch");
         pausedTick = tag.getInt("PausedTick");
         if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
+        ghostColor = tag.contains("GhostColor") ? tag.getInt("GhostColor") : DEFAULT_GHOST_COLOR;
         items.clear();
         ContainerHelper.loadAllItems(tag, items, registries);
     }
