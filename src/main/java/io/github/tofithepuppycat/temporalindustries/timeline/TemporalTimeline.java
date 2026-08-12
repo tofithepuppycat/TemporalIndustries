@@ -66,6 +66,56 @@ public class TemporalTimeline {
         return commit;
     }
 
+    /** Records a player's manual bookmark across markedChunks — a zero-diff waypoint (see
+     * {@link TemporalCommit#playerMark}), never elided like branch() can be, so it always gets a
+     * stable id the Portable ChronoMarker can look up and diff against later. */
+    public TemporalCommit addPlayerMark(long gameTime, List<ChunkPos> markedChunks, UUID ownerId) {
+        TemporalCommit commit = TemporalCommit.playerMark(nextId++, headId, gameTime, markedChunks, ownerId);
+        registerCommit(commit);
+        return commit;
+    }
+
+    /** ownerId's most recent PLAYER_MARK commits, oldest-first, at most count of them. */
+    public List<TemporalCommit> getLatestPlayerMarks(UUID ownerId, int count) {
+        LinkedList<TemporalCommit> result = new LinkedList<>();
+        for (Iterator<TemporalCommit> it = commits.descendingIterator(); it.hasNext() && result.size() < count; ) {
+            TemporalCommit commit = it.next();
+            if (commit.isPlayerMark() && ownerId.equals(commit.getOwnerId())) {
+                result.addFirst(commit);
+            }
+        }
+        return result;
+    }
+
+    /** Ensures chunkPos has at least one commit to anchor its history walk — same "give freshly
+     * tracked chunks a baseline immediately" rule TimeMachineBlockEntity/ChronosphereBlockEntity
+     * already apply, reused here so a Portable ChronoMarker's tracked chunks stay bounded too. */
+    public void ensureBaseline(ChunkPos chunkPos, ServerLevel level) {
+        if (!getCommitsForChunk(chunkPos).isEmpty()) return;
+        addSnapshot(level.getGameTime(), List.of(ChunkSnapshot.capture(level, chunkPos)));
+    }
+
+    /** The net block changes to chunkPos between two of a player's marks — computed by walking the
+     * same intervening DELTA chain resolveDesiredState already walks for rollback, once to read the
+     * "new" state at newer and once to read the "old" state at older, rather than diffing any raw
+     * block grids. Read-only. */
+    public List<BlockDiffEntry> diffChunkBetweenMarks(ChunkPos chunkPos, TemporalCommit older, TemporalCommit newer) {
+        Map<BlockPos, BlockState> newStates = resolveDesiredState(chunkPos, newer.getGameTime(), older.getId()).states();
+        Map<BlockPos, BlockState> oldStates = resolveDesiredState(chunkPos, older.getGameTime(), newer.getId()).states();
+
+        List<BlockDiffEntry> diffs = new ArrayList<>();
+        for (Map.Entry<BlockPos, BlockState> entry : newStates.entrySet()) {
+            BlockState oldState = oldStates.get(entry.getKey());
+            BlockState newState = entry.getValue();
+            if (oldState != null && !oldState.equals(newState)) {
+                diffs.add(new BlockDiffEntry(entry.getKey(), oldState, newState));
+            }
+        }
+        return diffs;
+    }
+
+    public record BlockDiffEntry(BlockPos pos, BlockState oldState, BlockState newState) {}
+
     /** Checks out targetGameTime for chunkPos. No-op if this chunk has no history yet, or its head
      * is already at the resolved point. Landing on a childless point just moves the chunk's head
      * there (no new commit); otherwise forks a zero-diff marker commit scoped to this chunk. */
@@ -103,6 +153,11 @@ public class TemporalTimeline {
         }
         for (ChunkSnapshot snapshot : commit.getChunkSnapshots()) {
             long chunkKey = snapshot.getChunkPos().toLong();
+            long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
+            indexChunkTouch(chunkKey, commit.getId(), localParent);
+        }
+        for (ChunkPos markedChunk : commit.getMarkedChunks()) {
+            long chunkKey = markedChunk.toLong();
             long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
             indexChunkTouch(chunkKey, commit.getId(), localParent);
         }
