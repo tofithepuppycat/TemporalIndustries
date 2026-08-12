@@ -202,6 +202,9 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
     private static final int SNAPSHOT_COMMIT_THRESHOLD = 50;
 
+    /** Skips chunks the world isn't currently tracking (auto-tracking off and untouched by a
+     * ChronoMarker) so this timer can't manufacture a commit on its own — with auto-tracking off,
+     * a chunk only accumulates history the player explicitly recorded, and this must not add to it. */
     private void maybeResnapshot(ServerLevel serverLevel) {
         MinecraftServer server = serverLevel.getServer();
         if (server == null) return;
@@ -209,6 +212,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         TemporalWorldData worldData = TemporalWorldData.get(server);
         TemporalTimeline timeline = worldData.getOrCreateTimeline(serverLevel.dimension().location());
         for (ChunkPos chunkPos : getAllChunks()) {
+            if (!worldData.isTracked(chunkPos)) continue;
             if (timeline.getCommitsSinceSnapshot(chunkPos) < SNAPSHOT_COMMIT_THRESHOLD) continue;
             timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
             worldData.setDirty();
