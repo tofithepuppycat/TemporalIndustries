@@ -237,6 +237,20 @@ public class TemporalTimeline {
             }
         }
 
+        // If the target lineage shares no history with the live one, its chain starts fresh from
+        // its own nearest SNAPSHOT ancestor (see TemporalCommit#ancestryChain) — a full baseline
+        // whose block grid must be applied directly, since a SNAPSHOT itself carries no ChunkDelta
+        // for the undo/replay loops to walk. Without this, jumping onto a disjoint lineage (e.g.
+        // back to the trunk after a re-snapshot happened while branched off it) applies nothing at
+        // all for everything the snapshot baselined, leaving the world stuck on the live branch.
+        if (commonPrefixLen == 0 && !targetChain.isEmpty() && targetChain.get(0).getType() == TemporalCommit.Type.SNAPSHOT) {
+            for (ChunkSnapshot snapshot : targetChain.get(0).getChunkSnapshots()) {
+                if (!snapshot.getChunkPos().equals(chunkPos)) continue;
+                desiredStates.putAll(snapshot.toBlockStateMap());
+                desiredBETags.putAll(snapshot.getBlockEntityTags());
+            }
+        }
+
         // Replay whatever happened past the fork on the target lineage (latest touch wins).
         for (int i = commonPrefixLen; i < targetChain.size(); i++) {
             for (ChunkDelta cd : targetChain.get(i).getChunkDeltas()) {

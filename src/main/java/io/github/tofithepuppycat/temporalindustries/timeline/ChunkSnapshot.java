@@ -52,6 +52,24 @@ public final class ChunkSnapshot {
 
     public ChunkPos getChunkPos() { return chunkPos; }
 
+    /** Every block position this baseline covers, expanded from its section encoding — used to
+     * seed a rollback's desired state when the chain being resolved has no shared history with the
+     * live chain to diff deltas against (see TemporalTimeline#resolveDesiredState). Read-only: unlike
+     * {@link #applyTo}, this never touches the world. */
+    public Map<BlockPos, BlockState> toBlockStateMap() {
+        Map<BlockPos, BlockState> map = new HashMap<>();
+        for (int i = 0; i < sections.size(); i++) {
+            sections.get(i).collectInto(chunkPos, minSectionY + i, map);
+        }
+        return map;
+    }
+
+    /** This baseline's captured block entity NBT, keyed by position — the read-only counterpart to
+     * {@link #toBlockStateMap()} for {@link #applyTo}'s block entity restoration. */
+    public Map<BlockPos, CompoundTag> getBlockEntityTags() {
+        return blockEntities;
+    }
+
     // -------------------------------------------------------------------------
     // Capture
 
@@ -252,6 +270,38 @@ public final class ChunkSnapshot {
         private static void setIfDifferent(ServerLevel level, BlockPos pos, BlockState state) {
             if (!level.getBlockState(pos).equals(state)) {
                 level.setBlock(pos, state, 3);
+            }
+        }
+
+        /** Same traversal as {@link #applyTo}, but writes into a map instead of the world (and,
+         * unlike applyTo, doesn't skip uniform-air sections — the map needs to say "air" explicitly
+         * so a caller can tell "this position should be cleared" from "this position isn't covered"). */
+        void collectInto(ChunkPos chunkPos, int sectionY, Map<BlockPos, BlockState> out) {
+            int baseX = chunkPos.getMinBlockX();
+            int baseZ = chunkPos.getMinBlockZ();
+            int baseY = sectionY * 16;
+
+            if (uniform) {
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int x = 0; x < 16; x++) {
+                            out.put(new BlockPos(baseX + x, baseY + y, baseZ + z), uniformState);
+                        }
+                    }
+                }
+                return;
+            }
+
+            int y = 0, z = 0, x = 0;
+            for (int run = 0; run < runPaletteIndex.length; run++) {
+                BlockState state = palette.get(runPaletteIndex[run]);
+                int remaining = runLength[run];
+                while (remaining > 0) {
+                    out.put(new BlockPos(baseX + x, baseY + y, baseZ + z), state);
+                    remaining--;
+                    x++;
+                    if (x == 16) { x = 0; z++; if (z == 16) { z = 0; y++; } }
+                }
             }
         }
 
