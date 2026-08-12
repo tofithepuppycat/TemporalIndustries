@@ -66,6 +66,10 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     private long selectedGameTime = UNSET_TIME;
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
+    /** Whether this Chronosphere is currently recording DELTA commits for its claimed chunks.
+     * Off by default: a freshly placed/claimed Chronosphere doesn't record anything until the
+     * player opts in via the GUI's auto-track tab, so idle claims don't silently accumulate history. */
+    private boolean autoTrackingEnabled = false;
 
     /** Named (rather than anonymous) so jump()'s cost can be deducted directly, bypassing the
      * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
@@ -141,11 +145,11 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
                 TemporalWorldData worldData = TemporalWorldData.get(server);
                 TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
 
-                worldData.trackChunk(getHomeChunkPos());
+                if (autoTrackingEnabled) worldData.trackChunk(getHomeChunkPos());
                 ensureSnapshotted(worldData, timeline, serverLevel, getHomeChunkPos());
                 for (long key : additionalChunks) {
                     ChunkPos chunk = new ChunkPos(key);
-                    worldData.trackChunk(chunk);
+                    if (autoTrackingEnabled) worldData.trackChunk(chunk);
                     ensureSnapshotted(worldData, timeline, serverLevel, chunk);
                 }
             }
@@ -211,6 +215,29 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         }
     }
 
+    public boolean isAutoTrackingEnabled() {
+        return autoTrackingEnabled;
+    }
+
+    /** Flips auto-tracking, immediately (un)tracking every chunk this Chronosphere has claimed so
+     * recording starts/stops right away rather than waiting for the next onLoad(). */
+    public void setAutoTrackingEnabled(boolean enabled) {
+        if (enabled == autoTrackingEnabled) return;
+        autoTrackingEnabled = enabled;
+
+        if (level instanceof ServerLevel && level.getServer() != null) {
+            TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+            for (ChunkPos chunk : getAllChunks()) {
+                if (enabled) {
+                    worldData.trackChunk(chunk);
+                } else {
+                    worldData.untrackChunk(chunk);
+                }
+            }
+        }
+        setChanged();
+    }
+
     // -------------------------------------------------------------------------
     // Chunk selection
 
@@ -262,7 +289,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
             if (worldData.isTracked(pos)) return ToggleResult.ALREADY_TRACKED_ELSEWHERE;
 
-            worldData.trackChunk(pos);
+            if (autoTrackingEnabled) worldData.trackChunk(pos);
             additionalChunks.add(key);
             ensureSnapshotted(worldData, worldData.getOrCreateTimeline(level.dimension().location()), serverLevel, pos);
             setChanged();
@@ -462,6 +489,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putLong("PlacedGameTime",   placedGameTime);
         tag.putLong("SelectedGameTime", selectedGameTime);
+        tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
 
         ListTag chunkList = new ListTag();
         for (long key : additionalChunks) chunkList.add(LongTag.valueOf(key));
@@ -474,6 +502,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (tag.contains("Energy"))           energyStorage.deserializeNBT(registries, tag.get("Energy"));
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
+        autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
 
         additionalChunks.clear();
         ListTag chunkList = tag.getList("AdditionalChunks", Tag.TAG_LONG);

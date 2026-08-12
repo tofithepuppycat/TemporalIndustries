@@ -44,5 +44,7 @@
 	"block.temporalindustries.chronosphere.limit_reached": "This Chronosphere has claimed the maximum number of chunks",
 	"gui.temporalindustries.chronosphere.map_title": "Claim Chunks",
 	"gui.temporalindustries.chronosphere.map_hint": "Click a chunk to claim or release it",
-	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map"
+	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map",
+	"gui.temporalindustries.chronosphere.auto_track_tooltip_on": "Auto-Tracking: ON (click to disable)",
+	"gui.temporalindustries.chronosphere.auto_track_tooltip_off": "Auto-Tracking: OFF (click to enable)"
 }

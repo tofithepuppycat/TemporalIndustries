@@ -28,12 +28,14 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final BlockPos machinePos;
     private final List<Long> selectedChunkKeys;
     private final List<Long> blockedChunkKeys;
+    private final boolean autoTrackingEnabled;
 
     public ChronosphereStateSyncPacket(BlockPos machinePos, List<Long> selectedChunkKeys,
-                                       List<Long> blockedChunkKeys) {
+                                       List<Long> blockedChunkKeys, boolean autoTrackingEnabled) {
         this.machinePos = machinePos;
         this.selectedChunkKeys = selectedChunkKeys;
         this.blockedChunkKeys = blockedChunkKeys;
+        this.autoTrackingEnabled = autoTrackingEnabled;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereStateSyncPacket packet) {
@@ -42,6 +44,7 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         for (long key : packet.selectedChunkKeys) buf.writeLong(key);
         buf.writeVarInt(packet.blockedChunkKeys.size());
         for (long key : packet.blockedChunkKeys) buf.writeLong(key);
+        buf.writeBoolean(packet.autoTrackingEnabled);
     }
 
     public static ChronosphereStateSyncPacket decode(RegistryFriendlyByteBuf buf) {
@@ -52,14 +55,15 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         int blockedCount = buf.readVarInt();
         List<Long> blocked = new ArrayList<>(blockedCount);
         for (int i = 0; i < blockedCount; i++) blocked.add(buf.readLong());
-        return new ChronosphereStateSyncPacket(machinePos, selected, blocked);
+        boolean autoTrackingEnabled = buf.readBoolean();
+        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, autoTrackingEnabled);
     }
 
     public static void handle(ChronosphereStateSyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             Set<Long> selected = new HashSet<>(packet.selectedChunkKeys);
             Set<Long> blocked = new HashSet<>(packet.blockedChunkKeys);
-            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked);
+            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked, packet.autoTrackingEnabled);
         });
     }
 

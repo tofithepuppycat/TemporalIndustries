@@ -10,6 +10,7 @@ import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGrap
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
@@ -50,6 +51,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int BOOKMARK_OVERLAP = 6;
     private static final int BOOKMARK_Y_OFFSET = 40;
 
+    // Auto-track tab: same protruding style, stacked directly below the bookmark tab. Unlike the
+    // bookmark tab it isn't a modal overlay toggle — clicking it just flips auto-tracking on/off.
+    private static final int AUTO_TRACK_GAP = 4;
+    private static final int AUTO_TRACK_Y_OFFSET = BOOKMARK_Y_OFFSET + BOOKMARK_SIZE + AUTO_TRACK_GAP;
+
     private static final int RADIUS = ChronosphereBlockEntity.MAX_RADIUS;
     private static final int GRID_SIZE = RADIUS * 2 + 1;
     private static final int CELL_SIZE = 32;
@@ -72,6 +78,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private int bookmarkX;
     private int bookmarkY;
+    private int autoTrackX;
+    private int autoTrackY;
     private int gridX;
     private int gridY;
 
@@ -98,6 +106,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         bookmarkX = leftPos + imageWidth - BOOKMARK_OVERLAP;
         bookmarkY = topPos + BOOKMARK_Y_OFFSET;
+        autoTrackX = leftPos + imageWidth - BOOKMARK_OVERLAP;
+        autoTrackY = topPos + AUTO_TRACK_Y_OFFSET;
         gridX = leftPos + (imageWidth - GRID_PIXELS) / 2;
         gridY = topPos + 44;
 
@@ -240,6 +250,27 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 && mouseY >= bookmarkY && mouseY <= bookmarkY + BOOKMARK_SIZE;
     }
 
+    private void renderAutoTrackTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        boolean enabled = ChronosphereClientState.isAutoTrackingEnabled();
+        boolean hovered = isMouseOverAutoTrackTab(mouseX, mouseY);
+        int bg = enabled ? 0xFFCC5555 : (hovered ? 0xFF3A3A3A : 0xFF2A2A2A);
+
+        guiGraphics.fill(autoTrackX, autoTrackY, autoTrackX + BOOKMARK_SIZE, autoTrackY + BOOKMARK_SIZE, COLOR_BORDER);
+        guiGraphics.fill(autoTrackX + 1, autoTrackY + 1, autoTrackX + BOOKMARK_SIZE - 1, autoTrackY + BOOKMARK_SIZE - 1, bg);
+
+        // Placeholder icon: a small filled "record" dot, echoing a recording indicator.
+        int glyphColor = enabled ? 0xFFFFDDDD : 0xFFBFBFBF;
+        int dotSize = 10;
+        int dotX = autoTrackX + (BOOKMARK_SIZE - dotSize) / 2;
+        int dotY = autoTrackY + (BOOKMARK_SIZE - dotSize) / 2;
+        guiGraphics.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, glyphColor);
+    }
+
+    private boolean isMouseOverAutoTrackTab(double mouseX, double mouseY) {
+        return mouseX >= autoTrackX && mouseX <= autoTrackX + BOOKMARK_SIZE
+                && mouseY >= autoTrackY && mouseY <= autoTrackY + BOOKMARK_SIZE;
+    }
+
     private void renderMapOverlay(GuiGraphics guiGraphics) {
         guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xF0101010);
 
@@ -315,10 +346,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             renderMapOverlay(guiGraphics);
         }
         renderBookmark(guiGraphics, mouseX, mouseY);
+        renderAutoTrackTab(guiGraphics, mouseX, mouseY);
 
         if (mapOverlayOpen) {
             if (isMouseOverBookmark(mouseX, mouseY)) {
                 guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
+            } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
+                guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
             }
             return;
         }
@@ -330,7 +364,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
+        } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
         }
+    }
+
+    private static Component autoTrackTooltip() {
+        return Component.translatable(ChronosphereClientState.isAutoTrackingEnabled()
+                ? "gui.temporalindustries.chronosphere.auto_track_tooltip_on"
+                : "gui.temporalindustries.chronosphere.auto_track_tooltip_off");
     }
 
     @Override
@@ -357,6 +399,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isMouseOverBookmark(mouseX, mouseY)) {
             mapOverlayOpen = !mapOverlayOpen;
+            return true;
+        }
+
+        if (button == 0 && isMouseOverAutoTrackTab(mouseX, mouseY)) {
+            boolean newState = !ChronosphereClientState.isAutoTrackingEnabled();
+            PacketDistributor.sendToServer(new ChronosphereToggleAutoTrackPacket(menu.getBlockPos(), newState));
             return true;
         }
 
