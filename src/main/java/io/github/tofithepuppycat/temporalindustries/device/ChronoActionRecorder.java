@@ -176,6 +176,13 @@ public final class ChronoActionRecorder {
      * indirect damage aren't attributed to an "attack" here. Players are excluded as targets so a
      * replaying loop can never be used to automate PvP against someone who wasn't there when it was
      * recorded.
+     * <p>
+     * The held item is whatever's in the main hand, vanilla or modded, with no allow-list — any
+     * melee weapon or tool that deals damage records the same way. A Sweeping Edge (or modded
+     * equivalent) swing that damages several entities fires this event once per entity hit, each
+     * producing its own ATTACK action at the same tick with that entity's own recorded position —
+     * see {@code ChronoProjectorBlockEntity#executeActions} for how replay keeps those from
+     * colliding onto a single target.
      */
     public static void onLivingDamage(LivingDamageEvent.Post event) {
         if (!(event.getSource().getDirectEntity() instanceof ServerPlayer player)) return;
@@ -187,7 +194,7 @@ public final class ChronoActionRecorder {
         ResourceLocation targetType = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
 
         recordAction(player, target.blockPosition(), ChronoRecording.ActionType.ATTACK, null, 1,
-                player.level().getGameTime(), null, null, weaponId, targetType, event.getNewDamage());
+                player.level().getGameTime(), null, null, weaponId, targetType, target.isBaby(), event.getNewDamage());
     }
 
     public static void onContainerOpen(PlayerContainerEvent.Open event) {
@@ -250,14 +257,14 @@ public final class ChronoActionRecorder {
                                       @Nullable ResourceLocation item, int count, long gameTime,
                                       @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity,
                                       @Nullable ResourceLocation tool) {
-        recordAction(player, pos, type, item, count, gameTime, blockState, blockEntity, tool, null, 0F);
+        recordAction(player, pos, type, item, count, gameTime, blockState, blockEntity, tool, null, false, 0F);
     }
 
     private static void recordAction(ServerPlayer player, BlockPos pos, ChronoRecording.ActionType type,
                                       @Nullable ResourceLocation item, int count, long gameTime,
                                       @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity,
                                       @Nullable ResourceLocation tool, @Nullable ResourceLocation targetEntityType,
-                                      float damage) {
+                                      boolean targetBaby, float damage) {
         ItemStack recorder = findRecordingRecorder(player);
         if (recorder == null) return;
 
@@ -281,7 +288,10 @@ public final class ChronoActionRecorder {
         if (blockState != null) action.put("BlockState", blockState);
         if (blockEntity != null) action.put("BlockEntity", blockEntity);
         if (tool != null) action.putString("Tool", tool.toString());
-        if (targetEntityType != null) action.putString("TargetType", targetEntityType.toString());
+        if (targetEntityType != null) {
+            action.putString("TargetType", targetEntityType.toString());
+            action.putBoolean("TargetBaby", targetBaby);
+        }
         if (damage != 0F) action.putFloat("Damage", damage);
 
         ListTag actions = data.getList("Actions", Tag.TAG_COMPOUND);

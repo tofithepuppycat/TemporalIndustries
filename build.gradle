@@ -31,6 +31,20 @@ repositories {
         name = "modmaven"
         url = "https://modmaven.dev"
     }
+    // Modrinth's maven, used below to pull Jade into the dev/test environment and as an API
+    // dependency for the Jade integration (see client/jade). Restricted to maven.modrinth so it
+    // doesn't shadow other repos' artifacts of the same name.
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -119,6 +133,12 @@ dependencies {
     // recipes to derive costs from when running via runClient/runServer. Not compiled against,
     // so it's localRuntime rather than implementation -- no dependency is published on it.
     localRuntime "mekanism:Mekanism:${mekanism_version}"
+
+    // Jade: compiled against so the Jade integration (see client/jade) can implement its API,
+    // and pulled into the dev/test environment via localRuntime so runClient/runServer can
+    // actually exercise it. No dependency on it is published with the built mod.
+    compileOnly "maven.modrinth:jade:${jade_version}"
+    localRuntime "maven.modrinth:jade:${jade_version}"
 
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar

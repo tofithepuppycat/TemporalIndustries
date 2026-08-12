@@ -38,7 +38,9 @@ import net.neoforged.neoforge.items.ItemHandlerHelper;
 import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 /**
  * Block entity for the Chrono Loop Projector: holds one Chrono Recorder and, while it has a
@@ -53,7 +55,6 @@ import java.util.List;
 public class ChronoProjectorBlockEntity extends BlockEntity implements Container {
     private static final int ENERGY_CAPACITY = 32_000;
     private static final int ENERGY_MAX_RECEIVE = 800;
-    private static final int ENERGY_PER_TICK = 10;
     private static final int INVENTORY_SIZE = 9;
 
     private final class ProjectorEnergyStorage extends EnergyStorage {
@@ -160,26 +161,30 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
             return;
         }
 
-        if (be.energyStorage.getEnergyStored() >= ENERGY_PER_TICK) {
-            be.energyStorage.consumeInternal(ENERGY_PER_TICK);
+        long epoch = be.active ? be.loopEpoch : level.getGameTime() - be.pausedTick;
+        int frameCount = recording.frameCount();
+        long elapsed = level.getGameTime() - epoch;
+        int currentTick = (int) (((elapsed % frameCount) + frameCount) % frameCount);
+
+        int cost = be.lastExecutedTick != currentTick
+                ? recording.energyCostAt(currentTick)
+                : ChronoRecording.ENERGY_PER_TICK;
+
+        if (be.energyStorage.getEnergyStored() >= cost) {
+            be.energyStorage.consumeInternal(cost);
             if (!be.active) {
-                be.loopEpoch = level.getGameTime() - be.pausedTick;
+                be.loopEpoch = epoch;
                 be.active = true;
                 be.lastExecutedTick = -1;
                 be.syncToClients();
             }
 
-            int frameCount = recording.frameCount();
-            long elapsed = level.getGameTime() - be.loopEpoch;
-            int currentTick = (int) (((elapsed % frameCount) + frameCount) % frameCount);
             if (be.lastExecutedTick != currentTick && level instanceof ServerLevel serverLevel) {
                 be.executeActions(serverLevel, recording, currentTick);
                 be.lastExecutedTick = currentTick;
             }
         } else if (be.active) {
-            int frameCount = recording.frameCount();
-            long elapsed = level.getGameTime() - be.loopEpoch;
-            be.pausedTick = (int) (((elapsed % frameCount) + frameCount) % frameCount);
+            be.pausedTick = currentTick;
             be.active = false;
             be.syncToClients();
         }
@@ -201,6 +206,11 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         int anchorY = (int) Math.floor(recording.getStartY());
         int anchorZ = (int) Math.floor(recording.getStartZ());
 
+        // Sweeping-edge-style hits record one ATTACK action per struck entity in the same tick;
+        // tracking already-claimed targets here keeps a multi-hit swing from resolving two of
+        // those actions onto the same physical mob and leaving its neighbour untouched.
+        Set<LivingEntity> alreadyHit = new HashSet<>();
+
         for (ChronoRecording.Action action : recording.actionsAt(tick)) {
             BlockPos pos = new BlockPos(anchorX + action.dx(), anchorY + action.dy(), anchorZ + action.dz());
             switch (action.type()) {
@@ -209,7 +219,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
                 case MODIFY -> executeModify(level, pos, action.blockState(), action.blockEntity());
                 case INSERT -> executeInsert(level, pos, action.item(), action.count());
                 case EXTRACT -> executeExtract(level, pos, action.item(), action.count());
-                case ATTACK -> executeAttack(level, pos, action.targetEntityType(), action.damage());
+                case ATTACK -> executeAttack(level, pos, action.targetEntityType(), action.targetBaby(),
+                        action.damage(), alreadyHit);
             }
         }
     }
@@ -336,18 +347,21 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
      * post-reduction damage — applying armor again would double it up. Silently does nothing if no
      * matching entity is nearby, per the same "missing target just skips this cycle" design as
      * executeInsert/executeExtract. */
-    private void executeAttack(ServerLevel level, BlockPos pos, @Nullable ResourceLocation targetEntityTypeId, float damage) {
+    private void executeAttack(ServerLevel level, BlockPos pos, @Nullable ResourceLocation targetEntityTypeId,
+                                boolean targetBaby, float damage, Set<LivingEntity> alreadyHit) {
         if (targetEntityTypeId == null || damage <= 0F) return;
 
         EntityType<?> targetType = BuiltInRegistries.ENTITY_TYPE.get(targetEntityTypeId);
         LivingEntity target = level.getEntitiesOfClass(LivingEntity.class, new AABB(pos).inflate(1.5),
-                        e -> !(e instanceof Player) && e.getType() == targetType)
+                        e -> !(e instanceof Player) && e.getType() == targetType && e.isBaby() == targetBaby
+                                && !alreadyHit.contains(e))
                 .stream()
                 .min((a, b) -> Double.compare(a.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5),
                         b.distanceToSqr(pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5)))
                 .orElse(null);
         if (target == null) return;
 
+        alreadyHit.add(target);
         DamageSource source = level.damageSources().source(ModDamageTypes.CHRONO_ECHO);
         target.hurt(source, damage);
     }
