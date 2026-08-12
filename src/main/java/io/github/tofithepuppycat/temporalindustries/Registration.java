@@ -10,6 +10,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlock
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
@@ -59,6 +60,9 @@ public class Registration {
     public static final DeferredItem<Item> CHRONO_RECORD_ITEM = ITEMS.register("chrono_record",
             () -> new ChronoRecordItem(new Item.Properties().stacksTo(1)));
 
+    public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
+            () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1)));
+
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
 
@@ -103,6 +107,7 @@ public class Registration {
         if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
             event.accept(TEMPORAL_ANCHOR_ITEM);
             event.accept(CHRONO_RECORD_ITEM);
+            event.accept(PORTABLE_CHRONO_MARKER_ITEM);
         }
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(CHRONO_PROJECTOR_ITEM);

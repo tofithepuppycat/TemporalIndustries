@@ -194,21 +194,27 @@ public final class TimelineGraphWidget {
                 boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
                 int color = selected ? 0xFFFFFFFF : laneColor;
 
+                int shapeRadius = commit.isPlayerMark() ? markerRadius(r) : r;
+
                 if (isBranch) {
                     // Branch points render as a hollow ring so a fork is visually distinct from a plain commit.
                     int outer = r + 1;
                     int inner = Math.max(1, r - 1);
                     guiGraphics.fill(pointX - outer, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
                     guiGraphics.fill(pointX - inner, pointY - inner, pointX + inner + 1, pointY + inner + 1, 0xFF000000);
+                } else if (commit.isPlayerMark()) {
+                    // Player-recorded marks render as a diamond, distinct from an automatic commit's square —
+                    // enlarged relative to a plain node so a manual bookmark stands out on the graph.
+                    drawDiamond(guiGraphics, pointX, pointY, shapeRadius, color);
                 } else {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
                 }
 
                 if (commit.getId() == headCommitId) {
-                    drawHeadHighlight(guiGraphics, pointX, pointY, r, headHighlightColor);
+                    drawHeadHighlight(guiGraphics, pointX, pointY, shapeRadius, headHighlightColor);
                 }
 
-                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, r));
+                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius));
             }
         }
 
@@ -225,6 +231,8 @@ public final class TimelineGraphWidget {
                 int inner = Math.max(1, rc.hitRadius - 1);
                 guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, 0xFFFFFFFF);
                 guiGraphics.fill(rc.x - inner, rc.y - inner, rc.x + inner + 1, rc.y + inner + 1, 0xFF000000);
+            } else if (rc.commit.isPlayerMark()) {
+                drawDiamond(guiGraphics, rc.x, rc.y, rc.hitRadius, 0xFFFFFFFF);
             } else {
                 guiGraphics.fill(rc.x - rc.hitRadius, rc.y - rc.hitRadius, rc.x + rc.hitRadius + 1, rc.y + rc.hitRadius + 1, 0xFFFFFFFF);
             }
@@ -327,6 +335,12 @@ public final class TimelineGraphWidget {
         return Math.max(1, (int) Math.round(2 * zoom));
     }
 
+    /** Player-mark diamonds render larger than a plain node's radius so a manual bookmark reads
+     * clearly against the automatic squares around it. */
+    private static int markerRadius(int nodeRadius) {
+        return nodeRadius + Math.max(1, nodeRadius / 2) + 1;
+    }
+
     /** Draws a pulsing hollow square halo just outside a node, marking the chunk's live head. */
     private static void drawHeadHighlight(GuiGraphics guiGraphics, int pointX, int pointY, int r, int color) {
         int outer = r + 3;
@@ -335,6 +349,16 @@ public final class TimelineGraphWidget {
         guiGraphics.fill(pointX - outer, pointY + inner, pointX + outer + 1, pointY + outer + 1, color);
         guiGraphics.fill(pointX - outer, pointY - outer, pointX - inner, pointY + outer + 1, color);
         guiGraphics.fill(pointX + inner, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
+    }
+
+    /** Draws a filled diamond (a plus-like rotated square) centered on (pointX, pointY), one
+     * shrinking horizontal span per row — same per-row-fill rasterization style as the ring/square
+     * shapes above, just diamond-shaped instead. */
+    private static void drawDiamond(GuiGraphics guiGraphics, int pointX, int pointY, int r, int color) {
+        for (int dy = -r; dy <= r; dy++) {
+            int halfWidth = r - Math.abs(dy);
+            guiGraphics.fill(pointX - halfWidth, pointY + dy, pointX + halfWidth + 1, pointY + dy + 1, color);
+        }
     }
 
     /** Draws label horizontally centered under (centerX, topY) — topY is where the text starts. */
@@ -487,6 +511,7 @@ public final class TimelineGraphWidget {
             case BRANCH -> tooltip.add(Component.literal("Branch point"));
             case SNAPSHOT -> tooltip.add(Component.literal("Full snapshot"));
             case DELTA -> tooltip.add(Component.literal("Changes: " + commit.getTotalChangeCount()));
+            case PLAYER_MARK -> tooltip.add(Component.literal("Player-recorded snapshot"));
         }
         OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.getId());
         if (jumpCost.isPresent()) {

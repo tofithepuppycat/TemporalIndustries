@@ -46,5 +46,13 @@
 	"gui.temporalindustries.chronosphere.map_hint": "Click a chunk to claim or release it",
 	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map",
 	"gui.temporalindustries.chronosphere.auto_track_tooltip_on": "Auto-Tracking: ON (click to disable)",
-	"gui.temporalindustries.chronosphere.auto_track_tooltip_off": "Auto-Tracking: OFF (click to enable)"
+	"gui.temporalindustries.chronosphere.auto_track_tooltip_off": "Auto-Tracking: OFF (click to enable)",
+	"item.temporalindustries.portable_chrono_marker": "Portable ChronoMarker",
+	"item.temporalindustries.portable_chrono_marker.marked": "Snapshot marked",
+	"item.temporalindustries.portable_chrono_marker.no_marks": "Need at least two marks to compare - sneak and right-click to record one",
+	"item.temporalindustries.portable_chrono_marker.tooltip": "Right-click to compare your last two marks. Sneak and right-click to record a new one.",
+	"item.temporalindustries.portable_chrono_marker.tooltip_mark": "Tracks a chunk radius around you while held.",
+	"gui.temporalindustries.portable_chrono_marker.title": "Snapshot Comparison",
+	"gui.temporalindustries.portable_chrono_marker.no_changes": "No changes recorded",
+	"gui.temporalindustries.portable_chrono_marker.change_count": "%s blocks changed"
 }
