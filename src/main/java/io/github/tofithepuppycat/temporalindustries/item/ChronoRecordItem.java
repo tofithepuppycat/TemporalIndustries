@@ -34,11 +34,11 @@ import java.util.List;
  * stored server-side, so the recording travels with the item.
  */
 @SuppressWarnings("null")
-public class ChronoRecorderItem extends Item {
+public class ChronoRecordItem extends Item {
     /** 60 seconds at 20 ticks/second — keeps a saved recording's NBT bounded. */
     private static final int MAX_FRAMES = 20 * 60;
 
-    public ChronoRecorderItem(Properties properties) {
+    public ChronoRecordItem(Properties properties) {
         super(properties);
     }
 
@@ -56,7 +56,7 @@ public class ChronoRecorderItem extends Item {
             if (player.isCrouching()) {
                 clearRecording(stack, data, player, level);
             } else {
-                player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.clear_hint"), true);
+                player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.clear_hint"), true);
             }
         } else {
             startRecording(stack, data, player, level);
@@ -78,7 +78,7 @@ public class ChronoRecorderItem extends Item {
         data.put("Actions", new ListTag());
         writeData(stack, data);
 
-        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.started"), true);
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.started"), true);
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.6F);
     }
 
@@ -89,12 +89,12 @@ public class ChronoRecorderItem extends Item {
         writeData(stack, data);
 
         if (frameCount < 2) {
-            player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.too_short"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.too_short"), true);
             level.playSound(null, player.blockPosition(), SoundEvents.VILLAGER_NO, SoundSource.PLAYERS, 1.0F, 1.0F);
             return;
         }
 
-        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.saved",
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.saved",
                 String.format("%.1f", frameCount / 20.0)), true);
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.7F);
     }
@@ -108,7 +108,7 @@ public class ChronoRecorderItem extends Item {
         data.put("Actions", new ListTag());
         writeData(stack, data);
 
-        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.cleared"), true);
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.cleared"), true);
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 1.0F);
     }
 
@@ -117,7 +117,7 @@ public class ChronoRecorderItem extends Item {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
         // Deliberately NOT gated on isSelected: recording must keep sampling movement even while
         // the player is wielding a different tool to mine/place (see ChronoActionRecorder), as
-        // long as the Chrono Recorder itself is still somewhere in their inventory.
+        // long as the Chrono Record itself is still somewhere in their inventory.
         if (!(level instanceof ServerLevel serverLevel) || !(entity instanceof ServerPlayer player)) return;
 
         CompoundTag data = readData(stack);
@@ -128,7 +128,7 @@ public class ChronoRecorderItem extends Item {
         ListTag frames = data.getList("Frames", Tag.TAG_COMPOUND);
         if (frames.size() >= MAX_FRAMES) {
             stopRecording(stack, data, player, level);
-            player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_recorder.limit_reached"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_record.limit_reached"), true);
             return;
         }
 
@@ -171,24 +171,24 @@ public class ChronoRecorderItem extends Item {
         CompoundTag data = readData(stack);
         int frameCount = data.getList("Frames", Tag.TAG_COMPOUND).size();
         if (data.getBoolean("Recording")) {
-            tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip_recording",
+            tooltip.add(Component.translatable("item.temporalindustries.chrono_record.tooltip_recording",
                     String.format("%.1f", frameCount / 20.0)).withStyle(ChatFormatting.RED));
         } else if (data.getBoolean("Saved")) {
-            tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip_saved",
+            tooltip.add(Component.translatable("item.temporalindustries.chrono_record.tooltip_saved",
                     String.format("%.1f", frameCount / 20.0)).withStyle(ChatFormatting.AQUA));
             ChronoRecording.fromStack(stack).ifPresent(recording ->
-                    tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip_energy",
+                    tooltip.add(Component.translatable("item.temporalindustries.chrono_record.tooltip_energy",
                             String.format("%.1f", recording.averageEnergyPerTick()), recording.peakEnergyPerTick())
                             .withStyle(ChatFormatting.GRAY)));
         } else {
-            tooltip.add(Component.translatable("item.temporalindustries.chrono_recorder.tooltip").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("item.temporalindustries.chrono_record.tooltip").withStyle(ChatFormatting.GRAY));
         }
     }
 
-    /** Whether stack is a Chrono Recorder actively recording (used by ChronoActionRecorder to find
+    /** Whether stack is a Chrono Record actively recording (used by ChronoActionRecorder to find
      * which, if any, of a player's items should capture a block break/place they just performed). */
     public static boolean isRecording(ItemStack stack) {
-        return stack.getItem() instanceof ChronoRecorderItem && readData(stack).getBoolean("Recording");
+        return stack.getItem() instanceof ChronoRecordItem && readData(stack).getBoolean("Recording");
     }
 
     public static CompoundTag readData(ItemStack stack) {
