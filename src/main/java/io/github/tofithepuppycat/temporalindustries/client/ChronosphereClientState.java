@@ -12,6 +12,7 @@ public final class ChronosphereClientState {
     private static BlockPos activeMachinePos;
     private static Set<Long> selectedChunks = new HashSet<>();
     private static Set<Long> blockedChunks = new HashSet<>();
+    private static boolean autoTrackingEnabled = false;
 
     private ChronosphereClientState() {}
 
@@ -31,12 +32,19 @@ public final class ChronosphereClientState {
         activeMachinePos = null;
         selectedChunks = new HashSet<>();
         blockedChunks = new HashSet<>();
+        autoTrackingEnabled = false;
     }
 
-    public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked) {
+    public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked,
+                                        boolean serverAutoTrackingEnabled) {
         activeMachinePos = machinePos;
         selectedChunks = serverSelected;
         blockedChunks = serverBlocked;
+        autoTrackingEnabled = serverAutoTrackingEnabled;
+    }
+
+    public static boolean isAutoTrackingEnabled() {
+        return autoTrackingEnabled;
     }
 
     public static boolean isSelected(long chunkKey) {
