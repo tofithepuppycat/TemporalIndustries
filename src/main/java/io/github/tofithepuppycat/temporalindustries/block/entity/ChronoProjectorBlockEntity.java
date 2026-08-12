@@ -88,8 +88,22 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     /** ARGB tint for this projector's ghost render — see {@code ChronoGhostRenderer}. Right-clicking
      * the projector with a dye recolors it (RGB only; the alpha is fixed so the ghost always stays
-     * translucent regardless of dye). */
-    public static final int DEFAULT_GHOST_COLOR = FastColor.ARGB32.color(150, 70, 235, 255);
+     * translucent regardless of dye). Channels are lightened toward white before use: the render
+     * multiplies this straight onto the recording owner's actual skin texture (not a plain overlay
+     * like leather armor's), so a saturated tint reads mostly as the skin's own colors darkened
+     * rather than a clean dye color — lightening it keeps the hue recognizable while letting less
+     * of the skin's original coloring show through. */
+    private static final int GHOST_ALPHA = 150;
+    public static final int DEFAULT_GHOST_COLOR = ghostTint(70, 235, 255);
+
+    private static int ghostTint(int r, int g, int b) {
+        return FastColor.ARGB32.color(GHOST_ALPHA, lightenChannel(r), lightenChannel(g), lightenChannel(b));
+    }
+
+    private static int lightenChannel(int channel) {
+        return channel + Math.round((255 - channel) * 0.55F);
+    }
+
     private int ghostColor = DEFAULT_GHOST_COLOR;
 
     private ItemStack recorderStack = ItemStack.EMPTY;
@@ -117,11 +131,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return ghostColor;
     }
 
-    /** Recolors this projector's ghost render, keeping the translucent alpha fixed and only taking
-     * the dye's RGB — see {@link #DEFAULT_GHOST_COLOR}. */
+    /** Recolors this projector's ghost render from a dye's RGB, lightened the same way as
+     * {@link #DEFAULT_GHOST_COLOR} — see {@link #ghostTint(int, int, int)}. */
     public void setGhostTint(int rgb) {
-        ghostColor = FastColor.ARGB32.color(FastColor.ARGB32.alpha(DEFAULT_GHOST_COLOR),
-                FastColor.ARGB32.red(rgb), FastColor.ARGB32.green(rgb), FastColor.ARGB32.blue(rgb));
+        ghostColor = ghostTint(FastColor.ARGB32.red(rgb), FastColor.ARGB32.green(rgb), FastColor.ARGB32.blue(rgb));
         setChanged();
         syncToClients();
     }
