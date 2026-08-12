@@ -435,7 +435,11 @@ public final class TimelineGraphWidget {
         }
         RenderedCommit clicked = getCommitAt((int) mouseX, (int) mouseY);
         if (clicked != null) {
-            TimelineProjectionManager.setSelectedCommit(clicked.commit.getId());
+            if (clicked.commit.getId() == TimelineProjectionManager.getSelectedCommitId()) {
+                TimelineProjectionManager.clearSelectedCommit();
+            } else {
+                TimelineProjectionManager.setSelectedCommit(clicked.commit.getId());
+            }
         } else {
             draggingView = true;
         }
