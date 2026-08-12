@@ -89,6 +89,11 @@ public final class TimelineProjectionManager {
         return selectedCommitId != -1L;
     }
 
+    /** Deselects the current node, e.g. when the user clicks blank space in the graph. */
+    public static void clearSelectedCommit() {
+        selectedCommitId = -1L;
+    }
+
     public static boolean isShowChangesEnabled() {
         return showChangesEnabled;
     }
