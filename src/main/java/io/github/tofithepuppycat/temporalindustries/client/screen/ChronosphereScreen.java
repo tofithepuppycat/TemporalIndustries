@@ -13,6 +13,7 @@ import io.github.tofithepuppycat.temporalindustries.client.ChronosphereMapClient
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleAutoTrackPacket;
@@ -73,6 +74,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int AUTO_TRACK_GAP = 4;
     private static final int AUTO_TRACK_Y_OFFSET = BOOKMARK_Y_OFFSET + BOOKMARK_SIZE + AUTO_TRACK_GAP;
 
+    // Settings tab: same protruding style again, stacked below the auto-track tab. A modal overlay
+    // toggle like the bookmark tab, just with a destructive action behind it instead of the claim map.
+    private static final int SETTINGS_GAP = 4;
+    private static final int SETTINGS_Y_OFFSET = AUTO_TRACK_Y_OFFSET + BOOKMARK_SIZE + SETTINGS_GAP;
+    private static final int DELETE_BUTTON_WIDTH = 140;
+    private static final int DELETE_BUTTON_HEIGHT = 20;
+    private static final int CONFIRM_BUTTON_WIDTH = 66;
+
     private static final int RADIUS = ChronosphereBlockEntity.MAX_RADIUS;
     private static final int GRID_SIZE = RADIUS * 2 + 1;
     private static final int CELL_SIZE = 32;
@@ -93,6 +102,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int ticksSinceSync = 0;
     private int ticksSinceMapSync = 0;
     private boolean mapOverlayOpen = false;
+    private boolean settingsOverlayOpen = false;
+    /** Whether the settings overlay is showing the "are you sure" step rather than the plain
+     * Delete All History button — reset whenever the overlay itself closes. */
+    private boolean deleteHistoryConfirmPending = false;
     /** null = the shared "All" view; otherwise the packed key of one claimed chunk's own tab. */
     @Nullable
     private Long selectedViewChunkKey = null;
@@ -101,6 +114,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int bookmarkY;
     private int autoTrackX;
     private int autoTrackY;
+    private int settingsX;
+    private int settingsY;
     private int gridX;
     private int gridY;
 
@@ -129,6 +144,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         bookmarkY = topPos + BOOKMARK_Y_OFFSET;
         autoTrackX = leftPos + imageWidth - BOOKMARK_OVERLAP;
         autoTrackY = topPos + AUTO_TRACK_Y_OFFSET;
+        settingsX = leftPos + imageWidth - BOOKMARK_OVERLAP;
+        settingsY = topPos + SETTINGS_Y_OFFSET;
         gridX = leftPos + (imageWidth - GRID_PIXELS) / 2;
         gridY = topPos + 44;
 
@@ -205,8 +222,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         }
 
         jumpButton.active = TimelineProjectionManager.hasSelection();
-        showChangesButton.visible = !mapOverlayOpen;
-        jumpButton.visible = !mapOverlayOpen;
+        boolean overlayOpen = mapOverlayOpen || settingsOverlayOpen;
+        showChangesButton.visible = !overlayOpen;
+        jumpButton.visible = !overlayOpen;
 
         if (mapOverlayOpen) {
             ticksSinceMapSync++;
@@ -220,6 +238,29 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private void toggleShowChanges() {
         TimelineProjectionManager.toggleShowChanges();
         showChangesButton.setMessage(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()));
+    }
+
+    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
+     * Button widgets (consistent with the claim map overlay's own click handling). */
+    private void handleSettingsOverlayClick(double mouseX, double mouseY) {
+        int buttonY = topPos + 130;
+
+        if (deleteHistoryConfirmPending) {
+            int confirmX = leftPos + (imageWidth - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
+            int cancelX = confirmX + CONFIRM_BUTTON_WIDTH + 6;
+            if (isMouseOverRect(mouseX, mouseY, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+                PacketDistributor.sendToServer(new ChronosphereDeleteHistoryPacket(menu.getBlockPos()));
+                deleteHistoryConfirmPending = false;
+                settingsOverlayOpen = false;
+            } else if (isMouseOverRect(mouseX, mouseY, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+                deleteHistoryConfirmPending = false;
+            }
+        } else {
+            int buttonX = leftPos + (imageWidth - DELETE_BUTTON_WIDTH) / 2;
+            if (isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+                deleteHistoryConfirmPending = true;
+            }
+        }
     }
 
     private void jumpAndClose() {
@@ -393,6 +434,76 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 && mouseY >= autoTrackY && mouseY <= autoTrackY + BOOKMARK_SIZE;
     }
 
+    /** Placeholder glyph until a real icon is made — a plain gray square, distinct enough from the
+     * auto-track dot and the bookmark tab not to be confused with either. */
+    private void renderSettingsTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        boolean hovered = isMouseOverSettingsTab(mouseX, mouseY);
+        int bg = hovered ? 0xFF3A3A3A : 0xFF2A2A2A;
+
+        guiGraphics.fill(settingsX, settingsY, settingsX + BOOKMARK_SIZE, settingsY + BOOKMARK_SIZE, COLOR_BORDER);
+        guiGraphics.fill(settingsX + 1, settingsY + 1, settingsX + BOOKMARK_SIZE - 1, settingsY + BOOKMARK_SIZE - 1, bg);
+
+        int glyphSize = 10;
+        int glyphX = settingsX + (BOOKMARK_SIZE - glyphSize) / 2;
+        int glyphY = settingsY + (BOOKMARK_SIZE - glyphSize) / 2;
+        guiGraphics.fill(glyphX, glyphY, glyphX + glyphSize, glyphY + glyphSize, 0xFFBFBFBF);
+    }
+
+    private boolean isMouseOverSettingsTab(double mouseX, double mouseY) {
+        return mouseX >= settingsX && mouseX <= settingsX + BOOKMARK_SIZE
+                && mouseY >= settingsY && mouseY <= settingsY + BOOKMARK_SIZE;
+    }
+
+    private void renderSettingsOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xF0101010);
+
+        guiGraphics.drawCenteredString(font, Component.translatable("gui.temporalindustries.chronosphere.settings_title"),
+                leftPos + imageWidth / 2, topPos + 16, 0xFFFFFF);
+
+        guiGraphics.drawWordWrap(font, Component.translatable("gui.temporalindustries.chronosphere.delete_history_hint"),
+                leftPos + 20, topPos + 60, imageWidth - 40, 0xFFBFBFBF);
+
+        int buttonX = leftPos + (imageWidth - DELETE_BUTTON_WIDTH) / 2;
+        int buttonY = topPos + 130;
+
+        if (deleteHistoryConfirmPending) {
+            guiGraphics.drawCenteredString(font, Component.translatable("gui.temporalindustries.chronosphere.delete_history_confirm_prompt"),
+                    leftPos + imageWidth / 2, buttonY - 14, 0xFFFF6E6E);
+
+            int confirmX = leftPos + (imageWidth - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
+            int cancelX = confirmX + CONFIRM_BUTTON_WIDTH + 6;
+            drawOverlayButton(guiGraphics, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_confirm_button"),
+                    0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+            drawOverlayButton(guiGraphics, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_cancel_button"),
+                    0xFF3A3A3A, isMouseOverRect(mouseX, mouseY, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+        } else {
+            drawOverlayButton(guiGraphics, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_button"),
+                    0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+        }
+    }
+
+    private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
+                                   Component label, int baseColor, boolean hovered) {
+        int bg = hovered ? brighten(baseColor) : baseColor;
+        guiGraphics.fill(x, y, x + width, y + height, COLOR_BORDER);
+        guiGraphics.fill(x + 1, y + 1, x + width - 1, y + height - 1, bg);
+        guiGraphics.drawCenteredString(font, label, x + width / 2, y + (height - 8) / 2, 0xFFFFFFFF);
+    }
+
+    private static int brighten(int color) {
+        int r = Math.min(255, ((color >> 16) & 0xFF) + 30);
+        int g = Math.min(255, ((color >> 8) & 0xFF) + 30);
+        int b = Math.min(255, (color & 0xFF) + 30);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    }
+
+    private static boolean isMouseOverRect(double mouseX, double mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
     private void renderMapOverlay(GuiGraphics guiGraphics) {
         guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xF0101010);
 
@@ -487,9 +598,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         if (mapOverlayOpen) {
             renderMapOverlay(guiGraphics);
+        } else if (settingsOverlayOpen) {
+            renderSettingsOverlay(guiGraphics, mouseX, mouseY);
         }
         renderBookmark(guiGraphics, mouseX, mouseY);
         renderAutoTrackTab(guiGraphics, mouseX, mouseY);
+        renderSettingsTab(guiGraphics, mouseX, mouseY);
 
         if (mapOverlayOpen) {
             if (isMouseOverBookmark(mouseX, mouseY)) {
@@ -497,6 +611,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
                 guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
             }
+            return;
+        }
+        if (settingsOverlayOpen) {
             return;
         }
 
@@ -518,6 +635,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
         } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
+        } else if (isMouseOverSettingsTab(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.settings_tooltip"), mouseX, mouseY);
         }
     }
 
@@ -551,6 +670,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isMouseOverBookmark(mouseX, mouseY)) {
             mapOverlayOpen = !mapOverlayOpen;
+            settingsOverlayOpen = false;
+            deleteHistoryConfirmPending = false;
             if (mapOverlayOpen) {
                 ticksSinceMapSync = 0;
                 PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
@@ -561,6 +682,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (button == 0 && isMouseOverAutoTrackTab(mouseX, mouseY)) {
             boolean newState = !ChronosphereClientState.isAutoTrackingEnabled();
             PacketDistributor.sendToServer(new ChronosphereToggleAutoTrackPacket(menu.getBlockPos(), newState));
+            return true;
+        }
+
+        if (button == 0 && isMouseOverSettingsTab(mouseX, mouseY)) {
+            settingsOverlayOpen = !settingsOverlayOpen;
+            mapOverlayOpen = false;
+            deleteHistoryConfirmPending = false;
             return true;
         }
 
@@ -577,6 +705,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
             // The overlay is modal: swallow every click on the panel while it's open so nothing
             // underneath (the graph, the buttons) reacts to it.
+            return true;
+        }
+
+        if (settingsOverlayOpen) {
+            if (button == 0) {
+                handleSettingsOverlayClick(mouseX, mouseY);
+            }
+            // Modal, same as the claim map overlay above.
             return true;
         }
 
@@ -602,7 +738,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (mapOverlayOpen) {
+        if (mapOverlayOpen || settingsOverlayOpen) {
             return true;
         }
         if (graphWidget.mouseDragged(dragX, dragY)) {
