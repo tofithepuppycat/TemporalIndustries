@@ -390,6 +390,27 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         return ItemEnergyCosts.getCost(state.getBlock()).orElse(0);
     }
 
+    /** Wipes every claimed chunk's recorded history and re-baselines each from its current live
+     * state, without changing a single block — the world stays exactly as it is, there's just
+     * nothing left to jump back to until new history accumulates from here. Also resets
+     * placed/selected game time to now, same as if the Chronosphere had just been placed. */
+    public void deleteAllHistory() {
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
+
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+
+        for (ChunkPos chunk : getAllChunks()) {
+            timeline.clearChunkHistory(chunk);
+            ensureSnapshotted(worldData, timeline, serverLevel, chunk);
+        }
+
+        placedGameTime = level.getGameTime();
+        selectedGameTime = placedGameTime;
+        worldData.setDirty();
+        setChanged();
+    }
+
     // -------------------------------------------------------------------------
     // TimelineViewProvider — the home chunk's own commit graph is what's displayed, but jump()
     // above still moves every claimed chunk together, and getChunkJumpCosts() below prices each
