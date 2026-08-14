@@ -277,7 +277,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         long homeKey = new ChunkPos(menu.getBlockPos()).toLong();
         int x = stripX;
-        x = renderTab(guiGraphics, x, stripY, tabWidth, "A", selectedViewChunkKey == null, mouseX, mouseY, null);
+        x = renderTab(guiGraphics, x, stripY, tabWidth, "S", selectedViewChunkKey == null, mouseX, mouseY, null);
         for (long key : chunkKeys) {
             if (x >= stripX + GRAPH_WIDTH) break; // out of room: remaining chunks are click-reachable only via scroll (future work)
             String label = key == homeKey ? "H" : "";
@@ -502,7 +502,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         TabHit hoveredTab = getTabAt(mouseX, mouseY);
         if (hoveredTab != null) {
             Component label = hoveredTab.chunkKey() == null
-                    ? Component.literal("All claimed chunks")
+                    ? Component.literal("Shared history (all claimed chunks)")
                     : Component.literal("Chunk " + new ChunkPos(hoveredTab.chunkKey()).x + ", " + new ChunkPos(hoveredTab.chunkKey()).z);
             guiGraphics.renderTooltip(font, label, mouseX, mouseY);
             return;

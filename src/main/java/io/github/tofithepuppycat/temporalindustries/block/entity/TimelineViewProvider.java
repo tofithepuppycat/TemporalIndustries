@@ -64,7 +64,8 @@ public interface TimelineViewProvider {
     }
 
     /** Commits for one specific chunk from {@link #getViewableChunks()}, or — when chunkPos is
-     * null — a shared view merging every viewable chunk's history together. */
+     * null — the shared view: only the commits every viewable chunk has in common (an
+     * intersection, not a union; see ChronosphereBlockEntity#sharedCommits for why). */
     default List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
         return getChunkCommits();
     }
