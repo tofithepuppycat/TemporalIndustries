@@ -154,6 +154,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         graphWidget.init(menu.getBlockPos());
         ChronosphereClientState.setActiveMachine(menu.getBlockPos());
         selectedViewChunkKey = null;
+        TimelineProjectionManager.setSelectedViewChunk(null);
 
         requestTimelineView(true);
         PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
@@ -584,6 +585,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             if (tabHit != null) {
                 if (!java.util.Objects.equals(selectedViewChunkKey, tabHit.chunkKey())) {
                     selectedViewChunkKey = tabHit.chunkKey();
+                    TimelineProjectionManager.setSelectedViewChunk(
+                            selectedViewChunkKey == null ? null : new ChunkPos(selectedViewChunkKey));
                     TimelineProjectionManager.clearSelectedCommit();
                     requestTimelineView(true);
                 }
