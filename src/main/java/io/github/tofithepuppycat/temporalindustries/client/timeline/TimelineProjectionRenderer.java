@@ -1,6 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
@@ -12,6 +14,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -32,6 +35,16 @@ public class TimelineProjectionRenderer {
     private static final float BLINK_ALPHA_MAX = 0.85F;
     private static final long BLINK_PERIOD_MS = 900L;
 
+    /** Outer boundary of the previewed claim: a translucent wall standing on each chunk edge that
+     * has no other previewed chunk behind it. */
+    private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
+    /** Walls are backdrop, not the subject — kept well under the block decals' own blink alpha so
+     * they read as an enclosure rather than competing with the changes inside them. */
+    private static final float WALL_ALPHA_SCALE = 0.35F;
+    /** Half-height of the wall band, centered on the camera — a full world-height curtain would
+     * swamp the view, and the player only ever needs to see where the edge is near them. */
+    private static final float WALL_HALF_HEIGHT = 8.0F;
+
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
@@ -46,9 +59,6 @@ public class TimelineProjectionRenderer {
 
         TimelineProjectionManager.setCurrentGameTime(level.getGameTime());
         List<TimelineProjectionManager.ProjectionEntry> entries = TimelineProjectionManager.getProjectionEntries(level);
-        if (entries.isEmpty()) {
-            return;
-        }
 
         PoseStack poseStack = event.getPoseStack();
         Camera camera = minecraft.gameRenderer.getMainCamera();
@@ -62,6 +72,8 @@ public class TimelineProjectionRenderer {
         double blinkPhase = (System.currentTimeMillis() % BLINK_PERIOD_MS) / (double) BLINK_PERIOD_MS;
         float alpha = BLINK_ALPHA_MIN + (BLINK_ALPHA_MAX - BLINK_ALPHA_MIN)
                 * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase));
+
+        renderClaimBoundary(poseStack, quadBuffer, cameraX, cameraZ, alpha * WALL_ALPHA_SCALE);
 
         for (TimelineProjectionManager.ProjectionEntry entry : entries) {
             BlockPos pos = entry.getPos();
@@ -83,6 +95,53 @@ public class TimelineProjectionRenderer {
         }
 
         bufferSource.endBatch(RenderType.debugQuads());
+    }
+
+    /**
+     * Draws a wall along every chunk edge on the OUTER boundary of the previewed claim — an edge
+     * with no other previewed chunk on the far side of it. Interior edges (between two claimed
+     * chunks) are skipped, so a multi-chunk Chronosphere claim reads as one enclosure rather than
+     * a grid of boxes, and a single-chunk Time Machine still gets a plain box around its chunk.
+     */
+    private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer,
+                                            double cameraX, double cameraZ, float alpha) {
+        List<ChunkPos> chunks = TimelineProjectionManager.getPreviewChunks();
+        if (chunks.isEmpty()) {
+            return;
+        }
+
+        Set<Long> claimed = new HashSet<>();
+        for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
+
+        Matrix4f matrix = poseStack.last().pose();
+        float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
+        // The band is camera-relative, so its world height follows the player up and down.
+        float yBottom = -WALL_HALF_HEIGHT;
+        float yTop = WALL_HALF_HEIGHT;
+
+        for (ChunkPos chunk : chunks) {
+            float minX = (float) (chunk.getMinBlockX() - cameraX);
+            float maxX = (float) (chunk.getMinBlockX() + 16 - cameraX);
+            float minZ = (float) (chunk.getMinBlockZ() - cameraZ);
+            float maxZ = (float) (chunk.getMinBlockZ() + 16 - cameraZ);
+
+            if (!claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
+                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, minX, yBottom, maxZ,
+                        minX, yTop, maxZ, minX, yTop, minZ);
+            }
+            if (!claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
+                quad(matrix, buffer, r, g, b, alpha, maxX, yBottom, minZ, maxX, yBottom, maxZ,
+                        maxX, yTop, maxZ, maxX, yTop, minZ);
+            }
+            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
+                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, maxX, yBottom, minZ,
+                        maxX, yTop, minZ, minX, yTop, minZ);
+            }
+            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
+                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, maxZ, maxX, yBottom, maxZ,
+                        maxX, yTop, maxZ, minX, yTop, maxZ);
+            }
+        }
     }
 
     /** Draws a small square decal centered on each of the block's 6 faces, just outside the surface. */
