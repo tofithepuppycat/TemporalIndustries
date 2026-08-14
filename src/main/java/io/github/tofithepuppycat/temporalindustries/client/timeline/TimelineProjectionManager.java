@@ -58,6 +58,11 @@ public final class TimelineProjectionManager {
     private static List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>();
     /** Whether the in-world block-diff preview is toggled on via the "Show Changes" button. */
     private static boolean showChangesEnabled = false;
+    /** null when browsing the shared "All" view; otherwise the single claimed chunk whose own tab
+     * is currently open (see ChronosphereScreen#selectedViewChunkKey), so the boundary renderer can
+     * outline that one chunk even when it sits inside a larger claim and wouldn't otherwise get
+     * walls on every side. */
+    private static ChunkPos selectedViewChunk = null;
 
     private TimelineProjectionManager() {}
 
@@ -84,6 +89,17 @@ public final class TimelineProjectionManager {
         jumpCosts = new HashMap<>();
         previewChunkSnapshots = new ArrayList<>();
         showChangesEnabled = false;
+        selectedViewChunk = null;
+    }
+
+    /** Tells the boundary renderer which single claimed chunk's own tab (if any) is currently
+     * open, so it can outline that chunk specifically. Pass null for the shared "All" view. */
+    public static void setSelectedViewChunk(ChunkPos chunk) {
+        selectedViewChunk = chunk;
+    }
+
+    public static ChunkPos getSelectedViewChunk() {
+        return selectedViewChunk;
     }
 
     public static boolean hasSelection() {

@@ -102,6 +102,11 @@ public class TimelineProjectionRenderer {
      * with no other previewed chunk on the far side of it. Interior edges (between two claimed
      * chunks) are skipped, so a multi-chunk Chronosphere claim reads as one enclosure rather than
      * a grid of boxes, and a single-chunk Time Machine still gets a plain box around its chunk.
+     * If a single claimed chunk's own tab is open (see
+     * {@link TimelineProjectionManager#getSelectedViewChunk()}), that chunk also gets a full box
+     * on every side, even the edges it shares with a neighboring claimed chunk — otherwise a
+     * chunk in the middle of the claim wouldn't be outlined at all despite being the one whose
+     * history the player is actually browsing.
      */
     private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer,
                                             double cameraX, double cameraZ, float alpha) {
@@ -112,6 +117,7 @@ public class TimelineProjectionRenderer {
 
         Set<Long> claimed = new HashSet<>();
         for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
+        ChunkPos selectedChunk = TimelineProjectionManager.getSelectedViewChunk();
 
         Matrix4f matrix = poseStack.last().pose();
         float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
@@ -120,24 +126,25 @@ public class TimelineProjectionRenderer {
         float yTop = WALL_HALF_HEIGHT;
 
         for (ChunkPos chunk : chunks) {
+            boolean forceAllWalls = chunk.equals(selectedChunk);
             float minX = (float) (chunk.getMinBlockX() - cameraX);
             float maxX = (float) (chunk.getMinBlockX() + 16 - cameraX);
             float minZ = (float) (chunk.getMinBlockZ() - cameraZ);
             float maxZ = (float) (chunk.getMinBlockZ() + 16 - cameraZ);
 
-            if (!claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
+            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, minX, yBottom, maxZ,
                         minX, yTop, maxZ, minX, yTop, minZ);
             }
-            if (!claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
+            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, maxX, yBottom, minZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, maxX, yTop, minZ);
             }
-            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
+            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, maxX, yBottom, minZ,
                         maxX, yTop, minZ, minX, yTop, minZ);
             }
-            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
+            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, maxZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, minX, yTop, maxZ);
             }
