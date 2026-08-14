@@ -542,14 +542,22 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (timeline == null) return -1L;
         if (chunkPos != null) return timeline.getChunkHeadId(chunkPos);
 
-        // The home chunk's actual head is frequently NOT itself shared by every claimed chunk, and
-        // a head id the shared view never draws would leave its "live world is here" halo invisible.
-        // Fall back to the nearest ancestor that is drawn here.
+        // The home chunk's actual head is frequently NOT itself shared by every claimed chunk (a
+        // delta/branch commit only touches the chunks it actually affects), and a head id the
+        // shared view never draws would leave its "live world is here" pulse invisible. Resolve by
+        // TIME rather than walking the home chunk's own local-parent chain for a shared ancestor —
+        // after a jump lands the home chunk on a fresh per-chunk branch marker, that marker has no
+        // shared ancestor of its own to walk to (each claimed chunk gets its own distinct marker, so
+        // the walk can run out and strand the pulse on whatever shared commit was drawn before the
+        // jump). Nearest-by-gameTime always finds the shared node that best represents where the
+        // live world actually is now, since a jump target's marker always carries the exact gameTime
+        // it was checked out to.
         long homeHead = timeline.getChunkHeadId(getHomeChunkPos());
-        Set<Long> sharedIds = new HashSet<>();
-        for (TemporalCommit commit : sharedCommits(timeline)) sharedIds.add(commit.getId());
-        if (sharedIds.contains(homeHead)) return homeHead;
-        return nearestSharedAncestor(timeline.getLocalParentsForChunk(getHomeChunkPos()), sharedIds, homeHead);
+        TemporalCommit homeHeadCommit = timeline.getCommitById(homeHead);
+        if (homeHeadCommit == null) return -1L;
+        List<TemporalCommit> shared = sharedCommits(timeline);
+        if (shared.isEmpty()) return -1L;
+        return TemporalCommit.resolveNearest(shared, homeHeadCommit.getGameTime());
     }
 
     @Override
