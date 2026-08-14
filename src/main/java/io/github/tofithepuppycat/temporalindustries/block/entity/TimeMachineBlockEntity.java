@@ -12,6 +12,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -118,9 +119,10 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
             if (server != null) {
                 TemporalWorldData worldData = TemporalWorldData.get(server);
                 ChunkPos chunkPos = new ChunkPos(worldPosition);
-                worldData.trackChunk(chunkPos);
+                ResourceLocation dimension = level.dimension().location();
+                worldData.trackChunk(dimension, chunkPos, worldPosition);
 
-                TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+                TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
                 // A chunk with no commits yet (freshly tracked, or tracked-but-never-touched
                 // across a restart) gets a full baseline instead of waiting for its first delta —
                 // see ChunkSnapshot's class doc for why ancestryChain needs one of these to exist.
@@ -146,7 +148,8 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
     public void setRemoved() {
         super.setRemoved();
         if (level != null && !level.isClientSide && level.getServer() != null) {
-            TemporalWorldData.get(level.getServer()).untrackChunk(new ChunkPos(worldPosition));
+            TemporalWorldData.get(level.getServer())
+                    .untrackChunk(level.dimension().location(), new ChunkPos(worldPosition), worldPosition);
         }
     }
 
