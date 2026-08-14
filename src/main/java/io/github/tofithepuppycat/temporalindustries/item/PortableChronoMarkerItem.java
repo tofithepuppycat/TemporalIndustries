@@ -7,6 +7,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,8 +28,11 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 
 /**
@@ -52,6 +56,19 @@ public class PortableChronoMarkerItem extends Item {
     /** playerId -> gameTime the current terrain-tracing wave started, consumed in inventoryTick.
      * Purely cosmetic — never persisted. */
     private static final Map<UUID, Long> ACTIVE_WAVE_START = new HashMap<>();
+
+    /** playerId -> the chunks currently tracked on that player's behalf (see
+     * {@link TemporalWorldData#trackChunk}), so a chunk that falls out of radius — or every chunk,
+     * once the player stops carrying/selecting the marker — actually gets released instead of
+     * staying tracked (and recording deltas) forever. Never persisted: a fresh server start simply
+     * has nothing tracked here until a marker is held again. */
+    private static final Map<UUID, PlayerTrackedChunks> ACTIVE_TRACKED_CHUNKS = new HashMap<>();
+    /** A player who hasn't refreshed their tracked radius in this long is assumed to have
+     * deselected/dropped the marker or logged out — inventoryTick() has no direct hook for any of
+     * those, so {@link #releaseStaleTracking} sweeps for it periodically instead. */
+    private static final int STALE_AFTER_TICKS = TRACK_INTERVAL_TICKS * 3;
+
+    private record PlayerTrackedChunks(ResourceLocation dimension, Set<Long> chunkKeys, long lastRefreshTick) {}
 
     public PortableChronoMarkerItem(Properties properties) {
         super(properties);
@@ -92,8 +109,8 @@ public class PortableChronoMarkerItem extends Item {
         TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
 
         List<ChunkPos> chunks = chunksInRadius(player);
+        trackChunksForPlayer(player, level, chunks);
         for (ChunkPos chunkPos : chunks) {
-            worldData.trackChunk(chunkPos);
             timeline.ensureBaseline(chunkPos, level);
         }
 
@@ -147,11 +164,58 @@ public class PortableChronoMarkerItem extends Item {
     private static void trackRadius(ServerPlayer player, ServerLevel level) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
-        for (ChunkPos chunkPos : chunksInRadius(player)) {
-            worldData.trackChunk(chunkPos);
+        List<ChunkPos> chunks = chunksInRadius(player);
+        trackChunksForPlayer(player, level, chunks);
+        for (ChunkPos chunkPos : chunks) {
             timeline.ensureBaseline(chunkPos, level);
         }
+    }
+
+    /** Tracks exactly chunks on player's behalf, releasing any chunk this player was tracking
+     * previously (in whichever dimension) that isn't in the new set — so walking away shrinks the
+     * tracked radius instead of it only ever growing. */
+    private static void trackChunksForPlayer(ServerPlayer player, ServerLevel level, List<ChunkPos> chunks) {
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
+        UUID playerId = player.getUUID();
+
+        Set<Long> newKeys = new HashSet<>();
+        for (ChunkPos chunkPos : chunks) {
+            newKeys.add(chunkPos.toLong());
+            worldData.trackChunk(dimension, chunkPos, playerId);
+        }
+
+        PlayerTrackedChunks previous = ACTIVE_TRACKED_CHUNKS.get(playerId);
+        if (previous != null) {
+            for (long oldKey : previous.chunkKeys()) {
+                if (previous.dimension().equals(dimension) && newKeys.contains(oldKey)) continue;
+                worldData.untrackChunk(previous.dimension(), new ChunkPos(oldKey), playerId);
+            }
+        }
+
+        ACTIVE_TRACKED_CHUNKS.put(playerId, new PlayerTrackedChunks(dimension, newKeys, level.getGameTime()));
         worldData.setDirty();
+    }
+
+    /** Releases marker tracking for any player who hasn't refreshed it in a while — deselected the
+     * item, dropped it, switched dimension without the item ticking again yet, or logged out.
+     * Called periodically from {@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener}'s
+     * flush loop, since inventoryTick() itself has no "stopped being held" hook to release from. */
+    public static void releaseStaleTracking(MinecraftServer server, long gameTime) {
+        if (ACTIVE_TRACKED_CHUNKS.isEmpty()) return;
+
+        TemporalWorldData worldData = TemporalWorldData.get(server);
+        Iterator<Map.Entry<UUID, PlayerTrackedChunks>> it = ACTIVE_TRACKED_CHUNKS.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, PlayerTrackedChunks> entry = it.next();
+            if (gameTime - entry.getValue().lastRefreshTick() < STALE_AFTER_TICKS) continue;
+
+            UUID playerId = entry.getKey();
+            for (long key : entry.getValue().chunkKeys()) {
+                worldData.untrackChunk(entry.getValue().dimension(), new ChunkPos(key), playerId);
+            }
+            it.remove();
+        }
     }
 
     // -------------------------------------------------------------------------
