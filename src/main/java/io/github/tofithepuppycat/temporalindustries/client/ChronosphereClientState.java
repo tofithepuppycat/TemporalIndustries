@@ -62,6 +62,12 @@ public final class ChronosphereClientState {
         return selectedChunks.size();
     }
 
+    /** Every claimed chunk's packed key, as last synced from the server — used to build the
+     * Chronosphere GUI's per-chunk timeline tabs. */
+    public static Set<Long> getSelectedChunks() {
+        return selectedChunks;
+    }
+
     /** How many of the claimed chunks are currently tracked (recording deltas) — may be less than
      * getSelectedCount() when auto-tracking is off. */
     public static int getTrackedCount() {
