@@ -310,8 +310,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         guiGraphics.drawCenteredString(font, Component.literal(
                 menu.getBlockEntity().getChunkCount() + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
                 leftPos + imageWidth / 2, footerY, 0xFFBFBFBF);
+        int trackedCount = ChronosphereClientState.getTrackedCount();
+        int trackedColor = trackedCount == menu.getBlockEntity().getChunkCount() ? 0xFF8CFF9E : 0xFFFFB86B;
+        guiGraphics.drawCenteredString(font, Component.literal(
+                trackedCount + " / " + menu.getBlockEntity().getChunkCount() + " chunks tracked"),
+                leftPos + imageWidth / 2, footerY + 11, trackedColor);
         guiGraphics.drawCenteredString(font, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
-                leftPos + imageWidth / 2, footerY + 12, 0xFF808080);
+                leftPos + imageWidth / 2, footerY + 23, 0xFF808080);
     }
 
     private ChunkPos getGridCellAt(double mouseX, double mouseY) {

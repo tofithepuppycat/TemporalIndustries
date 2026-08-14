@@ -13,6 +13,7 @@ public final class ChronosphereClientState {
     private static Set<Long> selectedChunks = new HashSet<>();
     private static Set<Long> blockedChunks = new HashSet<>();
     private static boolean autoTrackingEnabled = false;
+    private static int trackedCount = 0;
 
     private ChronosphereClientState() {}
 
@@ -33,14 +34,16 @@ public final class ChronosphereClientState {
         selectedChunks = new HashSet<>();
         blockedChunks = new HashSet<>();
         autoTrackingEnabled = false;
+        trackedCount = 0;
     }
 
     public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked,
-                                        boolean serverAutoTrackingEnabled) {
+                                        boolean serverAutoTrackingEnabled, int serverTrackedCount) {
         activeMachinePos = machinePos;
         selectedChunks = serverSelected;
         blockedChunks = serverBlocked;
         autoTrackingEnabled = serverAutoTrackingEnabled;
+        trackedCount = serverTrackedCount;
     }
 
     public static boolean isAutoTrackingEnabled() {
@@ -57,5 +60,11 @@ public final class ChronosphereClientState {
 
     public static int getSelectedCount() {
         return selectedChunks.size();
+    }
+
+    /** How many of the claimed chunks are currently tracked (recording deltas) — may be less than
+     * getSelectedCount() when auto-tracking is off. */
+    public static int getTrackedCount() {
+        return trackedCount;
     }
 }
