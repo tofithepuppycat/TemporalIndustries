@@ -5,10 +5,13 @@ import java.util.List;
 import org.jetbrains.annotations.NotNull;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
+import io.github.tofithepuppycat.temporalindustries.client.ChronosphereMapClientState;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleChunkPacket;
@@ -18,6 +21,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.level.ChunkPos;
@@ -44,6 +48,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int ENERGY_BAR_HEIGHT = 8;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
+    /** How often the map overlay re-fetches terrain thumbnails while open, so it doesn't go stale
+     * for a player who leaves it open and keeps building nearby. */
+    private static final int MAP_SYNC_INTERVAL_TICKS = 100;
 
     // Bookmark tab: mostly overlaps the panel's right edge, protruding outward, like a vanilla
     // recipe-book tab attached to a crafting GUI.
@@ -74,6 +81,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private Button jumpButton;
     private Button showChangesButton;
     private int ticksSinceSync = 0;
+    private int ticksSinceMapSync = 0;
     private boolean mapOverlayOpen = false;
 
     private int bookmarkX;
@@ -140,6 +148,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public void onClose() {
         graphWidget.onClose();
+        ChronosphereMapClientState.clearAll();
         super.onClose();
     }
 
@@ -159,6 +168,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         jumpButton.active = TimelineProjectionManager.hasSelection();
         showChangesButton.visible = !mapOverlayOpen;
         jumpButton.visible = !mapOverlayOpen;
+
+        if (mapOverlayOpen) {
+            ticksSinceMapSync++;
+            if (ticksSinceMapSync >= MAP_SYNC_INTERVAL_TICKS) {
+                ticksSinceMapSync = 0;
+                PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
+            }
+        }
     }
 
     private void toggleShowChanges() {
@@ -286,23 +303,34 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
                 int cellX = gridX + col * (CELL_SIZE + CELL_GAP);
                 int cellY = gridY + row * (CELL_SIZE + CELL_GAP);
+                long key = new ChunkPos(home.x + dx, home.z + dz).toLong();
 
-                int color;
+                int tint;
                 if (dx == 0 && dz == 0) {
-                    color = COLOR_HOME;
+                    tint = COLOR_HOME;
+                } else if (ChronosphereClientState.isSelected(key)) {
+                    tint = COLOR_SELECTED;
+                } else if (ChronosphereClientState.isBlocked(key)) {
+                    tint = COLOR_BLOCKED;
                 } else {
-                    long key = new ChunkPos(home.x + dx, home.z + dz).toLong();
-                    if (ChronosphereClientState.isSelected(key)) {
-                        color = COLOR_SELECTED;
-                    } else if (ChronosphereClientState.isBlocked(key)) {
-                        color = COLOR_BLOCKED;
-                    } else {
-                        color = COLOR_AVAILABLE;
-                    }
+                    tint = COLOR_AVAILABLE;
                 }
 
                 guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, COLOR_BORDER);
-                guiGraphics.fill(cellX + 1, cellY + 1, cellX + CELL_SIZE - 1, cellY + CELL_SIZE - 1, color);
+
+                ResourceLocation terrain = ChronosphereMapClientState.getTexture(key);
+                int innerX0 = cellX + 1, innerY0 = cellY + 1, innerX1 = cellX + CELL_SIZE - 1, innerY1 = cellY + CELL_SIZE - 1;
+                if (terrain != null) {
+                    int inner = CELL_SIZE - 2;
+                    int size = ChronoMapSampler.SIZE;
+                    guiGraphics.blit(terrain, innerX0, innerY0, inner, inner, 0.0F, 0.0F, size, size, size, size);
+                    // Status tint over the terrain, translucent so the sampled ground stays visible.
+                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, (0x80 << 24) | (tint & 0xFFFFFF));
+                } else {
+                    // No thumbnail yet (overlay just opened, or the chunk isn't loaded server-side):
+                    // fall back to the flat status color instead of leaving the cell blank.
+                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, tint);
+                }
             }
         }
 
@@ -404,6 +432,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isMouseOverBookmark(mouseX, mouseY)) {
             mapOverlayOpen = !mapOverlayOpen;
+            if (mapOverlayOpen) {
+                ticksSinceMapSync = 0;
+                PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
+            }
             return true;
         }
 
