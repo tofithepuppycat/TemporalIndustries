@@ -41,7 +41,7 @@ public final class TimelineGraphWidget {
 
     // Whichever commit this chunk's live world currently reflects blinks: its own node pulses
     // between its lane color and HEAD_HIGHLIGHT_RGB, rather than being ringed by a separate halo.
-    private static final int HEAD_HIGHLIGHT_RGB = 0x00FFC8;
+    private static final int HEAD_HIGHLIGHT_RGB = 0xFFFFFF;
     private static final long HEAD_BLINK_PERIOD_MS = 900L;
     /** How far toward HEAD_HIGHLIGHT_RGB the head node's own color is pulled at the dimmest and
      * brightest points of the blink. Never reaches 0 so the head stays identifiable mid-cycle. */
@@ -196,7 +196,10 @@ public final class TimelineGraphWidget {
                 boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
                 int color = selected ? 0xFFFFFFFF : laneColor;
                 if (commit.getId() == headCommitId) {
-                    color = mixColor(color, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix);
+                    // Always pulses from the LANE color, never from the selected white: blending
+                    // white toward white is a no-op, which would freeze the blink for exactly the
+                    // node most likely to be selected.
+                    color = mixColor(laneColor, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix);
                 }
 
                 int shapeRadius = commit.isPlayerMark() ? markerRadius(r) : r;
@@ -215,7 +218,7 @@ public final class TimelineGraphWidget {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
                 }
 
-                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius));
+                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius, laneColor));
             }
         }
 
@@ -230,7 +233,7 @@ public final class TimelineGraphWidget {
             // Keeps blinking when the selection happens to BE the head — repainting flat white here
             // would otherwise freeze the pulse for exactly the node most likely to be selected.
             int selectedColor = rc.commit.getId() == headCommitId
-                    ? mixColor(0xFFFFFFFF, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix)
+                    ? mixColor(rc.laneColor, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix)
                     : 0xFFFFFFFF;
             if (rc.commit.getType() == TemporalCommit.Type.BRANCH) {
                 int outer = rc.hitRadius + 1;
@@ -546,12 +549,16 @@ public final class TimelineGraphWidget {
         private final int x;
         private final int y;
         private final int hitRadius;
+        /** This node's lineage color, kept so the selected-node redraw pass can restart the head
+         * blink from it rather than from the selection's flat white (see render()). */
+        private final int laneColor;
 
-        private RenderedCommit(TemporalCommit commit, int x, int y, int hitRadius) {
+        private RenderedCommit(TemporalCommit commit, int x, int y, int hitRadius, int laneColor) {
             this.commit = commit;
             this.x = x;
             this.y = y;
             this.hitRadius = hitRadius;
+            this.laneColor = laneColor;
         }
     }
 }
