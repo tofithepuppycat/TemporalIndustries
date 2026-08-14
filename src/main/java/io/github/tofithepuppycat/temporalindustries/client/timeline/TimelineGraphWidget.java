@@ -41,7 +41,7 @@ public final class TimelineGraphWidget {
 
     // Whichever commit this chunk's live world currently reflects blinks: its own node pulses
     // between its lane color and HEAD_HIGHLIGHT_RGB, rather than being ringed by a separate halo.
-    private static final int HEAD_HIGHLIGHT_RGB = 0xFFFFFF;
+    private static final int HEAD_HIGHLIGHT_RGB = 0xB266FF;
     private static final long HEAD_BLINK_PERIOD_MS = 900L;
     /** How far toward HEAD_HIGHLIGHT_RGB the head node's own color is pulled at the dimmest and
      * brightest points of the blink. Never reaches 0 so the head stays identifiable mid-cycle. */
