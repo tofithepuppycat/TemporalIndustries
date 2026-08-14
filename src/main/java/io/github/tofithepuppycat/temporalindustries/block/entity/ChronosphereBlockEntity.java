@@ -38,7 +38,7 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
+import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -468,20 +468,33 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
                 .getTimeline(level.dimension().location());
         if (timeline == null) return Collections.emptyList();
         if (chunkPos != null) return timeline.getCommitsForChunk(chunkPos);
+        return sharedCommits(timeline);
+    }
 
-        // Shared/"All" view: every commit relevant to any claimed chunk, deduplicated and ordered
-        // by id (creation order) — since a Chronosphere's jump()s batch every claimed chunk's
-        // DELTA/SNAPSHOT commits together on the same dimension-wide trunk, this mostly reflects
-        // one shared history, with each chunk's own BRANCH markers layered in alongside it.
-        Map<Long, TemporalCommit> byId = new LinkedHashMap<>();
-        for (ChunkPos chunk : getAllChunks()) {
-            for (TemporalCommit commit : timeline.getCommitsForChunk(chunk)) {
-                byId.putIfAbsent(commit.getId(), commit);
+    /**
+     * The shared "All" view: only commits relevant to EVERY claimed chunk, in creation order.
+     *
+     * <p>Deliberately an intersection rather than a union. Each chunk keeps its own independent
+     * ancestry (see {@link TemporalTimeline}'s class doc), so unioning the claimed chunks' commit
+     * lists produces commits from lineages that have no local-parent link to each other — the
+     * graph layout then treats every one of them as a fresh root, stacking them all at row 0 with
+     * their own "… Timeline" labels drawn on top of each other. The commits every chunk shares are
+     * exactly the ones that describe the claim as a whole (a Chronosphere's jumps batch every
+     * claimed chunk into the same DELTA/SNAPSHOT commits), and they form a single connected chain
+     * that lays out cleanly. Per-chunk detail is still one tab click away.
+     */
+    private List<TemporalCommit> sharedCommits(TemporalTimeline timeline) {
+        List<ChunkPos> chunks = getAllChunks();
+        List<TemporalCommit> shared = new ArrayList<>(timeline.getCommitsForChunk(chunks.get(0)));
+        for (int i = 1; i < chunks.size() && !shared.isEmpty(); i++) {
+            Set<Long> idsInChunk = new HashSet<>();
+            for (TemporalCommit commit : timeline.getCommitsForChunk(chunks.get(i))) {
+                idsInChunk.add(commit.getId());
             }
+            shared.removeIf(commit -> !idsInChunk.contains(commit.getId()));
         }
-        List<TemporalCommit> merged = new ArrayList<>(byId.values());
-        merged.sort(Comparator.comparingLong(TemporalCommit::getId));
-        return merged;
+        shared.sort(Comparator.comparingLong(TemporalCommit::getId));
+        return shared;
     }
 
     @Override
@@ -492,17 +505,33 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (timeline == null) return Collections.emptyMap();
         if (chunkPos != null) return timeline.getLocalParentsForChunk(chunkPos);
 
-        // The home chunk's own fork lineage is the primary skeleton for the shared view (a
-        // Chronosphere's jumps are always triggered through it), filled in with whichever other
-        // claimed chunk first recorded a local-parent entry for any commit home doesn't have one
-        // for — e.g. a chunk that had its own history before being claimed alongside home.
-        Map<Long, Long> merged = new HashMap<>(timeline.getLocalParentsForChunk(getHomeChunkPos()));
-        for (ChunkPos chunk : getAllChunks()) {
-            for (Map.Entry<Long, Long> entry : timeline.getLocalParentsForChunk(chunk).entrySet()) {
-                merged.putIfAbsent(entry.getKey(), entry.getValue());
-            }
+        // Shared view: re-link each shared commit to its nearest ancestor that is ALSO shared,
+        // rather than passing through the raw per-chunk links. A shared commit's immediate local
+        // parent is often a commit only some chunks have (so it isn't drawn here); left as-is that
+        // link would dangle, the layout would treat the commit as a root, and the shared chain
+        // would fragment back into the overlapping pile this view exists to avoid.
+        Set<Long> sharedIds = new HashSet<>();
+        for (TemporalCommit commit : sharedCommits(timeline)) sharedIds.add(commit.getId());
+
+        Map<Long, Long> rawParents = timeline.getLocalParentsForChunk(getHomeChunkPos());
+        Map<Long, Long> relinked = new HashMap<>();
+        for (long id : sharedIds) {
+            relinked.put(id, nearestSharedAncestor(rawParents, sharedIds, id));
         }
-        return merged;
+        return relinked;
+    }
+
+    /** Walks commitId's local-parent chain upward until it reaches a commit in sharedIds, or -1 if
+     * it runs out. Guarded against a cycle in the (persisted) parent links so a corrupt save can't
+     * hang the server tick here. */
+    private static long nearestSharedAncestor(Map<Long, Long> rawParents, Set<Long> sharedIds, long commitId) {
+        Set<Long> visited = new HashSet<>();
+        long current = rawParents.getOrDefault(commitId, -1L);
+        while (current >= 0 && visited.add(current)) {
+            if (sharedIds.contains(current)) return current;
+            current = rawParents.getOrDefault(current, -1L);
+        }
+        return -1L;
     }
 
     @Override
@@ -511,7 +540,16 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
                 .getTimeline(level.dimension().location());
         if (timeline == null) return -1L;
-        return timeline.getChunkHeadId(chunkPos != null ? chunkPos : getHomeChunkPos());
+        if (chunkPos != null) return timeline.getChunkHeadId(chunkPos);
+
+        // The home chunk's actual head is frequently NOT itself shared by every claimed chunk, and
+        // a head id the shared view never draws would leave its "live world is here" halo invisible.
+        // Fall back to the nearest ancestor that is drawn here.
+        long homeHead = timeline.getChunkHeadId(getHomeChunkPos());
+        Set<Long> sharedIds = new HashSet<>();
+        for (TemporalCommit commit : sharedCommits(timeline)) sharedIds.add(commit.getId());
+        if (sharedIds.contains(homeHead)) return homeHead;
+        return nearestSharedAncestor(timeline.getLocalParentsForChunk(getHomeChunkPos()), sharedIds, homeHead);
     }
 
     @Override
