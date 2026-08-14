@@ -334,14 +334,19 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
         }
 
+        // menu.getBlockEntity() is the CLIENT's copy of the block entity, which (having no custom
+        // getUpdateTag/handleUpdateTag override) never receives its fields from the server — its
+        // additionalChunks set is always empty client-side, so getChunkCount() would always read
+        // 1 here. ChronosphereClientState's synced selection is the only client-accurate source.
+        int claimedCount = ChronosphereClientState.getSelectedCount();
         int footerY = gridY + GRID_PIXELS + 10;
         guiGraphics.drawCenteredString(font, Component.literal(
-                menu.getBlockEntity().getChunkCount() + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
+                claimedCount + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
                 leftPos + imageWidth / 2, footerY, 0xFFBFBFBF);
         int trackedCount = ChronosphereClientState.getTrackedCount();
-        int trackedColor = trackedCount == menu.getBlockEntity().getChunkCount() ? 0xFF8CFF9E : 0xFFFFB86B;
+        int trackedColor = trackedCount == claimedCount ? 0xFF8CFF9E : 0xFFFFB86B;
         guiGraphics.drawCenteredString(font, Component.literal(
-                trackedCount + " / " + menu.getBlockEntity().getChunkCount() + " chunks tracked"),
+                trackedCount + " / " + claimedCount + " chunks tracked"),
                 leftPos + imageWidth / 2, footerY + 11, trackedColor);
         guiGraphics.drawCenteredString(font, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
                 leftPos + imageWidth / 2, footerY + 23, 0xFF808080);
