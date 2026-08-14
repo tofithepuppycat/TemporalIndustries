@@ -54,6 +54,19 @@ public class TemporalTimeline {
     // -------------------------------------------------------------------------
     // Mutation
 
+    /** Forgets chunkPos's entire recorded history — every commit that touched it, its local-parent
+     * links, and its head — without touching the live world. Commits that also touch OTHER chunks
+     * (a shared DELTA, say) are left registered globally; only this chunk's own reference to them is
+     * dropped, same as if it had never been tracked. Callers that want history to resume afterward
+     * still need to give the chunk a fresh baseline (see {@code ensureBaseline}), since without one
+     * it has no anchor to walk from. */
+    public void clearChunkHistory(ChunkPos chunkPos) {
+        long chunkKey = chunkPos.toLong();
+        chunkIndex.remove(chunkKey);
+        chunkLocalParent.remove(chunkKey);
+        chunkHeadId.remove(chunkKey);
+    }
+
     public TemporalCommit addDelta(long gameTime, List<ChunkDelta> chunkDeltas) {
         TemporalCommit commit = TemporalCommit.delta(nextId++, headId, gameTime, chunkDeltas);
         registerCommit(commit);
