@@ -66,6 +66,7 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
         for (ChunkPos pos : machine.getAllChunks()) selected.add(pos.toLong());
 
         TemporalWorldData worldData = TemporalWorldData.get(sender.serverLevel().getServer());
+        ResourceLocation dimension = sender.serverLevel().dimension().location();
         ChunkPos home = machine.getHomeChunkPos();
         List<Long> blocked = new ArrayList<>();
         int radius = ChronosphereBlockEntity.MAX_RADIUS;
@@ -74,14 +75,23 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
                 if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue;
                 ChunkPos pos = new ChunkPos(home.x + dx, home.z + dz);
                 long key = pos.toLong();
-                if (!selected.contains(key) && worldData.isTracked(pos)) {
+                if (!selected.contains(key) && worldData.isTracked(dimension, pos)) {
                     blocked.add(key);
                 }
             }
         }
 
+        // How many of the claimed chunks are actually being tracked (recording deltas) right now —
+        // may be fewer than selected.size() if auto-tracking is off, and can differ from it even
+        // when auto-tracking is on if another owner (a held Portable ChronoMarker, another
+        // machine) also happens to be tracking one of these chunks.
+        int trackedCount = 0;
+        for (long key : selected) {
+            if (worldData.isTracked(dimension, new ChunkPos(key))) trackedCount++;
+        }
+
         PacketDistributor.sendToPlayer(sender, new ChronosphereStateSyncPacket(
-                machinePos, new ArrayList<>(selected), blocked, machine.isAutoTrackingEnabled()));
+                machinePos, new ArrayList<>(selected), blocked, machine.isAutoTrackingEnabled(), trackedCount));
     }
 
     @Override
