@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 
@@ -156,6 +157,16 @@ public final class TimelineProjectionManager {
     public static void setCurrentGameTime(long current) {
         currentGameTime = Math.max(placedGameTime, current);
         selectedGameTime = clampSelected(selectedGameTime);
+    }
+
+    /** Every chunk the active preview covers — the graph's own chunk for a Time Machine, every
+     * claimed chunk for a Chronosphere. Used to outline the claim's outer boundary in-world while
+     * "Show Changes" is on, so the player can see the extent a jump would actually touch even
+     * where no individual block happens to be changing. */
+    public static List<ChunkPos> getPreviewChunks() {
+        List<ChunkPos> chunks = new ArrayList<>(previewChunkSnapshots.size());
+        for (ChunkTimelineSnapshot snapshot : previewChunkSnapshots) chunks.add(snapshot.chunkPos());
+        return chunks;
     }
 
     /** Computes which blocks differ from their live world state at selectedGameTime, across every
