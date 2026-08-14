@@ -37,8 +37,18 @@ public class TemporalWorldData extends SavedData {
     private final Map<ResourceLocation, TemporalTimeline> timelines = new HashMap<>();
     private final Map<UUID, PlayerTemporalState> playerStates = new HashMap<>();
 
-    // Not persisted: rebuilt when block entities load.
-    private final Set<Long> trackedChunks = new HashSet<>();
+    // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> the set
+    // of owners currently claiming that chunk needs tracking (a TimeMachineBlockEntity/
+    // ChronosphereBlockEntity keyed by its own BlockPos, or a held Portable ChronoMarker keyed by
+    // the wielder's UUID). Owner-scoped rather than a plain boolean set so one owner letting go of
+    // a chunk (auto-tracking toggled off, claim released, machine broken) can never silently stop
+    // another owner's tracking of that same chunk out from under it — seen in practice as deltas
+    // still being recorded for a chunk right after its Chronosphere's auto-tracking was switched
+    // off, because a Portable ChronoMarker (or another machine) sharing that chunk was still
+    // tracking it. Keyed by dimension too: chunk (x, z) coordinates collide across dimensions, and
+    // a raw ChunkPos-only key would let an unrelated chunk in another dimension enable/disable
+    // tracking here by coincidence of coordinates.
+    private final Map<ResourceLocation, Map<Long, Set<Object>>> trackedChunkOwners = new HashMap<>();
 
     // Transient pending deltas flushed by TemporalChangeListener on server tick.
     // Outer key: dimension. Inner key: chunkPos.toLong(). Value: latest merged delta per BlockPos.
@@ -70,16 +80,43 @@ public class TemporalWorldData extends SavedData {
     // -------------------------------------------------------------------------
     // Chunk tracking
 
-    public void trackChunk(ChunkPos pos) {
-        trackedChunks.add(pos.toLong());
+    /** Registers owner as wanting chunkPos (in dimension) tracked. Idempotent per owner: calling
+     * this repeatedly for the same owner (e.g. every tick a Portable ChronoMarker refreshes its
+     * radius) never grows past one claim, so a single matching untrackChunk always fully releases it. */
+    public void trackChunk(ResourceLocation dimension, ChunkPos pos, Object owner) {
+        trackedChunkOwners.computeIfAbsent(dimension, d -> new HashMap<>())
+                .computeIfAbsent(pos.toLong(), c -> new HashSet<>())
+                .add(owner);
     }
 
-    public void untrackChunk(ChunkPos pos) {
-        trackedChunks.remove(pos.toLong());
+    /** Releases owner's claim on chunkPos. The chunk stays tracked if any other owner still claims
+     * it — only the last owner letting go actually stops tracking. */
+    public void untrackChunk(ResourceLocation dimension, ChunkPos pos, Object owner) {
+        Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
+        if (dimChunks == null) return;
+        Set<Object> owners = dimChunks.get(pos.toLong());
+        if (owners == null) return;
+        owners.remove(owner);
+        if (owners.isEmpty()) dimChunks.remove(pos.toLong());
+        if (dimChunks.isEmpty()) trackedChunkOwners.remove(dimension);
     }
 
-    public boolean isTracked(ChunkPos pos) {
-        return trackedChunks.contains(pos.toLong());
+    /** Releases every chunk owner currently claims, across every dimension — for a stateful owner
+     * (a held Portable ChronoMarker, keyed by player UUID) that needs to fully let go without
+     * tracking which chunks it last touched itself. */
+    public void untrackAllForOwner(Object owner) {
+        for (Map<Long, Set<Object>> dimChunks : trackedChunkOwners.values()) {
+            dimChunks.values().removeIf(owners -> {
+                owners.remove(owner);
+                return owners.isEmpty();
+            });
+        }
+        trackedChunkOwners.values().removeIf(Map::isEmpty);
+    }
+
+    public boolean isTracked(ResourceLocation dimension, ChunkPos pos) {
+        Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
+        return dimChunks != null && dimChunks.containsKey(pos.toLong());
     }
 
     // -------------------------------------------------------------------------

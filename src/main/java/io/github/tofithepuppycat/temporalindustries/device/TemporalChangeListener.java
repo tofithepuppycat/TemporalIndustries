@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.device;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
@@ -71,7 +72,7 @@ public final class TemporalChangeListener {
         BlockPos pos = event.getPos().immutable();
         ServerPlayer player = event.getPlayer() instanceof ServerPlayer sp ? sp : null;
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!shouldRecord(data, pos, player)) return;
+        if (!shouldRecord(level, data, pos, player)) return;
 
         // saveWithFullMetadata() is a real cost (full BE NBT), so it's only paid once we already
         // know this change is actually going to be recorded somewhere.
@@ -90,7 +91,7 @@ public final class TemporalChangeListener {
         BlockPos pos = event.getPos().immutable();
         ServerPlayer player = event.getEntity() instanceof ServerPlayer sp ? sp : null;
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!shouldRecord(data, pos, player)) return;
+        if (!shouldRecord(level, data, pos, player)) return;
 
         BlockEntity be = level.getBlockEntity(pos);
         CompoundTag newBETag = be != null ? be.saveWithFullMetadata(level.registryAccess()) : null;
@@ -113,7 +114,7 @@ public final class TemporalChangeListener {
 
         for (BlockSnapshot snapshot : event.getReplacedBlockSnapshots()) {
             BlockPos pos = snapshot.getPos().immutable();
-            if (!shouldRecord(data, pos, player)) continue;
+            if (!shouldRecord(level, data, pos, player)) continue;
 
             BlockEntity be = level.getBlockEntity(pos);
             CompoundTag newBETag = be != null ? be.saveWithFullMetadata(level.registryAccess()) : null;
@@ -126,8 +127,8 @@ public final class TemporalChangeListener {
 
     /** Whether this change is actually going to be recorded anywhere (tracked chunk, or an armed
      * player's anchor) — checked before paying for full block-entity NBT serialization. */
-    private static boolean shouldRecord(TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
-        if (data.isTracked(new ChunkPos(pos))) return true;
+    private static boolean shouldRecord(ServerLevel level, TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
+        if (data.isTracked(level.dimension().location(), new ChunkPos(pos))) return true;
         if (player == null) return false;
         PlayerTemporalState state = data.getPlayerState(player.getUUID());
         return state != null && state.isArmed();
@@ -148,7 +149,7 @@ public final class TemporalChangeListener {
 
         // 2. Buffer for the timeline if this chunk is tracked by a Time Machine
         ChunkPos chunkPos = new ChunkPos(pos);
-        if (data.isTracked(chunkPos)) {
+        if (data.isTracked(dimension, chunkPos)) {
             data.recordTrackedBlockChange(dimension, chunkPos, delta);
         }
     }
@@ -165,11 +166,12 @@ public final class TemporalChangeListener {
 
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!data.isTracked(chunkPos)) return;
+        ResourceLocation dimension = level.dimension().location();
+        if (!data.isTracked(dimension, chunkPos)) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
-        data.recordEntityDelta(level.dimension().location(), chunkPos,
+        data.recordEntityDelta(dimension, chunkPos,
                 new EntityDelta(entity.getUUID(), EntityDelta.Type.SPAWNED, null, stateTag));
     }
 
@@ -182,11 +184,12 @@ public final class TemporalChangeListener {
 
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!data.isTracked(chunkPos)) return;
+        ResourceLocation dimension = level.dimension().location();
+        if (!data.isTracked(dimension, chunkPos)) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
-        data.recordEntityDelta(level.dimension().location(), chunkPos,
+        data.recordEntityDelta(dimension, chunkPos,
                 new EntityDelta(entity.getUUID(), EntityDelta.Type.REMOVED, stateTag, null));
     }
 
@@ -201,7 +204,7 @@ public final class TemporalChangeListener {
 
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!data.isTracked(chunkPos)) return;
+        if (!data.isTracked(level.dimension().location(), chunkPos)) return;
 
         CompoundTag before = new CompoundTag();
         entity.save(before);
@@ -286,6 +289,10 @@ public final class TemporalChangeListener {
         long gameTime = server.overworld().getGameTime();
         if (gameTime % FLUSH_INTERVAL_TICKS != 0) return;
 
+        // inventoryTick() has no "item was deselected/dropped/its holder logged out" hook to
+        // release tracking from directly (see PortableChronoMarkerItem), so this periodically
+        // sweeps for owners that stopped refreshing instead.
+        PortableChronoMarkerItem.releaseStaleTracking(server, gameTime);
         TemporalWorldData.get(server).flushPendingDeltas(gameTime);
     }
 }
