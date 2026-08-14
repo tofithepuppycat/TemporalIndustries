@@ -15,6 +15,7 @@ import net.minecraft.nbt.LongTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -143,13 +144,14 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
             MinecraftServer server = serverLevel.getServer();
             if (server != null) {
                 TemporalWorldData worldData = TemporalWorldData.get(server);
-                TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+                ResourceLocation dimension = level.dimension().location();
+                TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
 
-                if (autoTrackingEnabled) worldData.trackChunk(getHomeChunkPos());
+                if (autoTrackingEnabled) worldData.trackChunk(dimension, getHomeChunkPos(), worldPosition);
                 ensureSnapshotted(worldData, timeline, serverLevel, getHomeChunkPos());
                 for (long key : additionalChunks) {
                     ChunkPos chunk = new ChunkPos(key);
-                    if (autoTrackingEnabled) worldData.trackChunk(chunk);
+                    if (autoTrackingEnabled) worldData.trackChunk(dimension, chunk, worldPosition);
                     ensureSnapshotted(worldData, timeline, serverLevel, chunk);
                 }
             }
@@ -170,9 +172,10 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         super.setRemoved();
         if (level != null && !level.isClientSide && level.getServer() != null) {
             TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-            worldData.untrackChunk(getHomeChunkPos());
+            ResourceLocation dimension = level.dimension().location();
+            worldData.untrackChunk(dimension, getHomeChunkPos(), worldPosition);
             for (long key : additionalChunks) {
-                worldData.untrackChunk(new ChunkPos(key));
+                worldData.untrackChunk(dimension, new ChunkPos(key), worldPosition);
             }
         }
     }
@@ -210,9 +213,10 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (server == null) return;
 
         TemporalWorldData worldData = TemporalWorldData.get(server);
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(serverLevel.dimension().location());
+        ResourceLocation dimension = serverLevel.dimension().location();
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
         for (ChunkPos chunkPos : getAllChunks()) {
-            if (!worldData.isTracked(chunkPos)) continue;
+            if (!worldData.isTracked(dimension, chunkPos)) continue;
             if (timeline.getCommitsSinceSnapshot(chunkPos) < SNAPSHOT_COMMIT_THRESHOLD) continue;
             timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
             worldData.setDirty();
@@ -231,11 +235,12 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
         if (level instanceof ServerLevel && level.getServer() != null) {
             TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+            ResourceLocation dimension = level.dimension().location();
             for (ChunkPos chunk : getAllChunks()) {
                 if (enabled) {
-                    worldData.trackChunk(chunk);
+                    worldData.trackChunk(dimension, chunk, worldPosition);
                 } else {
-                    worldData.untrackChunk(chunk);
+                    worldData.untrackChunk(dimension, chunk, worldPosition);
                 }
             }
         }
@@ -286,21 +291,22 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (!isWithinBounds(pos)) return ToggleResult.OUT_OF_BOUNDS;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
         long key = pos.toLong();
 
         if (add) {
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
-            if (worldData.isTracked(pos)) return ToggleResult.ALREADY_TRACKED_ELSEWHERE;
+            if (worldData.isTracked(dimension, pos)) return ToggleResult.ALREADY_TRACKED_ELSEWHERE;
 
-            if (autoTrackingEnabled) worldData.trackChunk(pos);
+            if (autoTrackingEnabled) worldData.trackChunk(dimension, pos, worldPosition);
             additionalChunks.add(key);
-            ensureSnapshotted(worldData, worldData.getOrCreateTimeline(level.dimension().location()), serverLevel, pos);
+            ensureSnapshotted(worldData, worldData.getOrCreateTimeline(dimension), serverLevel, pos);
             setChanged();
             return ToggleResult.ADDED;
         } else {
             if (!additionalChunks.remove(key)) return ToggleResult.NOT_SELECTED;
-            worldData.untrackChunk(pos);
+            worldData.untrackChunk(dimension, pos, worldPosition);
             setChanged();
             return ToggleResult.REMOVED;
         }

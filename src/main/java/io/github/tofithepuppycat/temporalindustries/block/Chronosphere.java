@@ -51,7 +51,7 @@ public class Chronosphere extends BaseEntityBlock {
     public boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader level, @NotNull BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {
             TemporalWorldData data = TemporalWorldData.get(serverLevel.getServer());
-            if (data.isTracked(new ChunkPos(pos))) {
+            if (data.isTracked(serverLevel.dimension().location(), new ChunkPos(pos))) {
                 return false;
             }
         }
