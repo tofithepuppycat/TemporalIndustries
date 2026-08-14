@@ -39,11 +39,14 @@ public final class TimelineGraphWidget {
     private static final double MIN_COLUMN_GAP = 0.4D;
     private static final int BRANCH_X_OFFSET = 6;
 
-    // Blinking halo around whichever commit this chunk's live world currently reflects.
+    // Whichever commit this chunk's live world currently reflects blinks: its own node pulses
+    // between its lane color and HEAD_HIGHLIGHT_RGB, rather than being ringed by a separate halo.
     private static final int HEAD_HIGHLIGHT_RGB = 0x00FFC8;
     private static final long HEAD_BLINK_PERIOD_MS = 900L;
-    private static final float HEAD_BLINK_ALPHA_MIN = 0.15F;
-    private static final float HEAD_BLINK_ALPHA_MAX = 0.9F;
+    /** How far toward HEAD_HIGHLIGHT_RGB the head node's own color is pulled at the dimmest and
+     * brightest points of the blink. Never reaches 0 so the head stays identifiable mid-cycle. */
+    private static final float HEAD_BLINK_MIX_MIN = 0.15F;
+    private static final float HEAD_BLINK_MIX_MAX = 1.0F;
 
     private static final double MIN_ZOOM = 0.35D;
     private static final double MAX_ZOOM = 3.0D;
@@ -155,9 +158,8 @@ public final class TimelineGraphWidget {
 
         long headCommitId = TimelineProjectionManager.getHeadCommitId();
         double headBlinkPhase = (System.currentTimeMillis() % HEAD_BLINK_PERIOD_MS) / (double) HEAD_BLINK_PERIOD_MS;
-        int headBlinkAlpha = Math.round((HEAD_BLINK_ALPHA_MIN + (HEAD_BLINK_ALPHA_MAX - HEAD_BLINK_ALPHA_MIN)
-                * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * headBlinkPhase))) * 255.0F);
-        int headHighlightColor = (headBlinkAlpha << 24) | HEAD_HIGHLIGHT_RGB;
+        float headBlinkMix = HEAD_BLINK_MIX_MIN + (HEAD_BLINK_MIX_MAX - HEAD_BLINK_MIX_MIN)
+                * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * headBlinkPhase));
 
         // Two passes so lines always render under labels.
         int r = nodeRadius();
@@ -193,6 +195,9 @@ public final class TimelineGraphWidget {
                 boolean selected = commit.getId() == TimelineProjectionManager.getSelectedCommitId();
                 boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
                 int color = selected ? 0xFFFFFFFF : laneColor;
+                if (commit.getId() == headCommitId) {
+                    color = mixColor(color, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix);
+                }
 
                 int shapeRadius = commit.isPlayerMark() ? markerRadius(r) : r;
 
@@ -210,10 +215,6 @@ public final class TimelineGraphWidget {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
                 }
 
-                if (commit.getId() == headCommitId) {
-                    drawHeadHighlight(guiGraphics, pointX, pointY, shapeRadius, headHighlightColor);
-                }
-
                 renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius));
             }
         }
@@ -226,15 +227,20 @@ public final class TimelineGraphWidget {
             if (rc.commit.getId() != selectedCommitId) {
                 continue;
             }
+            // Keeps blinking when the selection happens to BE the head — repainting flat white here
+            // would otherwise freeze the pulse for exactly the node most likely to be selected.
+            int selectedColor = rc.commit.getId() == headCommitId
+                    ? mixColor(0xFFFFFFFF, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix)
+                    : 0xFFFFFFFF;
             if (rc.commit.getType() == TemporalCommit.Type.BRANCH) {
                 int outer = rc.hitRadius + 1;
                 int inner = Math.max(1, rc.hitRadius - 1);
-                guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, 0xFFFFFFFF);
+                guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, selectedColor);
                 guiGraphics.fill(rc.x - inner, rc.y - inner, rc.x + inner + 1, rc.y + inner + 1, 0xFF000000);
             } else if (rc.commit.isPlayerMark()) {
-                drawDiamond(guiGraphics, rc.x, rc.y, rc.hitRadius, 0xFFFFFFFF);
+                drawDiamond(guiGraphics, rc.x, rc.y, rc.hitRadius, selectedColor);
             } else {
-                guiGraphics.fill(rc.x - rc.hitRadius, rc.y - rc.hitRadius, rc.x + rc.hitRadius + 1, rc.y + rc.hitRadius + 1, 0xFFFFFFFF);
+                guiGraphics.fill(rc.x - rc.hitRadius, rc.y - rc.hitRadius, rc.x + rc.hitRadius + 1, rc.y + rc.hitRadius + 1, selectedColor);
             }
             break;
         }
@@ -341,14 +347,15 @@ public final class TimelineGraphWidget {
         return nodeRadius + Math.max(1, nodeRadius / 2) + 1;
     }
 
-    /** Draws a pulsing hollow square halo just outside a node, marking the chunk's live head. */
-    private static void drawHeadHighlight(GuiGraphics guiGraphics, int pointX, int pointY, int r, int color) {
-        int outer = r + 3;
-        int inner = outer - 1;
-        guiGraphics.fill(pointX - outer, pointY - outer, pointX + outer + 1, pointY - inner, color);
-        guiGraphics.fill(pointX - outer, pointY + inner, pointX + outer + 1, pointY + outer + 1, color);
-        guiGraphics.fill(pointX - outer, pointY - outer, pointX - inner, pointY + outer + 1, color);
-        guiGraphics.fill(pointX + inner, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
+    /** Blends two opaque ARGB colors, mix=0 giving from and mix=1 giving to. Used to pulse the
+     * head node's own fill rather than drawing anything extra around it — a translucent overlay
+     * would just darken toward the black graph background instead of reading as a blink. */
+    private static int mixColor(int from, int to, float mix) {
+        float t = Math.max(0.0F, Math.min(1.0F, mix));
+        int r = Math.round(((from >> 16) & 0xFF) * (1.0F - t) + ((to >> 16) & 0xFF) * t);
+        int g = Math.round(((from >> 8) & 0xFF) * (1.0F - t) + ((to >> 8) & 0xFF) * t);
+        int b = Math.round((from & 0xFF) * (1.0F - t) + (to & 0xFF) * t);
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     /** Draws a filled diamond (a plus-like rotated square) centered on (pointX, pointY), one
