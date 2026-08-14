@@ -41,7 +41,7 @@ public final class TimelineGraphWidget {
 
     // Whichever commit this chunk's live world currently reflects blinks: its own node pulses
     // between its lane color and HEAD_HIGHLIGHT_RGB, rather than being ringed by a separate halo.
-    private static final int HEAD_HIGHLIGHT_RGB = 0xB266FF;
+    private static final int HEAD_HIGHLIGHT_RGB = 0xFFFFFF;
     private static final long HEAD_BLINK_PERIOD_MS = 900L;
     /** How far toward HEAD_HIGHLIGHT_RGB the head node's own color is pulled at the dimmest and
      * brightest points of the blink. Never reaches 0 so the head stays identifiable mid-cycle. */
@@ -235,15 +235,18 @@ public final class TimelineGraphWidget {
             int selectedColor = rc.commit.getId() == headCommitId
                     ? mixColor(rc.laneColor, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix)
                     : 0xFFFFFFFF;
+            // Drawn larger than its normal size too, on top of the recolor, so the selection is
+            // obvious even when its color happens to be close to a neighboring lane's.
+            int selectedRadius = selectedRadius(rc.hitRadius);
             if (rc.commit.getType() == TemporalCommit.Type.BRANCH) {
-                int outer = rc.hitRadius + 1;
-                int inner = Math.max(1, rc.hitRadius - 1);
+                int outer = selectedRadius + 1;
+                int inner = Math.max(1, selectedRadius - 1);
                 guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, selectedColor);
                 guiGraphics.fill(rc.x - inner, rc.y - inner, rc.x + inner + 1, rc.y + inner + 1, 0xFF000000);
             } else if (rc.commit.isPlayerMark()) {
-                drawDiamond(guiGraphics, rc.x, rc.y, rc.hitRadius, selectedColor);
+                drawDiamond(guiGraphics, rc.x, rc.y, selectedRadius, selectedColor);
             } else {
-                guiGraphics.fill(rc.x - rc.hitRadius, rc.y - rc.hitRadius, rc.x + rc.hitRadius + 1, rc.y + rc.hitRadius + 1, selectedColor);
+                guiGraphics.fill(rc.x - selectedRadius, rc.y - selectedRadius, rc.x + selectedRadius + 1, rc.y + selectedRadius + 1, selectedColor);
             }
             break;
         }
@@ -348,6 +351,12 @@ public final class TimelineGraphWidget {
      * clearly against the automatic squares around it. */
     private static int markerRadius(int nodeRadius) {
         return nodeRadius + Math.max(1, nodeRadius / 2) + 1;
+    }
+
+    /** Grows a node's normal on-screen radius for the selection redraw, so the selected node reads
+     * clearly even when its (white, or blink-mixed) color ends up close to a neighboring lane's. */
+    private static int selectedRadius(int baseRadius) {
+        return baseRadius + Math.max(1, baseRadius / 2);
     }
 
     /** Blends two opaque ARGB colors, mix=0 giving from and mix=1 giving to. Used to pulse the
