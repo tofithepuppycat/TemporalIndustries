@@ -36,7 +36,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.Comparator;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
@@ -441,6 +443,83 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (selectedId == -1L) return Collections.emptyMap();
 
         for (TemporalCommit commit : getChunkCommits()) {
+            if (commit.getId() == selectedId) {
+                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime()));
+            }
+        }
+        return Collections.emptyMap();
+    }
+
+    // -------------------------------------------------------------------------
+    // Multi-chunk view — see TimelineViewProvider's class doc. getChunkCommits()/etc. above stay
+    // home-chunk-scoped (used by getSelectedCommitId()/getChunkJumpCosts() above, and as the
+    // fallback the default interface methods delegate to); these overloads add the per-claimed-
+    // chunk tabs and the "All" shared view the Chronosphere GUI shows on top of that.
+
+    @Override
+    public List<ChunkPos> getViewableChunks() {
+        return getAllChunks();
+    }
+
+    @Override
+    public List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
+        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return Collections.emptyList();
+        if (chunkPos != null) return timeline.getCommitsForChunk(chunkPos);
+
+        // Shared/"All" view: every commit relevant to any claimed chunk, deduplicated and ordered
+        // by id (creation order) — since a Chronosphere's jump()s batch every claimed chunk's
+        // DELTA/SNAPSHOT commits together on the same dimension-wide trunk, this mostly reflects
+        // one shared history, with each chunk's own BRANCH markers layered in alongside it.
+        Map<Long, TemporalCommit> byId = new LinkedHashMap<>();
+        for (ChunkPos chunk : getAllChunks()) {
+            for (TemporalCommit commit : timeline.getCommitsForChunk(chunk)) {
+                byId.putIfAbsent(commit.getId(), commit);
+            }
+        }
+        List<TemporalCommit> merged = new ArrayList<>(byId.values());
+        merged.sort(Comparator.comparingLong(TemporalCommit::getId));
+        return merged;
+    }
+
+    @Override
+    public Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos) {
+        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return Collections.emptyMap();
+        if (chunkPos != null) return timeline.getLocalParentsForChunk(chunkPos);
+
+        // The home chunk's own fork lineage is the primary skeleton for the shared view (a
+        // Chronosphere's jumps are always triggered through it), filled in with whichever other
+        // claimed chunk first recorded a local-parent entry for any commit home doesn't have one
+        // for — e.g. a chunk that had its own history before being claimed alongside home.
+        Map<Long, Long> merged = new HashMap<>(timeline.getLocalParentsForChunk(getHomeChunkPos()));
+        for (ChunkPos chunk : getAllChunks()) {
+            for (Map.Entry<Long, Long> entry : timeline.getLocalParentsForChunk(chunk).entrySet()) {
+                merged.putIfAbsent(entry.getKey(), entry.getValue());
+            }
+        }
+        return merged;
+    }
+
+    @Override
+    public long getChunkHeadId(@Nullable ChunkPos chunkPos) {
+        if (level == null || level.isClientSide || level.getServer() == null) return -1L;
+        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
+                .getTimeline(level.dimension().location());
+        if (timeline == null) return -1L;
+        return timeline.getChunkHeadId(chunkPos != null ? chunkPos : getHomeChunkPos());
+    }
+
+    @Override
+    public Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
+        long selectedId = getSelectedCommitId(chunkPos);
+        if (selectedId == -1L) return Collections.emptyMap();
+
+        for (TemporalCommit commit : getChunkCommits(chunkPos)) {
             if (commit.getId() == selectedId) {
                 return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime()));
             }
