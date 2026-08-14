@@ -2,6 +2,8 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import net.minecraft.world.level.ChunkPos;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Map;
@@ -46,4 +48,47 @@ public interface TimelineViewProvider {
 
     /** Updates selectedGameTime, optionally applying it to the live world. */
     void setSelectedGameTime(long targetGameTime, boolean applyToWorld);
+
+    // -------------------------------------------------------------------------
+    // Multi-chunk view — a Time Machine only ever has its own single chunk, so the defaults below
+    // just delegate to the no-arg methods above; ChronosphereBlockEntity is the only implementer
+    // that overrides them, to let its GUI show either one specific claimed chunk's own graph or a
+    // shared view merging every claimed chunk's history together.
+
+    /** Every chunk this provider can show a separate timeline tab for, home/primary chunk first.
+     * Empty (rather than the single implicit chunk getChunkCommits() etc. already cover) when
+     * there's nothing to choose between — a screen only needs a chunk selector when this has more
+     * than one entry. */
+    default List<ChunkPos> getViewableChunks() {
+        return List.of();
+    }
+
+    /** Commits for one specific chunk from {@link #getViewableChunks()}, or — when chunkPos is
+     * null — a shared view merging every viewable chunk's history together. */
+    default List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
+        return getChunkCommits();
+    }
+
+    /** Local-parent map for chunkPos (or the shared view when null) — see {@link #getChunkCommits(ChunkPos)}. */
+    default Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos) {
+        return getChunkLocalParents();
+    }
+
+    /** The commit chunkPos's (or, when null, the primary/home chunk's) live world currently reflects. */
+    default long getChunkHeadId(@Nullable ChunkPos chunkPos) {
+        return getChunkHeadId();
+    }
+
+    /** The id of the commit nearest the current selectedGameTime, within chunkPos's (or the shared)
+     * commit list. */
+    default long getSelectedCommitId(@Nullable ChunkPos chunkPos) {
+        return TemporalCommit.resolveNearest(getChunkCommits(chunkPos), getSelectedGameTime());
+    }
+
+    /** Jump costs for chunkPos's (or the shared view's) commit list — for a Chronosphere this is
+     * the same total-cost-across-every-claimed-chunk value regardless of which tab is showing,
+     * since Jump always moves everything together. */
+    default Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
+        return getChunkJumpCosts();
+    }
 }
