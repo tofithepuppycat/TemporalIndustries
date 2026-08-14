@@ -53,5 +53,15 @@ public class NetworkHandler {
                 ChronoMarkerDiffSyncPacket.TYPE,
                 ChronoMarkerDiffSyncPacket.STREAM_CODEC,
                 ChronoMarkerDiffSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereMapRequestPacket.TYPE,
+                ChronosphereMapRequestPacket.STREAM_CODEC,
+                ChronosphereMapRequestPacket::handle);
+
+        registrar.playToClient(
+                ChronosphereMapSyncPacket.TYPE,
+                ChronosphereMapSyncPacket.STREAM_CODEC,
+                ChronosphereMapSyncPacket::handle);
     }
 }
