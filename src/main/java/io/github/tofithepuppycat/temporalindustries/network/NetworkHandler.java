@@ -63,5 +63,10 @@ public class NetworkHandler {
                 ChronosphereMapSyncPacket.TYPE,
                 ChronosphereMapSyncPacket.STREAM_CODEC,
                 ChronosphereMapSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereDeleteHistoryPacket.TYPE,
+                ChronosphereDeleteHistoryPacket.STREAM_CODEC,
+                ChronosphereDeleteHistoryPacket::handle);
     }
 }
