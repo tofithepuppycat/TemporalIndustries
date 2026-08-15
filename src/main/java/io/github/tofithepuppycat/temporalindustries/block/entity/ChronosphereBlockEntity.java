@@ -44,6 +44,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
+import java.util.function.Predicate;
 
 /**
  * Block entity for the Chronosphere, the multi-chunk-tier time machine: the player claims up to a
@@ -318,11 +319,23 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     // Jump
 
     public void jump(long targetGameTime) {
+        jump(targetGameTime, -1L);
+    }
+
+    /** Same as {@link #jump(long)}, but prefers targetCommitId as the checkout target for whichever
+     * claimed chunk actually owns it, instead of re-deriving it from gameTime alone — see
+     * TimeMachineBlockEntity#jump(long, long) for why. Chunks that don't own targetCommitId (every
+     * other claimed chunk, typically) fall back to the gameTime match exactly as before. */
+    public void jump(long targetGameTime, long targetCommitId) {
         if (level == null || level.isClientSide) return;
-        setSelectedGameTime(targetGameTime, true);
+        setSelectedGameTime(targetGameTime, targetCommitId, true);
     }
 
     public void setSelectedGameTime(long targetGameTime, boolean applyToWorld) {
+        setSelectedGameTime(targetGameTime, -1L, applyToWorld);
+    }
+
+    public void setSelectedGameTime(long targetGameTime, long targetCommitId, boolean applyToWorld) {
         if (level == null || level.isClientSide) return;
 
         long min = placedGameTime == UNSET_TIME ? 0L : placedGameTime;
@@ -331,21 +344,29 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (selectedGameTime == clamped && !applyToWorld) return;
 
         selectedGameTime = clamped;
-        if (applyToWorld) applyTimelineView(clamped);
+        if (applyToWorld) applyTimelineView(clamped, targetCommitId);
         setChanged();
     }
 
     /** Read-only total cost of jumping every claimed chunk to targetGameTime from its current head. */
     public long computeTotalJumpCost(long targetGameTime) {
+        return computeTotalJumpCost(targetGameTime, -1L);
+    }
+
+    /** Same as {@link #computeTotalJumpCost(long)}, but see {@link #jump(long, long)} for what
+     * targetCommitId is for. */
+    public long computeTotalJumpCost(long targetGameTime, long targetCommitId) {
         if (level == null || level.getServer() == null) return 0L;
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
+        TemporalTimeline timeline = worldData.getTimeline(dimension);
         if (timeline == null) return 0L;
 
+        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
         long total = 0L;
         for (ChunkPos chunk : getAllChunks()) {
             long head = timeline.getChunkHeadId(chunk);
-            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, ChronosphereBlockEntity::costOf);
+            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, ChronosphereBlockEntity::costOf, targetCommitId, isGlued);
         }
         return total;
     }
@@ -354,20 +375,28 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
      * the combined jump cost from the shared energy pool first. Does nothing (but plays a denial
      * sound) if there isn't enough energy stored. */
     public void applyTimelineView(long targetGameTime) {
+        applyTimelineView(targetGameTime, -1L);
+    }
+
+    /** Same as {@link #applyTimelineView(long)}, but see {@link #jump(long, long)} for what
+     * targetCommitId is for. */
+    public void applyTimelineView(long targetGameTime, long targetCommitId) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
+        ResourceLocation dimension = level.dimension().location();
+        TemporalTimeline timeline = worldData.getTimeline(dimension);
         if (timeline == null) return;
 
         List<ChunkPos> chunks = getAllChunks();
+        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
 
         // Capture every chunk's head before branch() can move any of them.
         long[] previousHeads = new long[chunks.size()];
         long totalCost = 0L;
         for (int i = 0; i < chunks.size(); i++) {
             previousHeads[i] = timeline.getChunkHeadId(chunks.get(i));
-            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, ChronosphereBlockEntity::costOf);
+            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, ChronosphereBlockEntity::costOf, targetCommitId, isGlued);
         }
 
         if (totalCost > energyStorage.getEnergyStored()) {
@@ -378,8 +407,8 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
         for (int i = 0; i < chunks.size(); i++) {
             ChunkPos chunk = chunks.get(i);
-            timeline.branch(chunk, targetGameTime);
-            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel);
+            timeline.branch(chunk, targetGameTime, targetCommitId);
+            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued);
         }
         worldData.setDirty();
 
@@ -465,7 +494,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
         for (TemporalCommit commit : getChunkCommits()) {
             if (commit.getId() == selectedId) {
-                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime()));
+                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime(), selectedId));
             }
         }
         return Collections.emptyMap();
@@ -588,7 +617,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
         for (TemporalCommit commit : getChunkCommits(chunkPos)) {
             if (commit.getId() == selectedId) {
-                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime()));
+                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime(), selectedId));
             }
         }
         return Collections.emptyMap();

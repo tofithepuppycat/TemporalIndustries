@@ -20,19 +20,29 @@ public class RollbackChunkPacket implements CustomPacketPayload {
 
     private final BlockPos machinePos;
     private final long targetGameTime;
+    /** The exact commit clicked in the timeline graph, or -1L when there isn't one (falls back to
+     * gameTime-only resolution). Disambiguates a jump target from any other commit sharing the
+     * same gameTime — see TimelineViewProvider#jump(long, long). */
+    private final long targetCommitId;
 
     public RollbackChunkPacket(BlockPos machinePos, long targetGameTime) {
+        this(machinePos, targetGameTime, -1L);
+    }
+
+    public RollbackChunkPacket(BlockPos machinePos, long targetGameTime, long targetCommitId) {
         this.machinePos = machinePos;
         this.targetGameTime = targetGameTime;
+        this.targetCommitId = targetCommitId;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, RollbackChunkPacket packet) {
         buf.writeBlockPos(packet.machinePos);
         buf.writeLong(packet.targetGameTime);
+        buf.writeLong(packet.targetCommitId);
     }
 
     public static RollbackChunkPacket decode(RegistryFriendlyByteBuf buf) {
-        return new RollbackChunkPacket(buf.readBlockPos(), buf.readLong());
+        return new RollbackChunkPacket(buf.readBlockPos(), buf.readLong(), buf.readLong());
     }
 
     public static void handle(RollbackChunkPacket packet, IPayloadContext context) {
@@ -53,7 +63,7 @@ public class RollbackChunkPacket implements CustomPacketPayload {
                 return;
             }
 
-            menu.getTimelineProvider().jump(packet.targetGameTime);
+            menu.getTimelineProvider().jump(packet.targetGameTime, packet.targetCommitId);
         });
     }
 

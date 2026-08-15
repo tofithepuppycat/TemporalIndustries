@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
+import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
@@ -128,7 +129,9 @@ public final class TemporalChangeListener {
     /** Whether this change is actually going to be recorded anywhere (tracked chunk, or an armed
      * player's anchor) — checked before paying for full block-entity NBT serialization. */
     private static boolean shouldRecord(ServerLevel level, TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
-        if (data.isTracked(level.dimension().location(), new ChunkPos(pos))) return true;
+        ResourceLocation dimension = level.dimension().location();
+        if (data.isGlued(dimension, pos)) return false;
+        if (data.isTracked(dimension, new ChunkPos(pos))) return true;
         if (player == null) return false;
         PlayerTemporalState state = data.getPlayerState(player.getUUID());
         return state != null && state.isArmed();
@@ -152,6 +155,18 @@ public final class TemporalChangeListener {
         if (data.isTracked(dimension, chunkPos)) {
             data.recordTrackedBlockChange(dimension, chunkPos, delta);
         }
+    }
+
+    /** Left-clicking a block while holding Temporal Glue deletes every glued region containing it,
+     * instead of starting to break the block — mirrors Create's glue removal gesture. */
+    @SubscribeEvent
+    public static void onLeftClickGlue(PlayerInteractEvent.LeftClickBlock event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (!(event.getItemStack().getItem() instanceof TemporalGlueItem)) return;
+
+        event.setCanceled(true);
+        TemporalGlueItem.deleteRegionsAt(level, player, event.getItemStack(), event.getPos().immutable());
     }
 
     // -------------------------------------------------------------------------

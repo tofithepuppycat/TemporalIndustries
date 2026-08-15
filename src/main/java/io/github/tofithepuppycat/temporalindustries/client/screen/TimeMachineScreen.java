@@ -118,7 +118,8 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
             return;
         }
         long target = TimelineProjectionManager.getSelectedGameTime();
-        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), target));
+        long targetCommitId = TimelineProjectionManager.getSelectedCommitId();
+        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), target, targetCommitId));
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
