@@ -199,12 +199,25 @@ public final class TimelineProjectionManager {
         return entries;
     }
 
+    /** Prefers the exact selected commit id when this chunk's own commit list contains it,
+     * falling back to gameTime-based resolution only for chunks that don't (e.g. a Chronosphere
+     * preview chunk the selected mark never touched). Mirrors why setSelectedCommit() stores an
+     * exact id in the first place: resolveNearest alone is ambiguous once a BRANCH marker shares
+     * the exact gameTime of the commit it forked from, which routinely happens right after jumping
+     * to one of two same-lineage marks and then selecting the other. */
+    private static long resolveTargetCommit(List<TemporalCommit> chunkCommits) {
+        for (TemporalCommit c : chunkCommits) {
+            if (c.getId() == selectedCommitId) return selectedCommitId;
+        }
+        return TemporalCommit.resolveNearest(chunkCommits, selectedGameTime);
+    }
+
     private static void appendProjectionEntries(Level level, ChunkTimelineSnapshot snapshot, List<ProjectionEntry> out) {
         List<TemporalCommit> chunkCommits = snapshot.commits();
         if (chunkCommits.isEmpty()) return;
 
         Map<Long, Long> chunkLocalParents = snapshot.localParents();
-        long targetCommitId = TemporalCommit.resolveNearest(chunkCommits, selectedGameTime);
+        long targetCommitId = resolveTargetCommit(chunkCommits);
 
         List<TemporalCommit> liveChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, snapshot.headId());
         List<TemporalCommit> targetChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, targetCommitId);
