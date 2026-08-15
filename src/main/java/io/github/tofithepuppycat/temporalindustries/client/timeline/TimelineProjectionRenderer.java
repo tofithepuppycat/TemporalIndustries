@@ -41,9 +41,6 @@ public class TimelineProjectionRenderer {
     /** Walls are backdrop, not the subject — kept well under the block decals' own blink alpha so
      * they read as an enclosure rather than competing with the changes inside them. */
     private static final float WALL_ALPHA_SCALE = 0.35F;
-    /** Half-height of the wall band, centered on the camera — a full world-height curtain would
-     * swamp the view, and the player only ever needs to see where the edge is near them. */
-    private static final float WALL_HALF_HEIGHT = 8.0F;
 
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
@@ -73,7 +70,7 @@ public class TimelineProjectionRenderer {
         float alpha = BLINK_ALPHA_MIN + (BLINK_ALPHA_MAX - BLINK_ALPHA_MIN)
                 * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase));
 
-        renderClaimBoundary(poseStack, quadBuffer, cameraX, cameraZ, alpha * WALL_ALPHA_SCALE);
+        renderClaimBoundary(poseStack, quadBuffer, level, cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
 
         for (TimelineProjectionManager.ProjectionEntry entry : entries) {
             BlockPos pos = entry.getPos();
@@ -108,8 +105,8 @@ public class TimelineProjectionRenderer {
      * chunk in the middle of the claim wouldn't be outlined at all despite being the one whose
      * history the player is actually browsing.
      */
-    private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer,
-                                            double cameraX, double cameraZ, float alpha) {
+    private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer, Level level,
+                                            double cameraX, double cameraY, double cameraZ, float alpha) {
         List<ChunkPos> chunks = TimelineProjectionManager.getPreviewChunks();
         if (chunks.isEmpty()) {
             return;
@@ -121,9 +118,10 @@ public class TimelineProjectionRenderer {
 
         Matrix4f matrix = poseStack.last().pose();
         float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
-        // The band is camera-relative, so its world height follows the player up and down.
-        float yBottom = -WALL_HALF_HEIGHT;
-        float yTop = WALL_HALF_HEIGHT;
+        // Anchored to the world's actual build height, not the camera, so the wall stays put
+        // as the player flies up or down instead of chasing them.
+        float yBottom = (float) (level.getMinBuildHeight() - cameraY);
+        float yTop = (float) (level.getMaxBuildHeight() - cameraY);
 
         for (ChunkPos chunk : chunks) {
             boolean forceAllWalls = chunk.equals(selectedChunk);
