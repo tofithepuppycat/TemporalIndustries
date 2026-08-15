@@ -45,8 +45,8 @@
 	"gui.temporalindustries.chronosphere.map_title": "Claim Chunks",
 	"gui.temporalindustries.chronosphere.map_hint": "Click a chunk to claim or release it",
 	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map",
-	"gui.temporalindustries.chronosphere.auto_track_tooltip_on": "Auto-Tracking: ON (click to disable)",
-	"gui.temporalindustries.chronosphere.auto_track_tooltip_off": "Auto-Tracking: OFF (click to enable)",
+	"gui.temporalindustries.chronosphere.auto_track_tooltip_on": "Auto-Tracking: ON",
+	"gui.temporalindustries.chronosphere.auto_track_tooltip_off": "Auto-Tracking: OFF",
 	"gui.temporalindustries.chronosphere.settings_tooltip": "Settings",
 	"gui.temporalindustries.chronosphere.settings_title": "Settings",
 	"gui.temporalindustries.chronosphere.delete_history_button": "Delete All History",
@@ -61,5 +61,13 @@
 	"item.temporalindustries.portable_chrono_marker.tooltip_mark": "Tracks a chunk radius around you while held.",
 	"gui.temporalindustries.portable_chrono_marker.title": "Snapshot Comparison",
 	"gui.temporalindustries.portable_chrono_marker.no_changes": "No changes recorded",
-	"gui.temporalindustries.portable_chrono_marker.change_count": "%s blocks changed"
+	"gui.temporalindustries.portable_chrono_marker.change_count": "%s blocks changed",
+	"item.temporalindustries.temporal_glue": "Temporal Glue",
+	"item.temporalindustries.temporal_glue.corner_set": "First corner set - right-click the opposite corner to glue",
+	"item.temporalindustries.temporal_glue.glued": "Area glued - protected from rollbacks",
+	"item.temporalindustries.temporal_glue.unglued": "Area unglued",
+	"item.temporalindustries.temporal_glue.selection_cleared": "Selection cleared",
+	"item.temporalindustries.temporal_glue.tooltip": "Right-click two corners to glue an area, protecting it from rollbacks and jumps.",
+	"item.temporalindustries.temporal_glue.tooltip_remove": "Left-click a glued area to remove it.",
+	"item.temporalindustries.temporal_glue.tooltip_pending": "First corner set - right-click to place the second"
 }
