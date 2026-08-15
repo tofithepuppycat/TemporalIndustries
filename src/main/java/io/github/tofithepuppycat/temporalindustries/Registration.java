@@ -12,6 +12,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBloc
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
+import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
 import net.minecraft.core.registries.Registries;
@@ -63,6 +64,9 @@ public class Registration {
     public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
             () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1)));
 
+    public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
+            () -> new TemporalGlueItem(new Item.Properties().durability(20)));
+
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
 
@@ -108,6 +112,7 @@ public class Registration {
             event.accept(TEMPORAL_ANCHOR_ITEM);
             event.accept(CHRONO_RECORD_ITEM);
             event.accept(PORTABLE_CHRONO_MARKER_ITEM);
+            event.accept(TEMPORAL_GLUE_ITEM);
         }
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(CHRONO_PROJECTOR_ITEM);

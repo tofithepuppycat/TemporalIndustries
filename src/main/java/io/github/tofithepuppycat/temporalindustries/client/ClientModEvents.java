@@ -30,5 +30,6 @@ public class ClientModEvents {
         TimelineProjectionManager.clearAll();
         ChronosphereClientState.clearAll();
         ChronosphereMapClientState.clearAll();
+        GlueSelectionClientState.clear();
     }
 }

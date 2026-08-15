@@ -28,6 +28,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
+import java.util.function.Predicate;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -250,15 +251,17 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
      * every commit relevant to this chunk. Used to preview cost per node in the timeline GUI. */
     public Map<Long, Long> getChunkJumpCosts() {
         if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
+        TemporalTimeline timeline = worldData.getTimeline(dimension);
         if (timeline == null) return Collections.emptyMap();
 
         ChunkPos chunkPos = new ChunkPos(worldPosition);
         long headId = timeline.getChunkHeadId(chunkPos);
         Map<Long, Long> costs = new HashMap<>();
         for (TemporalCommit commit : timeline.getCommitsForChunk(chunkPos)) {
-            costs.put(commit.getId(), timeline.computeJumpCost(chunkPos, commit.getGameTime(), headId, level, TimeMachineBlockEntity::costOf));
+            costs.put(commit.getId(), timeline.computeJumpCost(chunkPos, commit.getGameTime(), headId, level,
+                    TimeMachineBlockEntity::costOf, commit.getId(), pos -> worldData.isGlued(dimension, pos)));
         }
         return costs;
     }
@@ -271,17 +274,31 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
     // -------------------------------------------------------------------------
     // Jump
 
-    /** Jumps to targetGameTime, applying it to the live world immediately. */
+    /** Jumps to the commit whose gameTime is targetGameTime, applying it to the live world
+     * immediately. */
     public void jump(long targetGameTime) {
+        jump(targetGameTime, -1L);
+    }
+
+    /** Same as {@link #jump(long)}, but jumps to targetCommitId exactly (when it's actually one of
+     * this chunk's own commits) instead of re-deriving the target from gameTime alone — needed so a
+     * specific node clicked in the timeline graph reliably lands on THAT node even when another
+     * commit (e.g. on a different branch) shares its exact gameTime. Pass -1L to fall back to the
+     * old gameTime-only behavior. */
+    public void jump(long targetGameTime, long targetCommitId) {
         if (level == null || level.isClientSide) return;
 
-        setSelectedGameTime(targetGameTime, true);
+        setSelectedGameTime(targetGameTime, targetCommitId, true);
     }
 
     // -------------------------------------------------------------------------
     // Rollback
 
     public void setSelectedGameTime(long targetGameTime, boolean applyToWorld) {
+        setSelectedGameTime(targetGameTime, -1L, applyToWorld);
+    }
+
+    public void setSelectedGameTime(long targetGameTime, long targetCommitId, boolean applyToWorld) {
         if (level == null || level.isClientSide) return;
 
         long min = placedGameTime == UNSET_TIME ? 0L : placedGameTime;
@@ -290,7 +307,7 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
         if (selectedGameTime == clamped && !applyToWorld) return;
 
         selectedGameTime = clamped;
-        if (applyToWorld) applyTimelineView(clamped);
+        if (applyToWorld) applyTimelineView(clamped, targetCommitId);
         setChanged();
     }
 
@@ -298,10 +315,17 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
      * the jump's energy cost first. Does nothing (but plays a denial sound) if the machine doesn't
      * have enough energy stored. */
     public void applyTimelineView(long targetGameTime) {
+        applyTimelineView(targetGameTime, -1L);
+    }
+
+    /** Same as {@link #applyTimelineView(long)}, but see {@link #jump(long, long)} for what
+     * targetCommitId is for. */
+    public void applyTimelineView(long targetGameTime, long targetCommitId) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
+        ResourceLocation dimension = level.dimension().location();
+        TemporalTimeline timeline = worldData.getTimeline(dimension);
         if (timeline == null) return;
 
         ChunkPos chunkPos = new ChunkPos(worldPosition);
@@ -309,17 +333,18 @@ public class TimeMachineBlockEntity extends BlockEntity implements net.minecraft
         // Capture the head before branch() can move it.
         long previousHead = timeline.getChunkHeadId(chunkPos);
 
-        long cost = timeline.computeJumpCost(chunkPos, targetGameTime, previousHead, level, TimeMachineBlockEntity::costOf);
+        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
+        long cost = timeline.computeJumpCost(chunkPos, targetGameTime, previousHead, level, TimeMachineBlockEntity::costOf, targetCommitId, isGlued);
         if (cost > energyStorage.getEnergyStored()) {
             serverLevel.playSound(null, worldPosition, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
             return;
         }
         energyStorage.consumeInternal((int) Math.min(cost, Integer.MAX_VALUE));
 
-        timeline.branch(chunkPos, targetGameTime);
+        timeline.branch(chunkPos, targetGameTime, targetCommitId);
         worldData.setDirty();
 
-        timeline.applyChunkAtTime(chunkPos, targetGameTime, previousHead, serverLevel);
+        timeline.applyChunkAtTime(chunkPos, targetGameTime, previousHead, serverLevel, targetCommitId, isGlued);
 
         serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
     }

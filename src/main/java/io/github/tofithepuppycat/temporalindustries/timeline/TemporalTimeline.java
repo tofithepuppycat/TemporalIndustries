@@ -15,6 +15,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
 import java.util.function.Function;
+import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 
 /**
@@ -113,8 +114,8 @@ public class TemporalTimeline {
      * "new" state at newer and once to read the "old" state at older, rather than diffing any raw
      * block grids. Read-only. */
     public List<BlockDiffEntry> diffChunkBetweenMarks(ChunkPos chunkPos, TemporalCommit older, TemporalCommit newer) {
-        Map<BlockPos, BlockState> newStates = resolveDesiredState(chunkPos, newer.getGameTime(), older.getId()).states();
-        Map<BlockPos, BlockState> oldStates = resolveDesiredState(chunkPos, older.getGameTime(), newer.getId()).states();
+        Map<BlockPos, BlockState> newStates = resolveDesiredState(chunkPos, newer.getGameTime(), older.getId(), newer.getId()).states();
+        Map<BlockPos, BlockState> oldStates = resolveDesiredState(chunkPos, older.getGameTime(), newer.getId(), older.getId()).states();
 
         List<BlockDiffEntry> diffs = new ArrayList<>();
         for (Map.Entry<BlockPos, BlockState> entry : newStates.entrySet()) {
@@ -134,13 +135,25 @@ public class TemporalTimeline {
      * there (no new commit); otherwise forks a zero-diff marker commit scoped to this chunk. */
     @Nullable
     public TemporalCommit branch(ChunkPos chunkPos, long targetGameTime) {
+        return branch(chunkPos, targetGameTime, -1L);
+    }
+
+    /** Same as {@link #branch(ChunkPos, long)}, but prefers preferredCommitId as the checkout target
+     * over resolveNearest's gameTime-only match, when it's actually one of chunkPos's own commits.
+     * A branch marker always shares its exact gameTime with the commit it forked from (see
+     * TemporalCommit#resolveNearest's tie-break), so re-deriving the target from gameTime alone
+     * can't distinguish between two different branches' commits at the same tick — the caller
+     * hands back the literal id of whichever node was actually selected to disambiguate. Pass -1L
+     * for the old gameTime-only behavior. */
+    @Nullable
+    public TemporalCommit branch(ChunkPos chunkPos, long targetGameTime, long preferredCommitId) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
         if (chunkCommits.isEmpty()) return null;
 
         long chunkKey = chunkPos.toLong();
         Map<Long, Long> localParents = chunkLocalParent.getOrDefault(chunkKey, Collections.emptyMap());
         long currentHead = chunkHeadId.getOrDefault(chunkKey, chunkCommits.get(chunkCommits.size() - 1).getId());
-        long parent = TemporalCommit.resolveNearest(chunkCommits, targetGameTime);
+        long parent = resolveTarget(chunkCommits, targetGameTime, preferredCommitId);
         if (parent == currentHead) return null;
 
         if (!TemporalCommit.hasChild(localParents, parent)) {
@@ -151,6 +164,18 @@ public class TemporalTimeline {
         TemporalCommit marker = TemporalCommit.branch(nextId++, parent, targetGameTime, chunkKey);
         registerCommit(marker);
         return marker;
+    }
+
+    /** targetGameTime resolved to a specific commit for chunkPos — preferredCommitId directly, if
+     * it's actually one of chunkPos's own commits, letting an exact node selection bypass
+     * resolveNearest's gameTime-only tie-break; otherwise the nearest match by gameTime, as before. */
+    private long resolveTarget(List<TemporalCommit> chunkCommits, long targetGameTime, long preferredCommitId) {
+        if (preferredCommitId != -1L) {
+            for (TemporalCommit c : chunkCommits) {
+                if (c.getId() == preferredCommitId) return preferredCommitId;
+            }
+        }
+        return TemporalCommit.resolveNearest(chunkCommits, targetGameTime);
     }
 
     private void registerCommit(TemporalCommit commit) {
@@ -264,12 +289,12 @@ public class TemporalTimeline {
     private record DesiredState(Map<BlockPos, BlockState> states, Map<BlockPos, CompoundTag> blockEntityTags,
                                  Map<UUID, CompoundTag> entityTags) {}
 
-    private DesiredState resolveDesiredState(ChunkPos chunkPos, long targetGameTime, long fromCommitId) {
+    private DesiredState resolveDesiredState(ChunkPos chunkPos, long targetGameTime, long fromCommitId, long preferredCommitId) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
         if (chunkCommits.isEmpty()) return new DesiredState(Map.of(), Map.of(), Map.of());
 
         Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
-        long targetCommitId = TemporalCommit.resolveNearest(chunkCommits, targetGameTime);
+        long targetCommitId = resolveTarget(chunkCommits, targetGameTime, preferredCommitId);
 
         List<TemporalCommit> liveChain = TemporalCommit.ancestryChain(chunkCommits, localParents, fromCommitId);
         List<TemporalCommit> targetChain = TemporalCommit.ancestryChain(chunkCommits, localParents, targetCommitId);
@@ -343,10 +368,21 @@ public class TemporalTimeline {
      * the commit this chunk's live world currently reflects. Callers must capture this via
      * getChunkHeadId(chunkPos) before calling branch() for the same checkout. */
     public void applyChunkAtTime(ChunkPos chunkPos, long targetGameTime, long fromCommitId, ServerLevel level) {
-        DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId);
+        applyChunkAtTime(chunkPos, targetGameTime, fromCommitId, level, -1L, pos -> false);
+    }
+
+    /** Same as {@link #applyChunkAtTime(ChunkPos, long, long, ServerLevel)}, but resolves the
+     * target the same preferredCommitId-aware way as {@link #branch(ChunkPos, long, long)} — pass
+     * the same preferredCommitId to both calls for one checkout so they can never disagree on
+     * which commit the target actually is — and never overwrites a position isGlued reports true
+     * for (see item.TemporalGlueItem), leaving it exactly as the live world has it. */
+    public void applyChunkAtTime(ChunkPos chunkPos, long targetGameTime, long fromCommitId, ServerLevel level,
+                                  long preferredCommitId, Predicate<BlockPos> isGlued) {
+        DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
 
         for (Map.Entry<BlockPos, BlockState> entry : desired.states().entrySet()) {
             BlockPos pos = entry.getKey();
+            if (isGlued.test(pos)) continue;
             BlockState desiredState = entry.getValue();
             if (!level.getBlockState(pos).equals(desiredState)) {
                 level.setBlock(pos, desiredState, 3);
@@ -383,9 +419,19 @@ public class TemporalTimeline {
      * matches cost nothing). Read-only — same fromCommitId-capture rule as applyChunkAtTime. */
     public long computeJumpCost(ChunkPos chunkPos, long targetGameTime, long fromCommitId, Level level,
                                  ToLongFunction<BlockState> costFn) {
-        DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId);
+        return computeJumpCost(chunkPos, targetGameTime, fromCommitId, level, costFn, -1L, pos -> false);
+    }
+
+    /** Same as {@link #computeJumpCost(ChunkPos, long, long, Level, ToLongFunction)}, but resolves
+     * the target the same preferredCommitId-aware way as {@link #branch(ChunkPos, long, long)}, and
+     * never charges for a glued position (see {@link #applyChunkAtTime(ChunkPos, long, long, ServerLevel, long, Predicate)}),
+     * since a jump will never actually touch it. */
+    public long computeJumpCost(ChunkPos chunkPos, long targetGameTime, long fromCommitId, Level level,
+                                 ToLongFunction<BlockState> costFn, long preferredCommitId, Predicate<BlockPos> isGlued) {
+        DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
         long total = 0L;
         for (Map.Entry<BlockPos, BlockState> entry : desired.states().entrySet()) {
+            if (isGlued.test(entry.getKey())) continue;
             BlockState desiredState = entry.getValue();
             if (!level.getBlockState(entry.getKey()).equals(desiredState)) {
                 total += costFn.applyAsLong(desiredState);

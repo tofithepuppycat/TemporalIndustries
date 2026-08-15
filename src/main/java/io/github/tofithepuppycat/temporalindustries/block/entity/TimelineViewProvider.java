@@ -43,8 +43,16 @@ public interface TimelineViewProvider {
     long getPlacedGameTime();
     long getSelectedGameTime();
 
-    /** Jumps to targetGameTime, applying it to the live world immediately. */
+    /** Jumps to the commit whose gameTime is targetGameTime, applying it to the live world
+     * immediately. */
     void jump(long targetGameTime);
+
+    /** Same as {@link #jump(long)}, but prefers targetCommitId as the exact checkout target
+     * (wherever it's actually one of the relevant chunk's own commits) instead of re-deriving it
+     * from gameTime alone — a branch marker always shares its exact gameTime with the commit it
+     * forked from, so gameTime alone can't tell two different branches' same-tick commits apart.
+     * Pass -1L for the old gameTime-only behavior. */
+    void jump(long targetGameTime, long targetCommitId);
 
     /** Updates selectedGameTime, optionally applying it to the live world. */
     void setSelectedGameTime(long targetGameTime, boolean applyToWorld);

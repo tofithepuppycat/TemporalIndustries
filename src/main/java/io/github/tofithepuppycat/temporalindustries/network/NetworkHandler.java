@@ -68,5 +68,15 @@ public class NetworkHandler {
                 ChronosphereDeleteHistoryPacket.TYPE,
                 ChronosphereDeleteHistoryPacket.STREAM_CODEC,
                 ChronosphereDeleteHistoryPacket::handle);
+
+        registrar.playToServer(
+                GlueRegionRequestPacket.TYPE,
+                GlueRegionRequestPacket.STREAM_CODEC,
+                GlueRegionRequestPacket::handle);
+
+        registrar.playToClient(
+                GlueRegionSyncPacket.TYPE,
+                GlueRegionSyncPacket.STREAM_CODEC,
+                GlueRegionSyncPacket::handle);
     }
 }

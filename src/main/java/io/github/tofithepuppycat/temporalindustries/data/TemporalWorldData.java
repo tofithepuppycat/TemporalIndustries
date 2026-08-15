@@ -13,6 +13,7 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
 import org.jetbrains.annotations.Nullable;
 
@@ -36,6 +37,12 @@ public class TemporalWorldData extends SavedData {
 
     private final Map<ResourceLocation, TemporalTimeline> timelines = new HashMap<>();
     private final Map<UUID, PlayerTemporalState> playerStates = new HashMap<>();
+
+    // dimension -> cuboid regions marked with Temporal Glue (see item.TemporalGlueItem). Glued
+    // blocks are never captured into a delta (TemporalChangeListener#shouldRecord) and are skipped
+    // when a rollback/jump would otherwise overwrite them (TemporalTimeline's isGlued predicate
+    // param), so they sit outside the timeline system entirely. Persisted like timelines.
+    private final Map<ResourceLocation, List<BoundingBox>> gluedRegions = new HashMap<>();
 
     // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> the set
     // of owners currently claiming that chunk needs tracking (a TimeMachineBlockEntity/
@@ -117,6 +124,43 @@ public class TemporalWorldData extends SavedData {
     public boolean isTracked(ResourceLocation dimension, ChunkPos pos) {
         Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
         return dimChunks != null && dimChunks.containsKey(pos.toLong());
+    }
+
+    // -------------------------------------------------------------------------
+    // Glued regions
+
+    public void addGluedRegion(ResourceLocation dimension, BoundingBox region) {
+        gluedRegions.computeIfAbsent(dimension, d -> new ArrayList<>()).add(region);
+        setDirty();
+    }
+
+    /** Removes every glued region containing pos — there can be several, since regions may overlap
+     * (see item.TemporalGlueItem's left-click-to-delete). @return how many were removed. */
+    public int removeGluedRegionsAt(ResourceLocation dimension, BlockPos pos) {
+        List<BoundingBox> regions = gluedRegions.get(dimension);
+        if (regions == null) return 0;
+
+        int before = regions.size();
+        regions.removeIf(region -> region.isInside(pos));
+        int removed = before - regions.size();
+        if (removed > 0) {
+            if (regions.isEmpty()) gluedRegions.remove(dimension);
+            setDirty();
+        }
+        return removed;
+    }
+
+    public boolean isGlued(ResourceLocation dimension, BlockPos pos) {
+        List<BoundingBox> regions = gluedRegions.get(dimension);
+        if (regions == null) return false;
+        for (BoundingBox region : regions) {
+            if (region.isInside(pos)) return true;
+        }
+        return false;
+    }
+
+    public List<BoundingBox> getGluedRegions(ResourceLocation dimension) {
+        return gluedRegions.getOrDefault(dimension, Collections.emptyList());
     }
 
     // -------------------------------------------------------------------------
@@ -241,6 +285,16 @@ public class TemporalWorldData extends SavedData {
             data.playerStates.put(state.getPlayerId(), state);
         }
 
+        ListTag glueList = tag.getList("GluedRegions", Tag.TAG_COMPOUND);
+        for (int i = 0; i < glueList.size(); i++) {
+            CompoundTag gTag = glueList.getCompound(i);
+            ResourceLocation dim = ResourceLocation.tryParse(gTag.getString("Dimension"));
+            BoundingBox region = new BoundingBox(
+                    gTag.getInt("MinX"), gTag.getInt("MinY"), gTag.getInt("MinZ"),
+                    gTag.getInt("MaxX"), gTag.getInt("MaxY"), gTag.getInt("MaxZ"));
+            data.gluedRegions.computeIfAbsent(dim, d -> new ArrayList<>()).add(region);
+        }
+
         // trackedChunks rebuilt from block entity onLoad() — not persisted.
         return data;
     }
@@ -261,6 +315,22 @@ public class TemporalWorldData extends SavedData {
             if (state.isArmed()) playerList.add(state.toTag());
         }
         tag.put("Players", playerList);
+
+        ListTag glueList = new ListTag();
+        for (Map.Entry<ResourceLocation, List<BoundingBox>> entry : gluedRegions.entrySet()) {
+            for (BoundingBox region : entry.getValue()) {
+                CompoundTag gTag = new CompoundTag();
+                gTag.putString("Dimension", entry.getKey().toString());
+                gTag.putInt("MinX", region.minX());
+                gTag.putInt("MinY", region.minY());
+                gTag.putInt("MinZ", region.minZ());
+                gTag.putInt("MaxX", region.maxX());
+                gTag.putInt("MaxY", region.maxY());
+                gTag.putInt("MaxZ", region.maxZ());
+                glueList.add(gTag);
+            }
+        }
+        tag.put("GluedRegions", glueList);
 
         return tag;
     }
