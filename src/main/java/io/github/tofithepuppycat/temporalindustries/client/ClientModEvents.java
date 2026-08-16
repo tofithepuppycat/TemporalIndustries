@@ -9,6 +9,8 @@ import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientPlayerNetworkEvent;
+import net.neoforged.neoforge.client.event.EntityRenderersEvent;
+import net.neoforged.neoforge.client.event.RegisterItemDecorationsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
@@ -18,6 +20,18 @@ public class ClientModEvents {
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
         event.register(Registration.TIME_MACHINE_MENU.get(), TimeMachineScreen::new);
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
+    }
+
+    @SuppressWarnings("null")
+    @SubscribeEvent
+    public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
+        event.registerEntityRenderer(Registration.ENTROPY_ORB.get(), EntropyOrbRenderer::new);
+    }
+
+    @SuppressWarnings("null")
+    @SubscribeEvent
+    public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
+        event.register(Registration.ENTROPY_CONTAINER_ITEM.get(), new EntropyContainerItemDecorator());
     }
 
     /** Drops the timeline/map client caches on logout — without this, a BlockPos from the world

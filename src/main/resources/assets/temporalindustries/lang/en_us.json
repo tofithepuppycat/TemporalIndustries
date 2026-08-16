@@ -72,5 +72,9 @@
 	"item.temporalindustries.temporal_glue.selection_cleared": "Selection cleared",
 	"item.temporalindustries.temporal_glue.tooltip": "Right-click two corners to glue an area, protecting it from rollbacks and jumps.",
 	"item.temporalindustries.temporal_glue.tooltip_remove": "Left-click a glued area to remove it.",
-	"item.temporalindustries.temporal_glue.tooltip_pending": "First corner set - right-click to place the second"
+	"item.temporalindustries.temporal_glue.tooltip_pending": "First corner set - right-click to place the second",
+	"item.temporalindustries.entropy_container": "Entropy Container",
+	"item.temporalindustries.entropy_container.order": "Order: %s / %s",
+	"item.temporalindustries.entropy_container.chaos": "Chaos: %s / %s",
+	"entity.temporalindustries.entropy_orb": "Entropy Orb"
 }

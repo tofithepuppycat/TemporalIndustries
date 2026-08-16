@@ -9,13 +9,19 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjector
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyContainerItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.world.item.CreativeModeTabs;
 import net.minecraft.world.item.BlockItem;
@@ -42,6 +48,8 @@ public class Registration {
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITIES = DeferredRegister.create(Registries.BLOCK_ENTITY_TYPE, MODID);
     public static final DeferredRegister<MenuType<?>> MENUS = DeferredRegister.create(Registries.MENU, MODID);
+    public static final DeferredRegister<EntityType<?>> ENTITY_TYPES = DeferredRegister.create(Registries.ENTITY_TYPE, MODID);
+    public static final DeferredRegister.DataComponents DATA_COMPONENTS = DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, MODID);
 
     public static final DeferredBlock<TimeMachine> TIME_MACHINE_BLOCK = BLOCKS.register("time_machine",
             () -> new TimeMachine(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -79,6 +87,16 @@ public class Registration {
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
             () -> new BlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties()));
 
+    public static final DeferredItem<Item> ENTROPY_CONTAINER_ITEM = ITEMS.register("entropy_container",
+            () -> new EntropyContainerItem(new Item.Properties().stacksTo(1)));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<EntropyContents>> ENTROPY_CONTENTS = DATA_COMPONENTS.registerComponentType(
+            "entropy_contents", builder -> builder.persistent(EntropyContents.CODEC).networkSynchronized(EntropyContents.STREAM_CODEC));
+
+    public static final DeferredHolder<EntityType<?>, EntityType<EntropyOrbEntity>> ENTROPY_ORB = ENTITY_TYPES.register("entropy_orb",
+            () -> EntityType.Builder.<EntropyOrbEntity>of(EntropyOrbEntity::new, MobCategory.MISC)
+                    .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).build("entropy_orb"));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TimeMachineBlockEntity>> TIME_MACHINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("time_machine",
             () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
 
@@ -102,6 +120,8 @@ public class Registration {
         ITEMS.register(modEventBus);
         BLOCK_ENTITIES.register(modEventBus);
         MENUS.register(modEventBus);
+        ENTITY_TYPES.register(modEventBus);
+        DATA_COMPONENTS.register(modEventBus);
     }
 
     static void addCreative(BuildCreativeModeTabContentsEvent event) {
@@ -113,6 +133,7 @@ public class Registration {
             event.accept(CHRONO_RECORD_ITEM);
             event.accept(PORTABLE_CHRONO_MARKER_ITEM);
             event.accept(TEMPORAL_GLUE_ITEM);
+            event.accept(ENTROPY_CONTAINER_ITEM);
         }
         if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
             event.accept(CHRONO_PROJECTOR_ITEM);
