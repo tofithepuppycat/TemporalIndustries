@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
@@ -159,9 +160,11 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable circle —
      * shared with {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}
      * and {@link io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket}
-     * so the map's drawn shape, click hit-testing, and the server's actual rule always agree. */
+     * so the map's drawn shape, click hit-testing, and the server's actual rule always agree. Delegates
+     * to {@link ChunkArea}, the same circular-radius math the Portable Chrono Marker's area-select map
+     * and its network handlers use. */
     public static boolean isWithinRadius(int dx, int dz) {
-        return dx * dx + dz * dz <= MAX_RADIUS * MAX_RADIUS;
+        return ChunkArea.isWithinRadius(MAX_RADIUS, dx, dz);
     }
 
     /** Every chunk this machine currently controls, home chunk first. */

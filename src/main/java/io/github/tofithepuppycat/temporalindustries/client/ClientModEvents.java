@@ -29,7 +29,7 @@ public class ClientModEvents {
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         TimelineProjectionManager.clearAll();
         ChronosphereClientState.clearAll();
-        ChronosphereMapClientState.clearAll();
+        ChunkThumbnailClientState.clearAll();
         GlueSelectionClientState.clear();
     }
 }

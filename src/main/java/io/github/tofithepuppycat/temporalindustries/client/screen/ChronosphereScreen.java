@@ -7,9 +7,9 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
-import io.github.tofithepuppycat.temporalindustries.client.ChronosphereMapClientState;
+import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
+import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
@@ -96,11 +96,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
 
-    private static final int RADIUS = ChronosphereBlockEntity.MAX_RADIUS;
-    private static final int GRID_SIZE = RADIUS * 2 + 1;
-    private static final int CELL_SIZE = 32;
-    private static final int CELL_GAP = 3;
-    private static final int GRID_PIXELS = GRID_SIZE * CELL_SIZE + (GRID_SIZE - 1) * CELL_GAP;
+    private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(ChronosphereBlockEntity.MAX_RADIUS);
     private static final int TOTAL_CLAIMABLE = countClaimableCells();
 
     private static final int COLOR_HOME       = 0xFFFFD166;
@@ -141,9 +137,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private static int countClaimableCells() {
+        int radius = ChronosphereBlockEntity.MAX_RADIUS;
         int count = 0;
-        for (int dx = -RADIUS; dx <= RADIUS; dx++) {
-            for (int dz = -RADIUS; dz <= RADIUS; dz++) {
+        for (int dx = -radius; dx <= radius; dx++) {
+            for (int dz = -radius; dz <= radius; dz++) {
                 if (ChronosphereBlockEntity.isWithinRadius(dx, dz)) count++;
             }
         }
@@ -160,7 +157,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         autoTrackY = topPos + AUTO_TRACK_Y_OFFSET;
         settingsX = leftPos + imageWidth - BOOKMARK_OVERLAP;
         settingsY = topPos + SETTINGS_Y_OFFSET;
-        gridX = leftPos + (imageWidth - GRID_PIXELS) / 2;
+        gridX = leftPos + (imageWidth - MAP_GRID.gridPixels()) / 2;
         gridY = topPos + 44;
 
         int buttonY = topPos + 224;
@@ -221,7 +218,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public void onClose() {
         graphWidget.onClose();
-        ChronosphereMapClientState.clearAll();
+        ChunkThumbnailClientState.clearAll();
         super.onClose();
     }
 
@@ -558,51 +555,27 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 leftPos + imageWidth / 2, topPos + 16, TEXT_PRIMARY);
 
         ChunkPos home = new ChunkPos(menu.getBlockPos());
-        for (int row = 0; row < GRID_SIZE; row++) {
-            for (int col = 0; col < GRID_SIZE; col++) {
-                int dx = col - RADIUS;
-                int dz = row - RADIUS;
-                if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue; // outside the circle: leave blank
-
-                int cellX = gridX + col * (CELL_SIZE + CELL_GAP);
-                int cellY = gridY + row * (CELL_SIZE + CELL_GAP);
-                long key = new ChunkPos(home.x + dx, home.z + dz).toLong();
-
-                int tint;
-                if (dx == 0 && dz == 0) {
-                    tint = COLOR_HOME;
-                } else if (ChronosphereClientState.isSelected(key)) {
-                    tint = COLOR_SELECTED;
-                } else if (ChronosphereClientState.isBlocked(key)) {
-                    tint = COLOR_BLOCKED;
-                } else {
-                    tint = COLOR_AVAILABLE;
-                }
-
-                guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, COLOR_BORDER);
-
-                ResourceLocation terrain = ChronosphereMapClientState.getTexture(key);
-                int innerX0 = cellX + 1, innerY0 = cellY + 1, innerX1 = cellX + CELL_SIZE - 1, innerY1 = cellY + CELL_SIZE - 1;
-                if (terrain != null) {
-                    int inner = CELL_SIZE - 2;
-                    int size = ChronoMapSampler.SIZE;
-                    guiGraphics.blit(terrain, innerX0, innerY0, inner, inner, 0.0F, 0.0F, size, size, size, size);
-                    // Status tint over the terrain, translucent so the sampled ground stays visible.
-                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, (0x80 << 24) | (tint & 0xFFFFFF));
-                } else {
-                    // No thumbnail yet (overlay just opened, or the chunk isn't loaded server-side):
-                    // fall back to the flat status color instead of leaving the cell blank.
-                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, tint);
-                }
+        MAP_GRID.render(guiGraphics, gridX, gridY, home, new ChunkSelectionGrid.CellPainter() {
+            @Override
+            public int tint(int dx, int dz, long chunkKey) {
+                if (dx == 0 && dz == 0) return COLOR_HOME;
+                if (ChronosphereClientState.isSelected(chunkKey)) return COLOR_SELECTED;
+                if (ChronosphereClientState.isBlocked(chunkKey)) return COLOR_BLOCKED;
+                return COLOR_AVAILABLE;
             }
-        }
+
+            @Override
+            public ResourceLocation texture(long chunkKey) {
+                return ChunkThumbnailClientState.getTexture(chunkKey);
+            }
+        });
 
         // menu.getBlockEntity() is the CLIENT's copy of the block entity, which (having no custom
         // getUpdateTag/handleUpdateTag override) never receives its fields from the server — its
         // additionalChunks set is always empty client-side, so getChunkCount() would always read
         // 1 here. ChronosphereClientState's synced selection is the only client-accurate source.
         int claimedCount = ChronosphereClientState.getSelectedCount();
-        int footerY = gridY + GRID_PIXELS + 10;
+        int footerY = gridY + MAP_GRID.gridPixels() + 10;
         drawCenteredNoShadow(guiGraphics, Component.literal(
                 claimedCount + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
                 leftPos + imageWidth / 2, footerY, TEXT_SECONDARY);
@@ -616,22 +589,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private ChunkPos getGridCellAt(double mouseX, double mouseY) {
-        if (mouseX < gridX || mouseY < gridY || mouseX >= gridX + GRID_PIXELS || mouseY >= gridY + GRID_PIXELS) {
-            return null;
-        }
-        int col = (int) ((mouseX - gridX) / (CELL_SIZE + CELL_GAP));
-        int row = (int) ((mouseY - gridY) / (CELL_SIZE + CELL_GAP));
-        double cellLocalX = (mouseX - gridX) - col * (CELL_SIZE + CELL_GAP);
-        double cellLocalY = (mouseY - gridY) - row * (CELL_SIZE + CELL_GAP);
-        if (cellLocalX > CELL_SIZE || cellLocalY > CELL_SIZE) return null; // clicked in the gap
-        if (col < 0 || col >= GRID_SIZE || row < 0 || row >= GRID_SIZE) return null;
-
-        int dx = col - RADIUS;
-        int dz = row - RADIUS;
-        if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) return null; // outside the circle: not drawn, not clickable
-
-        ChunkPos home = new ChunkPos(menu.getBlockPos());
-        return new ChunkPos(home.x + dx, home.z + dz);
+        return MAP_GRID.cellAt(mouseX, mouseY, gridX, gridY, new ChunkPos(menu.getBlockPos()));
     }
 
     @Override

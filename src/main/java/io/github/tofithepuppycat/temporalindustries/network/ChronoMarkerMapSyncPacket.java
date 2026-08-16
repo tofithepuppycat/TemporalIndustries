@@ -3,40 +3,40 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
 import io.netty.buffer.Unpooled;
-import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server -> client: terrain thumbnails (see {@link io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler})
- * for every currently-loaded chunk in a Chronosphere's claimable area, for {@link ChunkThumbnailClientState}. */
-public class ChronosphereMapSyncPacket implements CustomPacketPayload {
-    public static final Type<ChronosphereMapSyncPacket> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_map_sync"));
+/** Server -> client: terrain thumbnails for the Portable Chrono Marker's area-select map — see
+ * {@link ChronoMarkerMapRequestPacket}. Mirrors {@link ChronosphereMapSyncPacket}'s wire format
+ * (deflated payload, same reasoning) but keyed by a generic anchor chunk key rather than a
+ * machine's BlockPos. */
+public class ChronoMarkerMapSyncPacket implements CustomPacketPayload {
+    public static final Type<ChronoMarkerMapSyncPacket> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_map_sync"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, ChronosphereMapSyncPacket> STREAM_CODEC =
-            StreamCodec.of(ChronosphereMapSyncPacket::encode, ChronosphereMapSyncPacket::decode);
+    public static final StreamCodec<RegistryFriendlyByteBuf, ChronoMarkerMapSyncPacket> STREAM_CODEC =
+            StreamCodec.of(ChronoMarkerMapSyncPacket::encode, ChronoMarkerMapSyncPacket::decode);
 
-    private final BlockPos machinePos;
+    private final long anchorKey;
     private final Map<Long, byte[]> thumbnails;
 
-    public ChronosphereMapSyncPacket(BlockPos machinePos, Map<Long, byte[]> thumbnails) {
-        this.machinePos = machinePos;
+    public ChronoMarkerMapSyncPacket(long anchorKey, Map<Long, byte[]> thumbnails) {
+        this.anchorKey = anchorKey;
         this.thumbnails = thumbnails;
     }
 
-    public static void encode(RegistryFriendlyByteBuf buf, ChronosphereMapSyncPacket packet) {
-        buf.writeBlockPos(packet.machinePos);
+    public static void encode(RegistryFriendlyByteBuf buf, ChronoMarkerMapSyncPacket packet) {
+        buf.writeLong(packet.anchorKey);
 
-        // Thumbnails are cheap to compute but not cheap to send raw (up to 25 chunks x 256 bytes
-        // each): deflate the same way TimelinePreviewSyncPacket does for its commit payload.
+        // Thumbnails are cheap to compute but not cheap to send raw: deflate the same way
+        // ChronosphereMapSyncPacket does for its own thumbnail payload.
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.buffer());
         body.writeVarInt(packet.thumbnails.size());
         for (Map.Entry<Long, byte[]> entry : packet.thumbnails.entrySet()) {
@@ -51,14 +51,14 @@ public class ChronosphereMapSyncPacket implements CustomPacketPayload {
         buf.writeByteArray(CompressionUtil.compress(rawBody));
     }
 
-    public static ChronosphereMapSyncPacket decode(RegistryFriendlyByteBuf buf) {
-        BlockPos machinePos = buf.readBlockPos();
+    public static ChronoMarkerMapSyncPacket decode(RegistryFriendlyByteBuf buf) {
+        long anchorKey = buf.readLong();
 
         int rawBodyLength = buf.readVarInt();
         byte[] compressed = buf.readByteArray();
         byte[] rawBody = CompressionUtil.decompress(compressed);
         if (rawBody.length != rawBodyLength) {
-            throw new IllegalStateException("Decompressed Chronosphere map payload size mismatch: expected "
+            throw new IllegalStateException("Decompressed Chrono Marker map payload size mismatch: expected "
                     + rawBodyLength + " but got " + rawBody.length);
         }
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.wrappedBuffer(rawBody));
@@ -70,12 +70,11 @@ public class ChronosphereMapSyncPacket implements CustomPacketPayload {
         }
         body.release();
 
-        return new ChronosphereMapSyncPacket(machinePos, thumbnails);
+        return new ChronoMarkerMapSyncPacket(anchorKey, thumbnails);
     }
 
-    public static void handle(ChronosphereMapSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ChunkThumbnailClientState.updateFromServer(
-                new ChunkPos(packet.machinePos).toLong(), packet.thumbnails));
+    public static void handle(ChronoMarkerMapSyncPacket packet, IPayloadContext context) {
+        context.enqueueWork(() -> ChunkThumbnailClientState.updateFromServer(packet.anchorKey, packet.thumbnails));
     }
 
     @Override
