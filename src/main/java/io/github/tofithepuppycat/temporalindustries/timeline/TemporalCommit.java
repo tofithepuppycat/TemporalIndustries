@@ -2,8 +2,10 @@ package io.github.tofithepuppycat.temporalindustries.timeline;
 
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.FriendlyByteBuf;
+import net.minecraft.world.level.ChunkPos;
 
 import java.util.ArrayList;
 import java.util.Collections;
@@ -16,11 +18,13 @@ import java.util.Map;
  * A single point in the timeline. SNAPSHOT commits store a full baseline state;
  * DELTA commits store only what changed since the previous commit — the same two types a
  * Portable ChronoMarker's manual save point produces (see PortableChronoMarkerItem), so a
- * player-triggered save is indistinguishable from an automatically tracked one.
+ * player-triggered save is indistinguishable from an automatically tracked one for jump/rollback
+ * purposes. SAVE_MARKER is a purely cosmetic zero-diff landmark dropped alongside that real
+ * commit, just so the graph can point out where a player actually clicked "save".
  * Commits form a singly-linked chain via parentId (-1 for the root).
  */
 public final class TemporalCommit {
-    public enum Type { SNAPSHOT, DELTA, BRANCH }
+    public enum Type { SNAPSHOT, DELTA, BRANCH, SAVE_MARKER }
 
     /** Sentinel meaning "no specific commit preferred — resolve purely by gameTime", for the
      * preferredCommitId/targetCommitId parameters threaded through {@link TemporalTimeline#branch},
@@ -41,9 +45,13 @@ public final class TemporalCommit {
     /** Only meaningful for Type.BRANCH: the packed ChunkPos (see {@link net.minecraft.world.level.ChunkPos#toLong})
      * this marker was checked out for. */
     private final long branchChunkPos;
+    /** Only meaningful for Type.SAVE_MARKER: the chunks this manual save point covers. Positions
+     * only — no block data, since the actual state is already captured by the DELTA/SNAPSHOT commit
+     * recorded alongside it — so dropping one costs nothing beyond a handful of longs. */
+    private final List<ChunkPos> markedChunks;
 
     private TemporalCommit(long id, long parentId, Type type, long gameTime, List<ChunkDelta> chunkDeltas,
-                           List<ChunkSnapshot> chunkSnapshots, long branchChunkPos) {
+                           List<ChunkSnapshot> chunkSnapshots, long branchChunkPos, List<ChunkPos> markedChunks) {
         this.id = id;
         this.parentId = parentId;
         this.type = type;
@@ -51,10 +59,11 @@ public final class TemporalCommit {
         this.chunkDeltas = Collections.unmodifiableList(new ArrayList<>(chunkDeltas));
         this.chunkSnapshots = Collections.unmodifiableList(new ArrayList<>(chunkSnapshots));
         this.branchChunkPos = branchChunkPos;
+        this.markedChunks = Collections.unmodifiableList(new ArrayList<>(markedChunks));
     }
 
     public static TemporalCommit delta(long id, long parentId, long gameTime, List<ChunkDelta> chunkDeltas) {
-        return new TemporalCommit(id, parentId, Type.DELTA, gameTime, chunkDeltas, Collections.emptyList(), 0L);
+        return new TemporalCommit(id, parentId, Type.DELTA, gameTime, chunkDeltas, Collections.emptyList(), 0L, Collections.emptyList());
     }
 
     /**
@@ -63,7 +72,7 @@ public final class TemporalCommit {
      * last snapshotted instead of growing for the life of the world.
      */
     public static TemporalCommit snapshot(long id, long parentId, long gameTime, List<ChunkSnapshot> chunkSnapshots) {
-        return new TemporalCommit(id, parentId, Type.SNAPSHOT, gameTime, Collections.emptyList(), chunkSnapshots, 0L);
+        return new TemporalCommit(id, parentId, Type.SNAPSHOT, gameTime, Collections.emptyList(), chunkSnapshots, 0L, Collections.emptyList());
     }
 
     /**
@@ -73,7 +82,18 @@ public final class TemporalCommit {
      * affecting any other chunk's timeline.
      */
     public static TemporalCommit branch(long id, long parentId, long gameTime, long branchChunkPos) {
-        return new TemporalCommit(id, parentId, Type.BRANCH, gameTime, Collections.emptyList(), Collections.emptyList(), branchChunkPos);
+        return new TemporalCommit(id, parentId, Type.BRANCH, gameTime, Collections.emptyList(), Collections.emptyList(), branchChunkPos, Collections.emptyList());
+    }
+
+    /**
+     * A zero-diff landmark dropped across markedChunks by a Portable ChronoMarker, purely so the
+     * graph can flag where a player actually clicked "save" — the save itself already happened via
+     * the ordinary DELTA/SNAPSHOT commit recorded right alongside this one (see
+     * PortableChronoMarkerItem#recordMark). Never elided like branch() can be: it always gets its
+     * own stable commit id so the graph has something to point the diamond at.
+     */
+    public static TemporalCommit saveMarker(long id, long parentId, long gameTime, List<ChunkPos> markedChunks) {
+        return new TemporalCommit(id, parentId, Type.SAVE_MARKER, gameTime, Collections.emptyList(), Collections.emptyList(), 0L, markedChunks);
     }
 
     public long getId() { return id; }
@@ -85,6 +105,9 @@ public final class TemporalCommit {
     public List<ChunkSnapshot> getChunkSnapshots() { return chunkSnapshots; }
     /** Only meaningful when getType() == Type.BRANCH. */
     public long getBranchChunkPos() { return branchChunkPos; }
+    public boolean isSaveMarker() { return type == Type.SAVE_MARKER; }
+    /** Only meaningful when getType() == Type.SAVE_MARKER. */
+    public List<ChunkPos> getMarkedChunks() { return markedChunks; }
 
     public int getTotalChangeCount() {
         int count = 0;
@@ -122,6 +145,10 @@ public final class TemporalCommit {
         for (ChunkSnapshot snapshot : chunkSnapshots) snapshots.add(snapshot.toTag());
         tag.put("Snapshots", snapshots);
 
+        long[] markedChunkLongs = new long[markedChunks.size()];
+        for (int i = 0; i < markedChunks.size(); i++) markedChunkLongs[i] = markedChunks.get(i).toLong();
+        tag.put("MarkedChunks", new LongArrayTag(markedChunkLongs));
+
         return tag;
     }
 
@@ -142,7 +169,12 @@ public final class TemporalCommit {
             for (int i = 0; i < snapshotList.size(); i++) snapshots.add(ChunkSnapshot.fromTag(snapshotList.getCompound(i)));
         }
 
-        return new TemporalCommit(id, parentId, type, gameTime, chunks, snapshots, branchChunkPos);
+        List<ChunkPos> markedChunks = new ArrayList<>();
+        if (tag.contains("MarkedChunks", Tag.TAG_LONG_ARRAY)) {
+            for (long packed : tag.getLongArray("MarkedChunks")) markedChunks.add(new ChunkPos(packed));
+        }
+
+        return new TemporalCommit(id, parentId, type, gameTime, chunks, snapshots, branchChunkPos, markedChunks);
     }
 
     public static void encode(TemporalCommit commit, FriendlyByteBuf buf) {
@@ -154,6 +186,9 @@ public final class TemporalCommit {
 
         buf.writeVarInt(commit.chunkDeltas.size());
         for (ChunkDelta cd : commit.chunkDeltas) ChunkDelta.encode(cd, buf);
+
+        buf.writeVarInt(commit.markedChunks.size());
+        for (ChunkPos pos : commit.markedChunks) buf.writeLong(pos.toLong());
     }
 
     public static TemporalCommit decode(FriendlyByteBuf buf) {
@@ -167,7 +202,11 @@ public final class TemporalCommit {
         List<ChunkDelta> chunks = new ArrayList<>();
         for (int i = 0; i < chunkCount; i++) chunks.add(ChunkDelta.decode(buf));
 
-        return new TemporalCommit(id, parentId, type, gameTime, chunks, Collections.emptyList(), branchChunkPos);
+        int markedChunkCount = buf.readVarInt();
+        List<ChunkPos> markedChunks = new ArrayList<>();
+        for (int i = 0; i < markedChunkCount; i++) markedChunks.add(new ChunkPos(buf.readLong()));
+
+        return new TemporalCommit(id, parentId, type, gameTime, chunks, Collections.emptyList(), branchChunkPos, markedChunks);
     }
 
     // -------------------------------------------------------------------------

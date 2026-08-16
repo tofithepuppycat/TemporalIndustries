@@ -80,7 +80,8 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
         graphWidget.init(menu.getBlockPos());
         // Force a full response regardless of whatever TimelineProjectionManager still has
         // cached from a previously viewed machine (Long.MIN_VALUE can never equal a real head id).
-        PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE));
+        PacketDistributor.sendToServer(
+                new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE, Long.MIN_VALUE));
     }
 
     @Override
@@ -102,7 +103,8 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
         if (ticksSinceSync >= SYNC_INTERVAL_TICKS) {
             ticksSinceSync = 0;
             PacketDistributor.sendToServer(
-                    new TimelinePreviewRequestPacket(menu.getBlockPos(), TimelineProjectionManager.getHeadCommitId()));
+                    new TimelinePreviewRequestPacket(menu.getBlockPos(), TimelineProjectionManager.getHeadCommitId(),
+                            TimelineProjectionManager.getPreviewVersion()));
         }
 
         jumpButton.active = TimelineProjectionManager.hasSelection();

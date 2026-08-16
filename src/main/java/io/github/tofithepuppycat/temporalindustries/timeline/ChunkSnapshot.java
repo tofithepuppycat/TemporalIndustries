@@ -14,6 +14,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
@@ -37,6 +38,17 @@ import java.util.Map;
  */
 public final class ChunkSnapshot {
     private static final int SECTION_VOLUME = 16 * 16 * 16;
+
+    /** Bottom-up (y, then z, then x) — the same traversal order {@link SnapshotSection} uses to
+     * capture a chunk. Shared with {@link TemporalTimeline#applyChunkAtTime} so a delta-based
+     * rollback restores blocks in a deterministic, support-before-dependent order instead of
+     * whatever order a HashMap happens to iterate in — a plain HashMap order let gravity blocks
+     * (sand/gravel) and neighbor-reactive blocks (attached torches, redstone) reach the world in
+     * arbitrary order mid-restore. */
+    public static final Comparator<BlockPos> BOTTOM_UP_ORDER =
+            Comparator.<BlockPos>comparingInt(pos -> pos.getY())
+                    .thenComparingInt(pos -> pos.getZ())
+                    .thenComparingInt(pos -> pos.getX());
 
     private final ChunkPos chunkPos;
     private final int minSectionY;
@@ -88,27 +100,6 @@ public final class ChunkSnapshot {
         }
 
         return new ChunkSnapshot(chunkPos, level.getMinSection(), sections, blockEntities);
-    }
-
-    // -------------------------------------------------------------------------
-    // Apply
-
-    /** Writes every block (and block entity) this snapshot recorded back into the live world. */
-    public void applyTo(ServerLevel level) {
-        for (int i = 0; i < sections.size(); i++) {
-            int sectionY = minSectionY + i;
-            sections.get(i).applyTo(level, chunkPos, sectionY);
-        }
-        for (Map.Entry<BlockPos, CompoundTag> entry : blockEntities.entrySet()) {
-            BlockEntity be = level.getBlockEntity(entry.getKey());
-            if (be == null) continue;
-            CompoundTag restored = entry.getValue().copy();
-            restored.putInt("x", entry.getKey().getX());
-            restored.putInt("y", entry.getKey().getY());
-            restored.putInt("z", entry.getKey().getZ());
-            be.loadWithComponents(restored, level.registryAccess());
-            be.setChanged();
-        }
     }
 
     // -------------------------------------------------------------------------
@@ -237,45 +228,9 @@ public final class ChunkSnapshot {
             return new SnapshotSection(palette, indices, lengths);
         }
 
-        void applyTo(ServerLevel level, ChunkPos chunkPos, int sectionY) {
-            int baseX = chunkPos.getMinBlockX();
-            int baseZ = chunkPos.getMinBlockZ();
-            int baseY = sectionY * 16;
-
-            if (uniform) {
-                if (uniformState.isAir()) return; // nothing to place; a freshly-generated/empty area already reads as air
-                for (int y = 0; y < 16; y++) {
-                    for (int z = 0; z < 16; z++) {
-                        for (int x = 0; x < 16; x++) {
-                            setIfDifferent(level, new BlockPos(baseX + x, baseY + y, baseZ + z), uniformState);
-                        }
-                    }
-                }
-                return;
-            }
-
-            int y = 0, z = 0, x = 0;
-            for (int run = 0; run < runPaletteIndex.length; run++) {
-                BlockState state = palette.get(runPaletteIndex[run]);
-                int remaining = runLength[run];
-                while (remaining > 0) {
-                    setIfDifferent(level, new BlockPos(baseX + x, baseY + y, baseZ + z), state);
-                    remaining--;
-                    x++;
-                    if (x == 16) { x = 0; z++; if (z == 16) { z = 0; y++; } }
-                }
-            }
-        }
-
-        private static void setIfDifferent(ServerLevel level, BlockPos pos, BlockState state) {
-            if (!level.getBlockState(pos).equals(state)) {
-                level.setBlock(pos, state, 3);
-            }
-        }
-
-        /** Same traversal as {@link #applyTo}, but writes into a map instead of the world (and,
-         * unlike applyTo, doesn't skip uniform-air sections — the map needs to say "air" explicitly
-         * so a caller can tell "this position should be cleared" from "this position isn't covered"). */
+        /** Writes this section's captured state into a map, keyed by absolute position — explicit
+         * about air rather than skipping it, so a caller can tell "this position should be cleared"
+         * from "this position isn't covered". */
         void collectInto(ChunkPos chunkPos, int sectionY, Map<BlockPos, BlockState> out) {
             int baseX = chunkPos.getMinBlockX();
             int baseZ = chunkPos.getMinBlockZ();

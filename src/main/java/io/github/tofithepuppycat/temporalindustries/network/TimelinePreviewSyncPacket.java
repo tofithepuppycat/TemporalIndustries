@@ -11,6 +11,7 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
@@ -41,11 +42,19 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
      * Machine just its own chunk (duplicating the fields above), for a Chronosphere every chunk
      * it has claimed. See TimelineViewProvider#getPreviewChunkSnapshots(). */
     private final List<ChunkTimelineSnapshot> previewChunkSnapshots;
+    /** Every glued region in the machine's dimension, as of this sync — a jump skips these
+     * positions entirely (see TemporalTimeline's isGlued predicate), so the ghost preview needs
+     * them too, independent of whatever GlueSelectionClientState has cached from a Temporal Glue
+     * item that may not even be held right now. */
+    private final List<BoundingBox> gluedRegions;
+    /** See {@link TimelinePreviewRequestPacket}'s lastKnownPreviewVersion field doc. */
+    private final long previewVersion;
 
     public TimelinePreviewSyncPacket(BlockPos machinePos, long placedGameTime, long selectedGameTime,
                                      long currentGameTime, List<TemporalCommit> commits,
                                      Map<Long, Long> localParents, long headCommitId, long selectedCommitId,
-                                     Map<Long, Long> jumpCosts, List<ChunkTimelineSnapshot> previewChunkSnapshots) {
+                                     Map<Long, Long> jumpCosts, List<ChunkTimelineSnapshot> previewChunkSnapshots,
+                                     List<BoundingBox> gluedRegions, long previewVersion) {
         this.machinePos = machinePos;
         this.placedGameTime = placedGameTime;
         this.selectedGameTime = selectedGameTime;
@@ -56,6 +65,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         this.selectedCommitId = selectedCommitId;
         this.jumpCosts = jumpCosts;
         this.previewChunkSnapshots = previewChunkSnapshots;
+        this.gluedRegions = gluedRegions;
+        this.previewVersion = previewVersion;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, TimelinePreviewSyncPacket packet) {
@@ -83,6 +94,15 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         }
         body.writeVarInt(packet.previewChunkSnapshots.size());
         for (ChunkTimelineSnapshot snapshot : packet.previewChunkSnapshots) ChunkTimelineSnapshot.encode(snapshot, body);
+        body.writeVarInt(packet.gluedRegions.size());
+        for (BoundingBox region : packet.gluedRegions) {
+            body.writeInt(region.minX());
+            body.writeInt(region.minY());
+            body.writeInt(region.minZ());
+            body.writeInt(region.maxX());
+            body.writeInt(region.maxY());
+            body.writeInt(region.maxZ());
+        }
 
         byte[] rawBody = new byte[body.readableBytes()];
         body.readBytes(rawBody);
@@ -93,6 +113,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
 
         buf.writeLong(packet.headCommitId);
         buf.writeLong(packet.selectedCommitId);
+        buf.writeLong(packet.previewVersion);
     }
 
     public static TimelinePreviewSyncPacket decode(RegistryFriendlyByteBuf buf) {
@@ -129,12 +150,20 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         int previewChunkCount = body.readVarInt();
         List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>(previewChunkCount);
         for (int i = 0; i < previewChunkCount; i++) previewChunkSnapshots.add(ChunkTimelineSnapshot.decode(body));
+        int gluedRegionCount = body.readVarInt();
+        List<BoundingBox> gluedRegions = new ArrayList<>(gluedRegionCount);
+        for (int i = 0; i < gluedRegionCount; i++) {
+            gluedRegions.add(new BoundingBox(body.readInt(), body.readInt(), body.readInt(),
+                    body.readInt(), body.readInt(), body.readInt()));
+        }
         body.release();
 
         long headCommitId = buf.readLong();
         long selectedCommitId = buf.readLong();
+        long previewVersion = buf.readLong();
         return new TimelinePreviewSyncPacket(machinePos, placedGameTime, selectedGameTime,
-                currentGameTime, commits, localParents, headCommitId, selectedCommitId, jumpCosts, previewChunkSnapshots);
+                currentGameTime, commits, localParents, headCommitId, selectedCommitId, jumpCosts, previewChunkSnapshots,
+                gluedRegions, previewVersion);
     }
 
     public static void handle(TimelinePreviewSyncPacket packet, IPayloadContext context) {
@@ -146,7 +175,9 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                 packet.localParents,
                 packet.headCommitId,
                 packet.jumpCosts,
-                packet.previewChunkSnapshots));
+                packet.previewChunkSnapshots,
+                packet.gluedRegions,
+                packet.previewVersion));
     }
 
     @Override

@@ -12,6 +12,7 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -43,6 +44,13 @@ public class TemporalWorldData extends SavedData {
     // when a rollback/jump would otherwise overwrite them (TemporalTimeline's isGlued predicate
     // param), so they sit outside the timeline system entirely. Persisted like timelines.
     private final Map<ResourceLocation, List<BoundingBox>> gluedRegions = new HashMap<>();
+
+    // Not persisted: bumped on every glue/unglue. Gluing never creates a timeline commit (see
+    // above), so nothing else changes a chunk's head id when a region is glued/unglued — the
+    // in-world "Show Changes" preview (TimelineProjectionManager) needs this as a separate cheap
+    // fingerprint to notice glue changes and re-fetch, otherwise it keeps ghosting blocks a jump
+    // would actually skip (or vice versa) until the player re-opens the GUI.
+    private int glueVersion = 0;
 
     // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> the set
     // of owners currently claiming that chunk needs tracking (a TimeMachineBlockEntity/
@@ -89,11 +97,17 @@ public class TemporalWorldData extends SavedData {
 
     /** Registers owner as wanting chunkPos (in dimension) tracked. Idempotent per owner: calling
      * this repeatedly for the same owner (e.g. every tick a Portable ChronoMarker refreshes its
-     * radius) never grows past one claim, so a single matching untrackChunk always fully releases it. */
-    public void trackChunk(ResourceLocation dimension, ChunkPos pos, Object owner) {
+     * radius) never grows past one claim, so a single matching untrackChunk always fully releases it.
+     * Also guarantees chunkPos has a baseline snapshot to anchor its history walk (see
+     * {@link TemporalTimeline#ensureBaseline}) — centralized here so every owner gets this for free
+     * instead of each call site having to remember to pair the two calls itself. */
+    public void trackChunk(ResourceLocation dimension, ChunkPos pos, Object owner, ServerLevel level) {
         trackedChunkOwners.computeIfAbsent(dimension, d -> new HashMap<>())
                 .computeIfAbsent(pos.toLong(), c -> new HashSet<>())
                 .add(owner);
+        if (getOrCreateTimeline(dimension).ensureBaseline(pos, level)) {
+            setDirty();
+        }
     }
 
     /** Releases owner's claim on chunkPos. The chunk stays tracked if any other owner still claims
@@ -131,6 +145,7 @@ public class TemporalWorldData extends SavedData {
 
     public void addGluedRegion(ResourceLocation dimension, BoundingBox region) {
         gluedRegions.computeIfAbsent(dimension, d -> new ArrayList<>()).add(region);
+        glueVersion++;
         setDirty();
     }
 
@@ -145,6 +160,7 @@ public class TemporalWorldData extends SavedData {
         int removed = before - regions.size();
         if (removed > 0) {
             if (regions.isEmpty()) gluedRegions.remove(dimension);
+            glueVersion++;
             setDirty();
         }
         return removed;
@@ -161,6 +177,11 @@ public class TemporalWorldData extends SavedData {
 
     public List<BoundingBox> getGluedRegions(ResourceLocation dimension) {
         return gluedRegions.getOrDefault(dimension, Collections.emptyList());
+    }
+
+    /** Cheap fingerprint that changes on every glue/unglue, anywhere — see {@link #glueVersion}. */
+    public int getGlueVersion() {
+        return glueVersion;
     }
 
     // -------------------------------------------------------------------------
@@ -186,7 +207,8 @@ public class TemporalWorldData extends SavedData {
      * Records a block change for a tracked chunk. When the same position is
      * changed multiple times within one flush interval the deltas are merged:
      * the original previousState is preserved and only newState is updated.
-     * If the net effect is no change (prev == new) the entry is removed.
+     * If the net effect is no change (same state AND same block-entity tag)
+     * the entry is removed.
      */
     public void recordTrackedBlockChange(ResourceLocation dimension, ChunkPos chunkPos, BlockChangeDelta delta) {
         Map<BlockPos, BlockChangeDelta> chunkMap = pendingBlockDeltas
@@ -201,7 +223,9 @@ public class TemporalWorldData extends SavedData {
                     delta.getNewState(),
                     existing.getPreviousBlockEntityTag(),
                     delta.getNewBlockEntityTag());
-            if (merged.getPreviousState().equals(merged.getNewState())) {
+            boolean isNoOp = merged.getPreviousState().equals(merged.getNewState())
+                    && Objects.equals(merged.getPreviousBlockEntityTag(), merged.getNewBlockEntityTag());
+            if (isNoOp) {
                 chunkMap.remove(delta.getPos());
             } else {
                 chunkMap.put(delta.getPos(), merged);

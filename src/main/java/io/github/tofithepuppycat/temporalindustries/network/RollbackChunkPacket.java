@@ -1,9 +1,12 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -20,14 +23,10 @@ public class RollbackChunkPacket implements CustomPacketPayload {
 
     private final BlockPos machinePos;
     private final long targetGameTime;
-    /** The exact commit clicked in the timeline graph, or -1L when there isn't one (falls back to
-     * gameTime-only resolution). Disambiguates a jump target from any other commit sharing the
-     * same gameTime — see TimelineViewProvider#jump(long, long). */
+    /** The exact commit clicked in the timeline graph, or {@link TemporalCommit#NO_PREFERRED_COMMIT}
+     * when there isn't one (falls back to gameTime-only resolution). Disambiguates a jump target
+     * from any other commit sharing the same gameTime — see TimelineViewProvider#jump(long, long). */
     private final long targetCommitId;
-
-    public RollbackChunkPacket(BlockPos machinePos, long targetGameTime) {
-        this(machinePos, targetGameTime, -1L);
-    }
 
     public RollbackChunkPacket(BlockPos machinePos, long targetGameTime, long targetCommitId) {
         this.machinePos = machinePos;
@@ -63,7 +62,10 @@ public class RollbackChunkPacket implements CustomPacketPayload {
                 return;
             }
 
-            menu.getTimelineProvider().jump(packet.targetGameTime, packet.targetCommitId);
+            TimelineViewProvider.JumpResult result = menu.getTimelineProvider().jump(packet.targetGameTime, packet.targetCommitId);
+            if (result == TimelineViewProvider.JumpResult.INSUFFICIENT_ENERGY) {
+                sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.insufficient_energy"), true);
+            }
         });
     }
 

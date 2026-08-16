@@ -17,7 +17,6 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -68,6 +67,7 @@ public final class TemporalChangeListener {
 
     @SubscribeEvent
     public static void onBlockBreak(BlockEvent.BreakEvent event) {
+        if (event.isCanceled()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
         BlockPos pos = event.getPos().immutable();
@@ -79,14 +79,17 @@ public final class TemporalChangeListener {
         // know this change is actually going to be recorded somewhere.
         BlockEntity be = level.getBlockEntity(pos);
         CompoundTag prevBETag = be != null ? be.saveWithFullMetadata(level.registryAccess()) : null;
+        // Vanilla's Level#destroyBlock leaves behind whatever fluid the broken block was carrying
+        // (fluidstate.createLegacyBlock()), not air — matters for anything submerged/waterlogged.
         BlockChangeDelta delta = new BlockChangeDelta(
-                pos, event.getState(), Blocks.AIR.defaultBlockState(), prevBETag, null);
+                pos, event.getState(), event.getState().getFluidState().createLegacyBlock(), prevBETag, null);
 
         handleBlockChange(level, data, pos, delta, player);
     }
 
     @SubscribeEvent
     public static void onBlockPlace(BlockEvent.EntityPlaceEvent event) {
+        if (event.isCanceled()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
         BlockPos pos = event.getPos().immutable();
@@ -108,6 +111,7 @@ public final class TemporalChangeListener {
      * EntityPlaceEvent per block. */
     @SubscribeEvent
     public static void onBlockMultiPlace(BlockEvent.EntityMultiPlaceEvent event) {
+        if (event.isCanceled()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
         ServerPlayer player = event.getEntity() instanceof ServerPlayer sp ? sp : null;
