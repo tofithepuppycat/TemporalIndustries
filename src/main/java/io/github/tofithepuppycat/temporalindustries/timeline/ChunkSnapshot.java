@@ -64,6 +64,26 @@ public final class ChunkSnapshot {
 
     public ChunkPos getChunkPos() { return chunkPos; }
 
+    public int sectionCount() { return sections.size(); }
+    public int minSectionY() { return minSectionY; }
+
+    /** Whether section sectionIndex is a single uniform state in both this snapshot and other's —
+     * lets a whole 4096-position section be recognized as identical in O(1), without either side
+     * expanding into a position map first. Used by {@link TemporalTimeline#diffChunkAgainstHead}'s
+     * section-scoped fast path: the overwhelming majority of any real chunk (everything below the
+     * surface, everything above the build limit) is exactly this case. */
+    public boolean sectionTriviallyEquals(ChunkSnapshot other, int sectionIndex) {
+        SnapshotSection a = sections.get(sectionIndex);
+        SnapshotSection b = other.sections.get(sectionIndex);
+        return a.uniform && b.uniform && a.uniformState.equals(b.uniformState);
+    }
+
+    /** Collects just section sectionIndex's positions — the same output {@link #toBlockStateMap()}
+     * would produce for that section's Y-range, without expanding every other section too. */
+    public void collectSectionInto(int sectionIndex, Map<BlockPos, BlockState> out) {
+        sections.get(sectionIndex).collectInto(chunkPos, minSectionY + sectionIndex, out);
+    }
+
     /** Every block position this baseline covers, expanded from its section encoding — used to
      * seed a rollback's desired state when the chain being resolved has no shared history with the
      * live chain to diff deltas against (see TemporalTimeline#resolveDesiredState). Read-only: unlike

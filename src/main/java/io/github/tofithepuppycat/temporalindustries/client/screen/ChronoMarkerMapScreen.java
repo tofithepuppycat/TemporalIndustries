@@ -123,6 +123,16 @@ public class ChronoMarkerMapScreen extends Screen {
         return false;
     }
 
+    /** The base {@link Screen#renderBackground} applies the vanilla world-blur post-process behind
+     * the GUI (see {@code Screen#renderBlurredBackground}); {@link net.minecraft.client.gui.screens.inventory.AbstractContainerScreen}
+     * (what ChronosphereScreen extends) overrides this to skip that entirely and just dim the world,
+     * which is why its claim map never looks blurred. This screen isn't a container, so it has to
+     * opt out the same way explicitly to match. */
+    @Override
+    public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        renderTransparentBackground(guiGraphics);
+    }
+
     private void confirmMark() {
         PacketDistributor.sendToServer(new ChronoMarkerMarkPacket(new ArrayList<>(selected)));
         onClose();
