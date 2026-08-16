@@ -6,7 +6,7 @@
     "south": "temporalindustries:block/chronosphere_back",
     "west": "temporalindustries:block/chronosphere_left",
     "east": "temporalindustries:block/chronosphere_right",
-    "up": "temporalindustries:block/chronosphere_back",
-    "down": "temporalindustries:block/chronosphere_back"
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
   }
 }
