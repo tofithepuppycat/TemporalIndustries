@@ -58,7 +58,7 @@
 	"item.temporalindustries.portable_chrono_marker": "Portable Chrono Marker",
 	"item.temporalindustries.portable_chrono_marker.marked": "Save point recorded",
 	"item.temporalindustries.portable_chrono_marker.tooltip": "Right-click to record a save point in the surrounding area.",
-	"item.temporalindustries.portable_chrono_marker.tooltip_mark": "Tracks a chunk radius around you while held.",
+	"item.temporalindustries.portable_chrono_marker.tooltip_mark": "Captures a chunk radius around you when marked.",
 	"item.temporalindustries.temporal_glue": "Temporal Glue",
 	"item.temporalindustries.temporal_glue.corner_set": "First corner set - right-click the opposite corner to glue",
 	"item.temporalindustries.temporal_glue.glued": "Area glued - protected from rollbacks",
