@@ -81,6 +81,16 @@ public class TemporalTimeline {
         return commit;
     }
 
+    /** Drops a zero-diff {@link TemporalCommit.Type#SAVE_MARKER} across markedChunks — purely a
+     * graph landmark (see {@link TemporalCommit#saveMarker}) for a Portable ChronoMarker's manual
+     * save point; the save itself is the ordinary DELTA/SNAPSHOT commit recorded right before this
+     * call (see PortableChronoMarkerItem#recordMark). */
+    public TemporalCommit addSaveMarker(long gameTime, List<ChunkPos> markedChunks) {
+        TemporalCommit commit = TemporalCommit.saveMarker(nextId++, headId, gameTime, markedChunks);
+        registerCommit(commit);
+        return commit;
+    }
+
     /** How many commits chunkPos's head is past its nearest snapshot ancestor (inclusive of the
      * snapshot itself) needs to reach before a fresh {@link ChunkSnapshot} baseline is due — shared
      * by the periodic auto-tracking re-snapshot check ({@code AbstractTimelineMachineBlockEntity})
@@ -146,7 +156,7 @@ public class TemporalTimeline {
     private void registerCommit(TemporalCommit commit) {
         commits.addLast(commit);
         byId.put(commit.getId(), commit);
-        if (commit.getType() != TemporalCommit.Type.BRANCH) {
+        if (commit.getType() != TemporalCommit.Type.BRANCH && commit.getType() != TemporalCommit.Type.SAVE_MARKER) {
             headId = commit.getId();
         }
         for (ChunkDelta cd : commit.getChunkDeltas()) {
@@ -156,6 +166,11 @@ public class TemporalTimeline {
         }
         for (ChunkSnapshot snapshot : commit.getChunkSnapshots()) {
             long chunkKey = snapshot.getChunkPos().toLong();
+            long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
+            indexChunkTouch(chunkKey, commit.getId(), localParent);
+        }
+        for (ChunkPos markedChunk : commit.getMarkedChunks()) {
+            long chunkKey = markedChunk.toLong();
             long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
             indexChunkTouch(chunkKey, commit.getId(), localParent);
         }

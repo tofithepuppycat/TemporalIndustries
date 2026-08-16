@@ -9,7 +9,8 @@ They control a Entropy value that machines from this mod will need
 - Chrono loop player will slowly increase its entropy, player needs to periodicaly lower it with ORD 
   Early game:
 - Schrodinger's box - early game entropy generator - have to decide how it works
-  Late game:
+- Seebeck Generator - hot block from left, cold from the right, cold block melts of possible, and the hot block extinguishes/dissapears after a long time. Generates electricity based on the temperature difference, releases chaos and order orbs.
+- Late game:
   Machines:
   Generators:
 - Withergenic reactor - large amounts of +ent+

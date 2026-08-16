@@ -2,7 +2,6 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
@@ -18,19 +17,13 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
-import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
-import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
-import net.neoforged.neoforge.energy.EnergyStorage;
-import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -44,17 +37,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
-import java.util.function.Predicate;
 
 /**
  * Block entity for the Chronosphere, the multi-chunk-tier time machine: the player claims up to a
  * 5x5 chunk area (centred on the block's own chunk, always included) from
  * {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}'s map, and
  * a single jump moves every claimed chunk to the same target time, paid from one shared energy pool
- * (unlike the Time Machine, which is one energy pool per chunk).
+ * (unlike the Time Machine, which is one energy pool per chunk). See
+ * {@link AbstractTimelineMachineBlockEntity} for the jump/energy/re-snapshot logic shared between them.
  */
-@SuppressWarnings("null")
-public class ChronosphereBlockEntity extends BlockEntity implements net.minecraft.world.MenuProvider, TimelineViewProvider {
+public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
     /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. a 5x5 box. */
     public static final int MAX_RADIUS = 2;
     /** Home chunk plus up to this many additional chunks = 25 chunks, a full 5x5 box. */
@@ -62,12 +54,9 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
     private static final int ENERGY_CAPACITY = 500_000;
     private static final int ENERGY_TRANSFER  = 5_000;
-    private static final long UNSET_TIME = -1L;
 
     public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_TRACKED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
 
-    private long placedGameTime  = UNSET_TIME;
-    private long selectedGameTime = UNSET_TIME;
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
     /** Whether this Chronosphere is currently recording DELTA commits for its claimed chunks.
@@ -75,65 +64,8 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
      * player opts in via the GUI's auto-track tab, so idle claims don't silently accumulate history. */
     private boolean autoTrackingEnabled = false;
 
-    /** Named (rather than anonymous) so jump()'s cost can be deducted directly, bypassing the
-     * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
-    private final class MachineEnergyStorage extends EnergyStorage {
-        MachineEnergyStorage() {
-            super(ENERGY_CAPACITY, ENERGY_TRANSFER, ENERGY_TRANSFER);
-        }
-
-        @Override public int receiveEnergy(int max, boolean simulate) {
-            int v = super.receiveEnergy(max, simulate);
-            if (!simulate && v > 0) setChanged();
-            return v;
-        }
-        @Override public int extractEnergy(int max, boolean simulate) {
-            int v = super.extractEnergy(max, simulate);
-            if (!simulate && v > 0) setChanged();
-            return v;
-        }
-
-        void consumeInternal(long amount) {
-            if (amount <= 0) return;
-            energy = (int) Math.max(0, energy - amount);
-            setChanged();
-        }
-    }
-
-    private final MachineEnergyStorage energyStorage = new MachineEnergyStorage();
-
-    private final ContainerData data = new ContainerData() {
-        @Override public int get(int index) {
-            return switch (index) {
-                case 0  -> energyStorage.getEnergyStored()    & 0xFFFF;
-                case 1  -> (energyStorage.getEnergyStored()   >>> 16) & 0xFFFF;
-                case 2  -> energyStorage.getMaxEnergyStored() & 0xFFFF;
-                case 3  -> (energyStorage.getMaxEnergyStored() >>> 16) & 0xFFFF;
-                case 4  -> longPart(placedGameTime,   0);
-                case 5  -> longPart(placedGameTime,   1);
-                case 6  -> longPart(placedGameTime,   2);
-                case 7  -> longPart(placedGameTime,   3);
-                case 8  -> longPart(selectedGameTime, 0);
-                case 9  -> longPart(selectedGameTime, 1);
-                case 10 -> longPart(selectedGameTime, 2);
-                case 11 -> longPart(selectedGameTime, 3);
-                default -> 0;
-            };
-        }
-        @Override public void set(int index, int value) {}
-        @Override public int getCount() { return 12; }
-    };
-
-    private static int longPart(long value, int part) {
-        return (int) ((value >>> (part * 16)) & 0xFFFFL);
-    }
-
     public ChronosphereBlockEntity(BlockPos blockPos, BlockState blockState) {
-        super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState);
-    }
-
-    public IEnergyStorage getEnergyStorage() {
-        return energyStorage;
+        super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
     }
 
     // -------------------------------------------------------------------------
@@ -150,11 +82,11 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
                 ResourceLocation dimension = level.dimension().location();
                 TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
 
-                if (autoTrackingEnabled) worldData.trackChunk(dimension, getHomeChunkPos(), worldPosition);
+                if (autoTrackingEnabled) worldData.trackChunk(dimension, getHomeChunkPos(), worldPosition, serverLevel);
                 ensureSnapshotted(worldData, timeline, serverLevel, getHomeChunkPos());
                 for (long key : additionalChunks) {
                     ChunkPos chunk = new ChunkPos(key);
-                    if (autoTrackingEnabled) worldData.trackChunk(dimension, chunk, worldPosition);
+                    if (autoTrackingEnabled) worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
                     ensureSnapshotted(worldData, timeline, serverLevel, chunk);
                 }
             }
@@ -185,45 +117,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronosphereBlockEntity be) {
         if (level.isClientSide) return;
-
-        if (be.placedGameTime == UNSET_TIME) {
-            be.placedGameTime  = level.getGameTime();
-            be.selectedGameTime = be.placedGameTime;
-            be.setChanged();
-        }
-
-        long now = level.getGameTime();
-        if (be.selectedGameTime < be.placedGameTime || be.selectedGameTime > now) {
-            be.selectedGameTime = Math.max(be.placedGameTime, Math.min(now, be.selectedGameTime));
-            be.setChanged();
-        }
-
-        if (level instanceof ServerLevel serverLevel && now % SNAPSHOT_CHECK_INTERVAL_TICKS == 0) {
-            be.maybeResnapshot(serverLevel);
-        }
-    }
-
-    /** Trades a bounded once-a-minute-per-chunk full read for keeping every other history walk
-     * across all claimed chunks cheap for the rest of that minute — see ChunkSnapshot's class doc. */
-    private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
-    private static final int SNAPSHOT_COMMIT_THRESHOLD = 50;
-
-    /** Skips chunks the world isn't currently tracking (auto-tracking off and untouched by a
-     * ChronoMarker) so this timer can't manufacture a commit on its own — with auto-tracking off,
-     * a chunk only accumulates history the player explicitly recorded, and this must not add to it. */
-    private void maybeResnapshot(ServerLevel serverLevel) {
-        MinecraftServer server = serverLevel.getServer();
-        if (server == null) return;
-
-        TemporalWorldData worldData = TemporalWorldData.get(server);
-        ResourceLocation dimension = serverLevel.dimension().location();
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
-        for (ChunkPos chunkPos : getAllChunks()) {
-            if (!worldData.isTracked(dimension, chunkPos)) continue;
-            if (timeline.getCommitsSinceSnapshot(chunkPos) < SNAPSHOT_COMMIT_THRESHOLD) continue;
-            timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
-            worldData.setDirty();
-        }
+        be.commonTick(level);
     }
 
     public boolean isAutoTrackingEnabled() {
@@ -236,12 +130,12 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         if (enabled == autoTrackingEnabled) return;
         autoTrackingEnabled = enabled;
 
-        if (level instanceof ServerLevel && level.getServer() != null) {
+        if (level instanceof ServerLevel serverLevel && level.getServer() != null) {
             TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
             ResourceLocation dimension = level.dimension().location();
             for (ChunkPos chunk : getAllChunks()) {
                 if (enabled) {
-                    worldData.trackChunk(dimension, chunk, worldPosition);
+                    worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
                 } else {
                     worldData.untrackChunk(dimension, chunk, worldPosition);
                 }
@@ -271,6 +165,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     /** Every chunk this machine currently controls, home chunk first. */
+    @Override
     public List<ChunkPos> getAllChunks() {
         List<ChunkPos> chunks = new ArrayList<>(additionalChunks.size() + 1);
         chunks.add(getHomeChunkPos());
@@ -302,7 +197,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
             if (worldData.isTracked(dimension, pos)) return ToggleResult.ALREADY_TRACKED_ELSEWHERE;
 
-            if (autoTrackingEnabled) worldData.trackChunk(dimension, pos, worldPosition);
+            if (autoTrackingEnabled) worldData.trackChunk(dimension, pos, worldPosition, serverLevel);
             additionalChunks.add(key);
             ensureSnapshotted(worldData, worldData.getOrCreateTimeline(dimension), serverLevel, pos);
             setChanged();
@@ -316,108 +211,8 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     // -------------------------------------------------------------------------
-    // Jump
-
-    public void jump(long targetGameTime) {
-        jump(targetGameTime, -1L);
-    }
-
-    /** Same as {@link #jump(long)}, but prefers targetCommitId as the checkout target for whichever
-     * claimed chunk actually owns it, instead of re-deriving it from gameTime alone — see
-     * TimeMachineBlockEntity#jump(long, long) for why. Chunks that don't own targetCommitId (every
-     * other claimed chunk, typically) fall back to the gameTime match exactly as before. */
-    public void jump(long targetGameTime, long targetCommitId) {
-        if (level == null || level.isClientSide) return;
-        setSelectedGameTime(targetGameTime, targetCommitId, true);
-    }
-
-    public void setSelectedGameTime(long targetGameTime, boolean applyToWorld) {
-        setSelectedGameTime(targetGameTime, -1L, applyToWorld);
-    }
-
-    public void setSelectedGameTime(long targetGameTime, long targetCommitId, boolean applyToWorld) {
-        if (level == null || level.isClientSide) return;
-
-        long min = placedGameTime == UNSET_TIME ? 0L : placedGameTime;
-        long max = level.getGameTime();
-        long clamped = Math.max(min, Math.min(max, targetGameTime));
-        if (selectedGameTime == clamped && !applyToWorld) return;
-
-        selectedGameTime = clamped;
-        if (applyToWorld) applyTimelineView(clamped, targetCommitId);
-        setChanged();
-    }
-
-    /** Read-only total cost of jumping every claimed chunk to targetGameTime from its current head. */
-    public long computeTotalJumpCost(long targetGameTime) {
-        return computeTotalJumpCost(targetGameTime, -1L);
-    }
-
-    /** Same as {@link #computeTotalJumpCost(long)}, but see {@link #jump(long, long)} for what
-     * targetCommitId is for. */
-    public long computeTotalJumpCost(long targetGameTime, long targetCommitId) {
-        if (level == null || level.getServer() == null) return 0L;
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        TemporalTimeline timeline = worldData.getTimeline(dimension);
-        if (timeline == null) return 0L;
-
-        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
-        long total = 0L;
-        for (ChunkPos chunk : getAllChunks()) {
-            long head = timeline.getChunkHeadId(chunk);
-            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, ChronosphereBlockEntity::costOf, targetCommitId, isGlued);
-        }
-        return total;
-    }
-
-    /** Checks out targetGameTime for every claimed chunk and applies it to the live world, paying
-     * the combined jump cost from the shared energy pool first. Does nothing (but plays a denial
-     * sound) if there isn't enough energy stored. */
-    public void applyTimelineView(long targetGameTime) {
-        applyTimelineView(targetGameTime, -1L);
-    }
-
-    /** Same as {@link #applyTimelineView(long)}, but see {@link #jump(long, long)} for what
-     * targetCommitId is for. */
-    public void applyTimelineView(long targetGameTime, long targetCommitId) {
-        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
-
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        TemporalTimeline timeline = worldData.getTimeline(dimension);
-        if (timeline == null) return;
-
-        List<ChunkPos> chunks = getAllChunks();
-        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
-
-        // Capture every chunk's head before branch() can move any of them.
-        long[] previousHeads = new long[chunks.size()];
-        long totalCost = 0L;
-        for (int i = 0; i < chunks.size(); i++) {
-            previousHeads[i] = timeline.getChunkHeadId(chunks.get(i));
-            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, ChronosphereBlockEntity::costOf, targetCommitId, isGlued);
-        }
-
-        if (totalCost > energyStorage.getEnergyStored()) {
-            serverLevel.playSound(null, worldPosition, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
-            return;
-        }
-        energyStorage.consumeInternal(totalCost);
-
-        for (int i = 0; i < chunks.size(); i++) {
-            ChunkPos chunk = chunks.get(i);
-            timeline.branch(chunk, targetGameTime, targetCommitId);
-            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued);
-        }
-        worldData.setDirty();
-
-        serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
-    }
-
-    private static long costOf(BlockState state) {
-        return ItemEnergyCosts.getCost(state.getBlock()).orElse(0);
-    }
+    // Jump — computeTotalJumpCost/applyTimelineView/jump/setSelectedGameTime all live in
+    // AbstractTimelineMachineBlockEntity, operating over getAllChunks() above.
 
     /** Wipes every claimed chunk's recorded history and re-baselines each from its current live
      * state, without changing a single block — the world stays exactly as it is, there's just
@@ -441,70 +236,9 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     // -------------------------------------------------------------------------
-    // TimelineViewProvider — the home chunk's own commit graph is what's displayed, but jump()
-    // above still moves every claimed chunk together, and getChunkJumpCosts() below prices each
-    // node by the total cost across the whole claim, not just the home chunk's share of it.
-
-    @Override
-    public List<TemporalCommit> getChunkCommits() {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyList();
-        return timeline.getCommitsForChunk(getHomeChunkPos());
-    }
-
-    @Override
-    public Map<Long, Long> getChunkLocalParents() {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyMap();
-        return timeline.getLocalParentsForChunk(getHomeChunkPos());
-    }
-
-    @Override
-    public long getChunkHeadId() {
-        if (level == null || level.isClientSide || level.getServer() == null) return -1L;
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return -1L;
-        return timeline.getChunkHeadId(getHomeChunkPos());
-    }
-
-    @Override
-    public long getSelectedCommitId() {
-        return TemporalCommit.resolveNearest(getChunkCommits(), selectedGameTime);
-    }
-
-    /**
-     * Total cost is only priced for the currently selected node, not every node in the graph.
-     * computeTotalJumpCost() walks every claimed chunk's own ancestry chain, so pricing it for
-     * each of the home chunk's H commits costs O(H x claimedChunks x avgChunkHistory) — with 13
-     * chunks claimed and history that only ever grows over a session, that quadratic blowup was
-     * enough to stall the server tick on every 20-tick GUI poll. One commit's worth of that same
-     * O(claimedChunks x avgChunkHistory) work, computed only on an actual selection change, costs
-     * the same as a real jump — which nobody has needed to bound. Un-selected nodes simply render
-     * without a jump-cost line (see TimelineGraphWidget's tooltip).
-     */
-    @Override
-    public Map<Long, Long> getChunkJumpCosts() {
-        long selectedId = getSelectedCommitId();
-        if (selectedId == -1L) return Collections.emptyMap();
-
-        for (TemporalCommit commit : getChunkCommits()) {
-            if (commit.getId() == selectedId) {
-                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime(), selectedId));
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    // -------------------------------------------------------------------------
-    // Multi-chunk view — see TimelineViewProvider's class doc. getChunkCommits()/etc. above stay
-    // home-chunk-scoped (used by getSelectedCommitId()/getChunkJumpCosts() above, and as the
-    // fallback the default interface methods delegate to); these overloads add the per-claimed-
-    // chunk tabs and the "All" shared view the Chronosphere GUI shows on top of that.
+    // TimelineViewProvider — chunkPos null means the shared "All" view (the GUI's default tab);
+    // otherwise one specific claimed chunk's own graph (home chunk included). jump() always moves
+    // every claimed chunk together regardless of which one is being displayed.
 
     @Override
     public List<ChunkPos> getViewableChunks() {
@@ -610,6 +344,16 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         return TemporalCommit.resolveNearest(shared, homeHeadCommit.getGameTime());
     }
 
+    /**
+     * Total cost is only priced for the currently selected node, not every node in the graph.
+     * computeTotalJumpCost() walks every claimed chunk's own ancestry chain, so pricing it for
+     * each of H commits costs O(H x claimedChunks x avgChunkHistory) — with 13 chunks claimed and
+     * history that only ever grows over a session, that quadratic blowup was enough to stall the
+     * server tick on every 20-tick GUI poll. One commit's worth of that same
+     * O(claimedChunks x avgChunkHistory) work, computed only on an actual selection change, costs
+     * the same as a real jump — which nobody has needed to bound. Un-selected nodes simply render
+     * without a jump-cost line (see TimelineGraphWidget's tooltip).
+     */
     @Override
     public Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
         long selectedId = getSelectedCommitId(chunkPos);
@@ -623,7 +367,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
         return Collections.emptyMap();
     }
 
-    /** One snapshot per claimed chunk (not just the home chunk getChunkCommits() shows), so the
+    /** One snapshot per claimed chunk (not just whichever one tab is currently showing), so the
      * in-world ghost preview covers everything a jump would actually touch. */
     @Override
     public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
@@ -643,14 +387,6 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     }
 
     // -------------------------------------------------------------------------
-    // Accessors for menus / packets
-
-    @Override
-    public long getPlacedGameTime()   { return placedGameTime; }
-    @Override
-    public long getSelectedGameTime() { return selectedGameTime; }
-
-    // -------------------------------------------------------------------------
     // MenuProvider
 
     @Override
@@ -662,7 +398,7 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     @Override
     public AbstractContainerMenu createMenu(int id, @NotNull Inventory playerInventory, @NotNull Player player) {
         return new ChronosphereMenu(id, playerInventory, this,
-                ContainerLevelAccess.create(Objects.requireNonNull(level), worldPosition), data);
+                ContainerLevelAccess.create(Objects.requireNonNull(level), worldPosition), getContainerData());
     }
 
     // -------------------------------------------------------------------------
@@ -671,9 +407,6 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Energy", energyStorage.serializeNBT(registries));
-        tag.putLong("PlacedGameTime",   placedGameTime);
-        tag.putLong("SelectedGameTime", selectedGameTime);
         tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
 
         ListTag chunkList = new ListTag();
@@ -684,9 +417,6 @@ public class ChronosphereBlockEntity extends BlockEntity implements net.minecraf
     @Override
     protected void loadAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        if (tag.contains("Energy"))           energyStorage.deserializeNBT(registries, tag.get("Energy"));
-        if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
-        if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
         autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
 
         additionalChunks.clear();
