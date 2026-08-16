@@ -3,7 +3,6 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -68,16 +67,24 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         return new TimelinePreviewRequestPacket(machinePos, lastKnownHeadCommitId, lastKnownPreviewVersion, viewChunk);
     }
 
+    /** How close (in blocks) the sender must be to machinePos for a request to be honored. Not
+     * gated behind the machine's own container menu being open — the in-world "Show Changes" ghost
+     * preview (see {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionRenderer})
+     * is designed to keep refreshing while the player walks around away from the GUI (see {@link
+     * io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionPoller}), so a
+     * generous range covering a Chronosphere's full claim is used instead of a tight interaction
+     * range. */
+    private static final double MAX_RANGE_BLOCKS = 256.0D;
+
     public static void handle(TimelinePreviewRequestPacket packet, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer sender)) {
             return;
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof TimelineViewMenu menu)) return;
-            if (!menu.getBlockPos().equals(packet.machinePos)) return;
+            if (sender.blockPosition().distSqr(packet.machinePos) > MAX_RANGE_BLOCKS * MAX_RANGE_BLOCKS) return;
+            if (!(sender.level().getBlockEntity(packet.machinePos) instanceof TimelineViewProvider machine)) return;
 
-            TimelineViewProvider machine = menu.getTimelineProvider();
             ChunkPos viewChunk = packet.viewChunk;
 
             // The chunk's head id changes whenever any commit relevant to it is created (see
