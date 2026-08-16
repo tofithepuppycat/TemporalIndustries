@@ -49,11 +49,6 @@ public class NetworkHandler {
                 ChronosphereToggleAutoTrackPacket.STREAM_CODEC,
                 ChronosphereToggleAutoTrackPacket::handle);
 
-        registrar.playToClient(
-                ChronoMarkerDiffSyncPacket.TYPE,
-                ChronoMarkerDiffSyncPacket.STREAM_CODEC,
-                ChronoMarkerDiffSyncPacket::handle);
-
         registrar.playToServer(
                 ChronosphereMapRequestPacket.TYPE,
                 ChronosphereMapRequestPacket.STREAM_CODEC,
