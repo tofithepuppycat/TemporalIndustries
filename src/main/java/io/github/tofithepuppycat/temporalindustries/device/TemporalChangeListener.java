@@ -3,7 +3,6 @@ package io.github.tofithepuppycat.temporalindustries.device;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
@@ -308,10 +307,6 @@ public final class TemporalChangeListener {
         long gameTime = server.overworld().getGameTime();
         if (gameTime % FLUSH_INTERVAL_TICKS != 0) return;
 
-        // inventoryTick() has no "item was deselected/dropped/its holder logged out" hook to
-        // release tracking from directly (see PortableChronoMarkerItem), so this periodically
-        // sweeps for owners that stopped refreshing instead.
-        PortableChronoMarkerItem.releaseStaleTracking(server, gameTime);
         TemporalWorldData.get(server).flushPendingDeltas(gameTime);
     }
 }

@@ -4,6 +4,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
@@ -252,6 +253,70 @@ public class TemporalTimeline {
         long headId = getChunkHeadId(chunkPos);
         Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
         return TemporalCommit.ancestryChain(chunkCommits, localParents, headId).size();
+    }
+
+    // -------------------------------------------------------------------------
+    // Manual save-point diffing (Portable ChronoMarker — see PortableChronoMarkerItem)
+
+    /** chunkPos's full materialized block/block-entity state at its current head: the nearest
+     * SNAPSHOT ancestor's baseline, overlaid by every DELTA between that snapshot and the head
+     * (latest write wins) — the same ancestry walk {@link #resolveDesiredState} uses, but replayed
+     * forward in full rather than diffed against a target, since {@link #diffChunkAgainstHead} has
+     * no continuous change-tracking to diff against and needs the actual materialized state instead. */
+    private DesiredState materializeChunkAtHead(ChunkPos chunkPos) {
+        List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
+        if (chunkCommits.isEmpty()) return new DesiredState(Map.of(), Map.of(), Map.of());
+
+        long headId = getChunkHeadId(chunkPos);
+        Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
+        List<TemporalCommit> chain = TemporalCommit.ancestryChain(chunkCommits, localParents, headId);
+
+        Map<BlockPos, BlockState> states = new HashMap<>();
+        Map<BlockPos, CompoundTag> beTags = new HashMap<>();
+        if (!chain.isEmpty() && chain.get(0).getType() == TemporalCommit.Type.SNAPSHOT) {
+            for (ChunkSnapshot snapshot : chain.get(0).getChunkSnapshots()) {
+                if (!snapshot.getChunkPos().equals(chunkPos)) continue;
+                states.putAll(snapshot.toBlockStateMap());
+                beTags.putAll(snapshot.getBlockEntityTags());
+            }
+        }
+
+        for (int i = 1; i < chain.size(); i++) {
+            for (ChunkDelta cd : chain.get(i).getChunkDeltas()) {
+                if (!cd.getChunkPos().equals(chunkPos)) continue;
+                for (BlockChangeDelta change : cd.getBlockChanges()) {
+                    states.put(change.getPos(), change.getNewState());
+                    beTags.put(change.getPos(), change.getNewBlockEntityTag());
+                }
+            }
+        }
+        return new DesiredState(states, beTags, Map.of());
+    }
+
+    /** A {@link TemporalCommit.Type#DELTA}-ready diff of current (a just-captured full baseline)
+     * against chunkPos's materialized head (see {@link #materializeChunkAtHead}) — lets a Portable
+     * ChronoMarker's manual save point produce ordinary per-block deltas purely from two captures,
+     * without needing continuous background tracking of every chunk the player ever walks through
+     * (contrast Time Machine/Chronosphere auto-tracking, which records deltas as changes happen).
+     * @return null if nothing actually changed since the head */
+    @Nullable
+    public ChunkDelta diffChunkAgainstHead(ResourceLocation dimension, ChunkSnapshot current) {
+        ChunkPos chunkPos = current.getChunkPos();
+        DesiredState head = materializeChunkAtHead(chunkPos);
+        Map<BlockPos, CompoundTag> currentBeTags = current.getBlockEntityTags();
+
+        List<BlockChangeDelta> changes = new ArrayList<>();
+        for (Map.Entry<BlockPos, BlockState> entry : current.toBlockStateMap().entrySet()) {
+            BlockPos pos = entry.getKey();
+            BlockState newState = entry.getValue();
+            BlockState oldState = head.states().getOrDefault(pos, newState);
+            CompoundTag oldBeTag = head.blockEntityTags().get(pos);
+            CompoundTag newBeTag = currentBeTags.get(pos);
+            if (newState.equals(oldState) && Objects.equals(oldBeTag, newBeTag)) continue;
+            changes.add(new BlockChangeDelta(pos, oldState, newState, oldBeTag, newBeTag));
+        }
+
+        return changes.isEmpty() ? null : new ChunkDelta(dimension, chunkPos, changes);
     }
 
     // -------------------------------------------------------------------------
