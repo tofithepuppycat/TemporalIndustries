@@ -258,62 +258,93 @@ public class TemporalTimeline {
     // -------------------------------------------------------------------------
     // Manual save-point diffing (Portable ChronoMarker — see PortableChronoMarkerItem)
 
-    /** chunkPos's full materialized block/block-entity state at its current head: the nearest
-     * SNAPSHOT ancestor's baseline, overlaid by every DELTA between that snapshot and the head
-     * (latest write wins) — the same ancestry walk {@link #resolveDesiredState} uses, but replayed
-     * forward in full rather than diffed against a target, since {@link #diffChunkAgainstHead} has
-     * no continuous change-tracking to diff against and needs the actual materialized state instead. */
-    private DesiredState materializeChunkAtHead(ChunkPos chunkPos) {
+    /** chunkPos's nearest SNAPSHOT ancestor (inclusive) and every DELTA between it and the head, in
+     * chain order — the raw materials {@link #diffChunkAgainstHead} needs, without actually
+     * replaying them into a full per-position map (see that method's doc for why). Returns an empty
+     * chain if chunkPos has no history, or its earliest reachable commit isn't a SNAPSHOT (a
+     * defensive case that shouldn't occur once {@link #ensureBaseline} has run — every chunk's very
+     * first commit always is one). */
+    private List<TemporalCommit> headChainSinceSnapshot(ChunkPos chunkPos) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
-        if (chunkCommits.isEmpty()) return new DesiredState(Map.of(), Map.of(), Map.of());
+        if (chunkCommits.isEmpty()) return List.of();
 
         long headId = getChunkHeadId(chunkPos);
         Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
         List<TemporalCommit> chain = TemporalCommit.ancestryChain(chunkCommits, localParents, headId);
-
-        Map<BlockPos, BlockState> states = new HashMap<>();
-        Map<BlockPos, CompoundTag> beTags = new HashMap<>();
-        if (!chain.isEmpty() && chain.get(0).getType() == TemporalCommit.Type.SNAPSHOT) {
-            for (ChunkSnapshot snapshot : chain.get(0).getChunkSnapshots()) {
-                if (!snapshot.getChunkPos().equals(chunkPos)) continue;
-                states.putAll(snapshot.toBlockStateMap());
-                beTags.putAll(snapshot.getBlockEntityTags());
-            }
-        }
-
-        for (int i = 1; i < chain.size(); i++) {
-            for (ChunkDelta cd : chain.get(i).getChunkDeltas()) {
-                if (!cd.getChunkPos().equals(chunkPos)) continue;
-                for (BlockChangeDelta change : cd.getBlockChanges()) {
-                    states.put(change.getPos(), change.getNewState());
-                    beTags.put(change.getPos(), change.getNewBlockEntityTag());
-                }
-            }
-        }
-        return new DesiredState(states, beTags, Map.of());
+        if (chain.isEmpty() || chain.get(0).getType() != TemporalCommit.Type.SNAPSHOT) return List.of();
+        return chain;
     }
 
-    /** A {@link TemporalCommit.Type#DELTA}-ready diff of current (a just-captured full baseline)
-     * against chunkPos's materialized head (see {@link #materializeChunkAtHead}) — lets a Portable
-     * ChronoMarker's manual save point produce ordinary per-block deltas purely from two captures,
-     * without needing continuous background tracking of every chunk the player ever walks through
-     * (contrast Time Machine/Chronosphere auto-tracking, which records deltas as changes happen).
+    /**
+     * A {@link TemporalCommit.Type#DELTA}-ready diff of current (a just-captured full baseline)
+     * against chunkPos's materialized head — lets a Portable ChronoMarker's manual save point
+     * produce ordinary per-block deltas purely from two captures, without needing continuous
+     * background tracking of every chunk the player ever walks through (contrast Time
+     * Machine/Chronosphere auto-tracking, which records deltas as changes happen).
+     *
+     * <p>Section by section (see {@link ChunkSnapshot#sectionTriviallyEquals}) rather than
+     * expanding the baseline and current snapshots into full ~24-section, ~98k-position maps
+     * up front: a section neither the baseline-vs-current comparison nor any recorded delta
+     * touches — the common case for anything below the surface or above the build limit — never
+     * gets expanded at all. A claimed area's worth of untouched wilderness chunks used to mean a
+     * multi-hundred-thousand-entry HashMap build on every single mark; this keeps that work
+     * proportional to how much of the chunk has actually changed instead.
      * @return null if nothing actually changed since the head */
     @Nullable
     public ChunkDelta diffChunkAgainstHead(ResourceLocation dimension, ChunkSnapshot current) {
         ChunkPos chunkPos = current.getChunkPos();
-        DesiredState head = materializeChunkAtHead(chunkPos);
-        Map<BlockPos, CompoundTag> currentBeTags = current.getBlockEntityTags();
+        List<TemporalCommit> chain = headChainSinceSnapshot(chunkPos);
+        if (chain.isEmpty()) return null;
 
+        ChunkSnapshot baseline = null;
+        for (ChunkSnapshot snapshot : chain.get(0).getChunkSnapshots()) {
+            if (snapshot.getChunkPos().equals(chunkPos)) { baseline = snapshot; break; }
+        }
+        if (baseline == null) return null;
+
+        // Sparse overlay of every DELTA recorded on top of the baseline (latest write wins, same
+        // as the old full-materialization walk) — proportional to however many positions were ever
+        // actually changed, not the size of the chunk, so this costs nothing extra regardless of
+        // how large current/baseline are.
+        Map<BlockPos, BlockState> overlayStates = new HashMap<>();
+        Map<BlockPos, CompoundTag> overlayBeTags = new HashMap<>();
+        Set<Integer> touchedSections = new HashSet<>();
+        for (int i = 1; i < chain.size(); i++) {
+            for (ChunkDelta cd : chain.get(i).getChunkDeltas()) {
+                if (!cd.getChunkPos().equals(chunkPos)) continue;
+                for (BlockChangeDelta change : cd.getBlockChanges()) {
+                    overlayStates.put(change.getPos(), change.getNewState());
+                    overlayBeTags.put(change.getPos(), change.getNewBlockEntityTag());
+                    touchedSections.add(Math.floorDiv(change.getPos().getY(), 16));
+                }
+            }
+        }
+
+        Map<BlockPos, CompoundTag> currentBeTags = current.getBlockEntityTags();
+        Map<BlockPos, CompoundTag> baselineBeTags = baseline.getBlockEntityTags();
         List<BlockChangeDelta> changes = new ArrayList<>();
-        for (Map.Entry<BlockPos, BlockState> entry : current.toBlockStateMap().entrySet()) {
-            BlockPos pos = entry.getKey();
-            BlockState newState = entry.getValue();
-            BlockState oldState = head.states().getOrDefault(pos, newState);
-            CompoundTag oldBeTag = head.blockEntityTags().get(pos);
-            CompoundTag newBeTag = currentBeTags.get(pos);
-            if (newState.equals(oldState) && Objects.equals(oldBeTag, newBeTag)) continue;
-            changes.add(new BlockChangeDelta(pos, oldState, newState, oldBeTag, newBeTag));
+        int sectionCount = Math.min(current.sectionCount(), baseline.sectionCount());
+        for (int i = 0; i < sectionCount; i++) {
+            int sectionY = current.minSectionY() + i;
+            if (!touchedSections.contains(sectionY) && current.sectionTriviallyEquals(baseline, i)) {
+                continue; // whole section matches the baseline, and nothing overlays it either
+            }
+
+            Map<BlockPos, BlockState> currentSection = new HashMap<>();
+            current.collectSectionInto(i, currentSection);
+            Map<BlockPos, BlockState> baselineSection = new HashMap<>();
+            baseline.collectSectionInto(i, baselineSection);
+
+            for (Map.Entry<BlockPos, BlockState> entry : currentSection.entrySet()) {
+                BlockPos pos = entry.getKey();
+                BlockState newState = entry.getValue();
+                BlockState oldState = overlayStates.containsKey(pos) ? overlayStates.get(pos)
+                        : baselineSection.getOrDefault(pos, newState);
+                CompoundTag oldBeTag = overlayBeTags.containsKey(pos) ? overlayBeTags.get(pos) : baselineBeTags.get(pos);
+                CompoundTag newBeTag = currentBeTags.get(pos);
+                if (newState.equals(oldState) && Objects.equals(oldBeTag, newBeTag)) continue;
+                changes.add(new BlockChangeDelta(pos, oldState, newState, oldBeTag, newBeTag));
+            }
         }
 
         return changes.isEmpty() ? null : new ChunkDelta(dimension, chunkPos, changes);

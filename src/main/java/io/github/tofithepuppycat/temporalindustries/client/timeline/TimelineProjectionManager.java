@@ -79,6 +79,13 @@ public final class TimelineProjectionManager {
         activeMachinePos = machinePos;
     }
 
+    /** The machine the ghost preview is currently tracking, or null if none — used by {@link
+     * TimelineProjectionPoller} to keep polling for fresh data even after the machine's own GUI has
+     * closed, since {@link #hasActivePreview()} alone doesn't say which machine to ask. */
+    public static BlockPos getActiveMachinePos() {
+        return activeMachinePos;
+    }
+
     public static void clearActiveMachine(BlockPos machinePos) {
         if (activeMachinePos != null && activeMachinePos.equals(machinePos)) {
             clearAll();
