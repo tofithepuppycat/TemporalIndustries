@@ -43,10 +43,21 @@ import java.util.UUID;
  * two point-in-time captures, not from listening to every block change as it happens. A zero-diff
  * SAVE_MARKER commit rides alongside it purely so the graph can point out where the player
  * actually saved (see {@link TemporalTimeline#addSaveMarker}).
+ *
+ * <p>A plain right-click instantly marks the default square radius around the player. Sneak +
+ * right-click instead opens {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronoMarkerMapScreen},
+ * the same chunk-selection map the Chronosphere's claim overlay uses (see {@link
+ * io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid}), letting the
+ * player pick exactly which chunks around them get captured before confirming.
  */
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
     private static final int RADIUS_CHUNKS = 2;
+    /** Radius (in chunks) offered by the sneak-right-click area-select map — shares the same
+     * circular shape math as the Chronosphere's claim map (see {@link
+     * io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea}), unlike the plain
+     * right-click's square default radius above. */
+    public static final int MAP_RADIUS_CHUNKS = 2;
     private static final int WAVE_DURATION_TICKS = 15;
     private static final double RING_SPEED = 6.0D;
 
@@ -64,11 +75,19 @@ public class PortableChronoMarkerItem extends Item {
     @Override
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
+
+        if (player.isShiftKeyDown()) {
+            if (level.isClientSide) {
+                io.github.tofithepuppycat.temporalindustries.client.screen.ChronoMarkerMapScreen.open(new ChunkPos(player.blockPosition()));
+            }
+            return InteractionResultHolder.success(stack);
+        }
+
         if (level.isClientSide || !(player instanceof ServerPlayer serverPlayer)) {
             return InteractionResultHolder.success(stack);
         }
 
-        recordMark(serverPlayer, (ServerLevel) level);
+        recordMark(serverPlayer, (ServerLevel) level, chunksInRadius(serverPlayer));
         return InteractionResultHolder.success(stack);
     }
 
@@ -84,20 +103,21 @@ public class PortableChronoMarkerItem extends Item {
     // -------------------------------------------------------------------------
     // Marking
 
-    /** Records a save point across the wielder's radius purely from two point-in-time captures —
-     * no continuous background tracking involved. For each chunk: ensures it has a baseline (first
+    /** Records a save point across {@code chunks} purely from two point-in-time captures — no
+     * continuous background tracking involved. For each chunk: ensures it has a baseline (first
      * time it's ever marked), then either diffs a fresh {@link ChunkSnapshot} against that chunk's
      * current timeline head to produce an ordinary DELTA (see
      * {@link TemporalTimeline#diffChunkAgainstHead}), or, once the radius has drifted far enough
      * past its last baseline, re-snapshots it fresh instead — the exact same DELTA/SNAPSHOT commit
      * split (see {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) auto-tracking produces on its
-     * own. */
-    private void recordMark(ServerPlayer player, ServerLevel level) {
+     * own. Called both for the plain right-click's fixed square radius and for the sneak-right-click
+     * map screen's player-chosen selection — see {@link
+     * io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerMarkPacket}. */
+    public static void recordMark(ServerPlayer player, ServerLevel level, List<ChunkPos> chunks) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
         TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
 
-        List<ChunkPos> chunks = chunksInRadius(player);
         List<ChunkDelta> chunkDeltas = new ArrayList<>();
         List<ChunkSnapshot> chunkSnapshots = new ArrayList<>();
 
@@ -202,5 +222,6 @@ public class PortableChronoMarkerItem extends Item {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip").withStyle(ChatFormatting.GRAY));
         tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip_mark").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip_map").withStyle(ChatFormatting.GRAY));
     }
 }

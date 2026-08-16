@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.client.ChronosphereMapClientState;
+import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -9,13 +9,14 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
 
 /** Server -> client: terrain thumbnails (see {@link io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler})
- * for every currently-loaded chunk in a Chronosphere's claimable area, for {@link ChronosphereMapClientState}. */
+ * for every currently-loaded chunk in a Chronosphere's claimable area, for {@link ChunkThumbnailClientState}. */
 public class ChronosphereMapSyncPacket implements CustomPacketPayload {
     public static final Type<ChronosphereMapSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_map_sync"));
@@ -73,7 +74,8 @@ public class ChronosphereMapSyncPacket implements CustomPacketPayload {
     }
 
     public static void handle(ChronosphereMapSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ChronosphereMapClientState.updateFromServer(packet.machinePos, packet.thumbnails));
+        context.enqueueWork(() -> ChunkThumbnailClientState.updateFromServer(
+                new ChunkPos(packet.machinePos).toLong(), packet.thumbnails));
     }
 
     @Override

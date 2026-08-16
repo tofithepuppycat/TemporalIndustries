@@ -73,5 +73,20 @@ public class NetworkHandler {
                 GlueRegionSyncPacket.TYPE,
                 GlueRegionSyncPacket.STREAM_CODEC,
                 GlueRegionSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronoMarkerMapRequestPacket.TYPE,
+                ChronoMarkerMapRequestPacket.STREAM_CODEC,
+                ChronoMarkerMapRequestPacket::handle);
+
+        registrar.playToClient(
+                ChronoMarkerMapSyncPacket.TYPE,
+                ChronoMarkerMapSyncPacket.STREAM_CODEC,
+                ChronoMarkerMapSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronoMarkerMarkPacket.TYPE,
+                ChronoMarkerMarkPacket.STREAM_CODEC,
+                ChronoMarkerMarkPacket::handle);
     }
 }
