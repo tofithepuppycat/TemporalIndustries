@@ -1,13 +1,13 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
@@ -26,29 +26,27 @@ import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.UUID;
 
 /**
- * Handheld player save-point tool. While held, tracks (and shows the boundary of) a chunk radius
- * around the wielder — the same {@link TemporalWorldData#trackChunk} mechanism placed machines use
- * — so the timeline keeps recording deltas there. Right-click flushes those pending deltas into a
- * commit and, once the radius has drifted far enough from its last baseline, re-baselines it with a
- * full {@link ChunkSnapshot} — the exact same DELTA/SNAPSHOT commits (see
- * {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) auto-tracking produces on its own, so a
- * player's manual save point is restorable from any Time Machine/Chronosphere viewing that chunk
- * exactly like an automatically tracked one. A zero-diff SAVE_MARKER commit rides alongside it
- * purely so the graph can point out where the player actually saved (see
- * {@link TemporalTimeline#addSaveMarker}).
+ * Handheld player save-point tool. Right-click captures a fresh {@link ChunkSnapshot} of every
+ * chunk in a radius around the wielder and diffs it against that chunk's current timeline head
+ * (see {@link TemporalTimeline#diffChunkAgainstHead}), committing the result as an ordinary DELTA
+ * — or, once the radius has drifted far enough from its last baseline, a fresh SNAPSHOT instead
+ * (see {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) — the exact same commit types
+ * auto-tracking produces on its own, so a player's manual save point is restorable from any Time
+ * Machine/Chronosphere viewing that chunk exactly like an automatically tracked one. Unlike a
+ * placed machine, the marker never registers continuous background tracking ({@link
+ * TemporalWorldData#trackChunk}): it only ever touches the timeline at the moment of a save, from
+ * two point-in-time captures, not from listening to every block change as it happens. A zero-diff
+ * SAVE_MARKER commit rides alongside it purely so the graph can point out where the player
+ * actually saved (see {@link TemporalTimeline#addSaveMarker}).
  */
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
     private static final int RADIUS_CHUNKS = 2;
-    private static final int TRACK_INTERVAL_TICKS = 20;
     private static final int WAVE_DURATION_TICKS = 15;
     private static final double RING_SPEED = 6.0D;
 
@@ -58,19 +56,6 @@ public class PortableChronoMarkerItem extends Item {
     /** playerId -> gameTime the current terrain-tracing wave started, consumed in inventoryTick.
      * Purely cosmetic — never persisted. */
     private static final Map<UUID, Long> ACTIVE_WAVE_START = new HashMap<>();
-
-    /** playerId -> the chunks currently tracked on that player's behalf (see
-     * {@link TemporalWorldData#trackChunk}), so a chunk that falls out of radius — or every chunk,
-     * once the player stops carrying/selecting the marker — actually gets released instead of
-     * staying tracked (and recording deltas) forever. Never persisted: a fresh server start simply
-     * has nothing tracked here until a marker is held again. */
-    private static final Map<UUID, PlayerTrackedChunks> ACTIVE_TRACKED_CHUNKS = new HashMap<>();
-    /** A player who hasn't refreshed their tracked radius in this long is assumed to have
-     * deselected/dropped the marker or logged out — inventoryTick() has no direct hook for any of
-     * those, so {@link #releaseStaleTracking} sweeps for it periodically instead. */
-    private static final int STALE_AFTER_TICKS = TRACK_INTERVAL_TICKS * 3;
-
-    private record PlayerTrackedChunks(ResourceLocation dimension, Set<Long> chunkKeys, long lastRefreshTick) {}
 
     public PortableChronoMarkerItem(Properties properties) {
         super(properties);
@@ -92,9 +77,6 @@ public class PortableChronoMarkerItem extends Item {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
         if (!isSelected || !(level instanceof ServerLevel serverLevel) || !(entity instanceof ServerPlayer player)) return;
 
-        if (serverLevel.getGameTime() % TRACK_INTERVAL_TICKS == 0) {
-            trackRadius(player, serverLevel);
-        }
         spawnBoundaryWall(player, serverLevel);
         spawnWave(player, serverLevel);
     }
@@ -102,30 +84,40 @@ public class PortableChronoMarkerItem extends Item {
     // -------------------------------------------------------------------------
     // Marking
 
-    /** Records a save point across the wielder's tracked radius: flushes whatever's changed since
-     * the last periodic flush into a normal DELTA commit — same as auto-tracking's own 20-tick
-     * flush (TemporalChangeListener) — and, only once this radius has drifted far enough past its
-     * last baseline, re-snapshots it too. Never forces a full {@link ChunkSnapshot} capture on every
-     * click: that's the "optimise to deltas" half of this being a save point, not a screenshot. */
+    /** Records a save point across the wielder's radius purely from two point-in-time captures —
+     * no continuous background tracking involved. For each chunk: ensures it has a baseline (first
+     * time it's ever marked), then either diffs a fresh {@link ChunkSnapshot} against that chunk's
+     * current timeline head to produce an ordinary DELTA (see
+     * {@link TemporalTimeline#diffChunkAgainstHead}), or, once the radius has drifted far enough
+     * past its last baseline, re-snapshots it fresh instead — the exact same DELTA/SNAPSHOT commit
+     * split (see {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) auto-tracking produces on its
+     * own. */
     private void recordMark(ServerPlayer player, ServerLevel level) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+        ResourceLocation dimension = level.dimension().location();
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
 
         List<ChunkPos> chunks = chunksInRadius(player);
-        trackChunksForPlayer(player, level, chunks);
-
-        // Block changes since the last periodic flush (TemporalChangeListener, every 20 ticks) sit
-        // uncommitted in TemporalWorldData's pending-delta buffer. Without flushing them first, a
-        // block placed right before this save wouldn't be part of any commit yet, so the save's own
-        // head wouldn't include it — it would only show up later as a change attributed to *after*
-        // this save, once the next periodic flush finally commits it. Flushing here guarantees the
-        // save reflects everything that's actually happened up to this exact moment.
-        worldData.flushPendingDeltas(level.getGameTime());
+        List<ChunkDelta> chunkDeltas = new ArrayList<>();
+        List<ChunkSnapshot> chunkSnapshots = new ArrayList<>();
 
         for (ChunkPos chunkPos : chunks) {
-            if (timeline.getCommitsSinceSnapshot(chunkPos) < TemporalTimeline.SNAPSHOT_COMMIT_THRESHOLD) continue;
-            timeline.addSnapshot(level.getGameTime(), List.of(ChunkSnapshot.capture(level, chunkPos)));
+            // A chunk marked for the first time gets its baseline captured here, matching the live
+            // world exactly — nothing to diff yet, so it's skipped rather than double-counted.
+            if (timeline.ensureBaseline(chunkPos, level)) continue;
+
+            ChunkSnapshot current = ChunkSnapshot.capture(level, chunkPos);
+            if (timeline.getCommitsSinceSnapshot(chunkPos) >= TemporalTimeline.SNAPSHOT_COMMIT_THRESHOLD) {
+                chunkSnapshots.add(current);
+                continue;
+            }
+
+            ChunkDelta delta = timeline.diffChunkAgainstHead(dimension, current);
+            if (delta != null) chunkDeltas.add(delta);
         }
+
+        if (!chunkDeltas.isEmpty()) timeline.addDelta(level.getGameTime(), chunkDeltas);
+        if (!chunkSnapshots.isEmpty()) timeline.addSnapshot(level.getGameTime(), chunkSnapshots);
 
         // Purely cosmetic: flags where this save actually happened on the graph (see
         // TimelineGraphWidget's diamond rendering) — the save itself is already captured by the
@@ -139,7 +131,7 @@ public class PortableChronoMarkerItem extends Item {
     }
 
     // -------------------------------------------------------------------------
-    // Radius / tracking
+    // Radius
 
     private static List<ChunkPos> chunksInRadius(ServerPlayer player) {
         ChunkPos center = new ChunkPos(player.blockPosition());
@@ -150,58 +142,6 @@ public class PortableChronoMarkerItem extends Item {
             }
         }
         return chunks;
-    }
-
-    private static void trackRadius(ServerPlayer player, ServerLevel level) {
-        List<ChunkPos> chunks = chunksInRadius(player);
-        trackChunksForPlayer(player, level, chunks);
-    }
-
-    /** Tracks exactly chunks on player's behalf, releasing any chunk this player was tracking
-     * previously (in whichever dimension) that isn't in the new set — so walking away shrinks the
-     * tracked radius instead of it only ever growing. */
-    private static void trackChunksForPlayer(ServerPlayer player, ServerLevel level, List<ChunkPos> chunks) {
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        UUID playerId = player.getUUID();
-
-        Set<Long> newKeys = new HashSet<>();
-        for (ChunkPos chunkPos : chunks) {
-            newKeys.add(chunkPos.toLong());
-            worldData.trackChunk(dimension, chunkPos, playerId, level);
-        }
-
-        PlayerTrackedChunks previous = ACTIVE_TRACKED_CHUNKS.get(playerId);
-        if (previous != null) {
-            for (long oldKey : previous.chunkKeys()) {
-                if (previous.dimension().equals(dimension) && newKeys.contains(oldKey)) continue;
-                worldData.untrackChunk(previous.dimension(), new ChunkPos(oldKey), playerId);
-            }
-        }
-
-        ACTIVE_TRACKED_CHUNKS.put(playerId, new PlayerTrackedChunks(dimension, newKeys, level.getGameTime()));
-        worldData.setDirty();
-    }
-
-    /** Releases marker tracking for any player who hasn't refreshed it in a while — deselected the
-     * item, dropped it, switched dimension without the item ticking again yet, or logged out.
-     * Called periodically from {@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener}'s
-     * flush loop, since inventoryTick() itself has no "stopped being held" hook to release from. */
-    public static void releaseStaleTracking(MinecraftServer server, long gameTime) {
-        if (ACTIVE_TRACKED_CHUNKS.isEmpty()) return;
-
-        TemporalWorldData worldData = TemporalWorldData.get(server);
-        Iterator<Map.Entry<UUID, PlayerTrackedChunks>> it = ACTIVE_TRACKED_CHUNKS.entrySet().iterator();
-        while (it.hasNext()) {
-            Map.Entry<UUID, PlayerTrackedChunks> entry = it.next();
-            if (gameTime - entry.getValue().lastRefreshTick() < STALE_AFTER_TICKS) continue;
-
-            UUID playerId = entry.getKey();
-            for (long key : entry.getValue().chunkKeys()) {
-                worldData.untrackChunk(entry.getValue().dimension(), new ChunkPos(key), playerId);
-            }
-            it.remove();
-        }
     }
 
     // -------------------------------------------------------------------------
