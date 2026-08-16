@@ -1,8 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerDiffSyncPacket;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.DustParticleOptions;
@@ -23,7 +22,6 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import net.neoforged.neoforge.network.PacketDistributor;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
@@ -36,12 +34,14 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Handheld player bookmark tool. While held, tracks (and shows the boundary of) a chunk radius
+ * Handheld player save-point tool. While held, tracks (and shows the boundary of) a chunk radius
  * around the wielder — the same {@link TemporalWorldData#trackChunk} mechanism placed machines use
- * — so the timeline keeps recording deltas there. Crouch right-click records a zero-diff
- * {@link TemporalCommit.Type#PLAYER_MARK} waypoint across that radius (see
- * {@link TemporalTimeline#addPlayerMark}); a plain right-click asks the server for the block
- * changes between the wielder's latest two marks and opens a screen listing them.
+ * — so the timeline keeps recording deltas there. Right-click flushes those pending deltas into a
+ * commit and, once the radius has drifted far enough from its last baseline, re-baselines it with a
+ * full {@link ChunkSnapshot} — the exact same DELTA/SNAPSHOT commits (see
+ * {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) auto-tracking produces on its own, so a
+ * player's manual save point is restorable from any Time Machine/Chronosphere viewing that chunk
+ * exactly like an automatically tracked one.
  */
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
@@ -81,11 +81,7 @@ public class PortableChronoMarkerItem extends Item {
             return InteractionResultHolder.success(stack);
         }
 
-        if (player.isShiftKeyDown()) {
-            recordMark(serverPlayer, (ServerLevel) level);
-        } else {
-            sendDiff(serverPlayer, (ServerLevel) level);
-        }
+        recordMark(serverPlayer, (ServerLevel) level);
         return InteractionResultHolder.success(stack);
     }
 
@@ -104,47 +100,35 @@ public class PortableChronoMarkerItem extends Item {
     // -------------------------------------------------------------------------
     // Marking
 
+    /** Records a save point across the wielder's tracked radius: flushes whatever's changed since
+     * the last periodic flush into a normal DELTA commit — same as auto-tracking's own 20-tick
+     * flush (TemporalChangeListener) — and, only once this radius has drifted far enough past its
+     * last baseline, re-snapshots it too. Never forces a full {@link ChunkSnapshot} capture on every
+     * click: that's the "optimise to deltas" half of this being a save point, not a screenshot. */
     private void recordMark(ServerPlayer player, ServerLevel level) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
 
         List<ChunkPos> chunks = chunksInRadius(player);
         trackChunksForPlayer(player, level, chunks);
-        for (ChunkPos chunkPos : chunks) {
-            timeline.ensureBaseline(chunkPos, level);
-        }
 
-        timeline.addPlayerMark(level.getGameTime(), chunks, player.getUUID());
+        // Block changes since the last periodic flush (TemporalChangeListener, every 20 ticks) sit
+        // uncommitted in TemporalWorldData's pending-delta buffer. Without flushing them first, a
+        // block placed right before this save wouldn't be part of any commit yet, so the save's own
+        // head wouldn't include it — it would only show up later as a change attributed to *after*
+        // this save, once the next periodic flush finally commits it. Flushing here guarantees the
+        // save reflects everything that's actually happened up to this exact moment.
+        worldData.flushPendingDeltas(level.getGameTime());
+
+        for (ChunkPos chunkPos : chunks) {
+            if (timeline.getCommitsSinceSnapshot(chunkPos) < TemporalTimeline.SNAPSHOT_COMMIT_THRESHOLD) continue;
+            timeline.addSnapshot(level.getGameTime(), List.of(ChunkSnapshot.capture(level, chunkPos)));
+        }
         worldData.setDirty();
 
         player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.marked"), true);
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.2F);
         ACTIVE_WAVE_START.put(player.getUUID(), level.getGameTime());
-    }
-
-    private void sendDiff(ServerPlayer player, ServerLevel level) {
-        MinecraftServer server = level.getServer();
-        TemporalWorldData worldData = TemporalWorldData.get(server);
-        TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
-
-        List<TemporalCommit> marks = timeline == null ? List.of() : timeline.getLatestPlayerMarks(player.getUUID(), 2);
-        if (marks.size() < 2) {
-            player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.no_marks"), true);
-            level.playSound(null, player.blockPosition(), SoundEvents.VILLAGER_NO, SoundSource.PLAYERS, 1.0F, 1.0F);
-            return;
-        }
-
-        TemporalCommit older = marks.get(0);
-        TemporalCommit newer = marks.get(1);
-
-        List<ChronoMarkerDiffSyncPacket.Entry> entries = new ArrayList<>();
-        for (ChunkPos chunkPos : newer.getMarkedChunks()) {
-            for (TemporalTimeline.BlockDiffEntry diff : timeline.diffChunkBetweenMarks(chunkPos, older, newer)) {
-                entries.add(new ChronoMarkerDiffSyncPacket.Entry(diff.pos(), diff.oldState(), diff.newState()));
-            }
-        }
-
-        PacketDistributor.sendToPlayer(player, new ChronoMarkerDiffSyncPacket(older.getGameTime(), newer.getGameTime(), entries));
     }
 
     // -------------------------------------------------------------------------
@@ -162,13 +146,8 @@ public class PortableChronoMarkerItem extends Item {
     }
 
     private static void trackRadius(ServerPlayer player, ServerLevel level) {
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
         List<ChunkPos> chunks = chunksInRadius(player);
         trackChunksForPlayer(player, level, chunks);
-        for (ChunkPos chunkPos : chunks) {
-            timeline.ensureBaseline(chunkPos, level);
-        }
     }
 
     /** Tracks exactly chunks on player's behalf, releasing any chunk this player was tracking
@@ -182,7 +161,7 @@ public class PortableChronoMarkerItem extends Item {
         Set<Long> newKeys = new HashSet<>();
         for (ChunkPos chunkPos : chunks) {
             newKeys.add(chunkPos.toLong());
-            worldData.trackChunk(dimension, chunkPos, playerId);
+            worldData.trackChunk(dimension, chunkPos, playerId, level);
         }
 
         PlayerTrackedChunks previous = ACTIVE_TRACKED_CHUNKS.get(playerId);
