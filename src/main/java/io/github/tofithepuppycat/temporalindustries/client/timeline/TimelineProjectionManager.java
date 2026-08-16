@@ -1,13 +1,13 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
-import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -56,6 +56,15 @@ public final class TimelineProjectionManager {
      * chunk for a Time Machine, but every claimed chunk for a Chronosphere (see
      * TimelineViewProvider#getPreviewChunkSnapshots()), since a jump moves all of them together. */
     private static List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>();
+    /** Every glued region in the active machine's dimension, as of the last sync — positions inside
+     * these are excluded from the ghost preview below, since a jump skips them entirely (mirrors
+     * TemporalTimeline's isGlued predicate server-side). Synced directly rather than reusing
+     * GlueSelectionClientState, which only stays fresh while a Temporal Glue item is actually held. */
+    private static List<BoundingBox> gluedRegions = new ArrayList<>();
+    /** Last-synced previewVersion fingerprint (see TimelinePreviewSyncPacket), echoed back on the
+     * next request so the server can skip replying when nothing preview-relevant changed. See
+     * TimelinePreviewRequestPacket#handle for what this covers beyond headCommitId. */
+    private static long previewVersion = Long.MIN_VALUE;
     /** Whether the in-world block-diff preview is toggled on via the "Show Changes" button. */
     private static boolean showChangesEnabled = false;
     /** null when browsing the shared "All" view; otherwise the single claimed chunk whose own tab
@@ -88,6 +97,8 @@ public final class TimelineProjectionManager {
         selectedCommitId = -1L;
         jumpCosts = new HashMap<>();
         previewChunkSnapshots = new ArrayList<>();
+        gluedRegions = new ArrayList<>();
+        previewVersion = Long.MIN_VALUE;
         showChangesEnabled = false;
         selectedViewChunk = null;
     }
@@ -127,7 +138,8 @@ public final class TimelineProjectionManager {
     public static void updateFromServer(BlockPos machinePos, long placed, long current,
                                         List<TemporalCommit> serverCommits, Map<Long, Long> serverLocalParents,
                                         long serverHeadCommitId, Map<Long, Long> serverJumpCosts,
-                                        List<ChunkTimelineSnapshot> serverPreviewChunkSnapshots) {
+                                        List<ChunkTimelineSnapshot> serverPreviewChunkSnapshots,
+                                        List<BoundingBox> serverGluedRegions, long serverPreviewVersion) {
         activeMachinePos = machinePos;
         placedGameTime = Math.max(0L, placed);
         currentGameTime = Math.max(placedGameTime, current);
@@ -136,6 +148,8 @@ public final class TimelineProjectionManager {
         headCommitId = serverHeadCommitId;
         jumpCosts = new HashMap<>(serverJumpCosts);
         previewChunkSnapshots = new ArrayList<>(serverPreviewChunkSnapshots);
+        gluedRegions = new ArrayList<>(serverGluedRegions);
+        previewVersion = serverPreviewVersion;
     }
 
     private static TemporalCommit findCommit(long id) {
@@ -160,6 +174,7 @@ public final class TimelineProjectionManager {
     public static long getSelectedCommitId() { return selectedCommitId; }
     /** The commit this chunk's live world currently reflects (as opposed to the browsing selection). */
     public static long getHeadCommitId() { return headCommitId; }
+    public static long getPreviewVersion() { return previewVersion; }
     /** Energy cost of jumping to commitId from the chunk's current head, or empty if unknown
      * (e.g. stale client state right after switching machines). */
     public static OptionalLong getJumpCost(long commitId) {
@@ -186,9 +201,12 @@ public final class TimelineProjectionManager {
     }
 
     /** Computes which blocks differ from their live world state at selectedGameTime, across every
-     * chunk in previewChunkSnapshots (not just whichever chunk the graph is displaying) — mirroring
-     * {@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline#applyChunkAtTime}
-     * per chunk so the preview matches what Jump will actually do everywhere it does it. */
+     * chunk in previewChunkSnapshots (not just whichever chunk the graph is displaying) — calls the
+     * same {@link TemporalTimeline#walkDeltas} the server's real jump
+     * ({@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline#applyChunkAtTime})
+     * uses, so the preview can't hand-drift out of sync with what Jump will actually do. Known gap:
+     * a jump that crosses a re-snapshot boundary (see walkDeltas's doc) needs a full chunk baseline
+     * the client never receives, so the preview under-reports changes in that case specifically. */
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 
@@ -216,41 +234,13 @@ public final class TimelineProjectionManager {
         List<TemporalCommit> chunkCommits = snapshot.commits();
         if (chunkCommits.isEmpty()) return;
 
-        Map<Long, Long> chunkLocalParents = snapshot.localParents();
         long targetCommitId = resolveTargetCommit(chunkCommits);
+        TemporalTimeline.DeltaWalkResult walk = TemporalTimeline.walkDeltas(
+                chunkCommits, snapshot.localParents(), snapshot.chunkPos(), snapshot.headId(), targetCommitId);
 
-        List<TemporalCommit> liveChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, snapshot.headId());
-        List<TemporalCommit> targetChain = TemporalCommit.ancestryChain(chunkCommits, chunkLocalParents, targetCommitId);
-
-        int commonPrefixLen = 0;
-        int maxCommon = Math.min(liveChain.size(), targetChain.size());
-        while (commonPrefixLen < maxCommon
-                && liveChain.get(commonPrefixLen).getId() == targetChain.get(commonPrefixLen).getId()) {
-            commonPrefixLen++;
-        }
-
-        Map<BlockPos, BlockState> desiredStates = new HashMap<>();
-
-        for (int i = liveChain.size() - 1; i >= commonPrefixLen; i--) {
-            for (ChunkDelta cd : liveChain.get(i).getChunkDeltas()) {
-                if (!cd.getChunkPos().equals(snapshot.chunkPos())) continue;
-                for (BlockChangeDelta change : cd.getBlockChanges()) {
-                    desiredStates.put(change.getPos(), change.getPreviousState());
-                }
-            }
-        }
-
-        for (int i = commonPrefixLen; i < targetChain.size(); i++) {
-            for (ChunkDelta cd : targetChain.get(i).getChunkDeltas()) {
-                if (!cd.getChunkPos().equals(snapshot.chunkPos())) continue;
-                for (BlockChangeDelta change : cd.getBlockChanges()) {
-                    desiredStates.put(change.getPos(), change.getNewState());
-                }
-            }
-        }
-
-        for (Map.Entry<BlockPos, BlockState> entry : desiredStates.entrySet()) {
+        for (Map.Entry<BlockPos, BlockState> entry : walk.states().entrySet()) {
             BlockPos pos = entry.getKey();
+            if (isGlued(pos)) continue; // a jump skips glued positions entirely — see isGlued's doc.
             BlockState targetState = entry.getValue();
             BlockState currentState = level.getBlockState(pos);
 
@@ -266,6 +256,15 @@ public final class TimelineProjectionManager {
                 out.add(new ProjectionEntry(pos, currentState, targetState, type));
             }
         }
+    }
+
+    /** Mirrors TemporalWorldData#isGlued server-side: true when pos sits inside any glued region
+     * synced for the active machine's dimension, meaning a jump would leave it untouched. */
+    private static boolean isGlued(BlockPos pos) {
+        for (BoundingBox region : gluedRegions) {
+            if (region.isInside(pos)) return true;
+        }
+        return false;
     }
 
     private static long clampSelected(long selected) {

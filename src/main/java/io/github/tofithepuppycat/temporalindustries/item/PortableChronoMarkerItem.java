@@ -41,7 +41,9 @@ import java.util.UUID;
  * full {@link ChunkSnapshot} — the exact same DELTA/SNAPSHOT commits (see
  * {@link TemporalTimeline#SNAPSHOT_COMMIT_THRESHOLD}) auto-tracking produces on its own, so a
  * player's manual save point is restorable from any Time Machine/Chronosphere viewing that chunk
- * exactly like an automatically tracked one.
+ * exactly like an automatically tracked one. A zero-diff SAVE_MARKER commit rides alongside it
+ * purely so the graph can point out where the player actually saved (see
+ * {@link TemporalTimeline#addSaveMarker}).
  */
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
@@ -124,6 +126,11 @@ public class PortableChronoMarkerItem extends Item {
             if (timeline.getCommitsSinceSnapshot(chunkPos) < TemporalTimeline.SNAPSHOT_COMMIT_THRESHOLD) continue;
             timeline.addSnapshot(level.getGameTime(), List.of(ChunkSnapshot.capture(level, chunkPos)));
         }
+
+        // Purely cosmetic: flags where this save actually happened on the graph (see
+        // TimelineGraphWidget's diamond rendering) — the save itself is already captured by the
+        // DELTA/SNAPSHOT commit(s) above.
+        timeline.addSaveMarker(level.getGameTime(), chunks);
         worldData.setDirty();
 
         player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.marked"), true);
