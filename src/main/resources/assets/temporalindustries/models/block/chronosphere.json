@@ -1,6 +1,12 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "all": "minecraft:block/lapis_block"
+    "particle": "temporalindustries:block/chronosphere_front",
+    "north": "temporalindustries:block/chronosphere_front",
+    "south": "temporalindustries:block/chronosphere_back",
+    "west": "temporalindustries:block/chronosphere_left",
+    "east": "temporalindustries:block/chronosphere_right",
+    "up": "temporalindustries:block/chronosphere_back",
+    "down": "temporalindustries:block/chronosphere_back"
   }
 }
