@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "occupied=false": { "model": "temporalindustries:block/schrodingers_box" },
+    "occupied=true": { "model": "temporalindustries:block/schrodingers_box_occupied" }
+  }
+}

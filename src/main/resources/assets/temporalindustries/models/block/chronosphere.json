@@ -3,7 +3,7 @@
   "textures": {
     "particle": "temporalindustries:block/chronosphere_front",
     "north": "temporalindustries:block/chronosphere_front",
-    "south": "temporalindustries:block/chronosphere_back",
+    "south": "temporalindustries:block/machine_base_energy",
     "west": "temporalindustries:block/chronosphere_left",
     "east": "temporalindustries:block/chronosphere_right",
     "up": "temporalindustries:block/machine_base_up",
