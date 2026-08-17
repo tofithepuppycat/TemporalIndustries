@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "temporalindustries:block/seebeck_generator" },
+    "facing=east": { "model": "temporalindustries:block/seebeck_generator", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/seebeck_generator", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/seebeck_generator", "y": 270 }
+  }
+}

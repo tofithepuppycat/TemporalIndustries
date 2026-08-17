@@ -76,5 +76,9 @@
 	"item.temporalindustries.entropy_container": "Entropy Container",
 	"item.temporalindustries.entropy_container.order": "Order: %s / %s",
 	"item.temporalindustries.entropy_container.chaos": "Chaos: %s / %s",
-	"entity.temporalindustries.entropy_orb": "Entropy Orb"
+	"entity.temporalindustries.entropy_orb": "Entropy Orb",
+	"block.temporalindustries.schrodingers_box": "Schrodinger's Box",
+	"item.temporalindustries.schrodingers_box.tooltip": "Right-click a mob to trap it inside, then place the box to slowly generate Chaos.",
+	"item.temporalindustries.schrodingers_box.occupied": "Contains: %s",
+	"block.temporalindustries.seebeck_generator": "Seebeck Generator"
 }
