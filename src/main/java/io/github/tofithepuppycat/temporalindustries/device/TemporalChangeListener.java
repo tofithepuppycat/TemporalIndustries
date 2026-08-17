@@ -9,6 +9,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -72,6 +73,18 @@ public final class TemporalChangeListener {
         BlockPos pos = event.getPos().immutable();
         ServerPlayer player = event.getPlayer() instanceof ServerPlayer sp ? sp : null;
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
+
+        // Glued blocks are fully protected from breaking, not just excluded from delta recording —
+        // cancelling here stops Level#destroyBlock before it ever removes the block, so there's
+        // nothing to restore and no block-entity NBT to lose.
+        if (data.isGlued(level.dimension().location(), pos)) {
+            event.setCanceled(true);
+            if (player != null) {
+                player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.protected"), true);
+            }
+            return;
+        }
+
         if (!shouldRecord(level, data, pos, player)) return;
 
         // saveWithFullMetadata() is a real cost (full BE NBT), so it's only paid once we already

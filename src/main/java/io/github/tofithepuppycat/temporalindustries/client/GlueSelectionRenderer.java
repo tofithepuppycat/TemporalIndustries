@@ -28,9 +28,8 @@ import java.util.Optional;
 
 /** Renders Temporal Glue's selections in-world while a Temporal Glue is held in either hand: a
  * translucent fill plus a thin outline for every known glued region (see
- * {@link GlueSelectionClientState}), and a live preview box tracking the crosshair — from the
- * pending first corner (if one's set) to whatever block is currently looked at, or just that block
- * alone if no corner is pending yet. */
+ * {@link GlueSelectionClientState}), and, once a starting corner has been selected, a live preview
+ * box tracking the crosshair from that corner to whatever block is currently looked at. */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class GlueSelectionRenderer {
     private static final float[] FILL_COLOR = {0.55F, 0.85F, 1.0F};
@@ -68,10 +67,11 @@ public class GlueSelectionRenderer {
         ResourceLocation dimension = level.dimension().location();
         List<BoundingBox> regions = GlueSelectionClientState.getRegions(dimension);
         Optional<BlockPos> pendingCorner = TemporalGlueItem.getPendingCorner(heldStack);
-        BlockPos lookedAt = currentLookedAtBlock(minecraft);
-        BoundingBox preview = pendingCorner.isPresent()
-                ? BoundingBox.fromCorners(pendingCorner.get(), lookedAt != null ? lookedAt : pendingCorner.get())
-                : (lookedAt != null ? new BoundingBox(lookedAt) : null);
+        BoundingBox preview = null;
+        if (pendingCorner.isPresent()) {
+            BlockPos lookedAt = currentLookedAtBlock(minecraft);
+            preview = BoundingBox.fromCorners(pendingCorner.get(), lookedAt != null ? lookedAt : pendingCorner.get());
+        }
 
         if (regions.isEmpty() && preview == null) {
             return;
