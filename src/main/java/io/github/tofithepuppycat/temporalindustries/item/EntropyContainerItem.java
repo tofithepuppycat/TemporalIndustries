@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
@@ -14,15 +15,26 @@ import java.util.List;
 /**
  * Holds ORD (order) and CHS (chaos) picked up from {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity}
  * orbs, up to {@link EntropyContents#CAPACITY} of each. A player only attracts and picks up entropy
- * orbs while holding one of these, see {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity#isHoldingContainer}.
+ * orbs while holding an {@link EntropyReceptacle} that accepts the orb's type — see
+ * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity#isHoldingReceptacle}.
  * The two fill levels are drawn as stacked bars over the item icon by
  * {@link io.github.tofithepuppycat.temporalindustries.client.EntropyContainerItemDecorator}.
  */
 @SuppressWarnings("null")
-public class EntropyContainerItem extends Item {
+public class EntropyContainerItem extends Item implements EntropyReceptacle {
 
     public EntropyContainerItem(Properties properties) {
         super(properties);
+    }
+
+    @Override
+    public boolean accepts(EntropyType type) {
+        return true;
+    }
+
+    @Override
+    public int insertOrb(ItemStack stack, EntropyType type, int amount) {
+        return insert(stack, type, amount);
     }
 
     /** Adds amount of type into stack, respecting capacity. Returns whatever didn't fit. */

@@ -80,5 +80,14 @@
 	"block.temporalindustries.schrodingers_box": "Schrodinger's Box",
 	"item.temporalindustries.schrodingers_box.tooltip": "Right-click a mob to trap it inside, then place the box to slowly generate Chaos.",
 	"item.temporalindustries.schrodingers_box.occupied": "Contains: %s",
-	"block.temporalindustries.seebeck_generator": "Seebeck Generator"
+	"block.temporalindustries.seebeck_generator": "Seebeck Generator",
+	"item.temporalindustries.order_bottle": "Order Bottle",
+	"item.temporalindustries.order_bottle.contents": "Order: %s / %s",
+	"item.temporalindustries.chaos_bottle": "Chaos Bottle",
+	"item.temporalindustries.chaos_bottle.contents": "Chaos: %s / %s",
+	"item.temporalindustries.order_bucket": "Bucket of Order",
+	"item.temporalindustries.chaos_bucket": "Bucket of Chaos",
+	"fluid.temporalindustries.order_fluid": "Order",
+	"fluid.temporalindustries.chaos_fluid": "Chaos",
+	"block.temporalindustries.entropy_condenser": "Entropy Condenser"
 }
