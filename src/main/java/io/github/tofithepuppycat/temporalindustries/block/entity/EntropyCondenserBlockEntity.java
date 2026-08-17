@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -16,7 +17,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
-import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -26,8 +26,11 @@ import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
+import static io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser.FACING;
+
 /**
- * Pulls in nearby {@link EntropyOrbEntity} orbs (powered by FE) and condenses their value into
+ * Instantly absorbs (powered by FE) any {@link EntropyOrbEntity} orb inside a configurable cuboid
+ * range that starts at the block's front face and extends outward, and condenses its value into
  * liquid Order/Chaos fluid across two internal tanks, per IDEAS.md's Entropy Condenser.
  */
 @SuppressWarnings("null")
@@ -39,9 +42,11 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
     private static final int MB_PER_UNIT = 50;
     private static final int FE_PER_UNIT = 20;
 
-    private static final double PULL_RADIUS = 4.0;
-    private static final double PULL_SPEED = 0.1;
-    private static final double CONSUME_DISTANCE = 0.7;
+    public static final int MIN_RANGE = 3;
+    public static final int MAX_RANGE = 5;
+    private static final int DEFAULT_RANGE = 3;
+
+    private int range = DEFAULT_RANGE;
 
     private final class CondenserEnergyStorage extends EnergyStorage {
         CondenserEnergyStorage() {
@@ -52,6 +57,17 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
             int v = super.receiveEnergy(max, simulate);
             if (!simulate && v > 0) setChanged();
             return v;
+        }
+
+        /** {@link #extractEnergy} is capped at 0 (external capability is receive-only), so
+         * condensing needs its own path to spend stored FE that isn't clamped by that cap. */
+        boolean consumeInternal(int amount, boolean simulate) {
+            if (energy < amount) return false;
+            if (!simulate) {
+                energy -= amount;
+                setChanged();
+            }
+            return true;
         }
     }
 
@@ -126,22 +142,62 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         return chaosTank;
     }
 
+    public int getRange() {
+        return range;
+    }
+
+    public void setRange(int range) {
+        int clamped = Math.clamp(range, MIN_RANGE, MAX_RANGE);
+        if (clamped == this.range) return;
+        this.range = clamped;
+        setChanged();
+    }
+
     public static void tick(Level level, BlockPos pos, BlockState state, EntropyCondenserBlockEntity be) {
         if (level.isClientSide) return;
 
-        Vec3 center = Vec3.atCenterOf(pos);
-        AABB pullArea = new AABB(pos).inflate(PULL_RADIUS);
-        List<EntropyOrbEntity> orbs = level.getEntitiesOfClass(EntropyOrbEntity.class, pullArea);
-
+        AABB absorbArea = absorbArea(pos, state.getValue(FACING), be.range);
+        List<EntropyOrbEntity> orbs = level.getEntitiesOfClass(EntropyOrbEntity.class, absorbArea);
         for (EntropyOrbEntity orb : orbs) {
-            Vec3 toCenter = center.subtract(orb.position());
-            double dist = toCenter.length();
-            if (dist <= CONSUME_DISTANCE) {
-                be.tryCondense(orb);
-                continue;
-            }
-            orb.setDeltaMovement(orb.getDeltaMovement().add(toCenter.normalize().scale(PULL_SPEED)));
+            be.tryCondense(orb);
         }
+    }
+
+    /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face
+     * (per {@code facing}) and extending outward — not centered on the block itself. */
+    private static AABB absorbArea(BlockPos pos, Direction facing, int range) {
+        double cx = pos.getX() + 0.5;
+        double cy = pos.getY() + 0.5;
+        double cz = pos.getZ() + 0.5;
+        double half = range / 2.0;
+
+        double minX, maxX, minY, maxY, minZ, maxZ;
+        minY = cy - half;
+        maxY = cy + half;
+
+        if (facing.getAxis() == Direction.Axis.Z) {
+            minX = cx - half;
+            maxX = cx + half;
+            if (facing == Direction.SOUTH) {
+                minZ = pos.getZ() + 1.0;
+                maxZ = minZ + range;
+            } else {
+                maxZ = pos.getZ();
+                minZ = maxZ - range;
+            }
+        } else {
+            minZ = cz - half;
+            maxZ = cz + half;
+            if (facing == Direction.EAST) {
+                minX = pos.getX() + 1.0;
+                maxX = minX + range;
+            } else {
+                maxX = pos.getX();
+                minX = maxX - range;
+            }
+        }
+
+        return new AABB(minX, minY, minZ, maxX, maxY, maxZ);
     }
 
     private void tryCondense(EntropyOrbEntity orb) {
@@ -153,10 +209,10 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         int feCost = orb.getValue() * FE_PER_UNIT;
 
         if (tank.getFluidAmount() + mbAmount > tank.getCapacity()) return;
-        if (energyStorage.extractEnergy(feCost, true) < feCost) return;
+        if (!energyStorage.consumeInternal(feCost, true)) return;
 
         tank.fill(new FluidStack(fluid, mbAmount), IFluidHandler.FluidAction.EXECUTE);
-        energyStorage.extractEnergy(feCost, false);
+        energyStorage.consumeInternal(feCost, false);
         orb.discard();
         setChanged();
     }
@@ -177,6 +233,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.putInt("Range", range);
     }
 
     @Override
@@ -185,5 +242,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
         if (tag.contains("OrderTank")) orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
         if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        range = tag.contains("Range") ? Math.clamp(tag.getInt("Range"), MIN_RANGE, MAX_RANGE) : DEFAULT_RANGE;
     }
 }

@@ -57,6 +57,7 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
         data.set(5, blockEntity.getChaosTank().getFluidAmount());
         // Capacity is fixed and identical for both tanks, so one slot covers both.
         data.set(6, blockEntity.getOrderTank().getCapacity());
+        data.set(7, blockEntity.getRange());
     }
 
     private void setIntPacked(int lowIndex, int value) {
@@ -82,6 +83,10 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
 
     public int getTankCapacity() {
         return data.get(6);
+    }
+
+    public int getRange() {
+        return data.get(7);
     }
 
     @Override
