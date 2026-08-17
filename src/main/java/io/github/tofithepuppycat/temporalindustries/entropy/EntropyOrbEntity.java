@@ -1,7 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.entropy;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyContainerItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -28,7 +27,8 @@ import java.util.function.Predicate;
  * ORD/CHS orb, modeled on vanilla {@link net.minecraft.world.entity.ExperienceOrb}: it floats, bobs,
  * merges with nearby orbs of the same {@link EntropyType} and gets picked up on touch. Unlike an xp
  * orb it is only attracted towards (and only picked up by) a player currently holding an
- * {@link EntropyContainerItem} in either hand — see {@link #isHoldingContainer}.
+ * {@link EntropyReceptacle} that {@link EntropyReceptacle#accepts} this orb's type in either hand —
+ * see {@link #isHoldingReceptacle}.
  */
 public class EntropyOrbEntity extends Entity {
     private static final int LIFETIME = 6000;
@@ -154,7 +154,7 @@ public class EntropyOrbEntity extends Entity {
 
     private void scanForEntities() {
         if (this.followingPlayer == null || this.followingPlayer.distanceToSqr(this) > (double) (MAX_FOLLOW_DIST * MAX_FOLLOW_DIST)) {
-            Predicate<Entity> predicate = entity -> entity instanceof Player player && !player.isSpectator() && isHoldingContainer(player);
+            Predicate<Entity> predicate = entity -> entity instanceof Player player && !player.isSpectator() && isHoldingReceptacle(player, getEntropyType());
             this.followingPlayer = this.level().getNearestPlayer(this.getX(), this.getY(), this.getZ(), MAX_FOLLOW_DIST, predicate);
         }
 
@@ -166,9 +166,17 @@ public class EntropyOrbEntity extends Entity {
         }
     }
 
-    public static boolean isHoldingContainer(Player player) {
-        return player.getMainHandItem().is(Registration.ENTROPY_CONTAINER_ITEM.get())
-                || player.getOffhandItem().is(Registration.ENTROPY_CONTAINER_ITEM.get());
+    public static boolean isHoldingReceptacle(Player player, EntropyType type) {
+        return findReceptacle(player, type) != null;
+    }
+
+    @org.jetbrains.annotations.Nullable
+    private static ItemStack findReceptacle(Player player, EntropyType type) {
+        ItemStack main = player.getMainHandItem();
+        if (main.getItem() instanceof EntropyReceptacle receptacle && receptacle.accepts(type)) return main;
+        ItemStack off = player.getOffhandItem();
+        if (off.getItem() instanceof EntropyReceptacle receptacle && receptacle.accepts(type)) return off;
+        return null;
     }
 
     private boolean canMerge(EntropyOrbEntity orb) {
@@ -216,12 +224,10 @@ public class EntropyOrbEntity extends Entity {
     @Override
     public void playerTouch(Player entity) {
         if (!(this.level() instanceof ServerLevel)) return;
-        if (!isHoldingContainer(entity)) return;
+        ItemStack receptacle = findReceptacle(entity, getEntropyType());
+        if (receptacle == null) return;
 
-        ItemStack container = entity.getMainHandItem().is(Registration.ENTROPY_CONTAINER_ITEM.get())
-                ? entity.getMainHandItem() : entity.getOffhandItem();
-
-        int leftover = EntropyContainerItem.insert(container, getEntropyType(), this.value);
+        int leftover = ((EntropyReceptacle) receptacle.getItem()).insertOrb(receptacle, getEntropyType(), this.value);
         int accepted = this.value - leftover;
         if (accepted <= 0) return;
 
