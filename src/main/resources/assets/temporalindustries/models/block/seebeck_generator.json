@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "temporalindustries:block/seebeck_front",
+    "north": "temporalindustries:block/seebeck_front",
+    "south": "temporalindustries:block/machine_base_energy",
+    "west": "temporalindustries:block/seebeck_left",
+    "east": "temporalindustries:block/seebeck_right",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
+  }
+}

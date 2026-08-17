@@ -4,16 +4,22 @@ import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MO
 import io.github.tofithepuppycat.temporalindustries.block.ChronoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
+import io.github.tofithepuppycat.temporalindustries.block.SchrodingersBox;
+import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.TimeMachine;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingersBoxBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyContainerItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
+import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
@@ -93,9 +99,24 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<EntropyContents>> ENTROPY_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "entropy_contents", builder -> builder.persistent(EntropyContents.CODEC).networkSynchronized(EntropyContents.STREAM_CODEC));
 
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<CapturedMob>> CAPTURED_MOB = DATA_COMPONENTS.registerComponentType(
+            "captured_mob", builder -> builder.persistent(CapturedMob.CODEC).networkSynchronized(CapturedMob.STREAM_CODEC));
+
     public static final DeferredHolder<EntityType<?>, EntityType<EntropyOrbEntity>> ENTROPY_ORB = ENTITY_TYPES.register("entropy_orb",
             () -> EntityType.Builder.<EntropyOrbEntity>of(EntropyOrbEntity::new, MobCategory.MISC)
                     .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).build("entropy_orb"));
+
+    public static final DeferredBlock<SchrodingersBox> SCHRODINGERS_BOX_BLOCK = BLOCKS.register("schrodingers_box",
+            () -> new SchrodingersBox(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD)));
+
+    public static final DeferredItem<Item> SCHRODINGERS_BOX_ITEM = ITEMS.register("schrodingers_box",
+            () -> new SchrodingersBoxItem(SCHRODINGERS_BOX_BLOCK.get(), new Item.Properties().stacksTo(1)));
+
+    public static final DeferredBlock<SeebeckGenerator> SEEBECK_GENERATOR_BLOCK = BLOCKS.register("seebeck_generator",
+            () -> new SeebeckGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> SEEBECK_GENERATOR_ITEM = ITEMS.register("seebeck_generator",
+            () -> new BlockItem(SEEBECK_GENERATOR_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TimeMachineBlockEntity>> TIME_MACHINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("time_machine",
             () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
@@ -108,6 +129,12 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOSPHERE_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronosphere",
             () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOSPHERE_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SchrodingersBoxBlockEntity>> SCHRODINGERS_BOX_BLOCK_ENTITY = BLOCK_ENTITIES.register("schrodingers_box",
+            () -> BlockEntityType.Builder.of(SchrodingersBoxBlockEntity::new, SCHRODINGERS_BOX_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SeebeckGeneratorBlockEntity>> SEEBECK_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("seebeck_generator",
+            () -> BlockEntityType.Builder.of(SeebeckGeneratorBlockEntity::new, SEEBECK_GENERATOR_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<TimeMachineMenu>> TIME_MACHINE_MENU = MENUS.register("time_machine",
             () -> IMenuTypeExtension.create(TimeMachineMenu::new));
@@ -139,6 +166,8 @@ public class Registration {
             event.accept(CHRONO_PROJECTOR_ITEM);
             event.accept(CHRONODIAL_ITEM);
             event.accept(CHRONOSPHERE_ITEM);
+            event.accept(SCHRODINGERS_BOX_ITEM);
+            event.accept(SEEBECK_GENERATOR_ITEM);
         }
     }
 
@@ -152,6 +181,8 @@ public class Registration {
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONODIAL_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONOSPHERE_BLOCK_ENTITY.get(),
+                (be, side) -> be.getEnergyStorage());
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, SEEBECK_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
     }
 
