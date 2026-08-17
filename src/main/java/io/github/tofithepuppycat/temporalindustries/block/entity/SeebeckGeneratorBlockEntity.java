@@ -16,6 +16,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
@@ -46,6 +47,8 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
             Map.entry(Blocks.LAVA, 1000),
             Map.entry(Blocks.FIRE, 600),
             Map.entry(Blocks.SOUL_FIRE, 500),
+            Map.entry(Blocks.CAMPFIRE, 450),
+            Map.entry(Blocks.SOUL_CAMPFIRE, 400),
             Map.entry(Blocks.SNOW_BLOCK, -300),
             Map.entry(Blocks.ICE, -400),
             Map.entry(Blocks.PACKED_ICE, -600),
@@ -114,7 +117,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
         BlockState hotState = level.getBlockState(hotPos);
         BlockState coldState = level.getBlockState(coldPos);
 
-        boolean hot = hotState.is(HOT_SOURCES);
+        boolean hot = hotState.is(HOT_SOURCES) && isActiveHot(hotState);
         boolean cold = coldState.is(COLD_SOURCES);
 
         if (!(hot && cold)) {
@@ -155,6 +158,15 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
 
     private static boolean isDepletableHot(Block block) {
         return block == Blocks.FIRE || block == Blocks.SOUL_FIRE;
+    }
+
+    /** Campfires only count as a hot source while lit; every other hot source is always active. */
+    private static boolean isActiveHot(BlockState state) {
+        Block block = state.getBlock();
+        if (block == Blocks.CAMPFIRE || block == Blocks.SOUL_CAMPFIRE) {
+            return state.getValue(BlockStateProperties.LIT);
+        }
+        return true;
     }
 
     /** Normalized (0-1) temperature gap between the hot and cold source, scaled against the widest possible pairing. */
