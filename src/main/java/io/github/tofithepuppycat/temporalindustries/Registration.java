@@ -35,8 +35,9 @@ import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
+import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.BucketItem;
-import net.minecraft.world.item.CreativeModeTabs;
+import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.block.LiquidBlock;
@@ -50,7 +51,6 @@ import net.minecraft.world.level.material.PushReaction;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
 import net.neoforged.neoforge.common.extensions.IMenuTypeExtension;
-import net.neoforged.neoforge.event.BuildCreativeModeTabContentsEvent;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.neoforge.fluids.BaseFlowingFluid;
 import net.neoforged.neoforge.fluids.FluidType;
@@ -72,6 +72,7 @@ public class Registration {
     public static final DeferredRegister.DataComponents DATA_COMPONENTS = DeferredRegister.createDataComponents(Registries.DATA_COMPONENT_TYPE, MODID);
     public static final DeferredRegister<FluidType> FLUID_TYPES = DeferredRegister.create(NeoForgeRegistries.Keys.FLUID_TYPES, MODID);
     public static final DeferredRegister<Fluid> FLUIDS = DeferredRegister.create(Registries.FLUID, MODID);
+    public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
     public static final DeferredBlock<TimeMachine> TIME_MACHINE_BLOCK = BLOCKS.register("time_machine",
             () -> new TimeMachine(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -229,6 +230,30 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyCondenserMenu>> ENTROPY_CONDENSER_MENU = MENUS.register("entropy_condenser",
             () -> IMenuTypeExtension.create(EntropyCondenserMenu::new));
 
+    public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
+            () -> CreativeModeTab.builder()
+                    .title(Component.translatable("itemGroup.temporalindustries"))
+                    .icon(() -> TIME_MACHINE_ITEM.toStack())
+                    .displayItems((params, output) -> {
+                        output.accept(TIME_MACHINE_ITEM);
+                        output.accept(CHRONO_PROJECTOR_ITEM);
+                        output.accept(CHRONODIAL_ITEM);
+                        output.accept(CHRONOSPHERE_ITEM);
+                        output.accept(SCHRODINGERS_BOX_ITEM);
+                        output.accept(SEEBECK_GENERATOR_ITEM);
+                        output.accept(ENTROPY_CONDENSER_ITEM);
+                        output.accept(TEMPORAL_ANCHOR_ITEM);
+                        output.accept(CHRONO_RECORD_ITEM);
+                        output.accept(PORTABLE_CHRONO_MARKER_ITEM);
+                        output.accept(TEMPORAL_GLUE_ITEM);
+                        output.accept(ENTROPY_CONTAINER_ITEM);
+                        output.accept(ORDER_BOTTLE_ITEM);
+                        output.accept(CHAOS_BOTTLE_ITEM);
+                        output.accept(ORDER_BUCKET_ITEM);
+                        output.accept(CHAOS_BUCKET_ITEM);
+                    })
+                    .build());
+
     public static void init(IEventBus modEventBus) {
         BLOCKS.register(modEventBus);
         ITEMS.register(modEventBus);
@@ -238,31 +263,7 @@ public class Registration {
         DATA_COMPONENTS.register(modEventBus);
         FLUID_TYPES.register(modEventBus);
         FLUIDS.register(modEventBus);
-    }
-
-    static void addCreative(BuildCreativeModeTabContentsEvent event) {
-        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
-            event.accept(TIME_MACHINE_ITEM);
-        }
-        if (event.getTabKey() == CreativeModeTabs.TOOLS_AND_UTILITIES) {
-            event.accept(TEMPORAL_ANCHOR_ITEM);
-            event.accept(CHRONO_RECORD_ITEM);
-            event.accept(PORTABLE_CHRONO_MARKER_ITEM);
-            event.accept(TEMPORAL_GLUE_ITEM);
-            event.accept(ENTROPY_CONTAINER_ITEM);
-            event.accept(ORDER_BOTTLE_ITEM);
-            event.accept(CHAOS_BOTTLE_ITEM);
-            event.accept(ORDER_BUCKET_ITEM);
-            event.accept(CHAOS_BUCKET_ITEM);
-        }
-        if (event.getTabKey() == CreativeModeTabs.REDSTONE_BLOCKS) {
-            event.accept(CHRONO_PROJECTOR_ITEM);
-            event.accept(CHRONODIAL_ITEM);
-            event.accept(CHRONOSPHERE_ITEM);
-            event.accept(SCHRODINGERS_BOX_ITEM);
-            event.accept(SEEBECK_GENERATOR_ITEM);
-            event.accept(ENTROPY_CONDENSER_ITEM);
-        }
+        CREATIVE_MODE_TABS.register(modEventBus);
     }
 
     static void registerCapabilities(RegisterCapabilitiesEvent event) {
