@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "temporalindustries:block/machine_base_energy",
+    "north": "temporalindustries:block/machine_base_energy",
+    "south": "temporalindustries:block/machine_base",
+    "east": "temporalindustries:block/machine_base",
+    "west": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
+  }
+}
