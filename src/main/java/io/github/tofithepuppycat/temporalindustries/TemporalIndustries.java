@@ -24,7 +24,6 @@ public class TemporalIndustries
     {
         Registration.init(modEventBus);
 
-        modEventBus.addListener(Registration::addCreative);
         modEventBus.addListener(Registration::registerCapabilities);
         modEventBus.addListener(NetworkHandler::register);
 

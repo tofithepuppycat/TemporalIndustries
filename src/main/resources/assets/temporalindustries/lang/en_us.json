@@ -1,4 +1,5 @@
 {
+	"itemGroup.temporalindustries": "Temporal Industries",
 	"block.temporalindustries.time_machine": "Time Machine",
 	"container.temporalindustries.time_machine": "Time Machine",
 	"gui.temporalindustries.time_machine.timeline_point": "Timeline Point",
