@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "temporalindustries:block/entropy_condenser" }
+    "facing=north": { "model": "temporalindustries:block/entropy_condenser" },
+    "facing=east": { "model": "temporalindustries:block/entropy_condenser", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/entropy_condenser", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/entropy_condenser", "y": 270 }
   }
 }

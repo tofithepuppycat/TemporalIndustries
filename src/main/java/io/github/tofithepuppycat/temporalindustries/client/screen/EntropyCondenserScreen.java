@@ -1,15 +1,20 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.network.EntropyCondenserSetRangePacket;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.player.Inventory;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
-/** Minimal placeholder GUI: an FE bar and two fluid tank bars, drawn with plain fills (no texture
- * atlas yet) — same "no dedicated art" approach the rest of this mod's newer machines use. */
+/** Minimal placeholder GUI: an FE bar, two fluid tank bars, and a button cycling the absorb range
+ * — drawn with plain fills (no texture atlas yet), same "no dedicated art" approach the rest of
+ * this mod's newer machines use. */
 @SuppressWarnings("null")
 public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyCondenserMenu> {
     private static final int IMAGE_WIDTH = 176;
@@ -23,11 +28,44 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
     private static final int ORDER_BAR_X = 70;
     private static final int CHAOS_BAR_X = 100;
 
+    private static final int RANGE_BUTTON_X = 12;
+    private static final int RANGE_BUTTON_Y = 106;
+    private static final int RANGE_BUTTON_WIDTH = 130;
+    private static final int RANGE_BUTTON_HEIGHT = 16;
+
+    private Button rangeButton;
+
     public EntropyCondenserScreen(EntropyCondenserMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
         inventoryLabelY = imageHeight + 100;
+    }
+
+    @Override
+    protected void init() {
+        super.init();
+        rangeButton = Button.builder(rangeLabel(menu.getRange()), btn -> cycleRange())
+                .pos(leftPos + RANGE_BUTTON_X, topPos + RANGE_BUTTON_Y)
+                .size(RANGE_BUTTON_WIDTH, RANGE_BUTTON_HEIGHT)
+                .build();
+        addRenderableWidget(rangeButton);
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        rangeButton.setMessage(rangeLabel(menu.getRange()));
+    }
+
+    private void cycleRange() {
+        int next = menu.getRange() + 1;
+        if (next > EntropyCondenserBlockEntity.MAX_RANGE) next = EntropyCondenserBlockEntity.MIN_RANGE;
+        PacketDistributor.sendToServer(new EntropyCondenserSetRangePacket(menu.getBlockPos(), next));
+    }
+
+    private static Component rangeLabel(int range) {
+        return Component.literal("Range: " + range + "x" + range + "x" + range);
     }
 
     @Override
