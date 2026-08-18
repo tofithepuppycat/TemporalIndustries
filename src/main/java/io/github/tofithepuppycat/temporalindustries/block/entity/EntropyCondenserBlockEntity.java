@@ -188,8 +188,10 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     }
 
     /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face
-     * (per {@code facing}) and extending outward — not centered on the block itself. */
-    private static AABB absorbArea(BlockPos pos, Direction facing, int range) {
+     * (per {@code facing}) and extending outward — not centered on the block itself. Public so the
+     * client can render its perimeter (see EntropyCondenserRangeRenderer) from the same geometry
+     * the server uses to catch orbs. */
+    public static AABB absorbArea(BlockPos pos, Direction facing, int range) {
         double cx = pos.getX() + 0.5;
         double cy = pos.getY() + 0.5;
         double cz = pos.getZ() + 0.5;

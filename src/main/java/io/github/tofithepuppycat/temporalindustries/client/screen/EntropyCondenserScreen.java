@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.client.EntropyCondenserRangeClientState;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.network.EntropyCondenserSetRangePacket;
@@ -40,10 +41,16 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     private static final int RANGE_BUTTON_X = 12;
     private static final int RANGE_BUTTON_Y = 106;
-    private static final int RANGE_BUTTON_WIDTH = 130;
+    private static final int RANGE_BUTTON_WIDTH = 100;
     private static final int RANGE_BUTTON_HEIGHT = 16;
 
+    private static final int SHOW_RANGE_BUTTON_X = 116;
+    private static final int SHOW_RANGE_BUTTON_Y = 106;
+    private static final int SHOW_RANGE_BUTTON_WIDTH = 48;
+    private static final int SHOW_RANGE_BUTTON_HEIGHT = 16;
+
     private Button rangeButton;
+    private Button showRangeButton;
 
     public EntropyCondenserScreen(EntropyCondenserMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -60,6 +67,20 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
                 .size(RANGE_BUTTON_WIDTH, RANGE_BUTTON_HEIGHT)
                 .build();
         addRenderableWidget(rangeButton);
+
+        showRangeButton = Button.builder(showRangeLabel(), btn -> toggleShowRange())
+                .pos(leftPos + SHOW_RANGE_BUTTON_X, topPos + SHOW_RANGE_BUTTON_Y)
+                .size(SHOW_RANGE_BUTTON_WIDTH, SHOW_RANGE_BUTTON_HEIGHT)
+                .build();
+        addRenderableWidget(showRangeButton);
+    }
+
+    @Override
+    public void removed() {
+        super.removed();
+        if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
+            EntropyCondenserRangeClientState.clear();
+        }
     }
 
     @Override
@@ -74,8 +95,26 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         PacketDistributor.sendToServer(new EntropyCondenserSetRangePacket(menu.getBlockPos(), next));
     }
 
+    private void toggleShowRange() {
+        if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
+            EntropyCondenserRangeClientState.clear();
+        } else {
+            EntropyCondenserRangeClientState.show(dimensionKey(), menu.getBlockPos());
+        }
+        showRangeButton.setMessage(showRangeLabel());
+    }
+
+    private ResourceLocation dimensionKey() {
+        return Minecraft.getInstance().level.dimension().location();
+    }
+
     private static Component rangeLabel(int range) {
         return Component.literal("Range: " + range + "x" + range + "x" + range);
+    }
+
+    private Component showRangeLabel() {
+        boolean showing = EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos());
+        return Component.literal(showing ? "Hide Range" : "Show Range");
     }
 
     @Override
