@@ -40,7 +40,7 @@ import java.util.UUID;
 
 /**
  * Central event hub. Replaces both TemporalAnchorEvents and the block-scanning
- * loop that used to live in TimeMachineBlockEntity.tick().
+ * loop that used to live in ChronovaultBlockEntity.tick().
  *
  * Responsibilities:
  *   - Record player-caused block changes into PlayerTemporalState (anchor system)

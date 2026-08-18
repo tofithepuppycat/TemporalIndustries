@@ -50,7 +50,7 @@ public final class TimelineProjectionManager {
     private static long headCommitId = -1L;
     private static long selectedCommitId = -1L;
     /** commitId -> energy cost of jumping there from the chunk's current head, as last reported
-     * by the server (see TimeMachineBlockEntity#getChunkJumpCosts). */
+     * by the server (see ChronovaultBlockEntity#getChunkJumpCosts). */
     private static Map<Long, Long> jumpCosts = new HashMap<>();
     /** One commit-graph snapshot per chunk the ghost preview should cover — just the graph's own
      * chunk for a Time Machine, but every claimed chunk for a Chronosphere (see

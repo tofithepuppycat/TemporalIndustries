@@ -8,7 +8,7 @@ import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingersBox;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
-import io.github.tofithepuppycat.temporalindustries.block.TimeMachine;
+import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
@@ -16,7 +16,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCon
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingersBoxBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
@@ -32,7 +32,7 @@ import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
@@ -77,11 +77,11 @@ public class Registration {
     public static final DeferredRegister<Fluid> FLUIDS = DeferredRegister.create(Registries.FLUID, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
 
-    public static final DeferredBlock<TimeMachine> TIME_MACHINE_BLOCK = BLOCKS.register("time_machine",
-            () -> new TimeMachine(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<Chronovault> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
+            () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
-    public static final DeferredItem<Item> TIME_MACHINE_ITEM = ITEMS.register("time_machine",
-            () -> new BlockItem(TIME_MACHINE_BLOCK.get(), new Item.Properties()));
+    public static final DeferredItem<Item> CHRONOVAULT_ITEM = ITEMS.register("chronovault",
+            () -> new BlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredItem<Item> TEMPORAL_ANCHOR_ITEM = ITEMS.register("temporal_anchor",
             () -> new TemporalAnchorItem(new Item.Properties().stacksTo(1)));
@@ -211,8 +211,8 @@ public class Registration {
     public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
             () -> new BlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TimeMachineBlockEntity>> TIME_MACHINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("time_machine",
-            () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
+            () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronoProjectorBlockEntity>> CHRONO_PROJECTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("chrono_projector",
             () -> BlockEntityType.Builder.of(ChronoProjectorBlockEntity::new, ECHO_PROJECTOR_BLOCK.get()).build(null));
@@ -235,8 +235,8 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
             () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
-    public static final DeferredHolder<MenuType<?>, MenuType<TimeMachineMenu>> TIME_MACHINE_MENU = MENUS.register("time_machine",
-            () -> IMenuTypeExtension.create(TimeMachineMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
+            () -> IMenuTypeExtension.create(ChronovaultMenu::new));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronosphereMenu>> CHRONOSPHERE_MENU = MENUS.register("chronosphere",
             () -> IMenuTypeExtension.create(ChronosphereMenu::new));
@@ -250,9 +250,9 @@ public class Registration {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.temporalindustries"))
-                    .icon(() -> TIME_MACHINE_ITEM.toStack())
+                    .icon(() -> CHRONOVAULT_ITEM.toStack())
                     .displayItems((params, output) -> {
-                        output.accept(TIME_MACHINE_ITEM);
+                        output.accept(CHRONOVAULT_ITEM);
                         output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(CHRONODIAL_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
@@ -285,7 +285,7 @@ public class Registration {
     }
 
     static void registerCapabilities(RegisterCapabilitiesEvent event) {
-        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, TIME_MACHINE_BLOCK_ENTITY.get(),
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONOVAULT_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONO_PROJECTOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());

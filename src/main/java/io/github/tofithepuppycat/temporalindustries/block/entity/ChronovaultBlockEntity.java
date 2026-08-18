@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
@@ -26,16 +26,16 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Block entity for the Time Machine: holds per-machine energy/time state and reads/writes
+/** Block entity for the Chronovault: holds per-machine energy/time state and reads/writes
  * the shared {@link TemporalTimeline} for its chunk. See {@link AbstractTimelineMachineBlockEntity}
- * for the logic shared with {@link ChronosphereBlockEntity} — a Time Machine is just a Chronosphere
+ * for the logic shared with {@link ChronosphereBlockEntity} — a Chronovault is just a Chronosphere
  * whose jumps only ever move its own single chunk. */
-public class TimeMachineBlockEntity extends AbstractTimelineMachineBlockEntity {
+public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     private static final int ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000;
 
-    public TimeMachineBlockEntity(BlockPos blockPos, BlockState blockState) {
-        super(Registration.TIME_MACHINE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
+    public ChronovaultBlockEntity(BlockPos blockPos, BlockState blockState) {
+        super(Registration.CHRONOVAULT_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
     }
 
     private ChunkPos getChunkPos() {
@@ -85,7 +85,7 @@ public class TimeMachineBlockEntity extends AbstractTimelineMachineBlockEntity {
         }
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, TimeMachineBlockEntity be) {
+    public static void tick(Level level, BlockPos pos, BlockState state, ChronovaultBlockEntity be) {
         if (level.isClientSide) return;
         be.commonTick(level);
     }
@@ -163,13 +163,13 @@ public class TimeMachineBlockEntity extends AbstractTimelineMachineBlockEntity {
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("container.temporalindustries.time_machine");
+        return Component.translatable("container.temporalindustries.chronovault");
     }
 
     @Nullable
     @Override
     public AbstractContainerMenu createMenu(int id, @NotNull Inventory playerInventory, @NotNull Player player) {
-        return new TimeMachineMenu(id, playerInventory, this,
+        return new ChronovaultMenu(id, playerInventory, this,
                 ContainerLevelAccess.create(Objects.requireNonNull(level), worldPosition), getContainerData());
     }
 }
