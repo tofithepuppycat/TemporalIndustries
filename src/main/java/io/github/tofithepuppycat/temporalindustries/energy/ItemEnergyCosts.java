@@ -6,6 +6,7 @@ import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
 import com.mojang.logging.LogUtils;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -188,9 +189,10 @@ public final class ItemEnergyCosts {
 
     private static UserConfig loadUserConfig() {
         List<RawEntry> entries = new ArrayList<>();
-        parseCostEntries(EnergyCostConfig.INSTANCE.itemCosts.get(), true, entries);
-        parseCostEntries(EnergyCostConfig.INSTANCE.tagCosts.get(), false, entries);
-        return new UserConfig(entries, EnergyCostConfig.INSTANCE.defaultBlockCost.get());
+        EnergyCostConfig config = TemporalIndustriesConfig.INSTANCE.energyCosts;
+        parseCostEntries(config.itemCosts.get(), true, entries);
+        parseCostEntries(config.tagCosts.get(), false, entries);
+        return new UserConfig(entries, config.defaultBlockCost.get());
     }
 
     /** Parses "id=cost" config lines (see EnergyCostConfig) into raw entries, logging and skipping

@@ -29,11 +29,15 @@ import org.jetbrains.annotations.Nullable;
  */
 @SuppressWarnings("null")
 public class SchrodingersBoxBlockEntity extends BlockEntity {
-    private static final int CHS_INTERVAL_TICKS = 100;
-    private static final int CHS_PER_INTERVAL = 1;
+    // Interval halved and CHS_PER_INTERVAL halved to match, so the box drops orbs twice as often
+    // without producing chaos any faster overall; chsAccumulator carries the fractional remainder
+    // between checks since an orb can't be spawned with a value below 1.
+    private static final int CHS_INTERVAL_TICKS = 50;
+    private static final double CHS_PER_INTERVAL = 0.5;
 
     @Nullable private ResourceLocation capturedTypeId;
     @Nullable private Component capturedName;
+    private double chsAccumulator = 0.0;
 
     public SchrodingersBoxBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.SCHRODINGERS_BOX_BLOCK_ENTITY.get(), pos, state);
@@ -69,8 +73,13 @@ public class SchrodingersBoxBlockEntity extends BlockEntity {
         if (!(level instanceof ServerLevel serverLevel) || !be.isOccupied()) return;
         if (level.getGameTime() % CHS_INTERVAL_TICKS != 0) return;
 
+        be.chsAccumulator += CHS_PER_INTERVAL;
+        int toSpawn = (int) Math.floor(be.chsAccumulator);
+        if (toSpawn <= 0) return;
+        be.chsAccumulator -= toSpawn;
+
         EntropyOrbEntity.spawn(serverLevel, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5,
-                EntropyType.CHAOS, CHS_PER_INTERVAL);
+                EntropyType.CHAOS, toSpawn);
     }
 
     @Override
@@ -78,6 +87,7 @@ public class SchrodingersBoxBlockEntity extends BlockEntity {
         super.saveAdditional(tag, registries);
         if (capturedTypeId != null) tag.putString("CapturedType", capturedTypeId.toString());
         if (capturedName != null) tag.putString("CapturedName", Component.Serializer.toJson(capturedName, registries));
+        tag.putDouble("ChsAccumulator", chsAccumulator);
     }
 
     @Override
@@ -85,5 +95,6 @@ public class SchrodingersBoxBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         capturedTypeId = tag.contains("CapturedType") ? ResourceLocation.parse(tag.getString("CapturedType")) : null;
         capturedName = tag.contains("CapturedName") ? Component.Serializer.fromJson(tag.getString("CapturedName"), registries) : null;
+        chsAccumulator = tag.getDouble("ChsAccumulator");
     }
 }
