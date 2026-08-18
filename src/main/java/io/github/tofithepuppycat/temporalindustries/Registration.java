@@ -4,6 +4,7 @@ import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MO
 import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
+import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingersBox;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
@@ -11,6 +12,7 @@ import io.github.tofithepuppycat.temporalindustries.block.TimeMachine;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingersBoxBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
@@ -28,6 +30,7 @@ import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
 import net.minecraft.core.component.DataComponentType;
@@ -130,7 +133,7 @@ public class Registration {
 
     public static final DeferredHolder<EntityType<?>, EntityType<EntropyOrbEntity>> ENTROPY_ORB = ENTITY_TYPES.register("entropy_orb",
             () -> EntityType.Builder.<EntropyOrbEntity>of(EntropyOrbEntity::new, MobCategory.MISC)
-                    .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).build("entropy_orb"));
+                    .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).fireImmune().build("entropy_orb"));
 
     public static final DeferredBlock<SchrodingersBox> SCHRODINGERS_BOX_BLOCK = BLOCKS.register("schrodingers_box",
             () -> new SchrodingersBox(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD)));
@@ -200,6 +203,14 @@ public class Registration {
     public static final DeferredItem<Item> ENTROPY_CONDENSER_ITEM = ITEMS.register("entropy_condenser",
             () -> new BlockItem(ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
+    // --- Crude Entropy Condenser: unpowered lower tier that drains Cells instead of catching orbs ---
+
+    public static final DeferredBlock<CrudeEntropyCondenser> CRUDE_ENTROPY_CONDENSER_BLOCK = BLOCKS.register("crude_entropy_condenser",
+            () -> new CrudeEntropyCondenser(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
+            () -> new BlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TimeMachineBlockEntity>> TIME_MACHINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("time_machine",
             () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
 
@@ -221,6 +232,9 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyCondenserBlockEntity>> ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_condenser",
             () -> BlockEntityType.Builder.of(EntropyCondenserBlockEntity::new, ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
+            () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>, MenuType<TimeMachineMenu>> TIME_MACHINE_MENU = MENUS.register("time_machine",
             () -> IMenuTypeExtension.create(TimeMachineMenu::new));
 
@@ -229,6 +243,9 @@ public class Registration {
 
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyCondenserMenu>> ENTROPY_CONDENSER_MENU = MENUS.register("entropy_condenser",
             () -> IMenuTypeExtension.create(EntropyCondenserMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<CrudeEntropyCondenserMenu>> CRUDE_ENTROPY_CONDENSER_MENU = MENUS.register("crude_entropy_condenser",
+            () -> IMenuTypeExtension.create(CrudeEntropyCondenserMenu::new));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
@@ -242,6 +259,7 @@ public class Registration {
                         output.accept(SCHRODINGERS_BOX_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
+                        output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
@@ -282,6 +300,10 @@ public class Registration {
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
     }
 
