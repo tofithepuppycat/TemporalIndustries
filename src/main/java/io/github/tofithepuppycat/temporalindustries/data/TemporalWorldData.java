@@ -16,6 +16,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -149,14 +151,15 @@ public class TemporalWorldData extends SavedData {
         setDirty();
     }
 
-    /** Removes every glued region containing pos — there can be several, since regions may overlap
-     * (see item.TemporalGlueItem's left-click-to-delete). @return how many were removed. */
-    public int removeGluedRegionsAt(ResourceLocation dimension, BlockPos pos) {
+    /** Removes every glued region whose bounding box the segment from origin to end passes through
+     * — used to unglue by aiming roughly at a region rather than needing to click an exact block
+     * inside it (see item.TemporalGlueItem#deleteRegionsAlongSight). @return how many were removed. */
+    public int removeGluedRegionsAlongRay(ResourceLocation dimension, Vec3 origin, Vec3 end) {
         List<BoundingBox> regions = gluedRegions.get(dimension);
         if (regions == null) return 0;
 
         int before = regions.size();
-        regions.removeIf(region -> region.isInside(pos));
+        regions.removeIf(region -> regionAabb(region).clip(origin, end).isPresent());
         int removed = before - regions.size();
         if (removed > 0) {
             if (regions.isEmpty()) gluedRegions.remove(dimension);
@@ -164,6 +167,11 @@ public class TemporalWorldData extends SavedData {
             setDirty();
         }
         return removed;
+    }
+
+    private static AABB regionAabb(BoundingBox region) {
+        return new AABB(region.minX(), region.minY(), region.minZ(),
+                region.maxX() + 1, region.maxY() + 1, region.maxZ() + 1);
     }
 
     public boolean isGlued(ResourceLocation dimension, BlockPos pos) {
