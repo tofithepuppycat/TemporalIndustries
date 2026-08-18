@@ -9,13 +9,13 @@ import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.bus.api.EventPriority;
@@ -74,14 +74,13 @@ public final class TemporalChangeListener {
         ServerPlayer player = event.getPlayer() instanceof ServerPlayer sp ? sp : null;
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
 
-        // Glued blocks are fully protected from breaking, not just excluded from delta recording —
-        // cancelling here stops Level#destroyBlock before it ever removes the block, so there's
-        // nothing to restore and no block-entity NBT to lose.
-        if (data.isGlued(level.dimension().location(), pos)) {
+        // In creative mode, left-clicking destroys the block instantly server-side without ever
+        // going through PlayerInteractEvent.LeftClickBlock's cancellation (see onLeftClickGlue) —
+        // so a creative player selecting/unglueing a region would actually break the block they
+        // clicked. Cancelling here instead stops the destroy before it happens, so the glue/unglue
+        // gesture never costs a block.
+        if (player != null && TemporalGlueItem.isHolding(player)) {
             event.setCanceled(true);
-            if (player != null) {
-                player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.protected"), true);
-            }
             return;
         }
 
@@ -173,8 +172,9 @@ public final class TemporalChangeListener {
         }
     }
 
-    /** Left-clicking a block while holding Temporal Glue deletes every glued region containing it,
-     * instead of starting to break the block — mirrors Create's glue removal gesture. */
+    /** Left-clicking while holding Temporal Glue deletes every glued region along the player's sight
+     * line, instead of starting to break whatever block (if any) is under the crosshair — mirrors
+     * Create's glue removal gesture, but works by aim rather than requiring an exact block hit. */
     @SubscribeEvent
     public static void onLeftClickGlue(PlayerInteractEvent.LeftClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -182,7 +182,20 @@ public final class TemporalChangeListener {
         if (!(event.getItemStack().getItem() instanceof TemporalGlueItem)) return;
 
         event.setCanceled(true);
-        TemporalGlueItem.deleteRegionsAt(level, player, event.getItemStack(), event.getPos().immutable());
+        TemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
+    }
+
+    /** Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on a
+     * block at all (e.g. a glued region floating in open air, or just out past the nearest block). */
+    @SubscribeEvent
+    public static void onLeftClickEmptyGlue(PlayerInteractEvent.LeftClickEmpty event) {
+        if (!(event.getEntity() instanceof ServerPlayer player)) return;
+        if (!(player.level() instanceof ServerLevel level)) return;
+        if (!TemporalGlueItem.isHolding(player)) return;
+
+        ItemStack stack = player.getMainHandItem().getItem() instanceof TemporalGlueItem
+                ? player.getMainHandItem() : player.getOffhandItem();
+        TemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
     }
 
     // -------------------------------------------------------------------------

@@ -15,6 +15,7 @@ import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
@@ -22,6 +23,7 @@ import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.item.context.UseOnContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 import java.util.List;
@@ -32,8 +34,8 @@ import java.util.Optional;
  * then another, to glue that cuboid region — every block inside is skipped when a delta would be
  * captured ({@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener#shouldRecord})
  * and when a rollback/jump would otherwise overwrite it ({@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline}'s
- * isGlued predicate param), so it sits outside the timeline entirely. Left-click any block inside an
- * existing glued region (there can be several overlapping) to delete every region covering it.
+ * isGlued predicate param), so it sits outside the timeline entirely. Left-click while aiming at an
+ * existing glued region (there can be several overlapping) to delete every region along your sight line.
  * Regions are stored in {@link TemporalWorldData}, not on the item — the item only ever holds a
  * pending first corner, in its {@link DataComponents#CUSTOM_DATA}, mirroring
  * {@link ChronoRecordItem}'s per-stack storage. While held, both the pending corner and every known
@@ -84,15 +86,20 @@ public class TemporalGlueItem extends Item {
     }
 
     /** Left-click-with-glue handler, called from TemporalChangeListener (which cancels the block
-     * break that would otherwise start) with the exact stack that was clicking. Deletes every glued
-     * region containing pos, or clears a pending first corner if there's no region there and one is
-     * pending. */
-    public static void deleteRegionsAt(ServerLevel level, ServerPlayer player, ItemStack stack, BlockPos pos) {
+     * break that would otherwise start, or the swing-at-air interaction) for every left click while
+     * holding Temporal Glue. Deletes every glued region whose bounding box lies anywhere along the
+     * player's line of sight out to their block reach — so aiming roughly at a glued section is
+     * enough, no need to land the click on an exact block inside it — or clears a pending first
+     * corner if nothing was hit and one is pending. */
+    public static void deleteRegionsAlongSight(ServerLevel level, ServerPlayer player, ItemStack stack) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        int removed = worldData.removeGluedRegionsAt(level.dimension().location(), pos);
+        Vec3 origin = player.getEyePosition();
+        Vec3 end = origin.add(player.getViewVector(1.0F).scale(player.blockInteractionRange()));
+
+        int removed = worldData.removeGluedRegionsAlongRay(level.dimension().location(), origin, end);
         if (removed > 0) {
             player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.unglued"), true);
-            level.playSound(null, pos, SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 1.0F);
+            level.playSound(null, player.blockPosition(), SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 1.0F);
             broadcastRegions(level);
             return;
         }
@@ -102,6 +109,13 @@ public class TemporalGlueItem extends Item {
             clearData(stack);
             player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.selection_cleared"), true);
         }
+    }
+
+    /** Whether player is holding Temporal Glue in either hand — used by TemporalChangeListener to
+     * stop creative-mode instant break from destroying the block a glue/unglue click targets. */
+    public static boolean isHolding(Player player) {
+        return player.getMainHandItem().getItem() instanceof TemporalGlueItem
+                || player.getOffhandItem().getItem() instanceof TemporalGlueItem;
     }
 
     /** Pushes the current region list to every player in level's dimension, so a glue/unglue is
