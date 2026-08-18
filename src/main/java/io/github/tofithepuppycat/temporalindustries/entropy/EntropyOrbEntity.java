@@ -33,7 +33,11 @@ import java.util.function.Predicate;
 public class EntropyOrbEntity extends Entity {
     private static final int LIFETIME = 6000;
     private static final int MAX_FOLLOW_DIST = 8;
-    private static final double ORB_MERGE_DISTANCE = 0.5;
+    // Orbs only merge when they are practically touching, and stop merging once they carry
+    // MERGE_VALUE_LIMIT, so a machine emitting steadily leaves a visible stream of small orbs
+    // instead of collapsing into one big one at the spawn point.
+    private static final double ORB_MERGE_DISTANCE = 0.1;
+    private static final int MERGE_VALUE_LIMIT = 4;
 
     private static final EntityDataAccessor<Boolean> DATA_CHAOS =
             SynchedEntityData.defineId(EntropyOrbEntity.class, EntityDataSerializers.BOOLEAN);
@@ -161,7 +165,9 @@ public class EntropyOrbEntity extends Entity {
         if (this.level() instanceof ServerLevel) {
             for (EntropyOrbEntity orb : this.level()
                     .getEntities(EntityTypeTest.forClass(EntropyOrbEntity.class), this.getBoundingBox().inflate(ORB_MERGE_DISTANCE), this::canMerge)) {
-                merge(orb);
+                // Re-checked per orb: the candidate list is materialised up front, so earlier merges
+                // in this same loop can already have pushed this orb past the value limit.
+                if (canMerge(orb)) merge(orb);
             }
         }
     }
@@ -180,7 +186,8 @@ public class EntropyOrbEntity extends Entity {
     }
 
     private boolean canMerge(EntropyOrbEntity orb) {
-        return orb != this && !orb.isRemoved() && orb.getEntropyType() == this.getEntropyType();
+        return orb != this && !orb.isRemoved() && orb.getEntropyType() == this.getEntropyType()
+                && this.value + orb.value <= MERGE_VALUE_LIMIT;
     }
 
     private void merge(EntropyOrbEntity orb) {

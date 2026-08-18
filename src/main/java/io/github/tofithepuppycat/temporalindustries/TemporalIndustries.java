@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries;
 
+import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
-import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostConfig;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.network.NetworkHandler;
@@ -27,7 +27,7 @@ public class TemporalIndustries
         modEventBus.addListener(Registration::registerCapabilities);
         modEventBus.addListener(NetworkHandler::register);
 
-        modContainer.registerConfig(ModConfig.Type.COMMON, EnergyCostConfig.SPEC);
+        modContainer.registerConfig(ModConfig.Type.COMMON, TemporalIndustriesConfig.SPEC);
 
         NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(new EnergyCostReloadListener()));
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent event) -> ItemEnergyCosts.compute(event.getServer()));
