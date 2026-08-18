@@ -1,8 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -43,19 +43,19 @@ public class UpdateSelectedTimePacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof TimeMachineMenu)) {
+            if (!(sender.containerMenu instanceof ChronovaultMenu)) {
                 return;
             }
-            TimeMachineMenu menu = (TimeMachineMenu) sender.containerMenu;
+            ChronovaultMenu menu = (ChronovaultMenu) sender.containerMenu;
 
             if (!menu.getBlockPos().equals(packet.machinePos)) {
                 return;
             }
 
             BlockEntity blockEntity = sender.level().getBlockEntity(packet.machinePos);
-            if (blockEntity instanceof TimeMachineBlockEntity) {
-                TimeMachineBlockEntity timeMachineBlockEntity = (TimeMachineBlockEntity) blockEntity;
-                timeMachineBlockEntity.setSelectedGameTime(packet.targetGameTime, false);
+            if (blockEntity instanceof ChronovaultBlockEntity) {
+                ChronovaultBlockEntity chronovaultBlockEntity = (ChronovaultBlockEntity) blockEntity;
+                chronovaultBlockEntity.setSelectedGameTime(packet.targetGameTime, false);
             }
         });
     }
