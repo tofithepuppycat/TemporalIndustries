@@ -71,23 +71,25 @@ public class TemporalTimeline {
     }
 
     public TemporalCommit addDelta(long gameTime, List<ChunkDelta> chunkDeltas) {
-        TemporalCommit commit = TemporalCommit.delta(nextId++, headId, gameTime, chunkDeltas);
+        return addDelta(gameTime, chunkDeltas, false);
+    }
+
+    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than
+     * automatic tracking — flags the commit for the graph's special mark icon. */
+    public TemporalCommit addDelta(long gameTime, List<ChunkDelta> chunkDeltas, boolean playerMarked) {
+        TemporalCommit commit = TemporalCommit.delta(nextId++, headId, gameTime, chunkDeltas, playerMarked);
         registerCommit(commit);
         return commit;
     }
 
     public TemporalCommit addSnapshot(long gameTime, List<ChunkSnapshot> chunkSnapshots) {
-        TemporalCommit commit = TemporalCommit.snapshot(nextId++, headId, gameTime, chunkSnapshots);
-        registerCommit(commit);
-        return commit;
+        return addSnapshot(gameTime, chunkSnapshots, false);
     }
 
-    /** Drops a zero-diff {@link TemporalCommit.Type#SAVE_MARKER} across markedChunks — purely a
-     * graph landmark (see {@link TemporalCommit#saveMarker}) for a Portable ChronoMarker's manual
-     * save point; the save itself is the ordinary DELTA/SNAPSHOT commit recorded right before this
-     * call (see PortableChronoMarkerItem#recordMark). */
-    public TemporalCommit addSaveMarker(long gameTime, List<ChunkPos> markedChunks) {
-        TemporalCommit commit = TemporalCommit.saveMarker(nextId++, headId, gameTime, markedChunks);
+    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than
+     * automatic tracking — flags the commit for the graph's special mark icon. */
+    public TemporalCommit addSnapshot(long gameTime, List<ChunkSnapshot> chunkSnapshots, boolean playerMarked) {
+        TemporalCommit commit = TemporalCommit.snapshot(nextId++, headId, gameTime, chunkSnapshots, playerMarked);
         registerCommit(commit);
         return commit;
     }
@@ -157,7 +159,7 @@ public class TemporalTimeline {
     private void registerCommit(TemporalCommit commit) {
         commits.addLast(commit);
         byId.put(commit.getId(), commit);
-        if (commit.getType() != TemporalCommit.Type.BRANCH && commit.getType() != TemporalCommit.Type.SAVE_MARKER) {
+        if (commit.getType() != TemporalCommit.Type.BRANCH) {
             headId = commit.getId();
         }
         for (ChunkDelta cd : commit.getChunkDeltas()) {
@@ -167,11 +169,6 @@ public class TemporalTimeline {
         }
         for (ChunkSnapshot snapshot : commit.getChunkSnapshots()) {
             long chunkKey = snapshot.getChunkPos().toLong();
-            long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
-            indexChunkTouch(chunkKey, commit.getId(), localParent);
-        }
-        for (ChunkPos markedChunk : commit.getMarkedChunks()) {
-            long chunkKey = markedChunk.toLong();
             long localParent = chunkHeadId.getOrDefault(chunkKey, -1L);
             indexChunkTouch(chunkKey, commit.getId(), localParent);
         }
