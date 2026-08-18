@@ -291,6 +291,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         long target = TimelineProjectionManager.getSelectedGameTime();
         long targetCommitId = TimelineProjectionManager.getSelectedCommitId();
         PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), target, targetCommitId));
+        TimelineProjectionManager.clearSelectedCommit();
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
