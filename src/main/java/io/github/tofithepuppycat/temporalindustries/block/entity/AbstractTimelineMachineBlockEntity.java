@@ -39,8 +39,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         implements net.minecraft.world.MenuProvider, TimelineViewProvider {
     protected static final long UNSET_TIME = -1L;
 
+    /** Entropy is a balance between ORD (0, order) and CHS ({@link #ENTROPY_MAX}, chaos), starting
+     * centered. Per IDEAS.md, a machine drifts toward chaos while its selected view sits away from
+     * the present and settles back toward balance once it's caught up — the bar this backs is
+     * purely observational for now; nothing yet gates a jump on it. */
+    public static final int ENTROPY_MAX = 1000;
+    private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
+    private static final int ENTROPY_DRIFT_INTERVAL_TICKS = 20; // 1 second
+
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
+    protected int entropy = ENTROPY_BALANCED;
 
     /** Named (rather than anonymous) so a jump's own cost can be deducted directly, bypassing the
      * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
@@ -89,11 +98,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                     case 9  -> longPart(selectedGameTime, 1);
                     case 10 -> longPart(selectedGameTime, 2);
                     case 11 -> longPart(selectedGameTime, 3);
+                    case 12 -> entropy;
                     default -> 0;
                 };
             }
             @Override public void set(int index, int value) {}
-            @Override public int getCount() { return 12; }
+            @Override public int getCount() { return 13; }
         };
     }
 
@@ -108,6 +118,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public ContainerData getContainerData() {
         return data;
     }
+
+    public int getEntropy() { return entropy; }
 
     /** Every chunk a jump on this machine moves together — one for a Time Machine, up to 25 for a
      * Chronosphere. Home/primary chunk first. */
@@ -141,6 +153,19 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (level instanceof ServerLevel serverLevel && now % SNAPSHOT_CHECK_INTERVAL_TICKS == 0) {
             maybeResnapshot(serverLevel);
         }
+
+        if (now % ENTROPY_DRIFT_INTERVAL_TICKS == 0) {
+            driftEntropy(now);
+        }
+    }
+
+    /** Ticks entropy one step toward chaos while the selected view is behind the present, or one
+     * step back toward balance once it's caught up — see {@link #entropy}'s javadoc. */
+    private void driftEntropy(long now) {
+        int target = selectedGameTime < now ? ENTROPY_MAX : ENTROPY_BALANCED;
+        if (entropy == target) return;
+        entropy += Integer.signum(target - entropy);
+        setChanged();
     }
 
     /** Skips chunks the world isn't currently tracking (auto-tracking off, for a Chronosphere; or
@@ -279,6 +304,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putLong("PlacedGameTime",   placedGameTime);
         tag.putLong("SelectedGameTime", selectedGameTime);
+        tag.putInt("Entropy", entropy);
     }
 
     @Override
@@ -287,5 +313,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("Energy"))           energyStorage.deserializeNBT(registries, tag.get("Energy"));
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
+        if (tag.contains("Entropy"))          entropy          = tag.getInt("Entropy");
     }
 }

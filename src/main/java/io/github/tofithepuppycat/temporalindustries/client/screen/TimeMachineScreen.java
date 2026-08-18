@@ -9,6 +9,7 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
@@ -38,6 +39,13 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
     private static final int ENERGY_BAR_Y_OFFSET = 7;
     private static final int ENERGY_BAR_WIDTH = 88;
     private static final int ENERGY_BAR_HEIGHT = 8;
+
+    private static final int ENTROPY_BAR_X_OFFSET = 90;
+    private static final int ENTROPY_BAR_Y_OFFSET = 7;
+    private static final int ENTROPY_BAR_WIDTH = 60;
+    private static final int ENTROPY_BAR_HEIGHT = 8;
+    private static final int COLOR_ORDER = 0xFF000000 | EntropyType.ORDER.color();
+    private static final int COLOR_CHAOS = 0xFF000000 | EntropyType.CHAOS.color();
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
@@ -158,12 +166,44 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
             int filled = Math.max(1, Math.round((energyStored / (float) energyCapacity) * (ENERGY_BAR_WIDTH - 2)));
             guiGraphics.fill(barX + 1, barY + 1, barX + 1 + filled, barY + ENERGY_BAR_HEIGHT - 1, 0xFF4DD0E1);
         }
+
+        renderEntropyBar(guiGraphics);
     }
 
     private boolean isMouseOverEnergyBar(int mouseX, int mouseY) {
         int barX = leftPos + ENERGY_BAR_X_OFFSET;
         int barY = topPos + ENERGY_BAR_Y_OFFSET;
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
+    }
+
+    /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
+     * order (below the midpoint) and dark purple toward chaos (above it). */
+    private void renderEntropyBar(GuiGraphics guiGraphics) {
+        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
+        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        int entropy = menu.getEntropy();
+        int max = menu.getEntropyMax();
+
+        guiGraphics.fill(barX, barY, barX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
+
+        int mid = barX + ENTROPY_BAR_WIDTH / 2;
+        int half = ENTROPY_BAR_WIDTH / 2 - 1;
+        float balance = max > 0 ? (entropy - max / 2f) / (max / 2f) : 0f; // -1 (order) .. +1 (chaos)
+        int filled = Math.round(Math.abs(balance) * half);
+        if (filled > 0) {
+            if (balance >= 0) {
+                guiGraphics.fill(mid, barY + 1, mid + filled, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_CHAOS);
+            } else {
+                guiGraphics.fill(mid - filled, barY + 1, mid, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_ORDER);
+            }
+        }
+        guiGraphics.fill(mid, barY, mid + 1, barY + ENTROPY_BAR_HEIGHT, 0xFF888888);
+    }
+
+    private boolean isMouseOverEntropyBar(int mouseX, int mouseY) {
+        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
+        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
     }
 
     @Override
@@ -182,7 +222,19 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
             Component tooltipComponent = Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE");
             guiGraphics.renderTooltip(font, tooltipComponent, mouseX, mouseY);
+        } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         }
+    }
+
+    /** Shared with {@link ChronosphereScreen}'s identical entropy bar tooltip. */
+    static Component entropyTooltip(int entropy, int max) {
+        int half = max / 2;
+        if (entropy == half) {
+            return Component.translatable("gui.temporalindustries.entropy.balanced", entropy, max);
+        }
+        String key = entropy > half ? "gui.temporalindustries.entropy.chaos" : "gui.temporalindustries.entropy.order";
+        return Component.translatable(key, entropy, max);
     }
 
     @Override
