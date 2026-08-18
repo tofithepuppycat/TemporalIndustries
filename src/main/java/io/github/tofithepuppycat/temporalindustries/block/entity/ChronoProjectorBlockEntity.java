@@ -413,7 +413,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     }
 
     // -------------------------------------------------------------------------
-    // Insert / remove (jukebox-style interaction, see ChronoProjector)
+    // Insert / remove (jukebox-style interaction, see EchoProjector)
 
     public ItemStack getStoredRecorder() {
         return recorderStack;

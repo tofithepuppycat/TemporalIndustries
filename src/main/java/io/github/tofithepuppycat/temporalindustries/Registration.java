@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries;
 
 import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID;
-import io.github.tofithepuppycat.temporalindustries.block.ChronoProjector;
+import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
@@ -20,9 +20,9 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyBottleItem;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyContainerItem;
+import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
+import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
@@ -83,14 +83,14 @@ public class Registration {
     public static final DeferredItem<Item> TEMPORAL_ANCHOR_ITEM = ITEMS.register("temporal_anchor",
             () -> new TemporalAnchorItem(new Item.Properties().stacksTo(1)));
 
-    public static final DeferredBlock<ChronoProjector> CHRONO_PROJECTOR_BLOCK = BLOCKS.register("chrono_projector",
-            () -> new ChronoProjector(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 3)));
+    public static final DeferredBlock<EchoProjector> ECHO_PROJECTOR_BLOCK = BLOCKS.register("echo_projector",
+            () -> new EchoProjector(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 3)));
 
-    public static final DeferredItem<Item> CHRONO_PROJECTOR_ITEM = ITEMS.register("chrono_projector",
-            () -> new BlockItem(CHRONO_PROJECTOR_BLOCK.get(), new Item.Properties()));
+    public static final DeferredItem<Item> ECHO_PROJECTOR_ITEM = ITEMS.register("echo_projector",
+            () -> new BlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties()));
 
-    public static final DeferredItem<Item> CHRONO_RECORD_ITEM = ITEMS.register("chrono_record",
-            () -> new ChronoRecordItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> ECHO_RECORD_ITEM = ITEMS.register("echo_record",
+            () -> new EchoRecordItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
             () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1)));
@@ -110,8 +110,8 @@ public class Registration {
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
             () -> new BlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties()));
 
-    public static final DeferredItem<Item> ENTROPY_CONTAINER_ITEM = ITEMS.register("entropy_container",
-            () -> new EntropyContainerItem(new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> DUAL_ENTROPY_CELL_ITEM = ITEMS.register("dual_entropy_cell",
+            () -> new DualEntropyCellItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<EntropyContents>> ENTROPY_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "entropy_contents", builder -> builder.persistent(EntropyContents.CODEC).networkSynchronized(EntropyContents.STREAM_CODEC));
@@ -119,11 +119,11 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> BOTTLE_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "bottle_contents", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
-    public static final DeferredItem<Item> ORDER_BOTTLE_ITEM = ITEMS.register("order_bottle",
-            () -> new EntropyBottleItem(EntropyType.ORDER, new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> ORDER_CELL_ITEM = ITEMS.register("order_cell",
+            () -> new EntropyCellItem(EntropyType.ORDER, new Item.Properties().stacksTo(1)));
 
-    public static final DeferredItem<Item> CHAOS_BOTTLE_ITEM = ITEMS.register("chaos_bottle",
-            () -> new EntropyBottleItem(EntropyType.CHAOS, new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> CHAOS_CELL_ITEM = ITEMS.register("chaos_cell",
+            () -> new EntropyCellItem(EntropyType.CHAOS, new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CapturedMob>> CAPTURED_MOB = DATA_COMPONENTS.registerComponentType(
             "captured_mob", builder -> builder.persistent(CapturedMob.CODEC).networkSynchronized(CapturedMob.STREAM_CODEC));
@@ -204,7 +204,7 @@ public class Registration {
             () -> BlockEntityType.Builder.of(TimeMachineBlockEntity::new, TIME_MACHINE_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronoProjectorBlockEntity>> CHRONO_PROJECTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("chrono_projector",
-            () -> BlockEntityType.Builder.of(ChronoProjectorBlockEntity::new, CHRONO_PROJECTOR_BLOCK.get()).build(null));
+            () -> BlockEntityType.Builder.of(ChronoProjectorBlockEntity::new, ECHO_PROJECTOR_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronodialBlockEntity>> CHRONODIAL_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronodial",
             () -> BlockEntityType.Builder.of(ChronodialBlockEntity::new, CHRONODIAL_BLOCK.get()).build(null));
@@ -236,19 +236,19 @@ public class Registration {
                     .icon(() -> TIME_MACHINE_ITEM.toStack())
                     .displayItems((params, output) -> {
                         output.accept(TIME_MACHINE_ITEM);
-                        output.accept(CHRONO_PROJECTOR_ITEM);
+                        output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(CHRONODIAL_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
                         output.accept(SCHRODINGERS_BOX_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
-                        output.accept(CHRONO_RECORD_ITEM);
+                        output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
-                        output.accept(ENTROPY_CONTAINER_ITEM);
-                        output.accept(ORDER_BOTTLE_ITEM);
-                        output.accept(CHAOS_BOTTLE_ITEM);
+                        output.accept(DUAL_ENTROPY_CELL_ITEM);
+                        output.accept(ORDER_CELL_ITEM);
+                        output.accept(CHAOS_CELL_ITEM);
                         output.accept(ORDER_BUCKET_ITEM);
                         output.accept(CHAOS_BUCKET_ITEM);
                     })

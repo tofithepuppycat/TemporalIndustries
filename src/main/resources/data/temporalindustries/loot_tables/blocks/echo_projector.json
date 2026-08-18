@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "temporalindustries:chrono_projector"
+          "name": "temporalindustries:echo_projector"
         }
       ],
       "conditions": [

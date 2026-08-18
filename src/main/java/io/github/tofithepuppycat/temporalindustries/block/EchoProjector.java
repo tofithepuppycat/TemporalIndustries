@@ -4,7 +4,7 @@ import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoRecording;
-import io.github.tofithepuppycat.temporalindustries.item.ChronoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import net.minecraft.network.chat.Component;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -28,17 +28,17 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Consumes energy to endlessly replay whatever Chrono Record is inserted into it (see
+ * Consumes energy to endlessly replay whatever Echo Record is inserted into it (see
  * {@link ChronoProjectorBlockEntity}), rendered client-side as a translucent ghost (purple by
  * default; right-click with a dye to recolor it). Interaction otherwise mirrors a jukebox:
- * right-click with a recorded Chrono Record to insert it, right-click empty handed to take it
+ * right-click with a recorded Echo Record to insert it, right-click empty handed to take it
  * back out.
  */
 @SuppressWarnings("null")
-public class ChronoProjector extends BaseEntityBlock {
-    private static final MapCodec<ChronoProjector> CODEC = simpleCodec(ChronoProjector::new);
+public class EchoProjector extends BaseEntityBlock {
+    private static final MapCodec<EchoProjector> CODEC = simpleCodec(EchoProjector::new);
 
-    public ChronoProjector(Properties properties) {
+    public EchoProjector(Properties properties) {
         super(properties);
     }
 
@@ -60,7 +60,7 @@ public class ChronoProjector extends BaseEntityBlock {
             return dyeGhost(dye, level, pos, player, stack);
         }
 
-        if (!(stack.getItem() instanceof ChronoRecordItem)) {
+        if (!(stack.getItem() instanceof EchoRecordItem)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (level.isClientSide) {
@@ -73,7 +73,7 @@ public class ChronoProjector extends BaseEntityBlock {
         }
 
         if (!ChronoRecording.hasSavedRecording(stack)) {
-            player.displayClientMessage(Component.translatable("block.temporalindustries.chrono_projector.no_recording"), true);
+            player.displayClientMessage(Component.translatable("block.temporalindustries.echo_projector.no_recording"), true);
             return ItemInteractionResult.FAIL;
         }
 
