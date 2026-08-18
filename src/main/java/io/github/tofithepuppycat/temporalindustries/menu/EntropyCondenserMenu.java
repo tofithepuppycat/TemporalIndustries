@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -9,14 +10,22 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /** Container menu for the Entropy Condenser GUI: energy stored/capacity plus both tanks'
- * fill/capacity, packed into {@link ContainerData} 16-bit slots the same way as {@link ChronosphereMenu}. */
+ * fill/capacity, packed into {@link ContainerData} 16-bit slots the same way as {@link ChronosphereMenu},
+ * plus a Cell input slot (see {@link CrudeEntropyCondenserMenu} for its lower tier's identical slot). */
 @SuppressWarnings("null")
 public class EntropyCondenserMenu extends AbstractContainerMenu {
+    private static final int CELL_SLOT_X = 140;
+    private static final int CELL_SLOT_Y = 20;
+    private static final int INVENTORY_X = 8;
+    private static final int INVENTORY_Y = 140;
+    private static final int HOTBAR_Y = 202;
+
     private final EntropyCondenserBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
@@ -39,6 +48,21 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
 
         checkContainerDataCount(data, 8);
         addDataSlots(data);
+
+        addSlot(new Slot(blockEntity, EntropyCondenserBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
+            @Override public boolean mayPlace(@NotNull ItemStack stack) {
+                return stack.getItem() instanceof EntropyReceptacle;
+            }
+        });
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, INVENTORY_X + col * 18, INVENTORY_Y + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(playerInventory, col, INVENTORY_X + col * 18, HOTBAR_Y));
+        }
     }
 
     private static EntropyCondenserBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
@@ -90,8 +114,31 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
     }
 
     @Override
-    public ItemStack quickMoveStack(@NotNull Player player, int index) {
-        return ItemStack.EMPTY;
+    public @NotNull ItemStack quickMoveStack(@NotNull Player player, int index) {
+        Slot slot = slots.get(index);
+        if (!slot.hasItem()) return ItemStack.EMPTY;
+
+        ItemStack stackInSlot = slot.getItem();
+        ItemStack result = stackInSlot.copy();
+
+        int cellSlot = EntropyCondenserBlockEntity.CELL_SLOT;
+        int inventoryStart = cellSlot + 1;
+        int inventoryEnd = inventoryStart + 36;
+
+        if (index == cellSlot) {
+            if (!moveItemStackTo(stackInSlot, inventoryStart, inventoryEnd, true)) return ItemStack.EMPTY;
+        } else {
+            if (!(stackInSlot.getItem() instanceof EntropyReceptacle) || !moveItemStackTo(stackInSlot, cellSlot, cellSlot + 1, false)) {
+                return ItemStack.EMPTY;
+            }
+        }
+
+        if (stackInSlot.isEmpty()) {
+            slot.setByPlayer(ItemStack.EMPTY);
+        } else {
+            slot.setChanged();
+        }
+        return result;
     }
 
     @Override
