@@ -1,21 +1,20 @@
 package io.github.tofithepuppycat.temporalindustries.energy;
 
 import net.neoforged.neoforge.common.ModConfigSpec;
-import org.apache.commons.lang3.tuple.Pair;
 
 import java.util.List;
 
 /**
- * Modpack-editable energy cost overrides — the standard NeoForge common config
- * ({@code config/temporalindustries-common.toml}) rather than a hand-rolled file, so it gets the
- * usual TOML comments, validation and hot-reload for free. Read by {@link ItemEnergyCosts}.
+ * Modpack-editable energy cost overrides. A section of the shared
+ * {@link io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig} common config,
+ * so it gets the usual TOML comments, validation and hot-reload for free. Read by {@link ItemEnergyCosts}.
  */
 public final class EnergyCostConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> itemCosts;
     public final ModConfigSpec.ConfigValue<List<? extends String>> tagCosts;
     public final ModConfigSpec.IntValue defaultBlockCost;
 
-    private EnergyCostConfig(ModConfigSpec.Builder builder) {
+    public EnergyCostConfig(ModConfigSpec.Builder builder) {
         itemCosts = builder
                 .comment(
                         "Per-item energy cost overrides. Always win over the mod's built-in costs and are re-read every server start.",
@@ -35,14 +34,5 @@ public final class EnergyCostConfig {
 
     private static boolean isCostEntry(Object o) {
         return o instanceof String s && s.indexOf('=') > 0;
-    }
-
-    public static final EnergyCostConfig INSTANCE;
-    public static final ModConfigSpec SPEC;
-
-    static {
-        Pair<EnergyCostConfig, ModConfigSpec> specPair = new ModConfigSpec.Builder().configure(EnergyCostConfig::new);
-        INSTANCE = specPair.getLeft();
-        SPEC = specPair.getRight();
     }
 }

@@ -1,11 +1,13 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
@@ -20,7 +22,11 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
+import org.slf4j.Logger;
+import com.mojang.logging.LogUtils;
 
+import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID;
@@ -33,9 +39,6 @@ import static io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerato
  * and a cold source (right). While both are present it credits FE every tick, scaled by the
  * {@link #TEMPERATURES} gap between the two sources (per IDEAS.md's "Generates electricity based on
  * the temperature difference"), and periodically emits ORD/CHS orbs whose count scales the same way.
- * A depletable hot source (fire/soul fire, but not lava, which is treated as inexhaustible like
- * vanilla) burns out to air after a long time; a cold source melts (ice family to water, snow family
- * to air) the same way.
  */
 @SuppressWarnings("null")
 public class SeebeckGeneratorBlockEntity extends BlockEntity {
@@ -58,25 +61,24 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
     );
     private static final int MAX_TEMP_DIFF = 1000 - (-900);
 
-    private static final Map<Block, BlockState> COLD_MELT_RESULTS = Map.of(
-            Blocks.ICE, Blocks.WATER.defaultBlockState(),
-            Blocks.PACKED_ICE, Blocks.WATER.defaultBlockState(),
-            Blocks.BLUE_ICE, Blocks.WATER.defaultBlockState(),
-            Blocks.SNOW_BLOCK, Blocks.AIR.defaultBlockState(),
-            Blocks.POWDER_SNOW, Blocks.AIR.defaultBlockState()
-    );
+    private static final Logger LOGGER = LogUtils.getLogger();
+
+    private static List<? extends String> cachedHotConfigRaw = null;
+    private static Map<Block, Integer> cachedHotConfigMap = Map.of();
+    private static List<? extends String> cachedColdConfigRaw = null;
+    private static Map<Block, Integer> cachedColdConfigMap = Map.of();
 
     private static final int ENERGY_CAPACITY = 20_000;
     private static final int ENERGY_MAX_EXTRACT = 200;
     private static final int MIN_GEN_RATE_FE_PER_TICK = 4;
     private static final int MAX_GEN_RATE_FE_PER_TICK = 40;
 
-    private static final int ENTROPY_INTERVAL_TICKS = 200;
-    private static final int MAX_ENTROPY_PER_INTERVAL = 4;
-
-    /** ~10 minutes of active generation before a depletable hot source burns out / a cold source melts. */
-    private static final int HOT_LIFESPAN_TICKS = 12_000;
-    private static final int COLD_LIFESPAN_TICKS = 12_000;
+    // Orbs are emitted four times as often as before, with the per-emission amount scaled down to
+    // match, so total ORD/CHS output per minute is unchanged. entropyAccumulator carries the
+    // fractional remainder between emissions since an orb needs a whole value of at least 1.
+    private static final int ENTROPY_INTERVAL_TICKS = 50;
+    private static final double MIN_ENTROPY_PER_INTERVAL = 0.25;
+    private static final double MAX_ENTROPY_PER_INTERVAL = 1.0;
 
     private final class GeneratorEnergyStorage extends EnergyStorage {
         GeneratorEnergyStorage() {
@@ -97,9 +99,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
     }
 
     private final GeneratorEnergyStorage energyStorage = new GeneratorEnergyStorage();
-
-    private int hotBurnTicks = 0;
-    private int coldMeltTicks = 0;
+    private double entropyAccumulator = 0.0;
 
     public SeebeckGeneratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.SEEBECK_GENERATOR_BLOCK_ENTITY.get(), pos, state);
@@ -118,47 +118,36 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
         BlockState hotState = level.getBlockState(hotPos);
         BlockState coldState = level.getBlockState(coldPos);
 
-        boolean hot = hotState.is(HOT_SOURCES) && isActiveHot(hotState);
-        boolean cold = coldState.is(COLD_SOURCES);
+        Map<Block, Integer> extraHot = extraHotSources();
+        Map<Block, Integer> extraCold = extraColdSources();
 
-        if (!(hot && cold)) {
-            be.hotBurnTicks = 0;
-            be.coldMeltTicks = 0;
-            return;
-        }
+        boolean hot = (hotState.is(HOT_SOURCES) || extraHot.containsKey(hotState.getBlock())) && isActiveHot(hotState);
+        boolean cold = coldState.is(COLD_SOURCES) || extraCold.containsKey(coldState.getBlock());
 
-        double tempFactor = temperatureFactor(hotState.getBlock(), coldState.getBlock());
+        if (!(hot && cold)) return;
+
+        double tempFactor = temperatureFactor(hotState.getBlock(), coldState.getBlock(), extraHot, extraCold);
         int genRate = (int) Math.round(MIN_GEN_RATE_FE_PER_TICK + (MAX_GEN_RATE_FE_PER_TICK - MIN_GEN_RATE_FE_PER_TICK) * tempFactor);
         be.energyStorage.produce(genRate);
 
         if (level.getGameTime() % ENTROPY_INTERVAL_TICKS == 0) {
-            int entropyAmount = 1 + (int) Math.round((MAX_ENTROPY_PER_INTERVAL - 1) * tempFactor);
-            EntropyOrbEntity.spawn(serverLevel, hotPos.getX() + 0.5, hotPos.getY() + 0.5, hotPos.getZ() + 0.5, EntropyType.CHAOS, entropyAmount);
-            EntropyOrbEntity.spawn(serverLevel, coldPos.getX() + 0.5, coldPos.getY() + 0.5, coldPos.getZ() + 0.5, EntropyType.ORDER, entropyAmount);
-        }
-
-        if (isDepletableHot(hotState.getBlock())) {
-            if (++be.hotBurnTicks >= HOT_LIFESPAN_TICKS) {
-                level.setBlockAndUpdate(hotPos, Blocks.AIR.defaultBlockState());
-                be.hotBurnTicks = 0;
-            }
-        } else {
-            be.hotBurnTicks = 0;
-        }
-
-        BlockState meltResult = COLD_MELT_RESULTS.get(coldState.getBlock());
-        if (meltResult != null) {
-            if (++be.coldMeltTicks >= COLD_LIFESPAN_TICKS) {
-                level.setBlockAndUpdate(coldPos, meltResult);
-                be.coldMeltTicks = 0;
-            }
-        } else {
-            be.coldMeltTicks = 0;
+            be.entropyAccumulator += MIN_ENTROPY_PER_INTERVAL + (MAX_ENTROPY_PER_INTERVAL - MIN_ENTROPY_PER_INTERVAL) * tempFactor;
+            int entropyAmount = (int) Math.floor(be.entropyAccumulator);
+            if (entropyAmount <= 0) return;
+            be.entropyAccumulator -= entropyAmount;
+            EntropyOrbEntity.spawn(serverLevel, hotPos.getX() + 0.5, orbSpawnY(hotPos, hotState), hotPos.getZ() + 0.5, EntropyType.CHAOS, entropyAmount);
+            EntropyOrbEntity.spawn(serverLevel, coldPos.getX() + 0.5, orbSpawnY(coldPos, coldState), coldPos.getZ() + 0.5, EntropyType.ORDER, entropyAmount);
         }
     }
 
-    private static boolean isDepletableHot(Block block) {
-        return block == Blocks.FIRE || block == Blocks.SOUL_FIRE;
+    /**
+     * Fluid source blocks (lava, water) have no collision, so an orb spawned at their center can only
+     * escape if there's open space directly above; when the source is embedded in terrain that space
+     * may not exist, leaving the orb stuck bobbing inside the fluid forever. Spawning above the block
+     * instead lets the existing solid-block escape logic ({@code moveTowardsClosestSpace}) handle it.
+     */
+    private static double orbSpawnY(BlockPos pos, BlockState state) {
+        return pos.getY() + (state.getFluidState().isEmpty() ? 0.5 : 1.05);
     }
 
     /** Campfires only count as a hot source while lit; every other hot source is always active. */
@@ -171,25 +160,65 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
     }
 
     /** Normalized (0-1) temperature gap between the hot and cold source, scaled against the widest possible pairing. */
-    private static double temperatureFactor(Block hot, Block cold) {
-        int hotTemp = TEMPERATURES.getOrDefault(hot, 0);
-        int coldTemp = TEMPERATURES.getOrDefault(cold, 0);
+    private static double temperatureFactor(Block hot, Block cold, Map<Block, Integer> extraHot, Map<Block, Integer> extraCold) {
+        int hotTemp = TEMPERATURES.getOrDefault(hot, extraHot.getOrDefault(hot, 0));
+        int coldTemp = TEMPERATURES.getOrDefault(cold, extraCold.getOrDefault(cold, 0));
         return Math.clamp((double) (hotTemp - coldTemp) / MAX_TEMP_DIFF, 0.0, 1.0);
+    }
+
+    /** Config-defined hot sources beyond the {@link #HOT_SOURCES} tag, re-parsed only when the config list changes. */
+    private static Map<Block, Integer> extraHotSources() {
+        List<? extends String> raw = TemporalIndustriesConfig.INSTANCE.seebeckSources.extraHotSources.get();
+        if (raw != cachedHotConfigRaw) {
+            cachedHotConfigMap = parseSourceEntries(raw);
+            cachedHotConfigRaw = raw;
+        }
+        return cachedHotConfigMap;
+    }
+
+    /** Config-defined cold sources beyond the {@link #COLD_SOURCES} tag, re-parsed only when the config list changes. */
+    private static Map<Block, Integer> extraColdSources() {
+        List<? extends String> raw = TemporalIndustriesConfig.INSTANCE.seebeckSources.extraColdSources.get();
+        if (raw != cachedColdConfigRaw) {
+            cachedColdConfigMap = parseSourceEntries(raw);
+            cachedColdConfigRaw = raw;
+        }
+        return cachedColdConfigMap;
+    }
+
+    /** Parses "block_id=temperature" config lines (see SeebeckSourceConfig) into a block-to-temperature map. */
+    private static Map<Block, Integer> parseSourceEntries(List<? extends String> rawLines) {
+        Map<Block, Integer> result = new HashMap<>();
+        for (String line : rawLines) {
+            int eq = line.indexOf('=');
+            if (eq <= 0 || eq == line.length() - 1) {
+                LOGGER.warn("[{}] Malformed Seebeck source entry '{}' (expected \"block_id=temperature\"), skipping", MODID, line);
+                continue;
+            }
+            String id = line.substring(0, eq).trim();
+            try {
+                int temperature = Integer.parseInt(line.substring(eq + 1).trim());
+                Block block = BuiltInRegistries.BLOCK.getOptional(ResourceLocation.parse(id))
+                        .orElseThrow(() -> new IllegalArgumentException("Unknown block '" + id + "'"));
+                result.put(block, temperature);
+            } catch (RuntimeException e) {
+                LOGGER.warn("[{}] Malformed Seebeck source entry '{}', skipping", MODID, line, e);
+            }
+        }
+        return result;
     }
 
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Energy", energyStorage.serializeNBT(registries));
-        tag.putInt("HotBurnTicks", hotBurnTicks);
-        tag.putInt("ColdMeltTicks", coldMeltTicks);
+        tag.putDouble("EntropyAccumulator", entropyAccumulator);
     }
 
     @Override
     protected void loadAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
         if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
-        hotBurnTicks = tag.getInt("HotBurnTicks");
-        coldMeltTicks = tag.getInt("ColdMeltTicks");
+        entropyAccumulator = tag.getDouble("EntropyAccumulator");
     }
 }
