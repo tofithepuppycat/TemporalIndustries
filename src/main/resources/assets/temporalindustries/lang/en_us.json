@@ -90,5 +90,6 @@
 	"item.temporalindustries.chaos_bucket": "Bucket of Chaos",
 	"fluid.temporalindustries.order_fluid": "Order",
 	"fluid.temporalindustries.chaos_fluid": "Chaos",
-	"block.temporalindustries.entropy_condenser": "Entropy Condenser"
+	"block.temporalindustries.entropy_condenser": "Entropy Condenser",
+	"block.temporalindustries.crude_entropy_condenser": "Crude Entropy Condenser"
 }

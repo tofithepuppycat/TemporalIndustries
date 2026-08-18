@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.CrudeEntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.TimeMachineScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
@@ -26,6 +27,7 @@ public class ClientModEvents {
         event.register(Registration.TIME_MACHINE_MENU.get(), TimeMachineScreen::new);
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
+        event.register(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), CrudeEntropyCondenserScreen::new);
     }
 
     @SuppressWarnings("null")
