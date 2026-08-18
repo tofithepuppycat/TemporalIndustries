@@ -11,7 +11,7 @@ import java.util.Map;
 /**
  * Exposes a chunk's commit graph plus the shared jump/select controls, for whichever block entity
  * is currently showing {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget}
- * in its GUI. Implemented by {@link TimeMachineBlockEntity} (always its own single chunk — every
+ * in its GUI. Implemented by {@link ChronovaultBlockEntity} (always its own single chunk — every
  * method below ignores the chunkPos argument) and {@link ChronosphereBlockEntity} (chunkPos null
  * means the shared "All" view across every claimed chunk; otherwise one specific claimed chunk's
  * own graph). jump() always moves every chunk a provider controls together, regardless of which

@@ -31,9 +31,9 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** GUI for the Chronosphere block: the same timeline graph view as the Time Machine (via
- * {@link TimelineGraphWidget}), reading/jumping the home chunk's history exactly like a Time
- * Machine — except Jump moves every chunk this Chronosphere has claimed, not just the one shown.
+/** GUI for the Chronosphere block: the same timeline graph view as the Chronovault (via
+ * {@link TimelineGraphWidget}), reading/jumping the home chunk's history exactly like a
+ * Chronovault — except Jump moves every chunk this Chronosphere has claimed, not just the one shown.
  * The 5x5 claim map lives behind a square bookmark tab on the panel's side and opens as an
  * overlay, rather than occupying the main view. */
 @SuppressWarnings("null")
@@ -179,7 +179,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 .build();
         addRenderableWidget(showChangesButton);
 
-        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.time_machine.jump"), btn -> jumpAndClose())
+        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.chronovault.jump"), btn -> jumpAndClose())
                 .pos(groupX + buttonWidth + gap, buttonY)
                 .size(buttonWidth, 20)
                 .build();
@@ -298,8 +298,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private static Component showChangesLabel(boolean enabled) {
         return Component.translatable(enabled
-                ? "gui.temporalindustries.time_machine.hide_changes"
-                : "gui.temporalindustries.time_machine.show_changes");
+                ? "gui.temporalindustries.chronovault.hide_changes"
+                : "gui.temporalindustries.chronovault.show_changes");
     }
 
     private long getCurrentGameTime() {
@@ -676,7 +676,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, TimeMachineScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
         } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
@@ -697,14 +697,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), leftPos + 8, topPos + 8, TEXT_PRIMARY, false);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.time_machine.preview_current", formatGameDayTime(now)), leftPos + 8, topPos + 200, TEXT_PRIMARY, false);
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), leftPos + 8, topPos + 200, TEXT_PRIMARY, false);
 
         if (TimelineProjectionManager.hasSelection()) {
             long selected = TimelineProjectionManager.getSelectedGameTime();
             long diff = selected - now;
             String direction = diff <= 0L
-                    ? "gui.temporalindustries.time_machine.preview_past"
-                    : "gui.temporalindustries.time_machine.preview_future";
+                    ? "gui.temporalindustries.chronovault.preview_past"
+                    : "gui.temporalindustries.chronovault.preview_future";
             guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), leftPos + 8, topPos + 210, TEXT_PRIMARY, false);
         }
     }

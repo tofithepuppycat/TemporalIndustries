@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -15,25 +15,25 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Time Machine GUI; exposes the block entity's energy/time state to
+/** Container menu for the Chronovault GUI; exposes the block entity's energy/time state to
  * the client via {@link ContainerData}. */
 @SuppressWarnings("null")
-public class TimeMachineMenu extends AbstractContainerMenu implements TimelineViewMenu {
-    private final TimeMachineBlockEntity blockEntity;
+public class ChronovaultMenu extends AbstractContainerMenu implements TimelineViewMenu {
+    private final ChronovaultBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
     private final ContainerData data;
 
-    public TimeMachineMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
+    public ChronovaultMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
         this(id, playerInventory, dataBuffer.readBlockPos());
     }
 
-    public TimeMachineMenu(int id, Inventory playerInventory, BlockPos blockPos) {
+    public ChronovaultMenu(int id, Inventory playerInventory, BlockPos blockPos) {
         this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(13));
     }
 
-    public TimeMachineMenu(int id, Inventory playerInventory, TimeMachineBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
-        super(Registration.TIME_MACHINE_MENU.get(), id);
+    public ChronovaultMenu(int id, Inventory playerInventory, ChronovaultBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
+        super(Registration.CHRONOVAULT_MENU.get(), id);
         this.blockEntity = blockEntity;
         this.blockPos = blockEntity.getBlockPos();
         this.access = access;
@@ -43,12 +43,12 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
         addDataSlots(data);
     }
 
-    private static TimeMachineBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
-        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof TimeMachineBlockEntity) {
-            return (TimeMachineBlockEntity) playerInventory.player.level().getBlockEntity(blockPos);
+    private static ChronovaultBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
+        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof ChronovaultBlockEntity) {
+            return (ChronovaultBlockEntity) playerInventory.player.level().getBlockEntity(blockPos);
         }
 
-        throw new IllegalStateException("Expected TimeMachineBlockEntity at " + blockPos);
+        throw new IllegalStateException("Expected ChronovaultBlockEntity at " + blockPos);
     }
 
     @Override
@@ -58,7 +58,7 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return stillValid(access, player, Registration.TIME_MACHINE_BLOCK.get());
+        return stillValid(access, player, Registration.CHRONOVAULT_BLOCK.get());
     }
 
     public int getEnergyStored() {
@@ -93,7 +93,7 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
         return AbstractTimelineMachineBlockEntity.ENTROPY_MAX;
     }
 
-    public TimeMachineBlockEntity getBlockEntity() {
+    public ChronovaultBlockEntity getBlockEntity() {
         return blockEntity;
     }
 
