@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import net.minecraft.core.BlockPos;
@@ -28,7 +29,7 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
     }
 
     public TimeMachineMenu(int id, Inventory playerInventory, BlockPos blockPos) {
-        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(12));
+        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(13));
     }
 
     public TimeMachineMenu(int id, Inventory playerInventory, TimeMachineBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -38,7 +39,7 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 12);
+        checkContainerDataCount(data, 13);
         addDataSlots(data);
     }
 
@@ -82,6 +83,14 @@ public class TimeMachineMenu extends AbstractContainerMenu implements TimelineVi
 
     public long getSelectedGameTime() {
         return getLongFromData(8);
+    }
+
+    public int getEntropy() {
+        return data.get(12);
+    }
+
+    public int getEntropyMax() {
+        return AbstractTimelineMachineBlockEntity.ENTROPY_MAX;
     }
 
     public TimeMachineBlockEntity getBlockEntity() {

@@ -12,6 +12,7 @@ import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientS
 import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
@@ -61,6 +62,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int ENERGY_BAR_Y_OFFSET = 7;
     private static final int ENERGY_BAR_WIDTH = 88;
     private static final int ENERGY_BAR_HEIGHT = 8;
+
+    private static final int ENTROPY_BAR_X_OFFSET = 90;
+    private static final int ENTROPY_BAR_Y_OFFSET = 7;
+    private static final int ENTROPY_BAR_WIDTH = 60;
+    private static final int ENTROPY_BAR_HEIGHT = 8;
+    private static final int COLOR_ORDER_BAR = 0xFF000000 | EntropyType.ORDER.color();
+    private static final int COLOR_CHAOS_BAR = 0xFF000000 | EntropyType.CHAOS.color();
 
     private static final int SYNC_INTERVAL_TICKS = 20;
     /** How often the map overlay re-fetches terrain thumbnails while open, so it doesn't go stale
@@ -311,6 +319,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!mapOverlayOpen) renderChunkTabs(guiGraphics, mouseX, mouseY);
         graphWidget.render(guiGraphics, font, leftPos + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight());
         renderEnergyBar(guiGraphics);
+        renderEntropyBar(guiGraphics);
     }
 
     private int graphTop() {
@@ -396,6 +405,36 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         int barX = leftPos + ENERGY_BAR_X_OFFSET;
         int barY = topPos + ENERGY_BAR_Y_OFFSET;
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
+    }
+
+    /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
+     * order (below the midpoint) and dark purple toward chaos (above it). */
+    private void renderEntropyBar(GuiGraphics guiGraphics) {
+        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
+        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        int entropy = menu.getEntropy();
+        int max = menu.getEntropyMax();
+
+        guiGraphics.fill(barX, barY, barX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
+
+        int mid = barX + ENTROPY_BAR_WIDTH / 2;
+        int half = ENTROPY_BAR_WIDTH / 2 - 1;
+        float balance = max > 0 ? (entropy - max / 2f) / (max / 2f) : 0f; // -1 (order) .. +1 (chaos)
+        int filled = Math.round(Math.abs(balance) * half);
+        if (filled > 0) {
+            if (balance >= 0) {
+                guiGraphics.fill(mid, barY + 1, mid + filled, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_CHAOS_BAR);
+            } else {
+                guiGraphics.fill(mid - filled, barY + 1, mid, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_ORDER_BAR);
+            }
+        }
+        guiGraphics.fill(mid, barY, mid + 1, barY + ENTROPY_BAR_HEIGHT, 0xFF888888);
+    }
+
+    private boolean isMouseOverEntropyBar(int mouseX, int mouseY) {
+        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
+        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
     }
 
     /** Draws the shared menu_base_right.png sprite as an icon tab's background at its native 1:1
@@ -636,6 +675,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, tooltip, mouseX, mouseY);
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
+        } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, TimeMachineScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
         } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
