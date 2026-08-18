@@ -1,18 +1,26 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -22,6 +30,8 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
@@ -31,16 +41,21 @@ import static io.github.tofithepuppycat.temporalindustries.block.EntropyCondense
 /**
  * Instantly absorbs (powered by FE) any {@link EntropyOrbEntity} orb inside a configurable cuboid
  * range that starts at the block's front face and extends outward, and condenses its value into
- * liquid Order/Chaos fluid across two internal tanks, per IDEAS.md's Entropy Condenser.
+ * liquid Order/Chaos fluid across two internal tanks, per IDEAS.md's Entropy Condenser. Also has a
+ * single input slot that slowly drains an Order/Chaos Cell into the same tanks, the same unpowered
+ * way {@link CrudeEntropyCondenserBlockEntity} works, for topping tanks off by hand.
  */
 @SuppressWarnings("null")
-public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProvider {
+public class EntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider {
     private static final int ENERGY_CAPACITY = 50_000;
     private static final int ENERGY_MAX_RECEIVE = 500;
 
     private static final int TANK_CAPACITY = 8_000;
     private static final int MB_PER_UNIT = 50;
     private static final int FE_PER_UNIT = 20;
+    private static final int CELL_DRAIN_PER_TICK = 5;
+    private static final int SLOT_COUNT = 1;
+    public static final int CELL_SLOT = 0;
 
     public static final int MIN_RANGE = 3;
     public static final int MAX_RANGE = 5;
@@ -122,6 +137,9 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
     };
     private final CondenserFluidHandler fluidHandler = new CondenserFluidHandler();
 
+    private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
+    private final IItemHandler inventory = new InvWrapper(this);
+
     public EntropyCondenserBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.ENTROPY_CONDENSER_BLOCK_ENTITY.get(), pos, state);
     }
@@ -132,6 +150,10 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
 
     public IFluidHandler getFluidHandler() {
         return fluidHandler;
+    }
+
+    public IItemHandler getItemHandler() {
+        return inventory;
     }
 
     public FluidTank getOrderTank() {
@@ -161,6 +183,8 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         for (EntropyOrbEntity orb : orbs) {
             be.tryCondense(orb);
         }
+
+        be.drainCell();
     }
 
     /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face
@@ -217,6 +241,81 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         setChanged();
     }
 
+    // -------------------------------------------------------------------------
+    // Cell slot draining (unpowered; see CrudeEntropyCondenserBlockEntity for the same logic)
+
+    private void drainCell() {
+        ItemStack stack = items.get(CELL_SLOT);
+        if (stack.isEmpty()) return;
+
+        if (stack.getItem() instanceof EntropyCellItem cellItem) {
+            drainSingleCell(stack, cellItem);
+        } else if (stack.getItem() instanceof DualEntropyCellItem) {
+            drainDualCell(stack);
+        }
+    }
+
+    private void drainSingleCell(ItemStack stack, EntropyCellItem cellItem) {
+        EntropyType type = cellItem.accepts(EntropyType.ORDER) ? EntropyType.ORDER : EntropyType.CHAOS;
+        BottleContents contents = EntropyCellItem.getContents(stack);
+        if (contents.amount() <= 0) return;
+
+        int drained = drainInto(type, contents.amount());
+        if (drained <= 0) return;
+
+        stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(contents.amount() - drained));
+        setChanged();
+    }
+
+    private void drainDualCell(ItemStack stack) {
+        EntropyContents contents = DualEntropyCellItem.getContents(stack);
+        int drainedOrder = drainInto(EntropyType.ORDER, contents.order());
+        int drainedChaos = drainInto(EntropyType.CHAOS, contents.chaos());
+        if (drainedOrder <= 0 && drainedChaos <= 0) return;
+
+        EntropyContents updated = contents
+                .with(EntropyType.ORDER, contents.order() - drainedOrder)
+                .with(EntropyType.CHAOS, contents.chaos() - drainedChaos);
+        stack.set(Registration.ENTROPY_CONTENTS.get(), updated);
+        setChanged();
+    }
+
+    /** Fills up to {@link #CELL_DRAIN_PER_TICK} of {@code type} into its tank, capped by both the
+     * cell's remaining contents and the tank's remaining space. Returns how much was actually drained. */
+    private int drainInto(EntropyType type, int available) {
+        if (available <= 0) return 0;
+
+        FluidTank tank = type == EntropyType.ORDER ? orderTank : chaosTank;
+        var fluid = type == EntropyType.ORDER ? Registration.ORDER_FLUID.get() : Registration.CHAOS_FLUID.get();
+
+        int spaceInTank = tank.getCapacity() - tank.getFluidAmount();
+        int amount = Math.min(CELL_DRAIN_PER_TICK, Math.min(available, spaceInTank));
+        if (amount <= 0) return 0;
+
+        tank.fill(new FluidStack(fluid, amount), IFluidHandler.FluidAction.EXECUTE);
+        return amount;
+    }
+
+    // -------------------------------------------------------------------------
+    // Container (single cell slot; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
+
+    @Override public int getContainerSize() { return items.size(); }
+    @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty(); }
+    @Override public ItemStack getItem(int slot) { return items.get(slot); }
+    @Override public ItemStack removeItem(int slot, int amount) {
+        ItemStack result = ContainerHelper.removeItem(items, slot, amount);
+        if (!result.isEmpty()) setChanged();
+        return result;
+    }
+    @Override public ItemStack removeItemNoUpdate(int slot) { return ContainerHelper.takeItem(items, slot); }
+    @Override public void setItem(int slot, ItemStack stack) {
+        items.set(slot, stack);
+        if (stack.getCount() > getMaxStackSize()) stack.setCount(getMaxStackSize());
+        setChanged();
+    }
+    @Override public boolean stillValid(Player player) { return Container.stillValidBlockEntity(this, player); }
+    @Override public void clearContent() { items.clear(); }
+
     @Override
     public Component getDisplayName() {
         return Component.translatable("block.temporalindustries.entropy_condenser");
@@ -234,6 +333,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         tag.putInt("Range", range);
+        ContainerHelper.saveAllItems(tag, items, registries);
     }
 
     @Override
@@ -243,5 +343,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements MenuProv
         if (tag.contains("OrderTank")) orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
         if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
         range = tag.contains("Range") ? Math.clamp(tag.getInt("Range"), MIN_RANGE, MAX_RANGE) : DEFAULT_RANGE;
+        items.clear();
+        ContainerHelper.loadAllItems(tag, items, registries);
     }
 }
