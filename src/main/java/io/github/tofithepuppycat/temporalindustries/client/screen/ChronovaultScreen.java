@@ -10,7 +10,7 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.menu.TimeMachineMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
@@ -22,10 +22,10 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** GUI for the Time Machine block: renders its chunk's commit graph (via {@link TimelineGraphWidget})
+/** GUI for the Chronovault block: renders its chunk's commit graph (via {@link TimelineGraphWidget})
  * and lets the player pick a point in time to jump to. */
 @SuppressWarnings("null")
-public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> {
+public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> {
     private static final ResourceLocation INVENTORY_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/timemachine.png");
     private static final int TEXTURE_WIDTH = 256;
     private static final int TEXTURE_HEIGHT = 256;
@@ -55,7 +55,7 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
     private Button showChangesButton;
     private int ticksSinceSync = 0;
 
-    public TimeMachineScreen(TimeMachineMenu menu, Inventory playerInventory, Component title) {
+    public ChronovaultScreen(ChronovaultMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = TEXTURE_WIDTH;
         imageHeight = TEXTURE_HEIGHT;
@@ -77,7 +77,7 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
             .build();
         addRenderableWidget(showChangesButton);
 
-        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.time_machine.jump"), btn -> jumpAndClose())
+        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.chronovault.jump"), btn -> jumpAndClose())
             .pos(groupX + buttonWidth + gap, buttonY)
             .size(buttonWidth, 20)
             .build();
@@ -137,8 +137,8 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
 
     private static Component showChangesLabel(boolean enabled) {
         return Component.translatable(enabled
-                ? "gui.temporalindustries.time_machine.hide_changes"
-                : "gui.temporalindustries.time_machine.show_changes");
+                ? "gui.temporalindustries.chronovault.hide_changes"
+                : "gui.temporalindustries.chronovault.show_changes");
     }
 
     private long getCurrentGameTime() {
@@ -274,17 +274,17 @@ public class TimeMachineScreen extends AbstractContainerScreen<TimeMachineMenu> 
         // Skip super.renderLabels() to avoid rendering inventory slot labels.
         // Our render() override skips AbstractContainerScreen's leftPos/topPos translate,
         // so coordinates here must be absolute (unlike vanilla renderLabels overrides).
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.time_machine"), leftPos + 8, topPos + 8, 0xFFFFFF, false);
+        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronovault"), leftPos + 8, topPos + 8, 0xFFFFFF, false);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.time_machine.preview_current", formatGameDayTime(now)), leftPos + 8, topPos + 200, 0xFFFFFF, false);
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), leftPos + 8, topPos + 200, 0xFFFFFF, false);
 
         if (TimelineProjectionManager.hasSelection()) {
             long selected = TimelineProjectionManager.getSelectedGameTime();
             long diff = selected - now;
             String direction = diff <= 0L
-                    ? "gui.temporalindustries.time_machine.preview_past"
-                    : "gui.temporalindustries.time_machine.preview_future";
+                    ? "gui.temporalindustries.chronovault.preview_past"
+                    : "gui.temporalindustries.chronovault.preview_future";
             guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), leftPos + 8, topPos + 210, 0xFFFFFF, false);
         }
     }

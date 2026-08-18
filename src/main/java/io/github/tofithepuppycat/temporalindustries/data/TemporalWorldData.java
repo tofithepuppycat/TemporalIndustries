@@ -55,7 +55,7 @@ public class TemporalWorldData extends SavedData {
     private int glueVersion = 0;
 
     // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> the set
-    // of owners currently claiming that chunk needs tracking (a TimeMachineBlockEntity/
+    // of owners currently claiming that chunk needs tracking (a ChronovaultBlockEntity/
     // ChronosphereBlockEntity keyed by its own BlockPos, or a held Portable ChronoMarker keyed by
     // the wielder's UUID). Owner-scoped rather than a plain boolean set so one owner letting go of
     // a chunk (auto-tracking toggled off, claim released, machine broken) can never silently stop

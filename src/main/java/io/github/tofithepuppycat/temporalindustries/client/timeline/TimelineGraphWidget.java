@@ -17,7 +17,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 /**
  * Renders and drives a machine's commit graph — node layout, pan/zoom, click-to-select, hover
  * tooltip — reading from {@link TimelineProjectionManager}. Shared by every screen that shows
- * "the same timeline view as the Time Machine" ({@code TimeMachineScreen}, {@code ChronosphereScreen}),
+ * "the same timeline view as the Chronovault" ({@code ChronovaultScreen}, {@code ChronosphereScreen}),
  * so the graph looks and behaves identically everywhere it appears; only the surrounding chrome
  * (energy bar, buttons, labels) is screen-specific.
  *

@@ -3,7 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import io.github.tofithepuppycat.temporalindustries.block.entity.TimeMachineBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
@@ -24,10 +24,10 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import com.mojang.serialization.MapCodec;
 
 @SuppressWarnings("null")
-public class TimeMachine extends BaseEntityBlock {
-    private static final MapCodec<TimeMachine> CODEC = simpleCodec(TimeMachine::new);
+public class Chronovault extends BaseEntityBlock {
+    private static final MapCodec<Chronovault> CODEC = simpleCodec(Chronovault::new);
 
-    public TimeMachine(Properties properties) {
+    public Chronovault(Properties properties) {
         super(properties);
     }
 
@@ -42,7 +42,7 @@ public class TimeMachine extends BaseEntityBlock {
     }
 
     /**
-     * A chunk's timeline is only meaningful relative to a single Time Machine's own rollback
+     * A chunk's timeline is only meaningful relative to a single Chronovault's own rollback
      * history (see TemporalTimeline) — a second machine tracking the same chunk would silently
      * fight over which one's checkouts actually apply to it. Refusing to place (or survive) here
      * keeps that 1:1 relationship intact, the same way vanilla blocks refuse to place where they
@@ -66,10 +66,10 @@ public class TimeMachine extends BaseEntityBlock {
         }
 
         BlockEntity blockEntity = level.getBlockEntity(blockPos);
-        if (blockEntity instanceof TimeMachineBlockEntity && player instanceof ServerPlayer) {
-            TimeMachineBlockEntity timeMachineBlockEntity = (TimeMachineBlockEntity) blockEntity;
+        if (blockEntity instanceof ChronovaultBlockEntity && player instanceof ServerPlayer) {
+            ChronovaultBlockEntity chronovaultBlockEntity = (ChronovaultBlockEntity) blockEntity;
             ServerPlayer serverPlayer = (ServerPlayer) player;
-            serverPlayer.openMenu(timeMachineBlockEntity, buf -> buf.writeBlockPos(blockPos));
+            serverPlayer.openMenu(chronovaultBlockEntity, buf -> buf.writeBlockPos(blockPos));
         }
 
         return InteractionResult.CONSUME;
@@ -78,12 +78,12 @@ public class TimeMachine extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return createTickerHelper(type, Registration.TIME_MACHINE_BLOCK_ENTITY.get(), TimeMachineBlockEntity::tick);
+        return createTickerHelper(type, Registration.CHRONOVAULT_BLOCK_ENTITY.get(), ChronovaultBlockEntity::tick);
     }
 
     @Nullable
     @Override
     public BlockEntity newBlockEntity(@NotNull BlockPos blockPos, @NotNull BlockState blockState) {
-        return new TimeMachineBlockEntity(blockPos, blockState);
+        return new ChronovaultBlockEntity(blockPos, blockState);
     }
 }

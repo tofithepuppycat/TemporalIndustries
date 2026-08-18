@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "temporalindustries:time_machine"
+          "name": "temporalindustries:chronovault"
         }
       ],
       "conditions": [

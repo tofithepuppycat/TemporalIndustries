@@ -32,7 +32,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import com.mojang.serialization.MapCodec;
 
 /**
- * The multi-chunk-tier time machine: like {@link TimeMachine}, its home chunk can't overlap
+ * The multi-chunk-tier time machine: like {@link Chronovault}, its home chunk can't overlap
  * another machine's tracked chunk (see canSurvive), but it can go on to additionally claim up to
  * a 5x5 area of chunks around itself (see {@link ChronosphereBlockEntity}), all moved together by
  * one jump and paid from one shared energy pool.

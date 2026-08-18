@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.function.Predicate;
 
 /**
- * Shared logic between {@link TimeMachineBlockEntity} (one tracked chunk) and
+ * Shared logic between {@link ChronovaultBlockEntity} (one tracked chunk) and
  * {@link ChronosphereBlockEntity} (up to 25, sharing one energy pool) — the two differ only in how
  * many chunks a jump touches ({@link #getAllChunks()}) and in their energy pool size; everything
  * else (energy storage plumbing, the placed/selected game time clamp, periodic re-snapshotting,
