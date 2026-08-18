@@ -1,6 +1,7 @@
 {
   "replace": false,
   "values": [
+    "minecraft:water",
     "minecraft:ice",
     "minecraft:packed_ice",
     "minecraft:blue_ice",
