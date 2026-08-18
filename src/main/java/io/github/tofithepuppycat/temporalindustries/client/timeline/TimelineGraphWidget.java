@@ -2,9 +2,11 @@ package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -39,14 +41,10 @@ public final class TimelineGraphWidget {
     private static final double MIN_COLUMN_GAP = 0.4D;
     private static final int BRANCH_X_OFFSET = 6;
 
-    // Whichever commit this chunk's live world currently reflects blinks: its own node pulses
-    // between its lane color and HEAD_HIGHLIGHT_RGB, rather than being ringed by a separate halo.
-    private static final int HEAD_HIGHLIGHT_RGB = 0xFFFFFF;
-    private static final long HEAD_BLINK_PERIOD_MS = 900L;
-    /** How far toward HEAD_HIGHLIGHT_RGB the head node's own color is pulled at the dimmest and
-     * brightest points of the blink. Never reaches 0 so the head stays identifiable mid-cycle. */
-    private static final float HEAD_BLINK_MIX_MIN = 0.15F;
-    private static final float HEAD_BLINK_MIX_MAX = 1.0F;
+    // Whichever commit this chunk's live world currently reflects is ringed by a static green
+    // halo, distinguishing it from the selected node's white highlight without any blinking.
+    private static final int HEAD_HALO_RGB = 0xFF33FF33;
+    private static final int HEAD_HALO_MARGIN = 2;
 
     private static final double MIN_ZOOM = 0.35D;
     private static final double MAX_ZOOM = 3.0D;
@@ -157,9 +155,6 @@ public final class TimelineGraphWidget {
         guiGraphics.enableScissor(graphX, graphY, graphX + graphWidth, graphY + graphHeight);
 
         long headCommitId = TimelineProjectionManager.getHeadCommitId();
-        double headBlinkPhase = (System.currentTimeMillis() % HEAD_BLINK_PERIOD_MS) / (double) HEAD_BLINK_PERIOD_MS;
-        float headBlinkMix = HEAD_BLINK_MIX_MIN + (HEAD_BLINK_MIX_MAX - HEAD_BLINK_MIX_MIN)
-                * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * headBlinkPhase));
 
         // Two passes so lines always render under labels.
         int r = nodeRadius();
@@ -195,14 +190,12 @@ public final class TimelineGraphWidget {
                 boolean selected = commit.getId() == TimelineProjectionManager.getSelectedCommitId();
                 boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
                 int color = selected ? 0xFFFFFFFF : laneColor;
-                if (commit.getId() == headCommitId) {
-                    // Always pulses from the LANE color, never from the selected white: blending
-                    // white toward white is a no-op, which would freeze the blink for exactly the
-                    // node most likely to be selected.
-                    color = mixColor(laneColor, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix);
-                }
 
                 int shapeRadius = commit.isSaveMarker() ? markerRadius(r) : r;
+
+                if (commit.getId() == headCommitId) {
+                    drawHeadHalo(guiGraphics, pointX, pointY, shapeRadius);
+                }
 
                 if (isBranch) {
                     // Branch points render as a hollow ring so a fork is visually distinct from a plain commit.
@@ -218,7 +211,7 @@ public final class TimelineGraphWidget {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
                 }
 
-                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius, laneColor));
+                renderedCommits.add(new RenderedCommit(commit, pointX, pointY, shapeRadius));
             }
         }
 
@@ -230,14 +223,13 @@ public final class TimelineGraphWidget {
             if (rc.commit.getId() != selectedCommitId) {
                 continue;
             }
-            // Keeps blinking when the selection happens to BE the head — repainting flat white here
-            // would otherwise freeze the pulse for exactly the node most likely to be selected.
-            int selectedColor = rc.commit.getId() == headCommitId
-                    ? mixColor(rc.laneColor, 0xFF000000 | HEAD_HIGHLIGHT_RGB, headBlinkMix)
-                    : 0xFFFFFFFF;
+            int selectedColor = 0xFFFFFFFF;
             // Drawn larger than its normal size too, on top of the recolor, so the selection is
             // obvious even when its color happens to be close to a neighboring lane's.
             int selectedRadius = selectedRadius(rc.hitRadius);
+            if (rc.commit.getId() == headCommitId) {
+                drawHeadHalo(guiGraphics, rc.x, rc.y, selectedRadius);
+            }
             if (rc.commit.getType() == TemporalCommit.Type.BRANCH) {
                 int outer = selectedRadius + 1;
                 int inner = Math.max(1, selectedRadius - 1);
@@ -278,6 +270,10 @@ public final class TimelineGraphWidget {
         forkOffsetById = new HashMap<>();
         Map<Long, Integer> childCountByParent = new HashMap<>();
         timelineIndexById.clear();
+        // Branch labels ("Beta Timeline", etc.) are only shown once that lineage actually has a
+        // node of its own — a bare checkout that never got followed by a commit shouldn't clutter
+        // the graph with a name for a branch nothing was ever recorded on.
+        Set<Long> pendingBranchLabelIds = new HashSet<>();
 
         long baseGameTime = commits.get(0).getGameTime();
         int nextRow = 1;
@@ -298,8 +294,16 @@ public final class TimelineGraphWidget {
                 timelineIndex = timelineIndexById.getOrDefault(localParentId, 0);
             }
             timelineIndexById.put(commit.getId(), timelineIndex);
-            if (isRoot || isBranch) {
+            if (isRoot) {
                 labelById.put(commit.getId(), GREEK_NAMES[timelineIndex % GREEK_NAMES.length] + " Timeline");
+            } else if (isBranch) {
+                labelById.put(commit.getId(), GREEK_NAMES[timelineIndex % GREEK_NAMES.length] + " Timeline");
+                pendingBranchLabelIds.add(commit.getId());
+            }
+            // A non-branch commit checked out onto this branch point means the branch is no longer
+            // an empty fork, so its label can stay.
+            if (!isRoot && !isBranch) {
+                pendingBranchLabelIds.remove(localParentId);
             }
 
             int row;
@@ -340,6 +344,10 @@ public final class TimelineGraphWidget {
             columnById.put(commit.getId(), column);
         }
 
+        for (Long stillEmptyBranchId : pendingBranchLabelIds) {
+            labelById.remove(stillEmptyBranchId);
+        }
+
         cachedLayoutCommits = commits;
     }
 
@@ -354,20 +362,17 @@ public final class TimelineGraphWidget {
     }
 
     /** Grows a node's normal on-screen radius for the selection redraw, so the selected node reads
-     * clearly even when its (white, or blink-mixed) color ends up close to a neighboring lane's. */
+     * clearly even when its (white) color ends up close to a neighboring lane's. */
     private static int selectedRadius(int baseRadius) {
         return baseRadius + Math.max(1, baseRadius / 2);
     }
 
-    /** Blends two opaque ARGB colors, mix=0 giving from and mix=1 giving to. Used to pulse the
-     * head node's own fill rather than drawing anything extra around it — a translucent overlay
-     * would just darken toward the black graph background instead of reading as a blink. */
-    private static int mixColor(int from, int to, float mix) {
-        float t = Math.max(0.0F, Math.min(1.0F, mix));
-        int r = Math.round(((from >> 16) & 0xFF) * (1.0F - t) + ((to >> 16) & 0xFF) * t);
-        int g = Math.round(((from >> 8) & 0xFF) * (1.0F - t) + ((to >> 8) & 0xFF) * t);
-        int b = Math.round((from & 0xFF) * (1.0F - t) + (to & 0xFF) * t);
-        return 0xFF000000 | (r << 16) | (g << 8) | b;
+    /** Draws a static green square behind a node, centered on (pointX, pointY) and sized bigger
+     * than its shape, so a margin of it shows around every shape (square, diamond, ring) as a
+     * halo marking whichever commit the live world currently reflects. */
+    private static void drawHeadHalo(GuiGraphics guiGraphics, int pointX, int pointY, int shapeRadius) {
+        int halo = shapeRadius + HEAD_HALO_MARGIN;
+        guiGraphics.fill(pointX - halo, pointY - halo, pointX + halo + 1, pointY + halo + 1, HEAD_HALO_RGB);
     }
 
     /** Draws a filled diamond (a plus-like rotated square) centered on (pointX, pointY), one
@@ -558,16 +563,12 @@ public final class TimelineGraphWidget {
         private final int x;
         private final int y;
         private final int hitRadius;
-        /** This node's lineage color, kept so the selected-node redraw pass can restart the head
-         * blink from it rather than from the selection's flat white (see render()). */
-        private final int laneColor;
 
-        private RenderedCommit(TemporalCommit commit, int x, int y, int hitRadius, int laneColor) {
+        private RenderedCommit(TemporalCommit commit, int x, int y, int hitRadius) {
             this.commit = commit;
             this.x = x;
             this.y = y;
             this.hitRadius = hitRadius;
-            this.laneColor = laneColor;
         }
     }
 }
