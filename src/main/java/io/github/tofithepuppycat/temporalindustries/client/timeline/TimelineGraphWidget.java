@@ -191,7 +191,7 @@ public final class TimelineGraphWidget {
                 boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
                 int color = selected ? 0xFFFFFFFF : laneColor;
 
-                int shapeRadius = commit.isSaveMarker() ? markerRadius(r) : r;
+                int shapeRadius = commit.isPlayerMarked() ? markerRadius(r) : r;
 
                 if (commit.getId() == headCommitId) {
                     drawHeadHalo(guiGraphics, pointX, pointY, shapeRadius);
@@ -203,8 +203,8 @@ public final class TimelineGraphWidget {
                     int inner = Math.max(1, r - 1);
                     guiGraphics.fill(pointX - outer, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
                     guiGraphics.fill(pointX - inner, pointY - inner, pointX + inner + 1, pointY + inner + 1, 0xFF000000);
-                } else if (commit.isSaveMarker()) {
-                    // Manual save points render as a diamond, distinct from an automatic commit's square —
+                } else if (commit.isPlayerMarked()) {
+                    // Player-marked commits render as a diamond, distinct from an automatic commit's square —
                     // enlarged relative to a plain node so a player-triggered save stands out on the graph.
                     drawDiamond(guiGraphics, pointX, pointY, shapeRadius, color);
                 } else {
@@ -235,7 +235,7 @@ public final class TimelineGraphWidget {
                 int inner = Math.max(1, selectedRadius - 1);
                 guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, selectedColor);
                 guiGraphics.fill(rc.x - inner, rc.y - inner, rc.x + inner + 1, rc.y + inner + 1, 0xFF000000);
-            } else if (rc.commit.isSaveMarker()) {
+            } else if (rc.commit.isPlayerMarked()) {
                 drawDiamond(guiGraphics, rc.x, rc.y, selectedRadius, selectedColor);
             } else {
                 guiGraphics.fill(rc.x - selectedRadius, rc.y - selectedRadius, rc.x + selectedRadius + 1, rc.y + selectedRadius + 1, selectedColor);
@@ -539,7 +539,9 @@ public final class TimelineGraphWidget {
             case BRANCH -> tooltip.add(Component.literal("Branch point"));
             case SNAPSHOT -> tooltip.add(Component.literal("Full snapshot"));
             case DELTA -> tooltip.add(Component.literal("Changes: " + commit.getTotalChangeCount()));
-            case SAVE_MARKER -> tooltip.add(Component.literal("Manual save point"));
+        }
+        if (commit.isPlayerMarked()) {
+            tooltip.add(Component.literal("Manual save point"));
         }
         OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.getId());
         if (jumpCost.isPresent()) {

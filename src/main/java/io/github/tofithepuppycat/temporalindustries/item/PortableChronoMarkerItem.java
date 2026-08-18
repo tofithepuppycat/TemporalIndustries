@@ -40,9 +40,9 @@ import java.util.UUID;
  * Machine/Chronosphere viewing that chunk exactly like an automatically tracked one. Unlike a
  * placed machine, the marker never registers continuous background tracking ({@link
  * TemporalWorldData#trackChunk}): it only ever touches the timeline at the moment of a save, from
- * two point-in-time captures, not from listening to every block change as it happens. A zero-diff
- * SAVE_MARKER commit rides alongside it purely so the graph can point out where the player
- * actually saved (see {@link TemporalTimeline#addSaveMarker}).
+ * two point-in-time captures, not from listening to every block change as it happens. The
+ * resulting DELTA/SNAPSHOT is flagged player-marked so the graph can point out where the player
+ * actually saved, without needing a separate zero-diff commit for it.
  *
  * <p>A plain right-click instantly marks the default square radius around the player. Sneak +
  * right-click instead opens {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronoMarkerMapScreen},
@@ -136,13 +136,10 @@ public class PortableChronoMarkerItem extends Item {
             if (delta != null) chunkDeltas.add(delta);
         }
 
-        if (!chunkDeltas.isEmpty()) timeline.addDelta(level.getGameTime(), chunkDeltas);
-        if (!chunkSnapshots.isEmpty()) timeline.addSnapshot(level.getGameTime(), chunkSnapshots);
-
-        // Purely cosmetic: flags where this save actually happened on the graph (see
-        // TimelineGraphWidget's diamond rendering) — the save itself is already captured by the
-        // DELTA/SNAPSHOT commit(s) above.
-        timeline.addSaveMarker(level.getGameTime(), chunks);
+        // Flagged player-marked so the graph renders these with the special mark icon (see
+        // TimelineGraphWidget's diamond rendering) instead of dropping a separate zero-diff commit.
+        if (!chunkDeltas.isEmpty()) timeline.addDelta(level.getGameTime(), chunkDeltas, true);
+        if (!chunkSnapshots.isEmpty()) timeline.addSnapshot(level.getGameTime(), chunkSnapshots, true);
         worldData.setDirty();
 
         player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.marked"), true);
