@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "temporalindustries:item/chrono_record"
+    "layer0": "temporalindustries:item/echo_record"
   }
 }
