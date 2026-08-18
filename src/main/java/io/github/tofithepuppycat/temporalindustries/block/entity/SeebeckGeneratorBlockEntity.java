@@ -49,7 +49,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
             Map.entry(Blocks.SOUL_FIRE, 500),
             Map.entry(Blocks.CAMPFIRE, 450),
             Map.entry(Blocks.SOUL_CAMPFIRE, 400),
-            Map.entry(Blocks.WATER, 50),
+            Map.entry(Blocks.WATER, -10),
             Map.entry(Blocks.SNOW_BLOCK, -300),
             Map.entry(Blocks.ICE, -400),
             Map.entry(Blocks.PACKED_ICE, -600),
