@@ -21,9 +21,9 @@ import java.util.List;
  * {@link io.github.tofithepuppycat.temporalindustries.client.EntropyContainerItemDecorator}.
  */
 @SuppressWarnings("null")
-public class EntropyContainerItem extends Item implements EntropyReceptacle {
+public class DualEntropyCellItem extends Item implements EntropyReceptacle {
 
-    public EntropyContainerItem(Properties properties) {
+    public DualEntropyCellItem(Properties properties) {
         super(properties);
     }
 
@@ -39,7 +39,7 @@ public class EntropyContainerItem extends Item implements EntropyReceptacle {
 
     /** Adds amount of type into stack, respecting capacity. Returns whatever didn't fit. */
     public static int insert(ItemStack stack, EntropyType type, int amount) {
-        if (!(stack.getItem() instanceof EntropyContainerItem) || amount <= 0) return amount;
+        if (!(stack.getItem() instanceof DualEntropyCellItem) || amount <= 0) return amount;
 
         EntropyContents contents = getContents(stack);
         int current = contents.amount(type);
@@ -57,9 +57,9 @@ public class EntropyContainerItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         EntropyContents contents = getContents(stack);
-        tooltip.add(Component.translatable("item.temporalindustries.entropy_container.order", contents.order(), EntropyContents.CAPACITY)
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", contents.order(), EntropyContents.CAPACITY)
                 .withStyle(ChatFormatting.WHITE));
-        tooltip.add(Component.translatable("item.temporalindustries.entropy_container.chaos", contents.chaos(), EntropyContents.CAPACITY)
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", contents.chaos(), EntropyContents.CAPACITY)
                 .withStyle(ChatFormatting.DARK_PURPLE));
     }
 }

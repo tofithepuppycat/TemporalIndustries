@@ -53,7 +53,7 @@ public class ClientModEvents {
     @SuppressWarnings("null")
     @SubscribeEvent
     public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
-        event.register(Registration.ENTROPY_CONTAINER_ITEM.get(), new EntropyContainerItemDecorator());
+        event.register(Registration.DUAL_ENTROPY_CELL_ITEM.get(), new EntropyContainerItemDecorator());
     }
 
     /** Drops the timeline/map client caches on logout — without this, a BlockPos from the world

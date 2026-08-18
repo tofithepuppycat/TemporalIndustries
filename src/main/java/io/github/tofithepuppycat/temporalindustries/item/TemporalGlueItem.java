@@ -38,7 +38,7 @@ import java.util.Optional;
  * existing glued region (there can be several overlapping) to delete every region along your sight line.
  * Regions are stored in {@link TemporalWorldData}, not on the item — the item only ever holds a
  * pending first corner, in its {@link DataComponents#CUSTOM_DATA}, mirroring
- * {@link ChronoRecordItem}'s per-stack storage. While held, both the pending corner and every known
+ * {@link EchoRecordItem}'s per-stack storage. While held, both the pending corner and every known
  * glued region are drawn by {@link io.github.tofithepuppycat.temporalindustries.client.GlueSelectionRenderer}
  * — see {@link GlueRegionRequestPacket}/{@link GlueRegionSyncPacket} for how the client learns
  * which regions exist.

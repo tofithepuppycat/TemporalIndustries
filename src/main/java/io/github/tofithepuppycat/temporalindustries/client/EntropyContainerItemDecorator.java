@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyContainerItem;
+import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.renderer.RenderType;
@@ -9,7 +9,7 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.IItemDecorator;
 
 /**
- * Draws two durability-like bars over an {@link EntropyContainerItem} in inventory slots: a white
+ * Draws two durability-like bars over a {@link DualEntropyCellItem} in inventory slots: a white
  * one for ORD (order) and a {@code #3E2A49} one for CHS (chaos), stacked like a mekanism gauge.
  */
 public class EntropyContainerItemDecorator implements IItemDecorator {
@@ -18,7 +18,7 @@ public class EntropyContainerItemDecorator implements IItemDecorator {
 
     @Override
     public boolean render(GuiGraphics guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {
-        EntropyContents contents = EntropyContainerItem.getContents(stack);
+        EntropyContents contents = DualEntropyCellItem.getContents(stack);
 
         int x = xOffset + 2;
         drawBar(guiGraphics, x, yOffset + 10, contents.order(), WHITE);

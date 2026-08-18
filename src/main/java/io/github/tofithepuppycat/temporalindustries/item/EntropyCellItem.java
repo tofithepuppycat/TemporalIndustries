@@ -13,15 +13,15 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.List;
 
 /**
- * Single-type entropy storage — the Order Bottle and Chaos Bottle from IDEAS.md, both instances of
- * this class distinguished by {@link #type}. Smaller capacity than {@link EntropyContainerItem}
+ * Single-type entropy storage — the Order Cell and Chaos Cell, both instances of
+ * this class distinguished by {@link #type}. Smaller capacity than {@link DualEntropyCellItem}
  * ({@link BottleContents#CAPACITY}) and only attracts/accepts orbs of its own type.
  */
 @SuppressWarnings("null")
-public class EntropyBottleItem extends Item implements EntropyReceptacle {
+public class EntropyCellItem extends Item implements EntropyReceptacle {
     private final EntropyType type;
 
-    public EntropyBottleItem(EntropyType type, Properties properties) {
+    public EntropyCellItem(EntropyType type, Properties properties) {
         super(properties);
         this.type = type;
     }
@@ -50,7 +50,7 @@ public class EntropyBottleItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         int amount = getContents(stack).amount();
-        String key = type == EntropyType.ORDER ? "item.temporalindustries.order_bottle.contents" : "item.temporalindustries.chaos_bottle.contents";
+        String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
         tooltip.add(Component.translatable(key, amount, BottleContents.CAPACITY).withStyle(color));
     }
