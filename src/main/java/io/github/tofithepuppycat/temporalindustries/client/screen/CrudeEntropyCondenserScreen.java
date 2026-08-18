@@ -91,6 +91,7 @@ public class CrudeEntropyCondenserScreen extends AbstractContainerScreen<CrudeEn
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        renderTooltip(guiGraphics, mouseX, mouseY);
 
         if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + BAR_Y)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getTankCapacity() + " mB Order"), mouseX, mouseY);
