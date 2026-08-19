@@ -2,12 +2,15 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -36,7 +39,7 @@ import java.util.function.Predicate;
  */
 @SuppressWarnings("null")
 public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
-        implements net.minecraft.world.MenuProvider, TimelineViewProvider {
+        implements net.minecraft.world.MenuProvider, TimelineViewProvider, EntropyInfoProvider {
     protected static final long UNSET_TIME = -1L;
 
     /** Entropy is a balance between ORD (0, order) and CHS ({@link #ENTROPY_MAX}, chaos), starting
@@ -120,6 +123,15 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     public int getEntropy() { return entropy; }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        return List.of(getDisplayName().copy().withStyle(ChatFormatting.WHITE));
+    }
+
+    @Override public boolean hasEntropyBalance() { return true; }
+    @Override public int getEntropyBalance() { return entropy; }
+    @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
 
     /** Every chunk a jump on this machine moves together — one for a Time Machine, up to 25 for a
      * Chronosphere. Home/primary chunk first. */
