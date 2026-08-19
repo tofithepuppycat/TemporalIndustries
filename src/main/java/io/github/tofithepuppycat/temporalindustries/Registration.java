@@ -70,7 +70,8 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
 public class Registration {
 
     // "Echo"-prefixed items get a dark cyan name; "Chrono"-prefixed items reuse vanilla EPIC (light purple).
-    public static final EnumProxy<Rarity> ECHO_RARITY = new EnumProxy<>(Rarity.class, "temporalindustries_echo", ChatFormatting.DARK_AQUA);
+    // See META-INF/enumextensions.json - the -1 is a placeholder for Rarity's id param, which FML fills in with the ordinal.
+    public static final EnumProxy<Rarity> ECHO_RARITY = new EnumProxy<>(Rarity.class, -1, MODID + ":echo", ChatFormatting.DARK_AQUA);
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
 
