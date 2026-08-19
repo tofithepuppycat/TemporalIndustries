@@ -1,0 +1,13 @@
+{
+  "entries": [
+    {
+      "enum": "net/minecraft/world/item/Rarity",
+      "name": "temporalindustries_echo",
+      "constructor": "(ILjava/lang/String;Lnet/minecraft/ChatFormatting;)V",
+      "parameters": {
+        "class": "io/github/tofithepuppycat/temporalindustries/Registration",
+        "field": "ECHO_RARITY"
+      }
+    }
+  ]
+}
