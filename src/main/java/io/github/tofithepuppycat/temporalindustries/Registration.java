@@ -24,7 +24,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyGogglesItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
@@ -118,16 +118,16 @@ public class Registration {
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
 
-    // --- Entropy Goggles: no defense, lets the wearer see EntropyInfoProvider block entities' state ---
+    // --- Entropy Glasses: no defense, lets the wearer see EntropyInfoProvider block entities' state ---
 
-    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ENTROPY_GOGGLES_MATERIAL = ARMOR_MATERIALS.register("entropy_goggles",
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ENTROPY_GLASSES_MATERIAL = ARMOR_MATERIALS.register("entropy_glasses",
             () -> new ArmorMaterial(Map.of(ArmorItem.Type.HELMET, 0), 9, SoundEvents.ARMOR_EQUIP_LEATHER,
                     () -> Ingredient.of(net.minecraft.world.item.Items.GLASS),
-                    List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_goggles"))),
+                    List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_glasses"))),
                     0.0F, 0.0F));
 
-    public static final DeferredItem<Item> ENTROPY_GOGGLES_ITEM = ITEMS.register("entropy_goggles",
-            () -> new EntropyGogglesItem(ENTROPY_GOGGLES_MATERIAL, ArmorItem.Type.HELMET,
+    public static final DeferredItem<Item> ENTROPY_GLASSES_ITEM = ITEMS.register("entropy_glasses",
+            () -> new EntropyGlassesItem(ENTROPY_GLASSES_MATERIAL, ArmorItem.Type.HELMET,
                     new Item.Properties().stacksTo(1)));
 
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
@@ -293,7 +293,7 @@ public class Registration {
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
-                        output.accept(ENTROPY_GOGGLES_ITEM);
+                        output.accept(ENTROPY_GLASSES_ITEM);
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);
                         output.accept(CHAOS_CELL_ITEM);
