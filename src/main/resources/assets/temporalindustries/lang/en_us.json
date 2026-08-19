@@ -94,5 +94,11 @@
 	"fluid.temporalindustries.order_fluid": "Order",
 	"fluid.temporalindustries.chaos_fluid": "Chaos",
 	"block.temporalindustries.entropy_condenser": "Entropy Condenser",
-	"block.temporalindustries.crude_entropy_condenser": "Crude Entropy Condenser"
+	"block.temporalindustries.crude_entropy_condenser": "Crude Entropy Condenser",
+	"item.temporalindustries.entropy_goggles": "Entropy Goggles",
+	"item.temporalindustries.entropy_goggles.tooltip": "Worn on the head. Shows entropy info about the block you're looking at.",
+	"overlay.temporalindustries.entropy_goggles.order": "Order: %s / %s mB",
+	"overlay.temporalindustries.entropy_goggles.chaos": "Chaos: %s / %s mB",
+	"overlay.temporalindustries.entropy_goggles.schrodingers_box.generating": "Generating Chaos",
+	"overlay.temporalindustries.entropy_goggles.schrodingers_box.empty": "Empty"
 }
