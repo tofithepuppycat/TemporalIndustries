@@ -16,6 +16,9 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.Container;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
@@ -24,9 +27,11 @@ import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
+import org.jetbrains.annotations.Nullable;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -174,9 +179,9 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     public List<Component> getEntropyTooltip() {
         return List.of(
                 getDisplayName().copy().withStyle(ChatFormatting.WHITE),
-                Component.translatable("overlay.temporalindustries.entropy_goggles.order",
+                Component.translatable("overlay.temporalindustries.entropy_glasses.order",
                         orderTank.getFluidAmount(), orderTank.getCapacity()).withStyle(ChatFormatting.GRAY),
-                Component.translatable("overlay.temporalindustries.entropy_goggles.chaos",
+                Component.translatable("overlay.temporalindustries.entropy_glasses.chaos",
                         chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
     }
 
@@ -253,6 +258,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         energyStorage.consumeInternal(feCost, false);
         orb.discard();
         setChanged();
+        syncToClients();
     }
 
     // -------------------------------------------------------------------------
@@ -279,6 +285,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
 
         stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(contents.amount() - drained));
         setChanged();
+        syncToClients();
     }
 
     private void drainDualCell(ItemStack stack) {
@@ -292,6 +299,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
                 .with(EntropyType.CHAOS, contents.chaos() - drainedChaos);
         stack.set(Registration.ENTROPY_CONTENTS.get(), updated);
         setChanged();
+        syncToClients();
     }
 
     /** Fills up to {@link #CELL_DRAIN_PER_TICK} of {@code type} into its tank, capped by both the
@@ -308,6 +316,31 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
 
         tank.fill(new FluidStack(fluid, amount), IFluidHandler.FluidAction.EXECUTE);
         return amount;
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     // -------------------------------------------------------------------------
