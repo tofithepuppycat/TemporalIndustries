@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.client.DeltaTracker;
@@ -16,12 +17,14 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
+import net.neoforged.fml.ModList;
 
 import java.util.List;
 
 /** Draws the block the player is looking at's entropy info above the hotbar, on a vanilla
- * tooltip-style background, while Entropy Glasses are worn in the helmet slot. See
- * EntropyInfoProvider for which block entities report info. */
+ * tooltip-style background, while Entropy Glasses are worn in the helmet slot -- or, if Curios is
+ * installed, its head slot (see CuriosCompat). See EntropyInfoProvider for which block entities
+ * report info. */
 public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
@@ -40,7 +43,7 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         if (minecraft.options.hideGui) return;
 
         Player player = minecraft.player;
-        if (player == null || !player.getItemBySlot(EquipmentSlot.HEAD).is(Registration.ENTROPY_GLASSES_ITEM.get())) return;
+        if (player == null || !isWearingEntropyGlasses(player)) return;
 
         Level level = minecraft.level;
         if (level == null || !(minecraft.hitResult instanceof BlockHitResult blockHit) || blockHit.getType() != HitResult.Type.BLOCK) return;
@@ -86,6 +89,11 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
 
             drawCenteredLine(guiGraphics, font, balanceText, centerX, y);
         }
+    }
+
+    private static boolean isWearingEntropyGlasses(Player player) {
+        if (player.getItemBySlot(EquipmentSlot.HEAD).is(Registration.ENTROPY_GLASSES_ITEM.get())) return true;
+        return ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player);
     }
 
     private static int drawCenteredLine(GuiGraphics guiGraphics, Font font, Component line, int centerX, int y) {

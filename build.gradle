@@ -36,6 +36,23 @@ repositories {
         name = "blamejared"
         url = "https://maven.blamejared.com"
     }
+    // Curios' maven, used below to compile against its optional API and pull it into the
+    // dev/test environment.
+    maven {
+        name = "curios"
+        url = "https://maven.theillusivec4.top/"
+    }
+    // Create's maven (also hosts Flywheel and Ponder), used below to pull Create into the
+    // dev/test environment only.
+    maven {
+        name = "createmod"
+        url = "https://maven.createmod.net"
+    }
+    // Registrate's maven, a Create dependency, used below to pull it into the dev/test environment only.
+    maven {
+        name = "ithundxr"
+        url = "https://maven.ithundxr.dev/snapshots"
+    }
     // Modrinth's maven, used below to pull Jade into the dev/test environment and as an API
     // dependency for the Jade integration (see client/jade). Restricted to maven.modrinth so it
     // doesn't shadow other repos' artifacts of the same name.
@@ -143,6 +160,22 @@ dependencies {
     // actually exercise it. No dependency on it is published with the built mod.
     compileOnly "maven.modrinth:jade:${jade_version}"
     localRuntime "maven.modrinth:jade:${jade_version}"
+
+    // Curios: an optional dependency (see neoforge.mods.toml), compiled against its API so
+    // Entropy Glasses can also be worn in Curios' head slot (see compat/curios/CuriosCompat),
+    // and pulled into the dev/test environment via localRuntime so runClient/runServer can
+    // actually exercise it. No dependency on it is published with the built mod.
+    compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
+    localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
+
+    // Create (plus its Ponder/Flywheel/Registrate dependencies), for the dev/test environment
+    // only: no integration is implemented against it, it's just available in-game via
+    // runClient/runServer for cross-mod testing. Not compiled against, so it's localRuntime
+    // rather than implementation -- no dependency is published on it with the built mod.
+    localRuntime "com.simibubi.create:create-${minecraft_version}:${create_version}"
+    localRuntime "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
+    localRuntime "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
+    localRuntime "com.tterrag.registrate:Registrate:${registrate_version}"
 
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
