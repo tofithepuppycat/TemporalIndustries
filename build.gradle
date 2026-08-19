@@ -171,8 +171,13 @@ dependencies {
     // Create (plus its Ponder/Flywheel/Registrate dependencies), for the dev/test environment
     // only: no integration is implemented against it, it's just available in-game via
     // runClient/runServer for cross-mod testing. Not compiled against, so it's localRuntime
-    // rather than implementation -- no dependency is published on it with the built mod.
-    localRuntime "com.simibubi.create:create-${minecraft_version}:${create_version}"
+    // rather than implementation -- no dependency is published on it with the built mod. Uses the
+    // "slim" jar (isTransitive = false) since the full jar's POM pulls in dependencies for
+    // Create's own optional compat modules (FTB Chunks/Teams/Library, JourneyMap, CC: Tweaked,
+    // Architectury, ...), several of which fail to resolve without their own maven repos.
+    localRuntime("com.simibubi.create:create-${minecraft_version}:${create_version}:slim") {
+        transitive = false
+    }
     localRuntime "net.createmod.ponder:ponder-neoforge:${ponder_version}+mc${minecraft_version}"
     localRuntime "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
     localRuntime "com.tterrag.registrate:Registrate:${registrate_version}"
