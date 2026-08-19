@@ -63,8 +63,8 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.HOTBAR,
-                ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_goggles_overlay"),
-                EntropyGogglesOverlay.INSTANCE);
+                ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_glasses_overlay"),
+                EntropyGlassesOverlay.INSTANCE);
     }
 
     /** Drops the timeline/map client caches on logout — without this, a BlockPos from the world
