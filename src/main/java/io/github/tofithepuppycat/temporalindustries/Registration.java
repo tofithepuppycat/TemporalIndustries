@@ -128,7 +128,7 @@ public class Registration {
 
     public static final DeferredItem<Item> ENTROPY_GOGGLES_ITEM = ITEMS.register("entropy_goggles",
             () -> new EntropyGogglesItem(ENTROPY_GOGGLES_MATERIAL, ArmorItem.Type.HELMET,
-                    new Item.Properties().stacksTo(1).durability(ArmorItem.Type.HELMET.getDurability(15))));
+                    new Item.Properties().stacksTo(1)));
 
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
