@@ -1,8 +1,10 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -18,6 +20,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.List;
+
 /**
  * Early-game passive CHS generator: while it holds a captured mob (see
  * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem}), it periodically
@@ -28,7 +32,7 @@ import org.jetbrains.annotations.Nullable;
  * the mob.
  */
 @SuppressWarnings("null")
-public class SchrodingersBoxBlockEntity extends BlockEntity {
+public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyInfoProvider {
     // Interval halved and CHS_PER_INTERVAL halved to match, so the box drops orbs twice as often
     // without producing chaos any faster overall; chsAccumulator carries the fractional remainder
     // between checks since an orb can't be spawned with a value below 1.
@@ -45,6 +49,13 @@ public class SchrodingersBoxBlockEntity extends BlockEntity {
 
     public boolean isOccupied() {
         return capturedTypeId != null;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        return List.of(isOccupied()
+                ? Component.translatable("overlay.temporalindustries.entropy_goggles.schrodingers_box.generating").withStyle(ChatFormatting.DARK_PURPLE)
+                : Component.translatable("overlay.temporalindustries.entropy_goggles.schrodingers_box.empty").withStyle(ChatFormatting.GRAY));
     }
 
     public void capture(ResourceLocation typeId, @Nullable Component name) {
