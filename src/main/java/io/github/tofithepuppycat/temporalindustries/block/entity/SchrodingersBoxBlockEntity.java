@@ -10,11 +10,15 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
@@ -54,14 +58,15 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
     @Override
     public List<Component> getEntropyTooltip() {
         return List.of(isOccupied()
-                ? Component.translatable("overlay.temporalindustries.entropy_goggles.schrodingers_box.generating").withStyle(ChatFormatting.DARK_PURPLE)
-                : Component.translatable("overlay.temporalindustries.entropy_goggles.schrodingers_box.empty").withStyle(ChatFormatting.GRAY));
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.schrodingers_box.generating").withStyle(ChatFormatting.DARK_PURPLE)
+                : Component.translatable("overlay.temporalindustries.entropy_glasses.schrodingers_box.empty").withStyle(ChatFormatting.GRAY));
     }
 
     public void capture(ResourceLocation typeId, @Nullable Component name) {
         this.capturedTypeId = typeId;
         this.capturedName = name;
         setChanged();
+        syncToClients();
     }
 
     /** Spawns the stored mob back into the world above this block and clears the capture, if any. */
@@ -78,6 +83,32 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
         capturedTypeId = null;
         capturedName = null;
         setChanged();
+        syncToClients();
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, SchrodingersBoxBlockEntity be) {
