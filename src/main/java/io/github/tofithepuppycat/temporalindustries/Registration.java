@@ -24,6 +24,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyGogglesItem;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
@@ -40,11 +41,16 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.item.ArmorItem;
+import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
+import net.minecraft.world.item.crafting.Ingredient;
 import net.neoforged.fml.common.asm.enumextension.EnumProxy;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -66,6 +72,9 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
+import java.util.List;
+import java.util.Map;
+
 @SuppressWarnings("null")
 public class Registration {
 
@@ -83,6 +92,7 @@ public class Registration {
     public static final DeferredRegister<FluidType> FLUID_TYPES = DeferredRegister.create(NeoForgeRegistries.Keys.FLUID_TYPES, MODID);
     public static final DeferredRegister<Fluid> FLUIDS = DeferredRegister.create(Registries.FLUID, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
+    public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS = DeferredRegister.create(Registries.ARMOR_MATERIAL, MODID);
 
     public static final DeferredBlock<Chronovault> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
             () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -107,6 +117,18 @@ public class Registration {
 
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
+
+    // --- Entropy Goggles: no defense, lets the wearer see EntropyInfoProvider block entities' state ---
+
+    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ENTROPY_GOGGLES_MATERIAL = ARMOR_MATERIALS.register("entropy_goggles",
+            () -> new ArmorMaterial(Map.of(ArmorItem.Type.HELMET, 0), 9, SoundEvents.ARMOR_EQUIP_LEATHER,
+                    () -> Ingredient.of(net.minecraft.world.item.Items.GLASS),
+                    List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_goggles"))),
+                    0.0F, 0.0F));
+
+    public static final DeferredItem<Item> ENTROPY_GOGGLES_ITEM = ITEMS.register("entropy_goggles",
+            () -> new EntropyGogglesItem(ENTROPY_GOGGLES_MATERIAL, ArmorItem.Type.HELMET,
+                    new Item.Properties().stacksTo(1).durability(ArmorItem.Type.HELMET.getDurability(15))));
 
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
@@ -271,6 +293,7 @@ public class Registration {
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
+                        output.accept(ENTROPY_GOGGLES_ITEM);
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);
                         output.accept(CHAOS_CELL_ITEM);
@@ -289,6 +312,7 @@ public class Registration {
         FLUID_TYPES.register(modEventBus);
         FLUIDS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
+        ARMOR_MATERIALS.register(modEventBus);
     }
 
     static void registerCapabilities(RegisterCapabilitiesEvent event) {

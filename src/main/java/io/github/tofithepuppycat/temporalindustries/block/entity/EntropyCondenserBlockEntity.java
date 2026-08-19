@@ -3,11 +3,13 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
@@ -46,7 +48,7 @@ import static io.github.tofithepuppycat.temporalindustries.block.EntropyCondense
  * way {@link CrudeEntropyCondenserBlockEntity} works, for topping tanks off by hand.
  */
 @SuppressWarnings("null")
-public class EntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider {
+public class EntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
     private static final int ENERGY_CAPACITY = 50_000;
     private static final int ENERGY_MAX_RECEIVE = 500;
 
@@ -166,6 +168,16 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
 
     public int getRange() {
         return range;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        return List.of(
+                getDisplayName().copy().withStyle(ChatFormatting.WHITE),
+                Component.translatable("overlay.temporalindustries.entropy_goggles.order",
+                        orderTank.getFluidAmount(), orderTank.getCapacity()).withStyle(ChatFormatting.GRAY),
+                Component.translatable("overlay.temporalindustries.entropy_goggles.chaos",
+                        chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
     }
 
     public void setRange(int range) {
