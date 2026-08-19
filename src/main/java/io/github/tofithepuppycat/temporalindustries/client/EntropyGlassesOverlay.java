@@ -8,6 +8,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.LayeredDraw;
+import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
@@ -18,18 +19,20 @@ import net.minecraft.world.phys.HitResult;
 
 import java.util.List;
 
-/** Draws the block the player is looking at's entropy info above the hotbar, while Entropy Goggles
- * are worn in the helmet slot. See EntropyInfoProvider for which block entities report info. */
-public final class EntropyGogglesOverlay implements LayeredDraw.Layer {
-    public static final EntropyGogglesOverlay INSTANCE = new EntropyGogglesOverlay();
+/** Draws the block the player is looking at's entropy info above the hotbar, on a vanilla
+ * tooltip-style background, while Entropy Glasses are worn in the helmet slot. See
+ * EntropyInfoProvider for which block entities report info. */
+public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
+    public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
     /** Mirrors the bidirectional balance bar drawn by ChronosphereScreen/ChronovaultScreen. */
     private static final int BAR_WIDTH = 60;
     private static final int BAR_HEIGHT = 8;
+    private static final int LINE_GAP = 2;
     private static final int COLOR_ORDER_BAR = 0xFF000000 | EntropyType.ORDER.color();
     private static final int COLOR_CHAOS_BAR = 0xFF000000 | EntropyType.CHAOS.color();
 
-    private EntropyGogglesOverlay() {}
+    private EntropyGlassesOverlay() {}
 
     @Override
     public void render(GuiGraphics guiGraphics, DeltaTracker deltaTracker) {
@@ -37,7 +40,7 @@ public final class EntropyGogglesOverlay implements LayeredDraw.Layer {
         if (minecraft.options.hideGui) return;
 
         Player player = minecraft.player;
-        if (player == null || !player.getItemBySlot(EquipmentSlot.HEAD).is(Registration.ENTROPY_GOGGLES_ITEM.get())) return;
+        if (player == null || !player.getItemBySlot(EquipmentSlot.HEAD).is(Registration.ENTROPY_GLASSES_ITEM.get())) return;
 
         Level level = minecraft.level;
         if (level == null || !(minecraft.hitResult instanceof BlockHitResult blockHit) || blockHit.getType() != HitResult.Type.BLOCK) return;
@@ -46,31 +49,50 @@ public final class EntropyGogglesOverlay implements LayeredDraw.Layer {
         if (!(blockEntity instanceof EntropyInfoProvider provider)) return;
 
         List<Component> lines = provider.getEntropyTooltip();
-        if (lines.isEmpty() && !provider.hasEntropyBalance()) return;
+        boolean hasBalance = provider.hasEntropyBalance();
+        if (lines.isEmpty() && !hasBalance) return;
 
         Font font = minecraft.font;
-        int y = guiGraphics.guiHeight() / 2 - 60;
+        Component balanceText = hasBalance
+                ? entropyBalanceText(provider.getEntropyBalance(), provider.getEntropyBalanceMax())
+                : null;
+
+        int contentWidth = BAR_WIDTH;
+        for (Component line : lines) contentWidth = Math.max(contentWidth, font.width(line));
+        if (balanceText != null) contentWidth = Math.max(contentWidth, font.width(balanceText));
+
+        int contentHeight = lines.size() * (font.lineHeight + LINE_GAP);
+        if (hasBalance) contentHeight += BAR_HEIGHT + 3 + font.lineHeight + LINE_GAP;
+        contentHeight -= LINE_GAP;
+
+        int centerX = guiGraphics.guiWidth() / 2;
+        int top = guiGraphics.guiHeight() / 2 - 60;
+        int left = centerX - contentWidth / 2;
+
+        TooltipRenderUtil.renderTooltipBackground(guiGraphics, left, top, contentWidth, contentHeight, 0);
+
+        int y = top;
         for (Component line : lines) {
-            y = drawCenteredLine(guiGraphics, font, line, y);
+            y = drawCenteredLine(guiGraphics, font, line, centerX, y);
         }
 
-        if (provider.hasEntropyBalance()) {
+        if (hasBalance) {
             int entropy = provider.getEntropyBalance();
             int max = provider.getEntropyBalanceMax();
 
-            int barX = (guiGraphics.guiWidth() - BAR_WIDTH) / 2;
+            int barX = centerX - BAR_WIDTH / 2;
             renderEntropyBar(guiGraphics, barX, y, entropy, max);
             y += BAR_HEIGHT + 3;
 
-            drawCenteredLine(guiGraphics, font, entropyBalanceText(entropy, max), y);
+            drawCenteredLine(guiGraphics, font, balanceText, centerX, y);
         }
     }
 
-    private static int drawCenteredLine(GuiGraphics guiGraphics, Font font, Component line, int y) {
+    private static int drawCenteredLine(GuiGraphics guiGraphics, Font font, Component line, int centerX, int y) {
         int width = font.width(line);
-        int x = (guiGraphics.guiWidth() - width) / 2;
-        guiGraphics.drawStringWithBackdrop(font, line, x, y, width, 0xFFFFFF);
-        return y + font.lineHeight + 2;
+        int x = centerX - width / 2;
+        guiGraphics.drawString(font, line, x, y, 0xFFFFFF);
+        return y + font.lineHeight + LINE_GAP;
     }
 
     /** Bidirectional order<->chaos balance bar: fills from the center tick outward, white toward

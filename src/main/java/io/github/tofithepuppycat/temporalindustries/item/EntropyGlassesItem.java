@@ -12,14 +12,14 @@ import net.minecraft.world.item.TooltipFlag;
 import java.util.List;
 
 /** Worn in the helmet slot; grants no defense, only lets the wearer see entropy info about the block
- * they're looking at (see EntropyGogglesOverlay client-side and EntropyInfoProvider on block entities). */
-public class EntropyGogglesItem extends ArmorItem {
-    public EntropyGogglesItem(Holder<ArmorMaterial> material, Type type, Properties properties) {
+ * they're looking at (see EntropyGlassesOverlay client-side and EntropyInfoProvider on block entities). */
+public class EntropyGlassesItem extends ArmorItem {
+    public EntropyGlassesItem(Holder<ArmorMaterial> material, Type type, Properties properties) {
         super(material, type, properties);
     }
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.temporalindustries.entropy_goggles.tooltip").withStyle(ChatFormatting.GRAY));
+        tooltip.add(Component.translatable("item.temporalindustries.entropy_glasses.tooltip").withStyle(ChatFormatting.GRAY));
     }
 }
