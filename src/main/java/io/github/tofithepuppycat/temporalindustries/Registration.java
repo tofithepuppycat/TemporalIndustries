@@ -33,6 +33,7 @@ import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.world.entity.EntityType;
@@ -43,6 +44,8 @@ import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.Rarity;
+import net.neoforged.fml.common.asm.enumextension.EnumProxy;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SoundType;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -66,6 +69,9 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
 @SuppressWarnings("null")
 public class Registration {
 
+    // "Echo"-prefixed items get a dark cyan name; "Chrono"-prefixed items reuse vanilla EPIC (light purple).
+    public static final EnumProxy<Rarity> ECHO_RARITY = new EnumProxy<>(Rarity.class, "temporalindustries_echo", ChatFormatting.DARK_AQUA);
+
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
 
     public static final DeferredRegister.Items ITEMS = DeferredRegister.createItems(MODID);
@@ -81,7 +87,7 @@ public class Registration {
             () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CHRONOVAULT_ITEM = ITEMS.register("chronovault",
-            () -> new BlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties()));
+            () -> new BlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> TEMPORAL_ANCHOR_ITEM = ITEMS.register("temporal_anchor",
             () -> new TemporalAnchorItem(new Item.Properties().stacksTo(1)));
@@ -90,13 +96,13 @@ public class Registration {
             () -> new EchoProjector(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 3)));
 
     public static final DeferredItem<Item> ECHO_PROJECTOR_ITEM = ITEMS.register("echo_projector",
-            () -> new BlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties()));
+            () -> new BlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties().rarity(ECHO_RARITY.getValue())));
 
     public static final DeferredItem<Item> ECHO_RECORD_ITEM = ITEMS.register("echo_record",
-            () -> new EchoRecordItem(new Item.Properties().stacksTo(1)));
+            () -> new EchoRecordItem(new Item.Properties().stacksTo(1).rarity(ECHO_RARITY.getValue())));
 
     public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
-            () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1)));
+            () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
@@ -105,13 +111,13 @@ public class Registration {
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CHRONODIAL_ITEM = ITEMS.register("chronodial",
-            () -> new BlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties()));
+            () -> new BlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredBlock<Chronosphere> CHRONOSPHERE_BLOCK = BLOCKS.register("chronosphere",
             () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
-            () -> new BlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties()));
+            () -> new BlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> DUAL_ENTROPY_CELL_ITEM = ITEMS.register("dual_entropy_cell",
             () -> new DualEntropyCellItem(new Item.Properties().stacksTo(1)));
