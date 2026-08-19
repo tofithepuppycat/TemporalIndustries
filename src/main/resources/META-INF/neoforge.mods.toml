@@ -56,6 +56,9 @@ description='''${mod_description}'''
 #[[accessTransformers]]
 #file="META-INF/accesstransformer.cfg"
 
+# Path (relative to the mod file root) to a JSON file declaring custom entries to inject into vanilla/library enums.
+enumExtensions="META-INF/enumextensions.json"
+
 # The coremods config file path is not configurable and is always loaded from META-INF/coremods.json
 
 # A dependency - use the . to indicate dependency for a specific modid. Dependencies are optional.
