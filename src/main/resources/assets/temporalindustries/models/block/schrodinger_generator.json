@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:block/cube_all",
   "textures": {
-    "all": "temporalindustries:block/schrodingers_box"
+    "all": "temporalindustries:block/schrodinger_generator"
   }
 }

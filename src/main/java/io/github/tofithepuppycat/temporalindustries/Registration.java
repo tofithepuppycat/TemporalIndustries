@@ -6,7 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
-import io.github.tofithepuppycat.temporalindustries.block.SchrodingersBox;
+import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
@@ -14,7 +14,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlock
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingersBoxBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
@@ -27,7 +27,7 @@ import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
-import io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem;
+import io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
@@ -164,11 +164,11 @@ public class Registration {
             () -> EntityType.Builder.<EntropyOrbEntity>of(EntropyOrbEntity::new, MobCategory.MISC)
                     .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).fireImmune().build("entropy_orb"));
 
-    public static final DeferredBlock<SchrodingersBox> SCHRODINGERS_BOX_BLOCK = BLOCKS.register("schrodingers_box",
-            () -> new SchrodingersBox(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD)));
+    public static final DeferredBlock<SchrodingerGenerator> SCHRODINGER_GENERATOR_BLOCK = BLOCKS.register("schrodinger_generator",
+            () -> new SchrodingerGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD)));
 
-    public static final DeferredItem<Item> SCHRODINGERS_BOX_ITEM = ITEMS.register("schrodingers_box",
-            () -> new SchrodingersBoxItem(SCHRODINGERS_BOX_BLOCK.get(), new Item.Properties().stacksTo(1)));
+    public static final DeferredItem<Item> SCHRODINGER_GENERATOR_ITEM = ITEMS.register("schrodinger_generator",
+            () -> new SchrodingerGeneratorItem(SCHRODINGER_GENERATOR_BLOCK.get(), new Item.Properties().stacksTo(1)));
 
     public static final DeferredBlock<SeebeckGenerator> SEEBECK_GENERATOR_BLOCK = BLOCKS.register("seebeck_generator",
             () -> new SeebeckGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -252,8 +252,8 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOSPHERE_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronosphere",
             () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOSPHERE_BLOCK.get()).build(null));
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SchrodingersBoxBlockEntity>> SCHRODINGERS_BOX_BLOCK_ENTITY = BLOCK_ENTITIES.register("schrodingers_box",
-            () -> BlockEntityType.Builder.of(SchrodingersBoxBlockEntity::new, SCHRODINGERS_BOX_BLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SchrodingerGeneratorBlockEntity>> SCHRODINGER_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("schrodinger_generator",
+            () -> BlockEntityType.Builder.of(SchrodingerGeneratorBlockEntity::new, SCHRODINGER_GENERATOR_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SeebeckGeneratorBlockEntity>> SEEBECK_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("seebeck_generator",
             () -> BlockEntityType.Builder.of(SeebeckGeneratorBlockEntity::new, SEEBECK_GENERATOR_BLOCK.get()).build(null));
@@ -285,7 +285,7 @@ public class Registration {
                         output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(CHRONODIAL_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
-                        output.accept(SCHRODINGERS_BOX_ITEM);
+                        output.accept(SCHRODINGER_GENERATOR_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
@@ -327,6 +327,8 @@ public class Registration {
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONOSPHERE_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, SEEBECK_GENERATOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getEnergyStorage());
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, SCHRODINGER_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
