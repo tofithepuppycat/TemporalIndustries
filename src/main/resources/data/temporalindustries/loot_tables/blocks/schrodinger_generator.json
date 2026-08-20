@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "temporalindustries:schrodingers_box"
+          "name": "temporalindustries:schrodinger_generator"
         }
       ],
       "conditions": [
