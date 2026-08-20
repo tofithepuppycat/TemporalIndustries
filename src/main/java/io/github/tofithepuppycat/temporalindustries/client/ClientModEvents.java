@@ -58,6 +58,8 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
         event.register(Registration.DUAL_ENTROPY_CELL_ITEM.get(), new EntropyContainerItemDecorator());
+        event.register(Registration.ORDER_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.ORDER));
+        event.register(Registration.CHAOS_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.CHAOS));
     }
 
     @SubscribeEvent
