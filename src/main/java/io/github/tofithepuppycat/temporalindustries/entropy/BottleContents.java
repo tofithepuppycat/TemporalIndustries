@@ -8,7 +8,7 @@ import net.minecraft.network.codec.StreamCodec;
 /** How much of a single {@link EntropyType} an Order/Chaos Bottle is holding, stored as a data component on the stack. */
 public record BottleContents(int amount) {
     public static final BottleContents EMPTY = new BottleContents(0);
-    public static final int CAPACITY = 4_000;
+    public static final int CAPACITY = 100;
 
     public static final Codec<BottleContents> CODEC = Codec.INT.xmap(BottleContents::new, BottleContents::amount);
 

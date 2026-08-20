@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.client;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.client.DeltaTracker;
@@ -21,10 +22,10 @@ import net.neoforged.fml.ModList;
 
 import java.util.List;
 
-/** Draws the block the player is looking at's entropy info above the hotbar, on a vanilla
- * tooltip-style background, while Entropy Glasses are worn in the helmet slot -- or, if Curios is
- * installed, its head slot (see CuriosCompat). See EntropyInfoProvider for which block entities
- * report info. */
+/** Draws the block the player is looking at's entropy info to the right of the crosshair, on a
+ * vanilla tooltip-style background, while Entropy Glasses are worn in the helmet slot -- or, if
+ * Curios is installed, its head slot (see CuriosCompat). See EntropyInfoProvider for which block
+ * entities report info. */
 public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
@@ -32,6 +33,7 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     private static final int BAR_WIDTH = 60;
     private static final int BAR_HEIGHT = 8;
     private static final int LINE_GAP = 2;
+    private static final int CROSSHAIR_GAP = 12;
     private static final int COLOR_ORDER_BAR = 0xFF000000 | EntropyType.ORDER.color();
     private static final int COLOR_CHAOS_BAR = 0xFF000000 | EntropyType.CHAOS.color();
 
@@ -59,35 +61,36 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         Component balanceText = hasBalance
                 ? entropyBalanceText(provider.getEntropyBalance(), provider.getEntropyBalanceMax())
                 : null;
+        Component rateText = hasBalance ? entropyRateText(provider.getEntropyRatePerSecond()) : null;
 
         int contentWidth = BAR_WIDTH;
         for (Component line : lines) contentWidth = Math.max(contentWidth, font.width(line));
         if (balanceText != null) contentWidth = Math.max(contentWidth, font.width(balanceText));
+        if (rateText != null) contentWidth = Math.max(contentWidth, font.width(rateText));
 
         int contentHeight = lines.size() * (font.lineHeight + LINE_GAP);
-        if (hasBalance) contentHeight += BAR_HEIGHT + 3 + font.lineHeight + LINE_GAP;
+        if (hasBalance) contentHeight += BAR_HEIGHT + 3 + 2 * (font.lineHeight + LINE_GAP);
         contentHeight -= LINE_GAP;
 
-        int centerX = guiGraphics.guiWidth() / 2;
-        int top = guiGraphics.guiHeight() / 2 - 60;
-        int left = centerX - contentWidth / 2;
+        int left = guiGraphics.guiWidth() / 2 + CROSSHAIR_GAP;
+        int top = guiGraphics.guiHeight() / 2 - contentHeight / 2;
 
         TooltipRenderUtil.renderTooltipBackground(guiGraphics, left, top, contentWidth, contentHeight, 0);
 
         int y = top;
         for (Component line : lines) {
-            y = drawCenteredLine(guiGraphics, font, line, centerX, y);
+            y = drawLine(guiGraphics, font, line, left, y);
         }
 
         if (hasBalance) {
             int entropy = provider.getEntropyBalance();
             int max = provider.getEntropyBalanceMax();
 
-            int barX = centerX - BAR_WIDTH / 2;
-            renderEntropyBar(guiGraphics, barX, y, entropy, max);
+            renderEntropyBar(guiGraphics, left, y, entropy, max);
             y += BAR_HEIGHT + 3;
 
-            drawCenteredLine(guiGraphics, font, balanceText, centerX, y);
+            y = drawLine(guiGraphics, font, balanceText, left, y);
+            drawLine(guiGraphics, font, rateText, left, y);
         }
     }
 
@@ -96,9 +99,7 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         return ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player);
     }
 
-    private static int drawCenteredLine(GuiGraphics guiGraphics, Font font, Component line, int centerX, int y) {
-        int width = font.width(line);
-        int x = centerX - width / 2;
+    private static int drawLine(GuiGraphics guiGraphics, Font font, Component line, int x, int y) {
         guiGraphics.drawString(font, line, x, y, 0xFFFFFF);
         return y + font.lineHeight + LINE_GAP;
     }
@@ -124,8 +125,16 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
 
     private static Component entropyBalanceText(int entropy, int max) {
         int half = max / 2;
-        if (entropy == half) return Component.translatable("gui.temporalindustries.entropy.balanced", entropy, max);
+        String displayEntropy = EntropyDisplay.format(entropy);
+        String displayMax = EntropyDisplay.format(max);
+        if (entropy == half) return Component.translatable("gui.temporalindustries.entropy.balanced", displayEntropy, displayMax);
         String key = entropy > half ? "gui.temporalindustries.entropy.chaos" : "gui.temporalindustries.entropy.order";
-        return Component.translatable(key, entropy, max);
+        return Component.translatable(key, displayEntropy, displayMax);
+    }
+
+    private static Component entropyRateText(float ratePerSecond) {
+        String sign = ratePerSecond > 0 ? "+" : "";
+        String value = sign + String.format(java.util.Locale.ROOT, "%.1f", ratePerSecond);
+        return Component.translatable("gui.temporalindustries.entropy.rate", value);
     }
 }

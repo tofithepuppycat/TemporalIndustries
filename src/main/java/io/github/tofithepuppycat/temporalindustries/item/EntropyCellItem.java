@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
@@ -52,6 +53,6 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        tooltip.add(Component.translatable(key, amount, BottleContents.CAPACITY).withStyle(color));
+        tooltip.add(Component.translatable(key, EntropyDisplay.format(amount), EntropyDisplay.format(BottleContents.CAPACITY)).withStyle(color));
     }
 }

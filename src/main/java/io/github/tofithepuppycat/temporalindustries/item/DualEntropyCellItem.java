@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
@@ -57,9 +58,10 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         EntropyContents contents = getContents(stack);
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", contents.order(), EntropyContents.CAPACITY)
+        String capacity = EntropyDisplay.format(EntropyContents.CAPACITY);
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.format(contents.order()), capacity)
                 .withStyle(ChatFormatting.WHITE));
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", contents.chaos(), EntropyContents.CAPACITY)
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.format(contents.chaos()), capacity)
                 .withStyle(ChatFormatting.DARK_PURPLE));
     }
 }
