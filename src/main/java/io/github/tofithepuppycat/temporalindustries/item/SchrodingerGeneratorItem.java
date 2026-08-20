@@ -30,16 +30,16 @@ import java.util.Optional;
  * Placeable {@link BlockItem} that also doubles as an early-game mob trap: right-click a living,
  * non-player entity to capture it into a {@link CapturedMob} data component (bucket-of-mob style),
  * then place the filled item as a
- * {@link io.github.tofithepuppycat.temporalindustries.block.SchrodingersBox} to have it passively
- * generate CHS while occupied.
+ * {@link io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator} to have it passively
+ * generate ORD/CHS while occupied.
  */
 @SuppressWarnings("null")
-public class SchrodingersBoxItem extends BlockItem {
+public class SchrodingerGeneratorItem extends BlockItem {
     /** Entity types that can never be captured. Ships empty; datapacks can extend it (e.g. to exclude bosses). */
     public static final TagKey<EntityType<?>> CAPTURE_BLACKLIST = TagKey.create(Registries.ENTITY_TYPE,
-            ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "schrodingers_box_blacklist"));
+            ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "schrodinger_generator_blacklist"));
 
-    public SchrodingersBoxItem(Block block, Properties properties) {
+    public SchrodingerGeneratorItem(Block block, Properties properties) {
         super(block, properties);
     }
 
@@ -65,9 +65,9 @@ public class SchrodingersBoxItem extends BlockItem {
         CapturedMob captured = stack.get(Registration.CAPTURED_MOB.get());
         if (captured != null) {
             Component name = captured.customName().orElse(captured.entityType().getDescription());
-            tooltip.add(Component.translatable("item.temporalindustries.schrodingers_box.occupied", name).withStyle(ChatFormatting.LIGHT_PURPLE));
+            tooltip.add(Component.translatable("item.temporalindustries.schrodinger_generator.occupied", name).withStyle(ChatFormatting.LIGHT_PURPLE));
         } else {
-            tooltip.add(Component.translatable("item.temporalindustries.schrodingers_box.tooltip").withStyle(ChatFormatting.GRAY));
+            tooltip.add(Component.translatable("item.temporalindustries.schrodinger_generator.tooltip").withStyle(ChatFormatting.GRAY));
         }
     }
 }

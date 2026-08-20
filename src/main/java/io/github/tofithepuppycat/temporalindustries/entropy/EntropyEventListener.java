@@ -19,7 +19,7 @@ import net.neoforged.neoforge.event.level.block.CropGrowEvent;
 
 /**
  * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events, as opposed to the
- * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger's Box). ORDER:
+ * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger Generator). ORDER:
  * obsidian/basalt/cobblestone generation, crop growth, items despawning. CHAOS: player death,
  * splash/lingering potions.
  */
