@@ -1,6 +1,12 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "all": "minecraft:block/beacon"
+    "particle": "temporalindustries:block/echo_projector_front",
+    "north": "temporalindustries:block/echo_projector_front",
+    "south": "temporalindustries:block/machine_base",
+    "west": "temporalindustries:block/machine_base_up",
+    "east": "temporalindustries:block/machine_base_up",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
   }
 }
