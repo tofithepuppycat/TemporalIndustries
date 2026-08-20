@@ -2,15 +2,11 @@ package io.github.tofithepuppycat.temporalindustries.entropy;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.tags.BlockTags;
-import net.minecraft.tags.FluidTags;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.Items;
-import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -19,35 +15,25 @@ import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.item.ItemExpireEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
-
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.WeakHashMap;
+import net.neoforged.neoforge.event.level.block.CropGrowEvent;
 
 /**
  * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events, as opposed to the
  * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger's Box). ORDER:
- * obsidian/basalt/cobblestone generation, fire extinguished by water, items despawning. CHAOS:
- * player death, fire spreading, splash/lingering potions.
+ * obsidian/basalt/cobblestone generation, crop growth, items despawning. CHAOS: player death,
+ * splash/lingering potions.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class EntropyEventListener {
     private static final int OBSIDIAN_ORDER = 2;
     private static final int BASALT_ORDER = 1;
     private static final int COBBLESTONE_ORDER = 1;
-    private static final int FIRE_EXTINGUISH_ORDER = 1;
+    private static final int CROP_GROWTH_ORDER = 1;
     private static final int ITEM_DESPAWN_ORDER = 1;
 
     private static final int PLAYER_DEATH_CHAOS = 3;
-    private static final int FIRE_SPREAD_CHAOS = 1;
     private static final int SPLASH_POTION_CHAOS = 1;
     private static final int LINGERING_POTION_CHAOS = 2;
-
-    // Positions currently on fire, per level, so onNeighborNotify can tell a freshly-spread fire
-    // (reward chaos) apart from an existing fire just re-notifying its neighbors (aging tick), and
-    // a fire going out from natural burnout apart from one put out by adjacent water (reward order).
-    private static final Map<Level, Set<BlockPos>> TRACKED_FIRE = new WeakHashMap<>();
 
     private EntropyEventListener() {}
 
@@ -67,29 +53,11 @@ public final class EntropyEventListener {
     }
 
     @SubscribeEvent
-    public static void onNeighborNotify(BlockEvent.NeighborNotifyEvent event) {
+    public static void onCropGrow(CropGrowEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
-        BlockPos pos = event.getPos().immutable();
-        Set<BlockPos> fireHere = TRACKED_FIRE.computeIfAbsent(level, l -> new HashSet<>());
-        boolean isFireNow = event.getState().is(BlockTags.FIRE);
-        if (!isFireNow && !fireHere.contains(pos)) return;
-
-        if (isFireNow) {
-            if (fireHere.add(pos)) {
-                EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.CHAOS, FIRE_SPREAD_CHAOS);
-            }
-        } else if (fireHere.remove(pos) && hasAdjacentWater(level, pos)) {
-            EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.ORDER, FIRE_EXTINGUISH_ORDER);
-        }
-    }
-
-    private static boolean hasAdjacentWater(Level level, BlockPos pos) {
-        if (level.getFluidState(pos).is(FluidTags.WATER)) return true;
-        for (Direction dir : Direction.values()) {
-            if (level.getFluidState(pos.relative(dir)).is(FluidTags.WATER)) return true;
-        }
-        return false;
+        BlockPos pos = event.getPos();
+        EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.ORDER, CROP_GROWTH_ORDER);
     }
 
     @SubscribeEvent
