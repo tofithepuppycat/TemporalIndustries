@@ -1,6 +1,12 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "all": "minecraft:block/iron_block"
+    "particle": "temporalindustries:block/chronovault_front",
+    "north": "temporalindustries:block/chronovault_front",
+    "south": "temporalindustries:block/machine_base",
+    "west": "temporalindustries:block/machine_base",
+    "east": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
   }
 }
