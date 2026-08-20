@@ -22,6 +22,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
@@ -98,7 +99,7 @@ public class Registration {
             () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CHRONOVAULT_ITEM = ITEMS.register("chronovault",
-            () -> new BlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+            () -> new ChronoBlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> TEMPORAL_ANCHOR_ITEM = ITEMS.register("temporal_anchor",
             () -> new TemporalAnchorItem(new Item.Properties().stacksTo(1)));
@@ -134,13 +135,13 @@ public class Registration {
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CHRONODIAL_ITEM = ITEMS.register("chronodial",
-            () -> new BlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+            () -> new ChronoBlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredBlock<Chronosphere> CHRONOSPHERE_BLOCK = BLOCKS.register("chronosphere",
             () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
-            () -> new BlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+            () -> new ChronoBlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> DUAL_ENTROPY_CELL_ITEM = ITEMS.register("dual_entropy_cell",
             () -> new DualEntropyCellItem(new Item.Properties().stacksTo(1)));
