@@ -12,8 +12,10 @@ import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 
+import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 
 /**
@@ -29,6 +31,9 @@ import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
  */
 @SuppressWarnings("null")
 public final class TimelineGraphWidget {
+    private static final ResourceLocation INNER_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/inner.png");
+    private static final int INNER_TEXTURE_SIZE = 256;
+
     private static final int COLUMN_SPACING = 26;
     private static final int ROW_SPACING = 32;
     /** Game ticks per column of horizontal spacing — nodes are placed by actual elapsed time
@@ -132,7 +137,7 @@ public final class TimelineGraphWidget {
     public void render(GuiGraphics guiGraphics, Font font, int graphX, int graphY, int graphWidth, int graphHeight) {
         renderedCommits.clear();
 
-        guiGraphics.fill(graphX, graphY, graphX + graphWidth, graphY + graphHeight, 0xFF000000);
+        guiGraphics.blit(INNER_TEXTURE, graphX, graphY, 0, 0, graphWidth, graphHeight, INNER_TEXTURE_SIZE, INNER_TEXTURE_SIZE);
 
         List<TemporalCommit> commits = TimelineProjectionManager.getCommits();
         if (commits.isEmpty()) return;
