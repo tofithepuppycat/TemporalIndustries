@@ -8,16 +8,17 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
+import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
 import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
-import io.github.tofithepuppycat.temporalindustries.network.ChronosphereDeleteHistoryPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleAutoTrackPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
@@ -40,12 +41,18 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu> {
     private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/base.png");
-    private static final ResourceLocation MENU_BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/menu_base_right.png");
-    private static final int MENU_BASE_TEXTURE_SIZE = 32;
+    private static final ResourceLocation ICON_CONFIG_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_config.png");
+    private static final int ICON_CONFIG_SIZE = 26;
 
     private static final int IMAGE_WIDTH = 256;
     private static final int IMAGE_HEIGHT = 256;
+    /** base.png's actual panel artwork sits inset this many pixels on every side within the
+     * 256x256 canvas — every layout constant below is measured from the artwork's edge (via
+     * {@link #panelX()}/{@link #panelY()}), not from leftPos/topPos directly, and CONTENT_SIZE
+     * (not imageWidth) is the usable width/height for centering and right-edge anchoring. */
+    private static final int CONTENT_MARGIN = 16;
+    private static final int CONTENT_SIZE = IMAGE_WIDTH - 2 * CONTENT_MARGIN;
 
     // base.png is a light panel, so text/UI accents are tuned for a light background rather than
     // the dark theme the rest of the mod's placeholder GUIs still use.
@@ -55,20 +62,27 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private static final int GRAPH_X_OFFSET = 8;
     private static final int GRAPH_Y_OFFSET = 18;
-    private static final int GRAPH_WIDTH = 240;
-    private static final int GRAPH_HEIGHT = 178;
+    private static final int GRAPH_WIDTH = CONTENT_SIZE - 2 * GRAPH_X_OFFSET;
+    /** Below the graph: a small gap, the two preview-time labels, another gap, then the button
+     * row — see PREVIEW_CURRENT_Y_OFFSET/PREVIEW_DIFF_Y_OFFSET/BUTTON_ROW_Y_OFFSET below, all of
+     * which this height is sized to leave room for within CONTENT_SIZE. */
+    private static final int GRAPH_HEIGHT = 154;
 
-    private static final int ENERGY_BAR_X_OFFSET = 160;
+    private static final int ENERGY_BAR_X_OFFSET = 140;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
-    private static final int ENERGY_BAR_WIDTH = 88;
+    private static final int ENERGY_BAR_WIDTH = 77;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
-    private static final int ENTROPY_BAR_X_OFFSET = 90;
+    private static final int ENTROPY_BAR_X_OFFSET = 79;
     private static final int ENTROPY_BAR_Y_OFFSET = 7;
-    private static final int ENTROPY_BAR_WIDTH = 60;
+    private static final int ENTROPY_BAR_WIDTH = 52;
     private static final int ENTROPY_BAR_HEIGHT = 8;
     private static final int COLOR_ORDER_BAR = 0xFF000000 | EntropyType.ORDER.color();
     private static final int COLOR_CHAOS_BAR = 0xFF000000 | EntropyType.CHAOS.color();
+
+    private static final int PREVIEW_CURRENT_Y_OFFSET = 176;
+    private static final int PREVIEW_DIFF_Y_OFFSET = 186;
+    private static final int BUTTON_ROW_Y_OFFSET = 200;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
     /** How often the map overlay re-fetches terrain thumbnails while open, so it doesn't go stale
@@ -83,29 +97,30 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int TAB_MIN_WIDTH = 8;
     private static final int TAB_MAX_WIDTH = 26;
 
-    // Bookmark tab: mostly overlaps the panel's right edge, protruding outward, like a vanilla
-    // recipe-book tab attached to a crafting GUI. Sized to match menu_base_right.png's native
-    // resolution 1:1 so the sprite doesn't need to be scaled (scaling it introduced ugly aliasing
-    // on its rounded corners).
-    private static final int BOOKMARK_SIZE = MENU_BASE_TEXTURE_SIZE;
-    private static final int BOOKMARK_OVERLAP = 6;
+    // Bookmark/auto-track/settings tabs: a vertical stack mostly overlapping the panel's right
+    // edge, protruding outward, like a vanilla recipe-book tab attached to a crafting GUI — see
+    // IconTabRenderer for the layered sprite, and render()'s z-order note for why they're drawn
+    // BEFORE the panel background in the non-overlay case (so the panel's edge paints over the
+    // small overlap sliver, tucking the tab in rather than stacking it visibly on top).
+    private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
+    private static final int TAB_OVERLAP = 5;
     private static final int BOOKMARK_Y_OFFSET = 40;
-
-    // Auto-track tab: same protruding style, stacked directly below the bookmark tab. Unlike the
-    // bookmark tab it isn't a modal overlay toggle — clicking it just flips auto-tracking on/off.
-    private static final int AUTO_TRACK_GAP = 4;
-    private static final int AUTO_TRACK_Y_OFFSET = BOOKMARK_Y_OFFSET + BOOKMARK_SIZE + AUTO_TRACK_GAP;
-
-    // Settings tab: same protruding style again, stacked below the auto-track tab. A modal overlay
-    // toggle like the bookmark tab, just with a destructive action behind it instead of the claim map.
-    private static final int SETTINGS_GAP = 4;
-    private static final int SETTINGS_Y_OFFSET = AUTO_TRACK_Y_OFFSET + BOOKMARK_SIZE + SETTINGS_GAP;
+    private static final int TAB_ROW_SPACING = 4;
+    private static final int AUTO_TRACK_Y_OFFSET = BOOKMARK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
+    private static final int SETTINGS_Y_OFFSET = AUTO_TRACK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
 
     private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(ChronosphereBlockEntity.MAX_RADIUS);
     private static final int TOTAL_CLAIMABLE = countClaimableCells();
+
+    // The map overlay's grid (172px tall at MAX_RADIUS=2) eats most of CONTENT_SIZE's 224px, so
+    // its title/grid/footer are packed tighter than the settings overlay's equivalents.
+    private static final int MAP_TITLE_Y_OFFSET = 6;
+    private static final int MAP_GRID_Y_OFFSET = 18;
+    private static final int MAP_FOOTER_GAP = 4;
+    private static final int MAP_FOOTER_LINE_SPACING = 10;
 
     private static final int COLOR_HOME       = 0xFFFFD166;
     private static final int COLOR_SELECTED   = 0xFF3D9BE0;
@@ -155,23 +170,34 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return count;
     }
 
+    /** The visible top-left corner of base.png's artwork — every layout offset in this screen is
+     * measured from here, not from leftPos/topPos, which are the outer edge of the 16px-inset
+     * canvas the artwork sits within. */
+    private int panelX() {
+        return leftPos + CONTENT_MARGIN;
+    }
+
+    private int panelY() {
+        return topPos + CONTENT_MARGIN;
+    }
+
     @Override
     protected void init() {
         super.init();
 
-        bookmarkX = leftPos + imageWidth - BOOKMARK_OVERLAP;
-        bookmarkY = topPos + BOOKMARK_Y_OFFSET;
-        autoTrackX = leftPos + imageWidth - BOOKMARK_OVERLAP;
-        autoTrackY = topPos + AUTO_TRACK_Y_OFFSET;
-        settingsX = leftPos + imageWidth - BOOKMARK_OVERLAP;
-        settingsY = topPos + SETTINGS_Y_OFFSET;
-        gridX = leftPos + (imageWidth - MAP_GRID.gridPixels()) / 2;
-        gridY = topPos + 44;
+        bookmarkX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
+        bookmarkY = panelY() + BOOKMARK_Y_OFFSET;
+        autoTrackX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
+        autoTrackY = panelY() + AUTO_TRACK_Y_OFFSET;
+        settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
+        settingsY = panelY() + SETTINGS_Y_OFFSET;
+        gridX = panelX() + (CONTENT_SIZE - MAP_GRID.gridPixels()) / 2;
+        gridY = panelY() + MAP_GRID_Y_OFFSET;
 
-        int buttonY = topPos + 224;
+        int buttonY = panelY() + BUTTON_ROW_Y_OFFSET;
         int buttonWidth = 76;
         int gap = 3;
-        int groupX = leftPos + (imageWidth - (buttonWidth * 2 + gap)) / 2;
+        int groupX = panelX() + (CONTENT_SIZE - (buttonWidth * 2 + gap)) / 2;
 
         showChangesButton = Button.builder(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), btn -> toggleShowChanges())
                 .pos(groupX, buttonY)
@@ -264,20 +290,20 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
      * Button widgets (consistent with the claim map overlay's own click handling). */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
-        int buttonY = topPos + 130;
+        int buttonY = panelY() + 130;
 
         if (deleteHistoryConfirmPending) {
-            int confirmX = leftPos + (imageWidth - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
+            int confirmX = panelX() + (CONTENT_SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
             int cancelX = confirmX + CONFIRM_BUTTON_WIDTH + 6;
             if (isMouseOverRect(mouseX, mouseY, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
-                PacketDistributor.sendToServer(new ChronosphereDeleteHistoryPacket(menu.getBlockPos()));
+                PacketDistributor.sendToServer(new TimelineMachineDeleteHistoryPacket(menu.getBlockPos()));
                 deleteHistoryConfirmPending = false;
                 settingsOverlayOpen = false;
             } else if (isMouseOverRect(mouseX, mouseY, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
                 deleteHistoryConfirmPending = false;
             }
         } else {
-            int buttonX = leftPos + (imageWidth - DELETE_BUTTON_WIDTH) / 2;
+            int buttonX = panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
             if (isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
                 deleteHistoryConfirmPending = true;
             }
@@ -318,13 +344,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         if (!mapOverlayOpen) renderChunkTabs(guiGraphics, mouseX, mouseY);
-        graphWidget.render(guiGraphics, font, leftPos + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight());
+        graphWidget.render(guiGraphics, font, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight());
         renderEnergyBar(guiGraphics);
         renderEntropyBar(guiGraphics);
     }
 
     private int graphTop() {
-        return topPos + GRAPH_Y_OFFSET + TAB_STRIP_HEIGHT;
+        return panelY() + GRAPH_Y_OFFSET + TAB_STRIP_HEIGHT;
     }
 
     private int graphHeight() {
@@ -336,8 +362,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private void renderChunkTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         List<Long> chunkKeys = getOrderedTabChunkKeys();
         int tabCount = chunkKeys.size() + 1; // + the "All" tab
-        int stripX = leftPos + GRAPH_X_OFFSET;
-        int stripY = topPos + GRAPH_Y_OFFSET;
+        int stripX = panelX() + GRAPH_X_OFFSET;
+        int stripY = panelY() + GRAPH_Y_OFFSET;
         int tabWidth = Math.max(TAB_MIN_WIDTH, Math.min(TAB_MAX_WIDTH, (GRAPH_WIDTH - (tabCount - 1) * TAB_GAP) / tabCount));
 
         long homeKey = new ChunkPos(menu.getBlockPos()).toLong();
@@ -370,12 +396,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
      * used for both click handling and tooltips. */
     @Nullable
     private TabHit getTabAt(double mouseX, double mouseY) {
-        int stripY = topPos + GRAPH_Y_OFFSET;
+        int stripY = panelY() + GRAPH_Y_OFFSET;
         if (mouseY < stripY || mouseY >= stripY + TAB_STRIP_HEIGHT) return null;
 
         List<Long> chunkKeys = getOrderedTabChunkKeys();
         int tabCount = chunkKeys.size() + 1;
-        int stripX = leftPos + GRAPH_X_OFFSET;
+        int stripX = panelX() + GRAPH_X_OFFSET;
         int tabWidth = Math.max(TAB_MIN_WIDTH, Math.min(TAB_MAX_WIDTH, (GRAPH_WIDTH - (tabCount - 1) * TAB_GAP) / tabCount));
 
         if (mouseX < stripX || mouseX >= stripX + GRAPH_WIDTH) return null;
@@ -392,8 +418,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         int energyStored = menu.getEnergyStored();
         int energyCapacity = menu.getEnergyCapacity();
 
-        int barX = leftPos + ENERGY_BAR_X_OFFSET;
-        int barY = topPos + ENERGY_BAR_Y_OFFSET;
+        int barX = panelX() + ENERGY_BAR_X_OFFSET;
+        int barY = panelY() + ENERGY_BAR_Y_OFFSET;
 
         guiGraphics.fill(barX, barY, barX + ENERGY_BAR_WIDTH, barY + ENERGY_BAR_HEIGHT, 0xFF000000);
         if (energyCapacity > 0 && energyStored > 0) {
@@ -403,16 +429,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private boolean isMouseOverEnergyBar(int mouseX, int mouseY) {
-        int barX = leftPos + ENERGY_BAR_X_OFFSET;
-        int barY = topPos + ENERGY_BAR_Y_OFFSET;
+        int barX = panelX() + ENERGY_BAR_X_OFFSET;
+        int barY = panelY() + ENERGY_BAR_Y_OFFSET;
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
     }
 
     /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
      * order (below the midpoint) and dark purple toward chaos (above it). */
     private void renderEntropyBar(GuiGraphics guiGraphics) {
-        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
-        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        int barX = panelX() + ENTROPY_BAR_X_OFFSET;
+        int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
         int entropy = menu.getEntropy();
         int max = menu.getEntropyMax();
 
@@ -433,39 +459,24 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private boolean isMouseOverEntropyBar(int mouseX, int mouseY) {
-        int barX = leftPos + ENTROPY_BAR_X_OFFSET;
-        int barY = topPos + ENTROPY_BAR_Y_OFFSET;
+        int barX = panelX() + ENTROPY_BAR_X_OFFSET;
+        int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
         return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
-    }
-
-    /** Draws the shared menu_base_right.png sprite as an icon tab's background at its native 1:1
-     * resolution (BOOKMARK_SIZE matches MENU_BASE_TEXTURE_SIZE, so no scaling artifacts on its
-     * rounded corners), plus an optional accent tint on top for active/hovered state. */
-    private void renderIconTabBackground(GuiGraphics guiGraphics, int x, int y, int size, int tint) {
-        // menu_base_right.png is only 32x32 (not the mod's usual 256x256 GUI atlas), so the
-        // 6-arg blit overload — which assumes a 256x256 texture when normalizing UVs — can't be
-        // used here; it would sample a sliver of the sprite and stretch it. This 10-arg form
-        // states the real texture size explicitly.
-        guiGraphics.blit(MENU_BASE_TEXTURE, x, y, size, size,
-                0.0F, 0.0F, MENU_BASE_TEXTURE_SIZE, MENU_BASE_TEXTURE_SIZE, MENU_BASE_TEXTURE_SIZE, MENU_BASE_TEXTURE_SIZE);
-        if (tint != 0) {
-            guiGraphics.fill(x + 1, y + 1, x + size - 1, y + size - 1, tint);
-        }
     }
 
     private void renderBookmark(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean hovered = isMouseOverBookmark(mouseX, mouseY);
         int tint = mapOverlayOpen ? (0xB0 << 24 | (COLOR_SELECTED & 0xFFFFFF)) : (hovered ? 0x40000000 : 0);
 
-        renderIconTabBackground(guiGraphics, bookmarkX, bookmarkY, BOOKMARK_SIZE, tint);
+        IconTabRenderer.renderBackground(guiGraphics, bookmarkX, bookmarkY, tint);
 
         // Placeholder icon: a little 3x3 grid glyph, echoing the claim map it opens.
         int glyphColor = mapOverlayOpen ? 0xFFF0FAFF : TEXT_PRIMARY;
         int cell = 5;
         int gap = 2;
         int glyphSize = cell * 3 + gap * 2;
-        int glyphX = bookmarkX + (BOOKMARK_SIZE - glyphSize) / 2;
-        int glyphY = bookmarkY + (BOOKMARK_SIZE - glyphSize) / 2;
+        int glyphX = bookmarkX + (TAB_ROW_SIZE - glyphSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
+        int glyphY = bookmarkY + (TAB_ROW_SIZE - glyphSize) / 2;
         for (int row = 0; row < 3; row++) {
             for (int col = 0; col < 3; col++) {
                 int cx = glyphX + col * (cell + gap);
@@ -476,8 +487,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private boolean isMouseOverBookmark(double mouseX, double mouseY) {
-        return mouseX >= bookmarkX && mouseX <= bookmarkX + BOOKMARK_SIZE
-                && mouseY >= bookmarkY && mouseY <= bookmarkY + BOOKMARK_SIZE;
+        return mouseX >= bookmarkX && mouseX <= bookmarkX + TAB_ROW_SIZE
+                && mouseY >= bookmarkY && mouseY <= bookmarkY + TAB_ROW_SIZE;
     }
 
     private void renderAutoTrackTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -485,67 +496,61 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         boolean hovered = isMouseOverAutoTrackTab(mouseX, mouseY);
         int tint = enabled ? 0xB0CC5555 : (hovered ? 0x40000000 : 0);
 
-        renderIconTabBackground(guiGraphics, autoTrackX, autoTrackY, BOOKMARK_SIZE, tint);
+        IconTabRenderer.renderBackground(guiGraphics, autoTrackX, autoTrackY, tint);
 
         // Placeholder icon: a small filled "record" dot, echoing a recording indicator.
         int glyphColor = enabled ? 0xFFFFEDED : TEXT_PRIMARY;
         int dotSize = 10;
-        int dotX = autoTrackX + (BOOKMARK_SIZE - dotSize) / 2;
-        int dotY = autoTrackY + (BOOKMARK_SIZE - dotSize) / 2;
+        int dotX = autoTrackX + (TAB_ROW_SIZE - dotSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
+        int dotY = autoTrackY + (TAB_ROW_SIZE - dotSize) / 2;
         guiGraphics.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, glyphColor);
     }
 
     private boolean isMouseOverAutoTrackTab(double mouseX, double mouseY) {
-        return mouseX >= autoTrackX && mouseX <= autoTrackX + BOOKMARK_SIZE
-                && mouseY >= autoTrackY && mouseY <= autoTrackY + BOOKMARK_SIZE;
+        return mouseX >= autoTrackX && mouseX <= autoTrackX + TAB_ROW_SIZE
+                && mouseY >= autoTrackY && mouseY <= autoTrackY + TAB_ROW_SIZE;
     }
 
-    /** Placeholder glyph until a real icon is made — a plain gray square, distinct enough from the
-     * auto-track dot and the bookmark tab not to be confused with either. */
     private void renderSettingsTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean hovered = isMouseOverSettingsTab(mouseX, mouseY);
         int tint = hovered ? 0x40000000 : 0;
 
-        renderIconTabBackground(guiGraphics, settingsX, settingsY, BOOKMARK_SIZE, tint);
-
-        int glyphSize = 10;
-        int glyphX = settingsX + (BOOKMARK_SIZE - glyphSize) / 2;
-        int glyphY = settingsY + (BOOKMARK_SIZE - glyphSize) / 2;
-        guiGraphics.fill(glyphX, glyphY, glyphX + glyphSize, glyphY + glyphSize, TEXT_PRIMARY);
+        IconTabRenderer.renderBackground(guiGraphics, settingsX, settingsY, tint);
+        IconTabRenderer.renderIcon(guiGraphics, ICON_CONFIG_TEXTURE, ICON_CONFIG_SIZE, settingsX, settingsY);
     }
 
     private boolean isMouseOverSettingsTab(double mouseX, double mouseY) {
-        return mouseX >= settingsX && mouseX <= settingsX + BOOKMARK_SIZE
-                && mouseY >= settingsY && mouseY <= settingsY + BOOKMARK_SIZE;
+        return mouseX >= settingsX && mouseX <= settingsX + TAB_ROW_SIZE
+                && mouseY >= settingsY && mouseY <= settingsY + TAB_ROW_SIZE;
     }
 
     private void renderSettingsOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.settings_title"),
-                leftPos + imageWidth / 2, topPos + 16, TEXT_PRIMARY);
+        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.settings_title"),
+                panelX() + CONTENT_SIZE / 2, panelY() + 16, TEXT_PRIMARY);
 
-        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.delete_history_hint"),
-                leftPos + 20, topPos + 60, imageWidth - 40, TEXT_SECONDARY);
+        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
+                panelX() + 20, panelY() + 60, CONTENT_SIZE - 40, TEXT_SECONDARY);
 
-        int buttonX = leftPos + (imageWidth - DELETE_BUTTON_WIDTH) / 2;
-        int buttonY = topPos + 130;
+        int buttonX = panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
+        int buttonY = panelY() + 130;
 
         if (deleteHistoryConfirmPending) {
-            drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.delete_history_confirm_prompt"),
-                    leftPos + imageWidth / 2, buttonY - 14, 0xFFB03030);
+            drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
+                    panelX() + CONTENT_SIZE / 2, buttonY - 14, 0xFFB03030);
 
-            int confirmX = leftPos + (imageWidth - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
+            int confirmX = panelX() + (CONTENT_SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
             int cancelX = confirmX + CONFIRM_BUTTON_WIDTH + 6;
             drawOverlayButton(guiGraphics, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_confirm_button"),
+                    Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_button"),
                     0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
             drawOverlayButton(guiGraphics, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_cancel_button"),
+                    Component.translatable("gui.temporalindustries.timeline_machine.delete_history_cancel_button"),
                     0xFF3A3A3A, isMouseOverRect(mouseX, mouseY, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
         } else {
             drawOverlayButton(guiGraphics, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                    Component.translatable("gui.temporalindustries.chronosphere.delete_history_button"),
+                    Component.translatable("gui.temporalindustries.timeline_machine.delete_history_button"),
                     0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
         }
     }
@@ -592,7 +597,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_title"),
-                leftPos + imageWidth / 2, topPos + 16, TEXT_PRIMARY);
+                panelX() + CONTENT_SIZE / 2, panelY() + MAP_TITLE_Y_OFFSET, TEXT_PRIMARY);
 
         ChunkPos home = new ChunkPos(menu.getBlockPos());
         MAP_GRID.render(guiGraphics, gridX, gridY, home, new ChunkSelectionGrid.CellPainter() {
@@ -610,31 +615,49 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
         });
 
-        // menu.getBlockEntity() is the CLIENT's copy of the block entity, which (having no custom
-        // getUpdateTag/handleUpdateTag override) never receives its fields from the server — its
-        // additionalChunks set is always empty client-side, so getChunkCount() would always read
-        // 1 here. ChronosphereClientState's synced selection is the only client-accurate source.
+        // menu.getBlockEntity() is the CLIENT's copy of the block entity; toggleChunk() only calls
+        // setChanged() (not the block-update sync AbstractTimelineMachineBlockEntity's other
+        // mutators trigger), so its additionalChunks set never actually reaches the client —
+        // getChunkCount() would always read 1 here. ChronosphereClientState's synced selection is
+        // the only client-accurate source.
         int claimedCount = ChronosphereClientState.getSelectedCount();
-        int footerY = gridY + MAP_GRID.gridPixels() + 10;
+        int footerY = gridY + MAP_GRID.gridPixels() + MAP_FOOTER_GAP;
         drawCenteredNoShadow(guiGraphics, Component.literal(
                 claimedCount + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
-                leftPos + imageWidth / 2, footerY, TEXT_SECONDARY);
+                panelX() + CONTENT_SIZE / 2, footerY, TEXT_SECONDARY);
         int trackedCount = ChronosphereClientState.getTrackedCount();
         int trackedColor = trackedCount == claimedCount ? 0xFF2E8B45 : 0xFFB5701E;
         drawCenteredNoShadow(guiGraphics, Component.literal(
                 trackedCount + " / " + claimedCount + " chunks tracked"),
-                leftPos + imageWidth / 2, footerY + 11, trackedColor);
+                panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING, trackedColor);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
-                leftPos + imageWidth / 2, footerY + 23, TEXT_MUTED);
+                panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING * 2, TEXT_MUTED);
     }
 
     private ChunkPos getGridCellAt(double mouseX, double mouseY) {
         return MAP_GRID.cellAt(mouseX, mouseY, gridX, gridY, new ChunkPos(menu.getBlockPos()));
     }
 
+    private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        renderBookmark(guiGraphics, mouseX, mouseY);
+        renderAutoTrackTab(guiGraphics, mouseX, mouseY);
+        renderSettingsTab(guiGraphics, mouseX, mouseY);
+    }
+
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
+
+        boolean overlayOpen = mapOverlayOpen || settingsOverlayOpen;
+        // Normally the tabs are drawn BEFORE the panel background, so the panel's opaque texture
+        // paints over their small edge overlap and tucks them in — the same trick a vanilla
+        // recipe-book tab uses to look attached to, rather than stacked on top of, its GUI. While
+        // a modal overlay is open they're the only way to close it, so they're drawn on top of
+        // everything (below, after the overlay) instead, same as before.
+        if (!overlayOpen) {
+            renderTabs(guiGraphics, mouseX, mouseY);
+        }
+
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
         renderLabels(guiGraphics, mouseX, mouseY);
         for (var widget : renderables) {
@@ -646,9 +669,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (settingsOverlayOpen) {
             renderSettingsOverlay(guiGraphics, mouseX, mouseY);
         }
-        renderBookmark(guiGraphics, mouseX, mouseY);
-        renderAutoTrackTab(guiGraphics, mouseX, mouseY);
-        renderSettingsTab(guiGraphics, mouseX, mouseY);
+        if (overlayOpen) {
+            renderTabs(guiGraphics, mouseX, mouseY);
+        }
 
         if (mapOverlayOpen) {
             if (isMouseOverBookmark(mouseX, mouseY)) {
@@ -683,22 +706,22 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
         } else if (isMouseOverSettingsTab(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.settings_tooltip"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.settings_tooltip"), mouseX, mouseY);
         }
     }
 
     private static Component autoTrackTooltip() {
         return Component.translatable(ChronosphereClientState.isAutoTrackingEnabled()
-                ? "gui.temporalindustries.chronosphere.auto_track_tooltip_on"
-                : "gui.temporalindustries.chronosphere.auto_track_tooltip_off");
+                ? "gui.temporalindustries.timeline_machine.auto_track_tooltip_on"
+                : "gui.temporalindustries.timeline_machine.auto_track_tooltip_off");
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), leftPos + 8, topPos + 8, TEXT_PRIMARY, false);
+        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), panelX() + 8, panelY() + 8, TEXT_PRIMARY, false);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), leftPos + 8, topPos + 200, TEXT_PRIMARY, false);
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), panelX() + 8, panelY() + PREVIEW_CURRENT_Y_OFFSET, TEXT_PRIMARY, false);
 
         if (TimelineProjectionManager.hasSelection()) {
             long selected = TimelineProjectionManager.getSelectedGameTime();
@@ -706,7 +729,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             String direction = diff <= 0L
                     ? "gui.temporalindustries.chronovault.preview_past"
                     : "gui.temporalindustries.chronovault.preview_future";
-            guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), leftPos + 8, topPos + 210, TEXT_PRIMARY, false);
+            guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), panelX() + 8, panelY() + PREVIEW_DIFF_Y_OFFSET, TEXT_PRIMARY, false);
         }
     }
 
@@ -728,7 +751,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         if (button == 0 && isMouseOverAutoTrackTab(mouseX, mouseY)) {
             boolean newState = !ChronosphereClientState.isAutoTrackingEnabled();
-            PacketDistributor.sendToServer(new ChronosphereToggleAutoTrackPacket(menu.getBlockPos(), newState));
+            PacketDistributor.sendToServer(new TimelineMachineToggleAutoTrackPacket(menu.getBlockPos(), newState));
             return true;
         }
 
@@ -777,7 +800,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
         }
 
-        if (button == 0 && graphWidget.mouseClicked(mouseX, mouseY, leftPos + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
+        if (button == 0 && graphWidget.mouseClicked(mouseX, mouseY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
@@ -810,7 +833,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (mapOverlayOpen) {
             return true;
         }
-        if (graphWidget.mouseScrolled(mouseX, mouseY, scrollY, leftPos + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
+        if (graphWidget.mouseScrolled(mouseX, mouseY, scrollY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
             return true;
         }
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);

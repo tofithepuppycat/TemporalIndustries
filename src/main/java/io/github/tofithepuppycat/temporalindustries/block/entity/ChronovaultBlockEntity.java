@@ -59,9 +59,10 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
                 TemporalWorldData worldData = TemporalWorldData.get(serverLevel.getServer());
                 ChunkPos chunkPos = getChunkPos();
                 ResourceLocation dimension = level.dimension().location();
-                worldData.trackChunk(dimension, chunkPos, worldPosition, serverLevel);
+                if (autoTrackingEnabled) worldData.trackChunk(dimension, chunkPos, worldPosition, serverLevel);
 
                 TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
+                ensureSnapshotted(worldData, timeline, serverLevel, chunkPos);
 
                 // Restore placedGameTime from the timeline if this is a reload
                 if (placedGameTime == UNSET_TIME) {

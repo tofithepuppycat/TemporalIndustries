@@ -4,7 +4,6 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
@@ -60,10 +59,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
-    /** Whether this Chronosphere is currently recording DELTA commits for its claimed chunks.
-     * Off by default: a freshly placed/claimed Chronosphere doesn't record anything until the
-     * player opts in via the GUI's auto-track tab, so idle claims don't silently accumulate history. */
-    private boolean autoTrackingEnabled = false;
 
     public ChronosphereBlockEntity(BlockPos blockPos, BlockState blockState) {
         super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
@@ -94,15 +89,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         }
     }
 
-    /** A chunk with no commits yet (freshly claimed, or claimed-but-never-touched across a
-     * restart) gets a full baseline instead of waiting for its first delta — see ChunkSnapshot's
-     * class doc for why ancestryChain needs one of these to exist. */
-    private static void ensureSnapshotted(TemporalWorldData worldData, TemporalTimeline timeline, ServerLevel serverLevel, ChunkPos chunkPos) {
-        if (!timeline.getCommitsForChunk(chunkPos).isEmpty()) return;
-        timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
-        worldData.setDirty();
-    }
-
     @Override
     public void setRemoved() {
         super.setRemoved();
@@ -119,30 +105,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronosphereBlockEntity be) {
         if (level.isClientSide) return;
         be.commonTick(level);
-    }
-
-    public boolean isAutoTrackingEnabled() {
-        return autoTrackingEnabled;
-    }
-
-    /** Flips auto-tracking, immediately (un)tracking every chunk this Chronosphere has claimed so
-     * recording starts/stops right away rather than waiting for the next onLoad(). */
-    public void setAutoTrackingEnabled(boolean enabled) {
-        if (enabled == autoTrackingEnabled) return;
-        autoTrackingEnabled = enabled;
-
-        if (level instanceof ServerLevel serverLevel && level.getServer() != null) {
-            TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-            ResourceLocation dimension = level.dimension().location();
-            for (ChunkPos chunk : getAllChunks()) {
-                if (enabled) {
-                    worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
-                } else {
-                    worldData.untrackChunk(dimension, chunk, worldPosition);
-                }
-            }
-        }
-        setChanged();
     }
 
     // -------------------------------------------------------------------------
@@ -214,29 +176,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     }
 
     // -------------------------------------------------------------------------
-    // Jump — computeTotalJumpCost/applyTimelineView/jump/setSelectedGameTime all live in
-    // AbstractTimelineMachineBlockEntity, operating over getAllChunks() above.
-
-    /** Wipes every claimed chunk's recorded history and re-baselines each from its current live
-     * state, without changing a single block — the world stays exactly as it is, there's just
-     * nothing left to jump back to until new history accumulates from here. Also resets
-     * placed/selected game time to now, same as if the Chronosphere had just been placed. */
-    public void deleteAllHistory() {
-        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
-
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
-
-        for (ChunkPos chunk : getAllChunks()) {
-            timeline.clearChunkHistory(chunk);
-            ensureSnapshotted(worldData, timeline, serverLevel, chunk);
-        }
-
-        placedGameTime = level.getGameTime();
-        selectedGameTime = placedGameTime;
-        worldData.setDirty();
-        setChanged();
-    }
+    // Jump — computeTotalJumpCost/applyTimelineView/jump/setSelectedGameTime/deleteAllHistory all
+    // live in AbstractTimelineMachineBlockEntity, operating over getAllChunks() above.
 
     // -------------------------------------------------------------------------
     // TimelineViewProvider — chunkPos null means the shared "All" view (the GUI's default tab);
@@ -410,7 +351,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
 
         ListTag chunkList = new ListTag();
         for (long key : additionalChunks) chunkList.add(LongTag.valueOf(key));
@@ -420,7 +360,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     @Override
     protected void loadAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.loadAdditional(tag, registries);
-        autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
 
         additionalChunks.clear();
         ListTag chunkList = tag.getList("AdditionalChunks", Tag.TAG_LONG);
