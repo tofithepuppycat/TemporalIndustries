@@ -45,9 +45,9 @@ public class NetworkHandler {
                 ChronosphereStateSyncPacket::handle);
 
         registrar.playToServer(
-                ChronosphereToggleAutoTrackPacket.TYPE,
-                ChronosphereToggleAutoTrackPacket.STREAM_CODEC,
-                ChronosphereToggleAutoTrackPacket::handle);
+                TimelineMachineToggleAutoTrackPacket.TYPE,
+                TimelineMachineToggleAutoTrackPacket.STREAM_CODEC,
+                TimelineMachineToggleAutoTrackPacket::handle);
 
         registrar.playToServer(
                 ChronosphereMapRequestPacket.TYPE,
@@ -60,9 +60,9 @@ public class NetworkHandler {
                 ChronosphereMapSyncPacket::handle);
 
         registrar.playToServer(
-                ChronosphereDeleteHistoryPacket.TYPE,
-                ChronosphereDeleteHistoryPacket.STREAM_CODEC,
-                ChronosphereDeleteHistoryPacket::handle);
+                TimelineMachineDeleteHistoryPacket.TYPE,
+                TimelineMachineDeleteHistoryPacket.STREAM_CODEC,
+                TimelineMachineDeleteHistoryPacket::handle);
 
         registrar.playToServer(
                 GlueRegionRequestPacket.TYPE,

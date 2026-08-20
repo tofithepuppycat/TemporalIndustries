@@ -11,6 +11,9 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -19,12 +22,14 @@ import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.function.Predicate;
@@ -53,6 +58,11 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
     protected int entropy = ENTROPY_BALANCED;
+    /** Whether this machine is currently recording DELTA commits for the chunks getAllChunks()
+     * returns. Subclasses pick their own default: off for a Chronosphere (an idle claim shouldn't
+     * silently accumulate history until the player opts in), on for a Chronovault (it only ever
+     * has its own placed chunk, so there's no idle-claim concern). */
+    protected boolean autoTrackingEnabled = false;
 
     /** Named (rather than anonymous) so a jump's own cost can be deducted directly, bypassing the
      * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
@@ -133,9 +143,75 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override public int getEntropyBalance() { return entropy; }
     @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
 
+    /** Mirrors {@link #driftEntropy}'s direction (drift is server-only, but placed/selected game
+     * time and entropy are synced, so the client can recompute the same target without ticking). */
+    @Override
+    public float getEntropyRatePerSecond() {
+        if (level == null) return 0f;
+        int target = selectedGameTime < level.getGameTime() ? ENTROPY_MAX : ENTROPY_BALANCED;
+        if (entropy == target) return 0f;
+        return Integer.signum(target - entropy) / 10f;
+    }
+
     /** Every chunk a jump on this machine moves together — one for a Time Machine, up to 25 for a
      * Chronosphere. Home/primary chunk first. */
     public abstract List<ChunkPos> getAllChunks();
+
+    public boolean isAutoTrackingEnabled() {
+        return autoTrackingEnabled;
+    }
+
+    /** Flips auto-tracking, immediately (un)tracking every chunk getAllChunks() returns so
+     * recording starts/stops right away rather than waiting for the next onLoad(). */
+    public void setAutoTrackingEnabled(boolean enabled) {
+        if (enabled == autoTrackingEnabled) return;
+        autoTrackingEnabled = enabled;
+
+        if (level instanceof ServerLevel serverLevel && level.getServer() != null) {
+            TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+            ResourceLocation dimension = level.dimension().location();
+            for (ChunkPos chunk : getAllChunks()) {
+                if (enabled) {
+                    worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
+                } else {
+                    worldData.untrackChunk(dimension, chunk, worldPosition);
+                }
+            }
+        }
+        setChanged();
+        syncToClients();
+    }
+
+    /** A chunk with no commits yet (freshly claimed/placed, or claimed-but-never-touched across a
+     * restart) gets a full baseline instead of waiting for its first delta — see ChunkSnapshot's
+     * class doc for why ancestryChain needs one of these to exist. */
+    protected static void ensureSnapshotted(TemporalWorldData worldData, TemporalTimeline timeline, ServerLevel serverLevel, ChunkPos chunkPos) {
+        if (!timeline.getCommitsForChunk(chunkPos).isEmpty()) return;
+        timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
+        worldData.setDirty();
+    }
+
+    /** Wipes every chunk getAllChunks() returns of its recorded history and re-baselines each from
+     * its current live state, without changing a single block — the world stays exactly as it is,
+     * there's just nothing left to jump back to until new history accumulates from here. Also
+     * resets placed/selected game time to now, same as if the machine had just been placed. */
+    public void deleteAllHistory() {
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
+
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
+
+        for (ChunkPos chunk : getAllChunks()) {
+            timeline.clearChunkHistory(chunk);
+            ensureSnapshotted(worldData, timeline, serverLevel, chunk);
+        }
+
+        placedGameTime = level.getGameTime();
+        selectedGameTime = placedGameTime;
+        worldData.setDirty();
+        setChanged();
+        syncToClients();
+    }
 
     // -------------------------------------------------------------------------
     // Tick — normally just first-placement initialisation, no block scanning; the one deliberate
@@ -178,6 +254,32 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (entropy == target) return;
         entropy += Integer.signum(target - entropy);
         setChanged();
+        syncToClients();
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     /** Skips chunks the world isn't currently tracking (auto-tracking off, for a Chronosphere; or
@@ -317,6 +419,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.putLong("PlacedGameTime",   placedGameTime);
         tag.putLong("SelectedGameTime", selectedGameTime);
         tag.putInt("Entropy", entropy);
+        tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
     }
 
     @Override
@@ -326,5 +429,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
         if (tag.contains("Entropy"))          entropy          = tag.getInt("Entropy");
+        // Absent (pre-existing save from before this tag existed) leaves the subclass constructor's
+        // default in place, so old Chronospheres stay off and old Chronovaults stay always-on.
+        if (tag.contains("AutoTrackingEnabled")) autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
     }
 }
