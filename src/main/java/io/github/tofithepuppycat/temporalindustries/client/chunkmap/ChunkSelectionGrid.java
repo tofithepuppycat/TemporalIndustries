@@ -17,8 +17,7 @@ import org.jetbrains.annotations.Nullable;
  */
 public final class ChunkSelectionGrid {
     public static final int CELL_SIZE = 32;
-    public static final int CELL_GAP = 3;
-    private static final int COLOR_BORDER = 0xFF000000;
+    public static final int CELL_GAP = 0;
 
     private final int radius;
     private final int gridSize;
@@ -43,9 +42,10 @@ public final class ChunkSelectionGrid {
         return ChunkArea.isWithinRadius(radius, dx, dz);
     }
 
-    /** Draws every in-radius cell as a bordered square, tinted/textured per {@code painter} —
-     * either a flat status color, or (once a terrain thumbnail is available) that terrain tinted
-     * translucently by status, matching the Chronosphere screen's original map overlay look. */
+    /** Draws every in-radius cell tinted/textured per {@code painter} — either a flat status color,
+     * or (once a terrain thumbnail is available) that terrain tinted translucently by status. Cells
+     * sit flush against each other with no border/gap, so once every cell has its terrain thumbnail
+     * the grid reads as one continuous map instead of a mosaic of separate tiles. */
     public void render(GuiGraphics guiGraphics, int gridX, int gridY, ChunkPos anchor, CellPainter painter) {
         for (int row = 0; row < gridSize; row++) {
             for (int col = 0; col < gridSize; col++) {
@@ -53,23 +53,19 @@ public final class ChunkSelectionGrid {
                 int dz = row - radius;
                 if (!isWithinRadius(dx, dz)) continue;
 
-                int cellX = gridX + col * (CELL_SIZE + CELL_GAP);
-                int cellY = gridY + row * (CELL_SIZE + CELL_GAP);
+                int cellX = gridX + col * CELL_SIZE;
+                int cellY = gridY + row * CELL_SIZE;
                 long key = new ChunkPos(anchor.x + dx, anchor.z + dz).toLong();
 
-                guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, COLOR_BORDER);
-
-                int innerX0 = cellX + 1, innerY0 = cellY + 1, innerX1 = cellX + CELL_SIZE - 1, innerY1 = cellY + CELL_SIZE - 1;
                 int tint = painter.tint(dx, dz, key);
                 ResourceLocation terrain = painter.texture(key);
                 if (terrain != null) {
-                    int inner = CELL_SIZE - 2;
                     int size = ChronoMapSampler.SIZE;
-                    guiGraphics.blit(terrain, innerX0, innerY0, inner, inner, 0.0F, 0.0F, size, size, size, size);
+                    guiGraphics.blit(terrain, cellX, cellY, CELL_SIZE, CELL_SIZE, 0.0F, 0.0F, size, size, size, size);
                     // Status tint over the terrain, translucent so the sampled ground stays visible.
-                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, (0x80 << 24) | (tint & 0xFFFFFF));
+                    guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, (0x80 << 24) | (tint & 0xFFFFFF));
                 } else {
-                    guiGraphics.fill(innerX0, innerY0, innerX1, innerY1, tint);
+                    guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, tint);
                 }
             }
         }
@@ -81,11 +77,8 @@ public final class ChunkSelectionGrid {
         if (mouseX < gridX || mouseY < gridY || mouseX >= gridX + gridPixels || mouseY >= gridY + gridPixels) {
             return null;
         }
-        int col = (int) ((mouseX - gridX) / (CELL_SIZE + CELL_GAP));
-        int row = (int) ((mouseY - gridY) / (CELL_SIZE + CELL_GAP));
-        double cellLocalX = (mouseX - gridX) - col * (CELL_SIZE + CELL_GAP);
-        double cellLocalY = (mouseY - gridY) - row * (CELL_SIZE + CELL_GAP);
-        if (cellLocalX > CELL_SIZE || cellLocalY > CELL_SIZE) return null; // clicked in the gap
+        int col = (int) ((mouseX - gridX) / CELL_SIZE);
+        int row = (int) ((mouseY - gridY) / CELL_SIZE);
         if (col < 0 || col >= gridSize || row < 0 || row >= gridSize) return null;
 
         int dx = col - radius;
