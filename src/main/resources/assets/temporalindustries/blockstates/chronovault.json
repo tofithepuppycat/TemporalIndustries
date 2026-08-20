@@ -1,7 +1,19 @@
 {
   "variants": {
-    "": {
+    "facing=north": {
       "model": "temporalindustries:block/chronovault"
+    },
+    "facing=south": {
+      "model": "temporalindustries:block/chronovault",
+      "y": 180
+    },
+    "facing=west": {
+      "model": "temporalindustries:block/chronovault",
+      "y": 270
+    },
+    "facing=east": {
+      "model": "temporalindustries:block/chronovault",
+      "y": 90
     }
   }
 }

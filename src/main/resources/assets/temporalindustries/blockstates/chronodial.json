@@ -1,29 +1,25 @@
 {
   "variants": {
     "facing=down": {
-      "model": "temporalindustries:block/chronodial",
+      "model": "temporalindustries:block/chronodial_vertical",
       "x": 180
     },
     "facing=up": {
-      "model": "temporalindustries:block/chronodial"
+      "model": "temporalindustries:block/chronodial_vertical"
     },
     "facing=north": {
-      "model": "temporalindustries:block/chronodial",
-      "x": 90
+      "model": "temporalindustries:block/chronodial"
     },
     "facing=south": {
       "model": "temporalindustries:block/chronodial",
-      "x": 90,
       "y": 180
     },
     "facing=west": {
       "model": "temporalindustries:block/chronodial",
-      "x": 90,
       "y": 270
     },
     "facing=east": {
       "model": "temporalindustries:block/chronodial",
-      "x": 90,
       "y": 90
     }
   }
