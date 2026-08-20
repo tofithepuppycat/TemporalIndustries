@@ -81,9 +81,9 @@
 	"item.temporalindustries.dual_entropy_cell.order": "Order: %s / %s",
 	"item.temporalindustries.dual_entropy_cell.chaos": "Chaos: %s / %s",
 	"entity.temporalindustries.entropy_orb": "Entropy Orb",
-	"block.temporalindustries.schrodingers_box": "Schrodinger's Box",
-	"item.temporalindustries.schrodingers_box.tooltip": "Right-click a mob to trap it inside, then place the box to slowly generate Order or Chaos.",
-	"item.temporalindustries.schrodingers_box.occupied": "Contains: %s",
+	"block.temporalindustries.schrodinger_generator": "Schrodinger Generator",
+	"item.temporalindustries.schrodinger_generator.tooltip": "Right-click a mob to trap it inside, then place the block to slowly generate Order or Chaos. Landing on Order also pulses out FE.",
+	"item.temporalindustries.schrodinger_generator.occupied": "Contains: %s",
 	"block.temporalindustries.seebeck_generator": "Seebeck Generator",
 	"item.temporalindustries.order_cell": "Order Cell",
 	"item.temporalindustries.order_cell.contents": "Order: %s / %s",
@@ -99,6 +99,6 @@
 	"item.temporalindustries.entropy_glasses.tooltip": "Worn on the head. Shows entropy info about the block you're looking at.",
 	"overlay.temporalindustries.entropy_glasses.order": "Order: %s / %s mB",
 	"overlay.temporalindustries.entropy_glasses.chaos": "Chaos: %s / %s mB",
-	"overlay.temporalindustries.entropy_glasses.schrodingers_box.generating": "Generating Order/Chaos",
-	"overlay.temporalindustries.entropy_glasses.schrodingers_box.empty": "Empty"
+	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating": "Generating Order/Chaos",
+	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty": "Empty"
 }

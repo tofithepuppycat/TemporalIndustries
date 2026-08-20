@@ -13,7 +13,7 @@ import net.minecraft.world.entity.EntityType;
 
 import java.util.Optional;
 
-/** The mob a Schrodinger's Box has captured, carried as a data component on the item and mirrored
+/** The mob a Schrodinger Generator has captured, carried as a data component on the item and mirrored
  * onto the placed block entity via {@code applyImplicitComponents}/{@code collectImplicitComponents}. */
 public record CapturedMob(ResourceLocation entityTypeId, Optional<Component> customName) {
     public static final Codec<CapturedMob> CODEC = RecordCodecBuilder.create(instance -> instance.group(

@@ -21,6 +21,8 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.energy.EnergyStorage;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -28,39 +30,68 @@ import java.util.List;
 
 /**
  * Early-game passive entropy generator: while it holds a captured mob (see
- * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem}), it periodically
+ * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem}), it periodically
  * spawns a small {@link EntropyOrbEntity}, ORD or CHS with equal chance each time — the mob is both
- * alive and dead until observed. The mob itself is never simulated — only its type and
- * custom name are kept — and is respawned back into the world by {@link #release()}, called either
- * from an empty-handed right-click ({@code SchrodingersBox.useWithoutItem}) or when the block is
- * removed ({@code SchrodingersBox.onRemove}), so breaking an occupied box never silently deletes
+ * alive and dead until observed. Landing on ORD also fires a pulse of FE into {@link #energyStorage},
+ * as if collapsing the superposition into "alive" released a burst of energy. The mob itself is never
+ * simulated — only its type and custom name are kept — and is respawned back into the world by
+ * {@link #release()}, called either from an empty-handed right-click
+ * ({@code SchrodingerGenerator.useWithoutItem}) or when the block is removed
+ * ({@code SchrodingerGenerator.onRemove}), so breaking an occupied generator never silently deletes
  * the mob.
  */
 @SuppressWarnings("null")
-public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyInfoProvider {
-    // Interval halved and CHS_PER_INTERVAL halved to match, so the box drops orbs twice as often
+public class SchrodingerGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
+    // Interval halved and CHS_PER_INTERVAL halved to match, so the generator drops orbs twice as often
     // without producing entropy any faster overall; entropyAccumulator carries the fractional
     // remainder between checks since an orb can't be spawned with a value below 1.
     private static final int CHS_INTERVAL_TICKS = 50;
     private static final double CHS_PER_INTERVAL = 0.5;
 
+    private static final int ENERGY_CAPACITY = 4_000;
+    private static final int ENERGY_MAX_EXTRACT = 400;
+    private static final int ORDER_PULSE_ENERGY = 800;
+
+    private final class GeneratorEnergyStorage extends EnergyStorage {
+        GeneratorEnergyStorage() {
+            super(ENERGY_CAPACITY, 0, ENERGY_MAX_EXTRACT);
+        }
+
+        @Override public int extractEnergy(int max, boolean simulate) {
+            int v = super.extractEnergy(max, simulate);
+            if (!simulate && v > 0) setChanged();
+            return v;
+        }
+
+        void produce(int amount) {
+            if (amount <= 0) return;
+            energy = Math.min(capacity, energy + amount);
+            setChanged();
+        }
+    }
+
     @Nullable private ResourceLocation capturedTypeId;
     @Nullable private Component capturedName;
     private double entropyAccumulator = 0.0;
+    private final GeneratorEnergyStorage energyStorage = new GeneratorEnergyStorage();
 
-    public SchrodingersBoxBlockEntity(BlockPos pos, BlockState state) {
-        super(Registration.SCHRODINGERS_BOX_BLOCK_ENTITY.get(), pos, state);
+    public SchrodingerGeneratorBlockEntity(BlockPos pos, BlockState state) {
+        super(Registration.SCHRODINGER_GENERATOR_BLOCK_ENTITY.get(), pos, state);
     }
 
     public boolean isOccupied() {
         return capturedTypeId != null;
     }
 
+    public IEnergyStorage getEnergyStorage() {
+        return energyStorage;
+    }
+
     @Override
     public List<Component> getEntropyTooltip() {
         return List.of(isOccupied()
-                ? Component.translatable("overlay.temporalindustries.entropy_glasses.schrodingers_box.generating").withStyle(ChatFormatting.DARK_PURPLE)
-                : Component.translatable("overlay.temporalindustries.entropy_glasses.schrodingers_box.empty").withStyle(ChatFormatting.GRAY));
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating").withStyle(ChatFormatting.DARK_PURPLE)
+                : Component.translatable("overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty").withStyle(ChatFormatting.GRAY));
     }
 
     public void capture(ResourceLocation typeId, @Nullable Component name) {
@@ -112,7 +143,7 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, SchrodingersBoxBlockEntity be) {
+    public static void tick(Level level, BlockPos pos, BlockState state, SchrodingerGeneratorBlockEntity be) {
         if (!(level instanceof ServerLevel serverLevel) || !be.isOccupied()) return;
         if (level.getGameTime() % CHS_INTERVAL_TICKS != 0) return;
 
@@ -122,6 +153,7 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
         be.entropyAccumulator -= toSpawn;
 
         EntropyType type = serverLevel.getRandom().nextBoolean() ? EntropyType.ORDER : EntropyType.CHAOS;
+        if (type == EntropyType.ORDER) be.energyStorage.produce(ORDER_PULSE_ENERGY);
         EntropyOrbEntity.spawn(serverLevel, pos.getX() + 0.5, pos.getY() + 1.0, pos.getZ() + 0.5, type, toSpawn);
     }
 
@@ -131,6 +163,7 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
         if (capturedTypeId != null) tag.putString("CapturedType", capturedTypeId.toString());
         if (capturedName != null) tag.putString("CapturedName", Component.Serializer.toJson(capturedName, registries));
         tag.putDouble("ChsAccumulator", entropyAccumulator);
+        tag.put("Energy", energyStorage.serializeNBT(registries));
     }
 
     @Override
@@ -139,5 +172,6 @@ public class SchrodingersBoxBlockEntity extends BlockEntity implements EntropyIn
         capturedTypeId = tag.contains("CapturedType") ? ResourceLocation.parse(tag.getString("CapturedType")) : null;
         capturedName = tag.contains("CapturedName") ? Component.Serializer.fromJson(tag.getString("CapturedName"), registries) : null;
         entropyAccumulator = tag.getDouble("ChsAccumulator");
+        if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
     }
 }

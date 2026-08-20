@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingersBoxBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.InteractionResult;
@@ -26,18 +26,18 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Early-game generator block: undirected, its only state is whether a mob is currently trapped
- * inside (see {@link SchrodingersBoxBlockEntity}), which also drives a faint glow. Filled by
- * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingersBoxItem#interactLivingEntity}
+ * inside (see {@link SchrodingerGeneratorBlockEntity}), which also drives a faint glow. Filled by
+ * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem#interactLivingEntity}
  * before placement; emptied by an empty-handed right-click or by breaking the block, either of which
  * releases the mob back into the world rather than deleting it.
  */
 @SuppressWarnings("null")
-public class SchrodingersBox extends BaseEntityBlock {
+public class SchrodingerGenerator extends BaseEntityBlock {
     public static final BooleanProperty OCCUPIED = BlockStateProperties.OCCUPIED;
 
-    private static final MapCodec<SchrodingersBox> CODEC = simpleCodec(SchrodingersBox::new);
+    private static final MapCodec<SchrodingerGenerator> CODEC = simpleCodec(SchrodingerGenerator::new);
 
-    public SchrodingersBox(Properties properties) {
+    public SchrodingerGenerator(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(OCCUPIED, false));
     }
@@ -64,7 +64,7 @@ public class SchrodingersBox extends BaseEntityBlock {
         if (level.isClientSide) return;
 
         CapturedMob captured = stack.get(Registration.CAPTURED_MOB.get());
-        if (captured != null && level.getBlockEntity(pos) instanceof SchrodingersBoxBlockEntity blockEntity) {
+        if (captured != null && level.getBlockEntity(pos) instanceof SchrodingerGeneratorBlockEntity blockEntity) {
             blockEntity.capture(captured.entityTypeId(), captured.customName().orElse(null));
             level.setBlock(pos, state.setValue(OCCUPIED, true), 3);
         }
@@ -76,7 +76,7 @@ public class SchrodingersBox extends BaseEntityBlock {
         if (level.isClientSide) return InteractionResult.SUCCESS;
         if (!state.getValue(OCCUPIED)) return InteractionResult.PASS;
 
-        if (level.getBlockEntity(pos) instanceof SchrodingersBoxBlockEntity blockEntity) {
+        if (level.getBlockEntity(pos) instanceof SchrodingerGeneratorBlockEntity blockEntity) {
             blockEntity.release();
             level.setBlock(pos, state.setValue(OCCUPIED, false), 3);
         }
@@ -86,7 +86,7 @@ public class SchrodingersBox extends BaseEntityBlock {
     @Override
     public void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
                           @NotNull BlockState newState, boolean isMoving) {
-        if (state.getBlock() != newState.getBlock() && level.getBlockEntity(pos) instanceof SchrodingersBoxBlockEntity blockEntity) {
+        if (state.getBlock() != newState.getBlock() && level.getBlockEntity(pos) instanceof SchrodingerGeneratorBlockEntity blockEntity) {
             blockEntity.release();
         }
         super.onRemove(state, level, pos, newState, isMoving);
@@ -95,12 +95,12 @@ public class SchrodingersBox extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return createTickerHelper(type, Registration.SCHRODINGERS_BOX_BLOCK_ENTITY.get(), SchrodingersBoxBlockEntity::tick);
+        return createTickerHelper(type, Registration.SCHRODINGER_GENERATOR_BLOCK_ENTITY.get(), SchrodingerGeneratorBlockEntity::tick);
     }
 
     @Nullable
     @Override
     public BlockEntity newBlockEntity(@NotNull BlockPos pos, @NotNull BlockState state) {
-        return new SchrodingersBoxBlockEntity(pos, state);
+        return new SchrodingerGeneratorBlockEntity(pos, state);
     }
 }
