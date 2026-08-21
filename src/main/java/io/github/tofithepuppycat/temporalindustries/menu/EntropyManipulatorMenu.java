@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyChangeInducerBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -16,11 +16,11 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Entropy Change Inducer GUI: an input/output slot pair plus both entropy
+/** Container menu for the Entropy Manipulator GUI: an input/output slot pair plus both entropy
  * tanks' fill/capacity, the liquid material tank's fill/capacity/fluid, and processing progress,
  * packed into {@link ContainerData} the same way as {@link EntropyCondenserMenu}. */
 @SuppressWarnings("null")
-public class EntropyChangeInducerMenu extends AbstractContainerMenu {
+public class EntropyManipulatorMenu extends AbstractContainerMenu {
     private static final int INPUT_SLOT_X = 55;
     private static final int INPUT_SLOT_Y = 35;
     private static final int OUTPUT_SLOT_X = 116;
@@ -29,21 +29,21 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
     private static final int INVENTORY_Y = 84;
     private static final int HOTBAR_Y = 142;
 
-    private final EntropyChangeInducerBlockEntity blockEntity;
+    private final EntropyManipulatorBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
     private final ContainerData data;
 
-    public EntropyChangeInducerMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
+    public EntropyManipulatorMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
         this(id, playerInventory, getBlockEntity(playerInventory, dataBuffer.readBlockPos()));
     }
 
-    public EntropyChangeInducerMenu(int id, Inventory playerInventory, EntropyChangeInducerBlockEntity blockEntity) {
+    public EntropyManipulatorMenu(int id, Inventory playerInventory, EntropyManipulatorBlockEntity blockEntity) {
         this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(9));
     }
 
-    public EntropyChangeInducerMenu(int id, Inventory playerInventory, EntropyChangeInducerBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
-        super(Registration.ENTROPY_CHANGE_INDUCER_MENU.get(), id);
+    public EntropyManipulatorMenu(int id, Inventory playerInventory, EntropyManipulatorBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
+        super(Registration.ENTROPY_MANIPULATOR_MENU.get(), id);
         this.blockEntity = blockEntity;
         this.blockPos = blockEntity.getBlockPos();
         this.access = access;
@@ -52,8 +52,8 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
         checkContainerDataCount(data, 9);
         addDataSlots(data);
 
-        addSlot(new Slot(blockEntity, EntropyChangeInducerBlockEntity.INPUT_SLOT, INPUT_SLOT_X, INPUT_SLOT_Y));
-        addSlot(new Slot(blockEntity, EntropyChangeInducerBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
+        addSlot(new Slot(blockEntity, EntropyManipulatorBlockEntity.INPUT_SLOT, INPUT_SLOT_X, INPUT_SLOT_Y));
+        addSlot(new Slot(blockEntity, EntropyManipulatorBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
             @Override public boolean mayPlace(@NotNull ItemStack stack) {
                 return false;
             }
@@ -69,11 +69,11 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
         }
     }
 
-    private static EntropyChangeInducerBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
-        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof EntropyChangeInducerBlockEntity be) {
+    private static EntropyManipulatorBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
+        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof EntropyManipulatorBlockEntity be) {
             return be;
         }
-        throw new IllegalStateException("Expected EntropyChangeInducerBlockEntity at " + blockPos);
+        throw new IllegalStateException("Expected EntropyManipulatorBlockEntity at " + blockPos);
     }
 
     @Override
@@ -137,8 +137,8 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
         ItemStack stackInSlot = slot.getItem();
         ItemStack result = stackInSlot.copy();
 
-        int inputSlot = EntropyChangeInducerBlockEntity.INPUT_SLOT;
-        int outputSlot = EntropyChangeInducerBlockEntity.OUTPUT_SLOT;
+        int inputSlot = EntropyManipulatorBlockEntity.INPUT_SLOT;
+        int outputSlot = EntropyManipulatorBlockEntity.OUTPUT_SLOT;
         int inventoryStart = outputSlot + 1;
         int inventoryEnd = inventoryStart + 36;
 
@@ -158,7 +158,7 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return stillValid(access, player, Registration.ENTROPY_CHANGE_INDUCER_BLOCK.get());
+        return stillValid(access, player, Registration.ENTROPY_MANIPULATOR_BLOCK.get());
     }
 
     public BlockPos getBlockPos() {
