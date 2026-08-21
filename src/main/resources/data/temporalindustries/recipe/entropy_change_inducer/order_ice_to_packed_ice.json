@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_change_inducer",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:ice"
+  },
+  "result": {
+    "id": "minecraft:packed_ice",
+    "count": 1
+  }
+}
