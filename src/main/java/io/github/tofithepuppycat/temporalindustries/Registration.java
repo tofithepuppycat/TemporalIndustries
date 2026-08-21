@@ -38,6 +38,7 @@ import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMe
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyChangeInducerMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
+import io.github.tofithepuppycat.temporalindustries.recipe.EntropyChangeInducerRecipe;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.registries.Registries;
@@ -55,6 +56,8 @@ import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.crafting.Ingredient;
+import net.minecraft.world.item.crafting.RecipeSerializer;
+import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.fml.common.asm.enumextension.EnumProxy;
 import net.minecraft.world.level.block.LiquidBlock;
 import net.minecraft.world.level.block.SoundType;
@@ -97,6 +100,8 @@ public class Registration {
     public static final DeferredRegister<Fluid> FLUIDS = DeferredRegister.create(Registries.FLUID, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
     public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS = DeferredRegister.create(Registries.ARMOR_MATERIAL, MODID);
+    public static final DeferredRegister<RecipeType<?>> RECIPE_TYPES = DeferredRegister.create(Registries.RECIPE_TYPE, MODID);
+    public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister.create(Registries.RECIPE_SERIALIZER, MODID);
 
     public static final DeferredBlock<Chronovault> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
             () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -264,6 +269,12 @@ public class Registration {
     public static final DeferredItem<Item> ENTROPY_CHANGE_INDUCER_ITEM = ITEMS.register("entropy_change_inducer",
             () -> new BlockItem(ENTROPY_CHANGE_INDUCER_BLOCK.get(), new Item.Properties()));
 
+    public static final DeferredHolder<RecipeType<?>, RecipeType<EntropyChangeInducerRecipe>> ENTROPY_CHANGE_INDUCER_RECIPE_TYPE =
+            RECIPE_TYPES.register("entropy_change_inducer", () -> RecipeType.simple(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_change_inducer")));
+
+    public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<EntropyChangeInducerRecipe>> ENTROPY_CHANGE_INDUCER_RECIPE_SERIALIZER =
+            RECIPE_SERIALIZERS.register("entropy_change_inducer", () -> new EntropyChangeInducerRecipe.Serializer());
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
@@ -344,6 +355,8 @@ public class Registration {
         FLUIDS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
         ARMOR_MATERIALS.register(modEventBus);
+        RECIPE_TYPES.register(modEventBus);
+        RECIPE_SERIALIZERS.register(modEventBus);
     }
 
     static void registerCapabilities(RegisterCapabilitiesEvent event) {

@@ -1,0 +1,10 @@
+{
+  "type": "temporalindustries:entropy_change_inducer",
+  "entropy_type": "order",
+  "input_fluid": "minecraft:water",
+  "fluid_amount": 1000,
+  "result": {
+    "id": "minecraft:ice",
+    "count": 1
+  }
+}
