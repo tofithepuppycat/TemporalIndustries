@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
+import io.github.tofithepuppycat.temporalindustries.block.EntropyChangeInducer;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
@@ -13,6 +14,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjector
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyChangeInducerBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
@@ -33,6 +35,7 @@ import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyChangeInducerMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import net.minecraft.ChatFormatting;
@@ -253,6 +256,14 @@ public class Registration {
     public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
             () -> new BlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
+    // --- Entropy Change Inducer: spends liquid Order/Chaos to transmute items/blocks/liquids ---
+
+    public static final DeferredBlock<EntropyChangeInducer> ENTROPY_CHANGE_INDUCER_BLOCK = BLOCKS.register("entropy_change_inducer",
+            () -> new EntropyChangeInducer(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> ENTROPY_CHANGE_INDUCER_ITEM = ITEMS.register("entropy_change_inducer",
+            () -> new BlockItem(ENTROPY_CHANGE_INDUCER_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
@@ -277,6 +288,9 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
             () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyChangeInducerBlockEntity>> ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_change_inducer",
+            () -> BlockEntityType.Builder.of(EntropyChangeInducerBlockEntity::new, ENTROPY_CHANGE_INDUCER_BLOCK.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
             () -> IMenuTypeExtension.create(ChronovaultMenu::new));
 
@@ -288,6 +302,9 @@ public class Registration {
 
     public static final DeferredHolder<MenuType<?>, MenuType<CrudeEntropyCondenserMenu>> CRUDE_ENTROPY_CONDENSER_MENU = MENUS.register("crude_entropy_condenser",
             () -> IMenuTypeExtension.create(CrudeEntropyCondenserMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<EntropyChangeInducerMenu>> ENTROPY_CHANGE_INDUCER_MENU = MENUS.register("entropy_change_inducer",
+            () -> IMenuTypeExtension.create(EntropyChangeInducerMenu::new));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
@@ -302,6 +319,7 @@ public class Registration {
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
+                        output.accept(ENTROPY_CHANGE_INDUCER_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
@@ -352,6 +370,10 @@ public class Registration {
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
     }
 
