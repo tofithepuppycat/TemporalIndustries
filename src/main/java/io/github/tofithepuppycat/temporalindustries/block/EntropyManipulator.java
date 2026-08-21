@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyChangeInducerBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerPlayer;
@@ -27,15 +27,15 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /** Machine that spends liquid Order/Chaos to transmute whatever sits in its input slot or liquid
- * tank into the next item in an entropy chain; see {@link EntropyChangeInducerBlockEntity}.
+ * tank into the next item in an entropy chain; see {@link EntropyManipulatorBlockEntity}.
  * {@link #FACING} picks the "front" face the same way {@link EntropyCondenser}'s does. */
 @SuppressWarnings("null")
-public class EntropyChangeInducer extends BaseEntityBlock {
+public class EntropyManipulator extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
 
-    private static final MapCodec<EntropyChangeInducer> CODEC = simpleCodec(EntropyChangeInducer::new);
+    private static final MapCodec<EntropyManipulator> CODEC = simpleCodec(EntropyManipulator::new);
 
-    public EntropyChangeInducer(Properties properties) {
+    public EntropyManipulator(Properties properties) {
         super(properties);
         registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
     }
@@ -73,20 +73,20 @@ public class EntropyChangeInducer extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return createTickerHelper(type, Registration.ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY.get(), EntropyChangeInducerBlockEntity::tick);
+        return createTickerHelper(type, Registration.ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(), EntropyManipulatorBlockEntity::tick);
     }
 
     @Nullable
     @Override
     public BlockEntity newBlockEntity(@NotNull BlockPos pos, @NotNull BlockState state) {
-        return new EntropyChangeInducerBlockEntity(pos, state);
+        return new EntropyManipulatorBlockEntity(pos, state);
     }
 
     @Override
     protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hitResult) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
 
-        if (level.getBlockEntity(pos) instanceof EntropyChangeInducerBlockEntity be && player instanceof ServerPlayer serverPlayer) {
+        if (level.getBlockEntity(pos) instanceof EntropyManipulatorBlockEntity be && player instanceof ServerPlayer serverPlayer) {
             serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));
         }
         return InteractionResult.CONSUME;

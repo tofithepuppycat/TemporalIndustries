@@ -1,8 +1,0 @@
-{
-  "variants": {
-    "facing=north": { "model": "temporalindustries:block/entropy_change_inducer" },
-    "facing=east": { "model": "temporalindustries:block/entropy_change_inducer", "y": 90 },
-    "facing=south": { "model": "temporalindustries:block/entropy_change_inducer", "y": 180 },
-    "facing=west": { "model": "temporalindustries:block/entropy_change_inducer", "y": 270 }
-  }
-}

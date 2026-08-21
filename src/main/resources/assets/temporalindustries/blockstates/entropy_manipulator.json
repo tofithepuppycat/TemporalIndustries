@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "temporalindustries:block/entropy_manipulator" },
+    "facing=east": { "model": "temporalindustries:block/entropy_manipulator", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/entropy_manipulator", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/entropy_manipulator", "y": 270 }
+  }
+}
