@@ -160,8 +160,9 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
 
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.entropy_change_inducer"), 8, 6, 0xFFFFFF, false);
-        guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFFFFFF, false);
+        Component machineTitle = Component.translatable("block.temporalindustries.entropy_change_inducer");
+        guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
+        guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
 
     @Override
