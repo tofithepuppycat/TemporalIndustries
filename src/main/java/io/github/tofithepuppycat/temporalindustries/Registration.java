@@ -152,6 +152,18 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> BOTTLE_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "bottle_contents", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
+    // --- Temporal Anchor order bar/mode, and Temporal Glue's sub-durability charge progress ---
+    // all reuse BottleContents (a plain persistent+networked int wrapper) rather than adding new records.
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_ORDER = DATA_COMPONENTS.registerComponentType(
+            "anchor_order", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_MODE = DATA_COMPONENTS.registerComponentType(
+            "anchor_mode", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> GLUE_CHARGE_PROGRESS = DATA_COMPONENTS.registerComponentType(
+            "glue_charge_progress", builder -> builder.persistent(BottleContents.CODEC));
+
     public static final DeferredItem<Item> ORDER_CELL_ITEM = ITEMS.register("order_cell",
             () -> new EntropyCellItem(EntropyType.ORDER, new Item.Properties().stacksTo(1)));
 

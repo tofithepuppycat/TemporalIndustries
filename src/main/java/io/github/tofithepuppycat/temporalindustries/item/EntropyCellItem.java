@@ -33,6 +33,11 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
     }
 
     @Override
+    public boolean hasRoom(ItemStack stack, EntropyType type) {
+        return this.type == type && getContents(stack).amount() < BottleContents.CAPACITY;
+    }
+
+    @Override
     public int insertOrb(ItemStack stack, EntropyType type, int amount) {
         if (this.type != type || amount <= 0) return amount;
 
@@ -53,6 +58,7 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        tooltip.add(Component.translatable(key, EntropyDisplay.format(amount), EntropyDisplay.format(BottleContents.CAPACITY)).withStyle(color));
+        tooltip.add(Component.translatable(key, EntropyDisplay.format(amount), EntropyDisplay.format(BottleContents.CAPACITY)).withStyle(color)
+                .append(EntropyDisplay.unit(type)));
     }
 }
