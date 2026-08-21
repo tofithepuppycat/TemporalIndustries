@@ -181,7 +181,7 @@ public class EchoRecordItem extends Item {
                             String.format("%.1f", recording.averageEnergyPerTick()), recording.peakEnergyPerTick())
                             .withStyle(ChatFormatting.GRAY)));
         } else {
-            tooltip.add(Component.translatable("item.temporalindustries.echo_record.tooltip").withStyle(ChatFormatting.GRAY));
+            TooltipUtil.appendDescription(tooltip, "item.temporalindustries.echo_record.tooltip");
         }
     }
 

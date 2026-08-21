@@ -1,6 +1,5 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.item.ArmorItem;
@@ -20,6 +19,6 @@ public class EntropyGlassesItem extends ArmorItem {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.temporalindustries.entropy_glasses.tooltip").withStyle(ChatFormatting.GRAY));
+        TooltipUtil.appendDescription(tooltip, "item.temporalindustries.entropy_glasses.tooltip");
     }
 }

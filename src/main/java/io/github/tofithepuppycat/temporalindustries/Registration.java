@@ -25,6 +25,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
+import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
@@ -52,7 +53,6 @@ import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.crafting.Ingredient;
@@ -116,7 +116,7 @@ public class Registration {
             () -> new EchoProjector(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_CYAN).strength(3.0F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 3)));
 
     public static final DeferredItem<Item> ECHO_PROJECTOR_ITEM = ITEMS.register("echo_projector",
-            () -> new BlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties().rarity(ECHO_RARITY.getValue())));
+            () -> new DescribedBlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties().rarity(ECHO_RARITY.getValue())));
 
     public static final DeferredItem<Item> ECHO_RECORD_ITEM = ITEMS.register("echo_record",
             () -> new EchoRecordItem(new Item.Properties().stacksTo(1).rarity(ECHO_RARITY.getValue())));
@@ -195,7 +195,7 @@ public class Registration {
             () -> new SeebeckGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> SEEBECK_GENERATOR_ITEM = ITEMS.register("seebeck_generator",
-            () -> new BlockItem(SEEBECK_GENERATOR_BLOCK.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(SEEBECK_GENERATOR_BLOCK.get(), new Item.Properties()));
 
     // --- Order/Chaos fluids: the "liquid form" of ORD/CHS condensed by the Entropy Condenser ---
 
@@ -251,7 +251,7 @@ public class Registration {
             () -> new EntropyCondenser(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> ENTROPY_CONDENSER_ITEM = ITEMS.register("entropy_condenser",
-            () -> new BlockItem(ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
     // --- Crude Entropy Condenser: unpowered lower tier that drains Cells instead of catching orbs ---
 
@@ -259,7 +259,7 @@ public class Registration {
             () -> new CrudeEntropyCondenser(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
-            () -> new BlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
     // --- Entropy Change Inducer: spends liquid Order/Chaos to transmute items/blocks/liquids ---
 
@@ -267,7 +267,7 @@ public class Registration {
             () -> new EntropyChangeInducer(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> ENTROPY_CHANGE_INDUCER_ITEM = ITEMS.register("entropy_change_inducer",
-            () -> new BlockItem(ENTROPY_CHANGE_INDUCER_BLOCK.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ENTROPY_CHANGE_INDUCER_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredHolder<RecipeType<?>, RecipeType<EntropyChangeInducerRecipe>> ENTROPY_CHANGE_INDUCER_RECIPE_TYPE =
             RECIPE_TYPES.register("entropy_change_inducer", () -> RecipeType.simple(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_change_inducer")));
