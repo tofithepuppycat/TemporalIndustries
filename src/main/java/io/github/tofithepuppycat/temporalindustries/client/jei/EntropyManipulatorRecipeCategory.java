@@ -26,7 +26,7 @@ import org.jetbrains.annotations.NotNull;
  */
 public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeHolder<EntropyManipulatorRecipe>> {
     private static final int WIDTH = 130;
-    private static final int HEIGHT = 44;
+    private static final int HEIGHT = 48;
 
     private static final int INPUT_X = 2;
     private static final int INPUT_Y = 6;
@@ -36,8 +36,10 @@ public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeH
     private static final int OUTPUT_Y = 6;
     private static final int ENTROPY_X = 2;
     private static final int ENTROPY_Y = 26;
+    private static final int AMOUNT_X = ENTROPY_X + 22;
+    private static final int AMOUNT_Y = ENTROPY_Y + 3;
     private static final int TIME_X = ENTROPY_X + 22;
-    private static final int TIME_Y = ENTROPY_Y + 6;
+    private static final int TIME_Y = ENTROPY_Y + 13;
 
     private final IDrawable icon;
     private final IDrawable arrow;
@@ -102,7 +104,12 @@ public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeH
         arrow.draw(guiGraphics, ARROW_X, ARROW_Y);
 
         EntropyManipulatorRecipe recipe = recipeHolder.value();
+        var font = Minecraft.getInstance().font;
+
+        Component amount = Component.literal(recipe.entropyCost() + " mB");
+        guiGraphics.drawString(font, amount, AMOUNT_X, AMOUNT_Y, 0xFF000000 | recipe.entropyType().color(), false);
+
         Component time = Component.literal(String.format("%.1fs", recipe.processTicks() / 20f));
-        guiGraphics.drawString(Minecraft.getInstance().font, time, TIME_X, TIME_Y, 0xFF808080, false);
+        guiGraphics.drawString(font, time, TIME_X, TIME_Y, 0xFF808080, false);
     }
 }
