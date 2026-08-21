@@ -49,7 +49,7 @@ public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeH
 
     @Override
     public RecipeType<RecipeHolder<EntropyManipulatorRecipe>> getRecipeType() {
-        return TemporalIndustriesJeiPlugin.ENTROPY_MANIPULATOR_RECIPE_TYPE;
+        return TemporalIndustriesJeiPlugin.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
     }
 
     @Override
