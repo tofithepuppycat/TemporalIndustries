@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_change_inducer",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:amethyst_shard"
+  },
+  "result": {
+    "id": "minecraft:echo_shard",
+    "count": 1
+  }
+}

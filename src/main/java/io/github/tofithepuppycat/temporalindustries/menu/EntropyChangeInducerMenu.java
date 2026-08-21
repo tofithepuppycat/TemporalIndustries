@@ -39,7 +39,7 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
     }
 
     public EntropyChangeInducerMenu(int id, Inventory playerInventory, EntropyChangeInducerBlockEntity blockEntity) {
-        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(8));
+        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(9));
     }
 
     public EntropyChangeInducerMenu(int id, Inventory playerInventory, EntropyChangeInducerBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -49,7 +49,7 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 8);
+        checkContainerDataCount(data, 9);
         addDataSlots(data);
 
         addSlot(new Slot(blockEntity, EntropyChangeInducerBlockEntity.INPUT_SLOT, INPUT_SLOT_X, INPUT_SLOT_Y));
@@ -89,6 +89,7 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
         data.set(6, blockEntity.getProgress());
         EntropyType activeType = blockEntity.getActiveType();
         data.set(7, activeType == null ? 0 : activeType.ordinal() + 1);
+        data.set(8, blockEntity.getMaxProgress());
     }
 
     public int getChaosFluidAmount() {
@@ -122,6 +123,10 @@ public class EntropyChangeInducerMenu extends AbstractContainerMenu {
     /** 0 = idle, 1 = Order, 2 = Chaos (see {@link EntropyType} declaration order). */
     public int getActiveTypeCode() {
         return data.get(7);
+    }
+
+    public int getMaxProgress() {
+        return data.get(8);
     }
 
     @Override

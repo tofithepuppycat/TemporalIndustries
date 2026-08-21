@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_change_inducer",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:sand"
+  },
+  "result": {
+    "id": "minecraft:redstone",
+    "count": 1
+  }
+}
