@@ -150,8 +150,9 @@ public class TemporalGlueItem extends Item {
         if (data.contains("Pos1X")) {
             tooltip.add(Component.translatable("item.temporalindustries.temporal_glue.tooltip_pending").withStyle(ChatFormatting.YELLOW));
         }
-        tooltip.add(Component.translatable("item.temporalindustries.temporal_glue.tooltip").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.temporalindustries.temporal_glue.tooltip_remove").withStyle(ChatFormatting.GRAY));
+        TooltipUtil.appendDescription(tooltip,
+                "item.temporalindustries.temporal_glue.tooltip",
+                "item.temporalindustries.temporal_glue.tooltip_remove");
     }
 
     private static CompoundTag readData(ItemStack stack) {
