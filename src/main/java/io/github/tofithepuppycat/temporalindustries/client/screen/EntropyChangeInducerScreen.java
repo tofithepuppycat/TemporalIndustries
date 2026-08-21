@@ -144,7 +144,7 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
         if (code == 0) return;
 
         EntropyType type = EntropyType.values()[code - 1];
-        int width = Math.round((menu.getProgress() / (float) EntropyChangeInducerBlockEntity.PROCESS_TICKS) * PROGRESS_WIDTH);
+        int width = Math.round((menu.getProgress() / (float) menu.getMaxProgress()) * PROGRESS_WIDTH);
         width = Math.clamp(width, 0, PROGRESS_WIDTH);
         if (width <= 0) return;
 

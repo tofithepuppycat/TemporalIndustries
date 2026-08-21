@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_change_inducer",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:ender_eye"
+  },
+  "result": {
+    "id": "minecraft:ender_pearl",
+    "count": 1
+  }
+}
