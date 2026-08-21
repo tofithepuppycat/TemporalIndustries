@@ -1,0 +1,8 @@
+{
+  "replace": false,
+  "values": [
+    "temporalindustries:order_cell",
+    "temporalindustries:chaos_cell",
+    "temporalindustries:dual_entropy_cell"
+  ]
+}
