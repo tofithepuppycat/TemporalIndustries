@@ -77,7 +77,9 @@ public class PlayerSnapshot {
                 player.level().getGameTime());
     }
 
-    public void applyTo(ServerPlayer player) {
+    /** @param restoreInventory whether to also overwrite the player's current inventory with the
+     * snapshot's — false for the Temporal Anchor's "keep inventory" rewind mode. */
+    public void applyTo(ServerPlayer player, boolean restoreInventory) {
         MinecraftServer server = player.getServer();
         ServerLevel targetLevel = null;
         if (server != null) {
@@ -107,8 +109,10 @@ public class PlayerSnapshot {
             }
         }
 
-        player.getInventory().clearContent();
-        player.getInventory().load(inventory);
+        if (restoreInventory) {
+            player.getInventory().clearContent();
+            player.getInventory().load(inventory);
+        }
     }
 
     public CompoundTag toTag() {

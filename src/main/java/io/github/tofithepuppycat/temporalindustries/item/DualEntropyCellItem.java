@@ -34,6 +34,11 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     }
 
     @Override
+    public boolean hasRoom(ItemStack stack, EntropyType type) {
+        return getContents(stack).amount(type) < EntropyContents.CAPACITY;
+    }
+
+    @Override
     public int insertOrb(ItemStack stack, EntropyType type, int amount) {
         return insert(stack, type, amount);
     }
@@ -60,8 +65,10 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
         EntropyContents contents = getContents(stack);
         String capacity = EntropyDisplay.format(EntropyContents.CAPACITY);
         tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.format(contents.order()), capacity)
-                .withStyle(ChatFormatting.WHITE));
+                .withStyle(ChatFormatting.WHITE)
+                .append(EntropyDisplay.unit(EntropyType.ORDER)));
         tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.format(contents.chaos()), capacity)
-                .withStyle(ChatFormatting.DARK_PURPLE));
+                .withStyle(ChatFormatting.DARK_PURPLE)
+                .append(EntropyDisplay.unit(EntropyType.CHAOS)));
     }
 }

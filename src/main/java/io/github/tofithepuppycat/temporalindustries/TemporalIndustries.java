@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries;
 
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
 import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
@@ -7,6 +8,7 @@ import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.network.NetworkHandler;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
+import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
 import net.neoforged.neoforge.common.NeoForge;
@@ -26,6 +28,10 @@ public class TemporalIndustries
 
         modEventBus.addListener(Registration::registerCapabilities);
         modEventBus.addListener(NetworkHandler::register);
+
+        if (ModList.get().isLoaded("curios")) {
+            modEventBus.addListener(CuriosCellCompat::registerCapabilities);
+        }
 
         modContainer.registerConfig(ModConfig.Type.COMMON, TemporalIndustriesConfig.SPEC);
 

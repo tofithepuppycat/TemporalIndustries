@@ -28,14 +28,15 @@ public final class CuriosCellCompat {
                 Registration.ORDER_CELL_ITEM.get(), Registration.CHAOS_CELL_ITEM.get(), Registration.DUAL_ENTROPY_CELL_ITEM.get());
     }
 
-    /** First cell equipped in the "cell" curio slot that accepts the given entropy type, or null. */
+    /** First cell equipped in the "cell" curio slot with spare capacity for the given entropy
+     * type, or null. */
     @Nullable
     public static ItemStack findCellInCurioSlot(Player player, EntropyType type) {
         return CuriosApi.getCuriosInventory(player)
                 .map(inventory -> {
                     for (SlotResult result : inventory.findCurios("cell")) {
                         ItemStack stack = result.stack();
-                        if (stack.getItem() instanceof EntropyReceptacle receptacle && receptacle.accepts(type)) {
+                        if (stack.getItem() instanceof EntropyReceptacle receptacle && receptacle.hasRoom(stack, type)) {
                             return stack;
                         }
                     }
