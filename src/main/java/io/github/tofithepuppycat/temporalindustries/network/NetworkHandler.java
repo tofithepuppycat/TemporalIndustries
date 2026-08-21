@@ -93,5 +93,15 @@ public class NetworkHandler {
                 EntropyCondenserSetRangePacket.TYPE,
                 EntropyCondenserSetRangePacket.STREAM_CODEC,
                 EntropyCondenserSetRangePacket::handle);
+
+        registrar.playToServer(
+                AnchorModeCyclePacket.TYPE,
+                AnchorModeCyclePacket.STREAM_CODEC,
+                AnchorModeCyclePacket::handle);
+
+        registrar.playToClient(
+                AnchorRewindEffectPacket.TYPE,
+                AnchorRewindEffectPacket.STREAM_CODEC,
+                AnchorRewindEffectPacket::handle);
     }
 }
