@@ -5,7 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.ChatFormatting;
-import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
@@ -22,7 +22,6 @@ import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.levelgen.Heightmap;
-import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -61,8 +60,6 @@ public class PortableChronoMarkerItem extends Item {
     private static final int WAVE_DURATION_TICKS = 15;
     private static final double RING_SPEED = 6.0D;
 
-    private static final DustParticleOptions WALL_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 1.0F, 1.0F), 1.0F);
-    private static final DustParticleOptions WAVE_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 1.0F, 1.0F), 1.4F);
 
     /** playerId -> gameTime the current terrain-tracing wave started, consumed in inventoryTick.
      * Purely cosmetic — never persisted. */
@@ -143,7 +140,8 @@ public class PortableChronoMarkerItem extends Item {
         worldData.setDirty();
 
         player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.marked"), true);
-        level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.2F);
+        level.playSound(null, player.blockPosition(), SoundEvents.SCULK_CATALYST_BLOOM, SoundSource.PLAYERS, 1.0F, 1.2F);
+        level.sendParticles(ParticleTypes.SONIC_BOOM, player.getX(), player.getY() + 1.0D, player.getZ(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         ACTIVE_WAVE_START.put(player.getUUID(), level.getGameTime());
     }
 
@@ -184,7 +182,7 @@ public class PortableChronoMarkerItem extends Item {
 
     private static void spawnWallColumn(ServerLevel level, int x, int z, double centerY) {
         for (double dy = -3.0D; dy <= 3.0D; dy += 1.5D) {
-            level.sendParticles(WALL_PARTICLE, x + 0.5D, centerY + dy, z + 0.5D, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            level.sendParticles(ParticleTypes.SCULK_SOUL, x + 0.5D, centerY + dy, z + 0.5D, 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 
@@ -211,7 +209,7 @@ public class PortableChronoMarkerItem extends Item {
             int x = centerX + (int) Math.round(Math.cos(angle) * radius);
             int z = centerZ + (int) Math.round(Math.sin(angle) * radius);
             int y = level.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
-            level.sendParticles(WAVE_PARTICLE, x + 0.5D, y + 0.2D, z + 0.5D, 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            level.sendParticles(ParticleTypes.SCULK_CHARGE_POP, x + 0.5D, y + 0.2D, z + 0.5D, 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 
