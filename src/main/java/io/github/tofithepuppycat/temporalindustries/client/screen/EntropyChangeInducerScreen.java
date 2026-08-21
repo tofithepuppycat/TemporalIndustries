@@ -22,7 +22,7 @@ import org.jetbrains.annotations.NotNull;
 
 /** Textured GUI for the Entropy Change Inducer: two vertical entropy tank bars (Chaos/Order), a
  * material liquid tank drawn underneath the background texture's transparent window, an
- * input/output slot pair, and a progress indicator over the gear icon baked into the texture. */
+ * input/output slot pair, and a Chaos/Order progress bar icon over the gear baked into the texture. */
 @SuppressWarnings("null")
 public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyChangeInducerMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -137,8 +137,8 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
         guiGraphics.disableScissor();
     }
 
-    /** Translucent tint over the gear icon that grows left-to-right with processing progress,
-     * colored by whichever entropy type is currently fueling the active recipe. */
+    /** Draws the Chaos or Order progress bar icon over the gear, growing left-to-right with
+     * processing progress; which icon is used depends on the active recipe's entropy type. */
     private void renderProgress(GuiGraphics guiGraphics) {
         int code = menu.getActiveTypeCode();
         if (code == 0) return;
@@ -148,8 +148,13 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
         width = Math.clamp(width, 0, PROGRESS_WIDTH);
         if (width <= 0) return;
 
-        int overlay = (0x60 << 24) | (type.color() & 0xFFFFFF);
-        guiGraphics.fill(leftPos + PROGRESS_X, topPos + PROGRESS_Y, leftPos + PROGRESS_X + width, topPos + PROGRESS_Y + PROGRESS_HEIGHT, overlay);
+        ResourceLocation icon = type == EntropyType.CHAOS ? CHAOS_ICON : ORDER_ICON;
+        int x = leftPos + PROGRESS_X;
+        int y = topPos + PROGRESS_Y;
+
+        guiGraphics.enableScissor(x, y, x + width, y + PROGRESS_HEIGHT);
+        guiGraphics.blit(icon, x, y, 0, 0, PROGRESS_WIDTH, PROGRESS_HEIGHT, PROGRESS_WIDTH, PROGRESS_HEIGHT);
+        guiGraphics.disableScissor();
     }
 
     @Override
