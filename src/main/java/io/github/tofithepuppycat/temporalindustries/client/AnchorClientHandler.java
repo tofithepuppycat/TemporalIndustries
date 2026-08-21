@@ -1,16 +1,31 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
+import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.player.LocalPlayer;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.ItemStack;
+import org.joml.Vector3f;
 
 /**
- * Client-side reaction to {@link io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket}.
- * Only ever invoked from that packet's handle() callback, which only fires on the client - kept
+ * Client-side reaction to {@link io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket}
+ * and {@link io.github.tofithepuppycat.temporalindustries.network.AnchorRewindEffectPacket}.
+ * Only ever invoked from those packets' handle() callbacks, which only fire on the client - kept
  * in its own class (mirroring {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager})
- * so the packet class itself never needs to reference client-only types.
+ * so the packet classes themselves never need to reference client-only types.
  */
 public final class AnchorClientHandler {
+    private static final Vector3f REWIND_PARTICLE_COLOR = new Vector3f(
+            ((EntropyType.CHAOS.color() >> 16) & 0xFF) / 255.0F,
+            ((EntropyType.CHAOS.color() >> 8) & 0xFF) / 255.0F,
+            (EntropyType.CHAOS.color() & 0xFF) / 255.0F);
+
     private AnchorClientHandler() {
     }
 
@@ -28,5 +43,36 @@ public final class AnchorClientHandler {
         minecraft.gui.setTimes(10, 70, 20);
         minecraft.gui.setTitle(Component.translatable("temporalindustries.anchor.reverted.title"));
         minecraft.gui.setSubtitle(Component.translatable("temporalindustries.anchor.reverted.subtitle", revertedChangeCount));
+    }
+
+    public static void onRewindEffect(int entityId) {
+        Minecraft minecraft = Minecraft.getInstance();
+        ClientLevel level = minecraft.level;
+        if (level == null) {
+            return;
+        }
+
+        Entity entity = level.getEntity(entityId);
+        if (!(entity instanceof LivingEntity livingEntity)) {
+            return;
+        }
+
+        DustParticleOptions particle = new DustParticleOptions(REWIND_PARTICLE_COLOR, 1.3F);
+        for (int i = 0; i < 30; i++) {
+            double xd = livingEntity.getRandom().nextGaussian() * 0.05;
+            double yd = livingEntity.getRandom().nextGaussian() * 0.05;
+            double zd = livingEntity.getRandom().nextGaussian() * 0.05;
+            double x = livingEntity.getRandomX(1.0);
+            double y = livingEntity.getRandomY();
+            double z = livingEntity.getRandomZ(1.0);
+            level.addParticle(particle, x, y, z, xd, yd, zd);
+        }
+
+        level.playLocalSound(livingEntity.getX(), livingEntity.getY(), livingEntity.getZ(),
+                SoundEvents.TOTEM_USE, livingEntity.getSoundSource(), 1.0F, 1.0F, false);
+
+        if (livingEntity == minecraft.player) {
+            minecraft.gameRenderer.displayItemActivation(new ItemStack(Registration.TEMPORAL_ANCHOR_ITEM.get()));
+        }
     }
 }
