@@ -1,0 +1,347 @@
+package io.github.tofithepuppycat.temporalindustries.block.entity;
+
+import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyChangeInducerMenu;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.NonNullList;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.material.Fluids;
+import org.jetbrains.annotations.Nullable;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.List;
+import java.util.Map;
+
+/**
+ * Spends liquid Order or Chaos to transmute whatever sits in its input slot, or the fluid in its
+ * liquid tank, into the next step of a fixed entropy chain (stone -> cobblestone -> gravel -> sand
+ * -> redstone under Chaos, water -> ice -> packed ice -> blue ice under Order, etc — see
+ * {@link #CHAOS_RECIPES}/{@link #ORDER_RECIPES}/{@link #WATER_RECIPE}). Item input takes priority
+ * over the liquid tank whenever both are present.
+ */
+@SuppressWarnings("null")
+public class EntropyChangeInducerBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
+    public static final int TANK_CAPACITY = 8_000;
+    public static final int LIQUID_TANK_CAPACITY = 4_000;
+    public static final int PROCESS_TICKS = 100;
+    private static final int ENTROPY_COST_MB = 100;
+
+    private static final int SLOT_COUNT = 2;
+    public static final int INPUT_SLOT = 0;
+    public static final int OUTPUT_SLOT = 1;
+
+    private record ItemRecipe(EntropyType type, Item output) {}
+    private record FluidRecipe(EntropyType type, int fluidCost, Item output) {}
+    private record ActiveRecipe(EntropyType type, Item output, boolean fromFluid) {}
+
+    private static final Map<Item, ItemRecipe> CHAOS_RECIPES = Map.of(
+            Items.STONE, new ItemRecipe(EntropyType.CHAOS, Items.COBBLESTONE),
+            Items.COBBLESTONE, new ItemRecipe(EntropyType.CHAOS, Items.GRAVEL),
+            Items.GRAVEL, new ItemRecipe(EntropyType.CHAOS, Items.SAND),
+            Items.SAND, new ItemRecipe(EntropyType.CHAOS, Items.REDSTONE),
+            Items.AMETHYST_SHARD, new ItemRecipe(EntropyType.CHAOS, Items.ECHO_SHARD));
+
+    private static final Map<Item, ItemRecipe> ORDER_RECIPES = Map.of(
+            Items.ENDER_EYE, new ItemRecipe(EntropyType.ORDER, Items.ENDER_PEARL),
+            Items.ENDER_PEARL, new ItemRecipe(EntropyType.ORDER, Items.SLIME_BALL),
+            Items.ICE, new ItemRecipe(EntropyType.ORDER, Items.PACKED_ICE),
+            Items.PACKED_ICE, new ItemRecipe(EntropyType.ORDER, Items.BLUE_ICE));
+
+    private static final FluidRecipe WATER_RECIPE = new FluidRecipe(EntropyType.ORDER, 1000, Items.ICE);
+
+    private final class InducerFluidHandler implements IFluidHandler {
+        @Override public int getTanks() { return 3; }
+
+        @Override public @NotNull FluidStack getFluidInTank(int tank) {
+            return switch (tank) {
+                case 0 -> chaosTank.getFluid();
+                case 1 -> orderTank.getFluid();
+                default -> liquidTank.getFluid();
+            };
+        }
+
+        @Override public int getTankCapacity(int tank) {
+            return switch (tank) {
+                case 0 -> chaosTank.getCapacity();
+                case 1 -> orderTank.getCapacity();
+                default -> liquidTank.getCapacity();
+            };
+        }
+
+        @Override public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+            return switch (tank) {
+                case 0 -> chaosTank.isFluidValid(stack);
+                case 1 -> orderTank.isFluidValid(stack);
+                default -> liquidTank.isFluidValid(stack);
+            };
+        }
+
+        @Override public int fill(FluidStack resource, FluidAction action) {
+            if (chaosTank.isFluidValid(resource)) return chaosTank.fill(resource, action);
+            if (orderTank.isFluidValid(resource)) return orderTank.fill(resource, action);
+            return liquidTank.fill(resource, action);
+        }
+
+        @Override public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
+            if (!chaosTank.getFluid().isEmpty() && chaosTank.getFluid().getFluid().isSame(resource.getFluid())) {
+                return chaosTank.drain(resource, action);
+            }
+            if (!orderTank.getFluid().isEmpty() && orderTank.getFluid().getFluid().isSame(resource.getFluid())) {
+                return orderTank.drain(resource, action);
+            }
+            if (!liquidTank.getFluid().isEmpty() && liquidTank.getFluid().getFluid().isSame(resource.getFluid())) {
+                return liquidTank.drain(resource, action);
+            }
+            return FluidStack.EMPTY;
+        }
+
+        @Override public @NotNull FluidStack drain(int maxDrain, FluidAction action) {
+            if (!liquidTank.getFluid().isEmpty()) return liquidTank.drain(maxDrain, action);
+            if (!chaosTank.getFluid().isEmpty()) return chaosTank.drain(maxDrain, action);
+            if (!orderTank.getFluid().isEmpty()) return orderTank.drain(maxDrain, action);
+            return FluidStack.EMPTY;
+        }
+    }
+
+    private final FluidTank chaosTank = new FluidTank(TANK_CAPACITY) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.CHAOS_FLUID.get());
+        }
+    };
+    private final FluidTank orderTank = new FluidTank(TANK_CAPACITY) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.ORDER_FLUID.get());
+        }
+    };
+    private final FluidTank liquidTank = new FluidTank(LIQUID_TANK_CAPACITY);
+    private final InducerFluidHandler fluidHandler = new InducerFluidHandler();
+
+    private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
+    private final IItemHandler inventory = new InvWrapper(this);
+
+    private int progress = 0;
+    @Nullable
+    private EntropyType activeType = null;
+
+    public EntropyChangeInducerBlockEntity(BlockPos pos, BlockState state) {
+        super(Registration.ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY.get(), pos, state);
+    }
+
+    public IItemHandler getItemHandler() {
+        return inventory;
+    }
+
+    public IFluidHandler getFluidHandler() {
+        return fluidHandler;
+    }
+
+    public FluidTank getChaosTank() {
+        return chaosTank;
+    }
+
+    public FluidTank getOrderTank() {
+        return orderTank;
+    }
+
+    public FluidTank getLiquidTank() {
+        return liquidTank;
+    }
+
+    public int getProgress() {
+        return progress;
+    }
+
+    @Nullable
+    public EntropyType getActiveType() {
+        return activeType;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        return List.of(
+                getDisplayName().copy().withStyle(ChatFormatting.WHITE),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.order",
+                        orderTank.getFluidAmount(), orderTank.getCapacity()).withStyle(ChatFormatting.GRAY),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.chaos",
+                        chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
+    }
+
+    public static void tick(Level level, BlockPos pos, BlockState state, EntropyChangeInducerBlockEntity be) {
+        if (level.isClientSide) return;
+        be.processTick();
+    }
+
+    private void processTick() {
+        ActiveRecipe active = resolveActiveRecipe();
+        if (active == null) {
+            if (progress != 0 || activeType != null) {
+                progress = 0;
+                activeType = null;
+                setChanged();
+                syncToClients();
+            }
+            return;
+        }
+
+        activeType = active.type();
+        progress++;
+        if (progress >= PROCESS_TICKS) {
+            completeRecipe(active);
+            progress = 0;
+        }
+        setChanged();
+        syncToClients();
+    }
+
+    @Nullable
+    private ActiveRecipe resolveActiveRecipe() {
+        ItemStack input = items.get(INPUT_SLOT);
+        if (!input.isEmpty()) {
+            ItemRecipe recipe = CHAOS_RECIPES.get(input.getItem());
+            if (recipe == null) recipe = ORDER_RECIPES.get(input.getItem());
+            if (recipe == null) return null;
+            if (!canOutput(recipe.output()) || !hasEntropy(recipe.type())) return null;
+            return new ActiveRecipe(recipe.type(), recipe.output(), false);
+        }
+
+        if (liquidTank.getFluidAmount() >= WATER_RECIPE.fluidCost()
+                && liquidTank.getFluid().getFluid().isSame(Fluids.WATER)
+                && canOutput(WATER_RECIPE.output()) && hasEntropy(WATER_RECIPE.type())) {
+            return new ActiveRecipe(WATER_RECIPE.type(), WATER_RECIPE.output(), true);
+        }
+        return null;
+    }
+
+    private boolean canOutput(Item output) {
+        ItemStack current = items.get(OUTPUT_SLOT);
+        return current.isEmpty() || (current.getItem() == output && current.getCount() < current.getMaxStackSize());
+    }
+
+    private boolean hasEntropy(EntropyType type) {
+        FluidTank tank = type == EntropyType.CHAOS ? chaosTank : orderTank;
+        return tank.getFluidAmount() >= ENTROPY_COST_MB;
+    }
+
+    private void completeRecipe(ActiveRecipe active) {
+        FluidTank entropyTank = active.type() == EntropyType.CHAOS ? chaosTank : orderTank;
+        var entropyFluid = active.type() == EntropyType.CHAOS ? Registration.CHAOS_FLUID.get() : Registration.ORDER_FLUID.get();
+        entropyTank.drain(new FluidStack(entropyFluid, ENTROPY_COST_MB), IFluidHandler.FluidAction.EXECUTE);
+
+        if (active.fromFluid()) {
+            liquidTank.drain(WATER_RECIPE.fluidCost(), IFluidHandler.FluidAction.EXECUTE);
+        } else {
+            items.get(INPUT_SLOT).shrink(1);
+        }
+
+        ItemStack output = items.get(OUTPUT_SLOT);
+        if (output.isEmpty()) {
+            items.set(OUTPUT_SLOT, new ItemStack(active.output()));
+        } else {
+            output.grow(1);
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    // -------------------------------------------------------------------------
+    // Container (input/output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
+
+    @Override public int getContainerSize() { return items.size(); }
+    @Override public boolean isEmpty() { return items.get(INPUT_SLOT).isEmpty() && items.get(OUTPUT_SLOT).isEmpty(); }
+    @Override public ItemStack getItem(int slot) { return items.get(slot); }
+    @Override public ItemStack removeItem(int slot, int amount) {
+        ItemStack result = ContainerHelper.removeItem(items, slot, amount);
+        if (!result.isEmpty()) setChanged();
+        return result;
+    }
+    @Override public ItemStack removeItemNoUpdate(int slot) { return ContainerHelper.takeItem(items, slot); }
+    @Override public void setItem(int slot, ItemStack stack) {
+        items.set(slot, stack);
+        if (stack.getCount() > getMaxStackSize()) stack.setCount(getMaxStackSize());
+        setChanged();
+    }
+    @Override public boolean stillValid(Player player) { return Container.stillValidBlockEntity(this, player); }
+    @Override public void clearContent() { items.clear(); }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.translatable("block.temporalindustries.entropy_change_inducer");
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int id, @NotNull Inventory inventory, @NotNull Player player) {
+        return new EntropyChangeInducerMenu(id, inventory, this);
+    }
+
+    @Override
+    protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("LiquidTank", liquidTank.writeToNBT(registries, new CompoundTag()));
+        tag.putInt("Progress", progress);
+        if (activeType != null) tag.putString("ActiveType", activeType.name());
+        ContainerHelper.saveAllItems(tag, items, registries);
+    }
+
+    @Override
+    protected void loadAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        if (tag.contains("OrderTank")) orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
+        if (tag.contains("LiquidTank")) liquidTank.readFromNBT(registries, tag.getCompound("LiquidTank"));
+        progress = tag.getInt("Progress");
+        activeType = tag.contains("ActiveType") ? EntropyType.valueOf(tag.getString("ActiveType")) : null;
+        items.clear();
+        ContainerHelper.loadAllItems(tag, items, registries);
+    }
+}
