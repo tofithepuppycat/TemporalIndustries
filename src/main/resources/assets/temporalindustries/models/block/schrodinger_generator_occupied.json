@@ -1,6 +1,12 @@
 {
-  "parent": "minecraft:block/cube_all",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "all": "temporalindustries:block/schrodinger_generator_occupied"
+    "particle": "temporalindustries:block/schrodinger_generator_occupied",
+    "north": "temporalindustries:block/schrodinger_generator_occupied",
+    "south": "temporalindustries:block/machine_base_energy",
+    "west": "temporalindustries:block/machine_base",
+    "east": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
   }
 }
