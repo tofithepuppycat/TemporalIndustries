@@ -41,9 +41,11 @@ public class EntropyOrbRenderer extends EntityRenderer<EntropyOrbEntity> {
         float v1 = 16.0F / 64.0F;
 
         int color = entity.getEntropyType().color();
-        int red = (color >> 16) & 0xFF;
-        int green = (color >> 8) & 0xFF;
-        int blue = color & 0xFF;
+        int tint_to = entity.getEntropyType().tint_to();
+        float pulse = 0.3F * (1.0F + Mth.sin(((float) entity.tickCount + partialTicks) * 0.2F));
+        int red = (int) Mth.lerp(pulse, (color >> 16) & 0xFF, (tint_to >> 16) & 0xFF);
+        int green = (int) Mth.lerp(pulse, (color >> 8) & 0xFF, (tint_to >> 8) & 0xFF);
+        int blue = (int) Mth.lerp(pulse, color & 0xFF, tint_to & 0xFF);
 
         poseStack.translate(0.0F, 0.1F, 0.0F);
         poseStack.mulPose(this.entityRenderDispatcher.cameraOrientation());

@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.entropy;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -20,6 +21,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.entity.EntityTypeTest;
 import net.minecraft.world.level.gameevent.GameEvent;
 import net.minecraft.world.phys.Vec3;
+import net.neoforged.fml.ModList;
 
 import java.util.function.Predicate;
 
@@ -179,9 +181,13 @@ public class EntropyOrbEntity extends Entity {
     @org.jetbrains.annotations.Nullable
     private static ItemStack findReceptacle(Player player, EntropyType type) {
         ItemStack main = player.getMainHandItem();
-        if (main.getItem() instanceof EntropyReceptacle receptacle && receptacle.accepts(type)) return main;
+        if (main.getItem() instanceof EntropyReceptacle receptacle && receptacle.hasRoom(main, type)) return main;
         ItemStack off = player.getOffhandItem();
-        if (off.getItem() instanceof EntropyReceptacle receptacle && receptacle.accepts(type)) return off;
+        if (off.getItem() instanceof EntropyReceptacle receptacle && receptacle.hasRoom(off, type)) return off;
+        if (ModList.get().isLoaded("curios")) {
+            ItemStack curio = CuriosCellCompat.findCellInCurioSlot(player, type);
+            if (curio != null) return curio;
+        }
         return null;
     }
 
