@@ -144,10 +144,12 @@ dependencies {
     // For all intends and purposes: You can treat this dependency as if it is a normal library you would use.
     implementation "net.neoforged:neoforge:${neo_version}"
 
-    // JEI, for the dev/test environment only: no integration is implemented against it (unlike
-    // Jade below), it's just available in-game via runClient/runServer for browsing recipes while
-    // testing. Not compiled against, so it's localRuntime rather than implementation -- no
-    // dependency is published on it with the built mod.
+    // JEI: compiled against its API so the JEI integration (see client/jei) can register the
+    // Entropy Manipulator's recipe category, and pulled into the dev/test environment via
+    // localRuntime so runClient/runServer can actually exercise it. No dependency on it is
+    // published with the built mod -- JEI is an optional integration (see neoforge.mods.toml).
+    compileOnly "mezz.jei:jei-${minecraft_version}-common-api:${jei_version}"
+    compileOnly "mezz.jei:jei-${minecraft_version}-neoforge-api:${jei_version}"
     localRuntime "mezz.jei:jei-${minecraft_version}-neoforge:${jei_version}"
 
     // Mekanism, for the dev/test environment only: gives the energy cost system real modded
