@@ -11,6 +11,9 @@ public interface EntropyReceptacle {
     /** Whether a stack of this item will attract/accept an orb of the given type. */
     boolean accepts(EntropyType type);
 
+    /** Whether stack currently has spare capacity for the given type. */
+    boolean hasRoom(ItemStack stack, EntropyType type);
+
     /** Adds amount of type into stack, respecting capacity. Returns whatever didn't fit. */
     int insertOrb(ItemStack stack, EntropyType type, int amount);
 }
