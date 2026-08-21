@@ -117,7 +117,6 @@ public class TemporalAnchorItem extends Item {
                 : "item.temporalindustries.temporal_anchor.mode_rewind_all";
         tooltip.add(Component.translatable(modeKey).withStyle(ChatFormatting.YELLOW));
 
-        tooltip.add(Component.translatable("item.temporalindustries.temporal_anchor.tooltip")
-                .withStyle(ChatFormatting.GRAY));
+        TooltipUtil.appendDescription(tooltip, "item.temporalindustries.temporal_anchor.tooltip");
     }
 }

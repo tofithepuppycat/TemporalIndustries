@@ -67,7 +67,7 @@ public class SchrodingerGeneratorItem extends BlockItem {
             Component name = captured.customName().orElse(captured.entityType().getDescription());
             tooltip.add(Component.translatable("item.temporalindustries.schrodinger_generator.occupied", name).withStyle(ChatFormatting.LIGHT_PURPLE));
         } else {
-            tooltip.add(Component.translatable("item.temporalindustries.schrodinger_generator.tooltip").withStyle(ChatFormatting.GRAY));
+            TooltipUtil.appendDescription(tooltip, "item.temporalindustries.schrodinger_generator.tooltip");
         }
     }
 }

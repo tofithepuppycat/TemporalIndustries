@@ -4,7 +4,6 @@ import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
-import net.minecraft.ChatFormatting;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -215,8 +214,9 @@ public class PortableChronoMarkerItem extends Item {
 
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
-        tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip_mark").withStyle(ChatFormatting.GRAY));
-        tooltip.add(Component.translatable("item.temporalindustries.portable_chrono_marker.tooltip_map").withStyle(ChatFormatting.GRAY));
+        TooltipUtil.appendDescription(tooltip,
+                "item.temporalindustries.portable_chrono_marker.tooltip",
+                "item.temporalindustries.portable_chrono_marker.tooltip_mark",
+                "item.temporalindustries.portable_chrono_marker.tooltip_map");
     }
 }
