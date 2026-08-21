@@ -1,5 +1,5 @@
 {
-  "type": "temporalindustries:entropy_change_inducer",
+  "type": "temporalindustries:entropy_manipulator",
   "entropy_type": "order",
   "input_item": {
     "item": "minecraft:ice"

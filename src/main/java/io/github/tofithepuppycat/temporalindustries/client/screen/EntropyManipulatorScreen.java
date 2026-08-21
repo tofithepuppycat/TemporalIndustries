@@ -2,9 +2,9 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyChangeInducerBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.menu.EntropyChangeInducerMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -20,13 +20,13 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.fluids.FluidType;
 import org.jetbrains.annotations.NotNull;
 
-/** Textured GUI for the Entropy Change Inducer: two vertical entropy tank bars (Chaos/Order), a
+/** Textured GUI for the Entropy Manipulator: two vertical entropy tank bars (Chaos/Order), a
  * material liquid tank drawn underneath the background texture's transparent window, an
  * input/output slot pair, and a Chaos/Order progress bar icon over the gear baked into the texture. */
 @SuppressWarnings("null")
-public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyChangeInducerMenu> {
+public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyManipulatorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/entropy_change_inducer.png");
+            TemporalIndustries.MODID, "textures/gui/entropy_manipulator.png");
     private static final ResourceLocation CHAOS_ICON = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/chaos_progress_bar_.png");
     private static final ResourceLocation ORDER_ICON = ResourceLocation.fromNamespaceAndPath(
@@ -47,12 +47,14 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
     private static final int LIQUID_WIDTH = 9;
     private static final int LIQUID_HEIGHT = 48;
 
-    private static final int PROGRESS_X = 74;
-    private static final int PROGRESS_Y = 26;
-    private static final int PROGRESS_WIDTH = 24;
-    private static final int PROGRESS_HEIGHT = 24;
+    /** Public so the JEI integration (see client/jei) can place its "Show Recipes" click area over
+     * the same region as the progress bar icon. */
+    public static final int PROGRESS_X = 74;
+    public static final int PROGRESS_Y = 26;
+    public static final int PROGRESS_WIDTH = 24;
+    public static final int PROGRESS_HEIGHT = 24;
 
-    public EntropyChangeInducerScreen(EntropyChangeInducerMenu menu, Inventory playerInventory, Component title) {
+    public EntropyManipulatorScreen(EntropyManipulatorMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
@@ -160,7 +162,7 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
 
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        Component machineTitle = Component.translatable("block.temporalindustries.entropy_change_inducer");
+        Component machineTitle = Component.translatable("block.temporalindustries.entropy_manipulator");
         guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
         guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
