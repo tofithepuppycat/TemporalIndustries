@@ -76,14 +76,6 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
     }
 
     @Override
-    public void removed() {
-        super.removed();
-        if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
-            EntropyCondenserRangeClientState.clear();
-        }
-    }
-
-    @Override
     protected void containerTick() {
         super.containerTick();
         rangeButton.setMessage(rangeLabel(menu.getRange()));
