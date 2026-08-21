@@ -512,6 +512,9 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         if (tag.contains("RecorderItem")) {
             recorderStack = ItemStack.parseOptional(registries, tag.getCompound("RecorderItem"));
             cachedRecording = ChronoRecording.fromStack(recorderStack).orElse(null);
+        } else {
+            recorderStack = ItemStack.EMPTY;
+            cachedRecording = null;
         }
         active = tag.getBoolean("Active");
         loopEpoch = tag.getLong("LoopEpoch");
