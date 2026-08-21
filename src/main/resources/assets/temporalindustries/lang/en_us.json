@@ -99,6 +99,7 @@
 	"fluid.temporalindustries.chaos_fluid": "Chaos",
 	"block.temporalindustries.entropy_condenser": "Entropy Condenser",
 	"block.temporalindustries.crude_entropy_condenser": "Crude Entropy Condenser",
+	"block.temporalindustries.entropy_change_inducer": "Entropy Change Inducer",
 	"item.temporalindustries.entropy_glasses": "Entropy Glasses",
 	"item.temporalindustries.entropy_glasses.tooltip": "Shows entropy info about the block you're looking at.",
 	"overlay.temporalindustries.entropy_glasses.order": "Liquid Order: %s/%s mB",
