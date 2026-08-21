@@ -38,13 +38,14 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
     private static final int CHAOS_BAR_X = 10;
     private static final int ORDER_BAR_X = 18;
     private static final int BAR_Y = 8;
-    private static final int BAR_WIDTH = 8;
-    private static final int BAR_HEIGHT = 40;
+    private static final int BAR_WIDTH = 4;
+    private static final int BAR_HEIGHT = 64;
     private static final int BAR_ICON_SIZE = 8;
 
     private static final int LIQUID_X = 37;
     private static final int LIQUID_Y = 16;
-    private static final int LIQUID_SIZE = 16;
+    private static final int LIQUID_WIDTH = 9;
+    private static final int LIQUID_HEIGHT = 48;
 
     private static final int PROGRESS_X = 74;
     private static final int PROGRESS_Y = 26;
@@ -123,16 +124,16 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
         float g = ((tintColor >> 8) & 0xFF) / 255f;
         float b = (tintColor & 0xFF) / 255f;
 
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * LIQUID_SIZE));
-        filled = Math.min(LIQUID_SIZE, filled);
+        int filled = Math.max(1, Math.round((amount / (float) capacity) * LIQUID_HEIGHT));
+        filled = Math.min(LIQUID_HEIGHT, filled);
 
         int x = leftPos + LIQUID_X;
-        int bottom = topPos + LIQUID_Y + LIQUID_SIZE;
+        int bottom = topPos + LIQUID_Y + LIQUID_HEIGHT;
         int top = bottom - filled;
 
-        guiGraphics.enableScissor(x, top, x + LIQUID_SIZE, bottom);
+        guiGraphics.enableScissor(x, top, x + LIQUID_WIDTH, bottom);
         for (int drawY = bottom - 16; drawY > top - 16; drawY -= 16) {
-            guiGraphics.blit(x, drawY, 0, LIQUID_SIZE, 16, sprite, r, g, b, 1f);
+            guiGraphics.blit(x, drawY, 0, LIQUID_WIDTH, 16, sprite, r, g, b, 1f);
         }
         guiGraphics.disableScissor();
     }
@@ -173,7 +174,7 @@ public class EntropyChangeInducerScreen extends AbstractContainerScreen<EntropyC
             guiGraphics.renderTooltip(font, Component.literal(menu.getChaosFluidAmount() + " / " + menu.getEntropyTankCapacity() + " mB Chaos"), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + BAR_Y, BAR_WIDTH, BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getEntropyTankCapacity() + " mB Order"), mouseX, mouseY);
-        } else if (isOver(mouseX, mouseY, leftPos + LIQUID_X, topPos + LIQUID_Y, LIQUID_SIZE, LIQUID_SIZE)) {
+        } else if (isOver(mouseX, mouseY, leftPos + LIQUID_X, topPos + LIQUID_Y, LIQUID_WIDTH, LIQUID_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getLiquidFluidAmount() + " / " + menu.getLiquidTankCapacity() + " mB"), mouseX, mouseY);
         }
     }
