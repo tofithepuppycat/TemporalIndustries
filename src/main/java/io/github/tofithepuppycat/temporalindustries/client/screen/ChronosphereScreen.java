@@ -718,7 +718,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.chronosphere"), panelX() + 8, panelY() + 8, TEXT_PRIMARY, false);
+        drawCenteredNoShadow(guiGraphics, Component.translatable("block.temporalindustries.chronosphere"), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), panelX() + 8, panelY() + PREVIEW_CURRENT_Y_OFFSET, TEXT_PRIMARY, false);

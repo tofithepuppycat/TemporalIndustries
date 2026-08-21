@@ -111,8 +111,8 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF303030);
-        guiGraphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, 0xFF1E1E1E);
+        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF8B8B8B);
+        guiGraphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, 0xFFC6C6C6);
 
         guiGraphics.fill(leftPos + SLOT_X - 1, topPos + SLOT_Y - 1, leftPos + SLOT_X + 17, topPos + SLOT_Y + 17, 0xFF8B8B8B);
         guiGraphics.fill(leftPos + SLOT_X, topPos + SLOT_Y, leftPos + SLOT_X + 16, topPos + SLOT_Y + 16, 0xFF373737);
@@ -165,8 +165,9 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.drawString(font, Component.translatable("block.temporalindustries.entropy_condenser"), 8, 6, 0xFFFFFF, false);
-        guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFFFFFF, false);
+        Component machineTitle = Component.translatable("block.temporalindustries.entropy_condenser");
+        guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
+        guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
 
     @Override
