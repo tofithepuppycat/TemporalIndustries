@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.crafting.RecipeHolder;
 
 import java.util.List;
+import java.util.function.Supplier;
 
 /**
  * Discovered by JEI via the {@link JeiPlugin} annotation (NeoForge scans annotated classes at
@@ -29,8 +30,11 @@ import java.util.List;
 public class TemporalIndustriesJeiPlugin implements IModPlugin {
     private static final ResourceLocation PLUGIN_UID = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "jei_plugin");
 
-    public static final RecipeType<RecipeHolder<EntropyManipulatorRecipe>> ENTROPY_MANIPULATOR_RECIPE_TYPE =
-            RecipeType.createFromVanilla(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
+    // Lazy (via createFromDeferredVanilla) since JEI can instantiate this plugin, running this
+    // field's initializer, before NeoForge's RegisterEvent has bound the DeferredHolder below --
+    // resolving it eagerly threw "Trying to access unbound value" on startup.
+    public static final Supplier<RecipeType<RecipeHolder<EntropyManipulatorRecipe>>> ENTROPY_MANIPULATOR_RECIPE_TYPE =
+            RecipeType.createFromDeferredVanilla(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE);
 
     @Override
     public ResourceLocation getPluginUid() {
@@ -49,12 +53,12 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
 
         List<RecipeHolder<EntropyManipulatorRecipe>> recipes =
                 level.getRecipeManager().getAllRecipesFor(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
-        registration.addRecipes(ENTROPY_MANIPULATOR_RECIPE_TYPE, recipes);
+        registration.addRecipes(ENTROPY_MANIPULATOR_RECIPE_TYPE.get(), recipes);
     }
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
-        registration.addRecipeCatalyst(Registration.ENTROPY_MANIPULATOR_ITEM.get().getDefaultInstance(), ENTROPY_MANIPULATOR_RECIPE_TYPE);
+        registration.addRecipeCatalyst(Registration.ENTROPY_MANIPULATOR_ITEM.get().getDefaultInstance(), ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
     }
 
     @Override
@@ -62,6 +66,6 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
         registration.addRecipeClickArea(EntropyManipulatorScreen.class,
                 EntropyManipulatorScreen.PROGRESS_X, EntropyManipulatorScreen.PROGRESS_Y,
                 EntropyManipulatorScreen.PROGRESS_WIDTH, EntropyManipulatorScreen.PROGRESS_HEIGHT,
-                ENTROPY_MANIPULATOR_RECIPE_TYPE);
+                ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
     }
 }
