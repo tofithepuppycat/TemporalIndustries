@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "temporalindustries:entropy_change_inducer"
+          "name": "temporalindustries:entropy_manipulator"
         }
       ],
       "conditions": [

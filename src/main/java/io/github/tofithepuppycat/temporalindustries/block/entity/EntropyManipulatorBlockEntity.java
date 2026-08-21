@@ -3,8 +3,8 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.menu.EntropyChangeInducerMenu;
-import io.github.tofithepuppycat.temporalindustries.recipe.EntropyChangeInducerRecipe;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
+import io.github.tofithepuppycat.temporalindustries.recipe.EntropyManipulatorRecipe;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -39,12 +39,12 @@ import java.util.List;
 
 /**
  * Spends liquid Order or Chaos to transmute whatever sits in its input slot, or the fluid in its
- * liquid tank, into the output of a matching {@link EntropyChangeInducerRecipe} loaded from
+ * liquid tank, into the output of a matching {@link EntropyManipulatorRecipe} loaded from
  * {@code data/temporalindustries/recipe/}. Item input takes priority over the liquid tank
  * whenever both are present.
  */
 @SuppressWarnings("null")
-public class EntropyChangeInducerBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
+public class EntropyManipulatorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
     public static final int TANK_CAPACITY = 8_000;
     public static final int LIQUID_TANK_CAPACITY = 4_000;
     /** Default progress-bar denominator before any recipe has been resolved. */
@@ -54,7 +54,7 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
     public static final int INPUT_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
 
-    private final class InducerFluidHandler implements IFluidHandler {
+    private final class ManipulatorFluidHandler implements IFluidHandler {
         @Override public int getTanks() { return 3; }
 
         @Override public @NotNull FluidStack getFluidInTank(int tank) {
@@ -119,7 +119,7 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
         }
     };
     private final FluidTank liquidTank = new FluidTank(LIQUID_TANK_CAPACITY);
-    private final InducerFluidHandler fluidHandler = new InducerFluidHandler();
+    private final ManipulatorFluidHandler fluidHandler = new ManipulatorFluidHandler();
 
     private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
@@ -129,8 +129,8 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
     @Nullable
     private EntropyType activeType = null;
 
-    public EntropyChangeInducerBlockEntity(BlockPos pos, BlockState state) {
-        super(Registration.ENTROPY_CHANGE_INDUCER_BLOCK_ENTITY.get(), pos, state);
+    public EntropyManipulatorBlockEntity(BlockPos pos, BlockState state) {
+        super(Registration.ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(), pos, state);
     }
 
     public IItemHandler getItemHandler() {
@@ -176,13 +176,13 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
                         chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, EntropyChangeInducerBlockEntity be) {
+    public static void tick(Level level, BlockPos pos, BlockState state, EntropyManipulatorBlockEntity be) {
         if (level.isClientSide) return;
         be.processTick();
     }
 
     private void processTick() {
-        EntropyChangeInducerRecipe active = resolveActiveRecipe();
+        EntropyManipulatorRecipe active = resolveActiveRecipe();
         if (active == null) {
             if (progress != 0 || activeType != null) {
                 progress = 0;
@@ -205,28 +205,28 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
     }
 
     @Nullable
-    private EntropyChangeInducerRecipe resolveActiveRecipe() {
+    private EntropyManipulatorRecipe resolveActiveRecipe() {
         if (level == null) return null;
         var recipeManager = level.getRecipeManager();
-        var recipeType = Registration.ENTROPY_CHANGE_INDUCER_RECIPE_TYPE.get();
+        var recipeType = Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
 
         ItemStack input = items.get(INPUT_SLOT);
         if (!input.isEmpty()) {
-            EntropyChangeInducerRecipe.Input recipeInput = new EntropyChangeInducerRecipe.Input(input, FluidStack.EMPTY);
+            EntropyManipulatorRecipe.Input recipeInput = new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY);
             return recipeManager.getRecipeFor(recipeType, recipeInput, level)
                     .map(RecipeHolder::value)
                     .filter(this::canProcess)
                     .orElse(null);
         }
 
-        EntropyChangeInducerRecipe.Input recipeInput = new EntropyChangeInducerRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
+        EntropyManipulatorRecipe.Input recipeInput = new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
         return recipeManager.getRecipeFor(recipeType, recipeInput, level)
                 .map(RecipeHolder::value)
                 .filter(this::canProcess)
                 .orElse(null);
     }
 
-    private boolean canProcess(EntropyChangeInducerRecipe recipe) {
+    private boolean canProcess(EntropyManipulatorRecipe recipe) {
         return canOutput(recipe.getResultItem(level.registryAccess()).getItem()) && hasEntropy(recipe.entropyType(), recipe.entropyCost());
     }
 
@@ -240,7 +240,7 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
         return tank.getFluidAmount() >= cost;
     }
 
-    private void completeRecipe(EntropyChangeInducerRecipe active) {
+    private void completeRecipe(EntropyManipulatorRecipe active) {
         FluidTank entropyTank = active.entropyType() == EntropyType.CHAOS ? chaosTank : orderTank;
         var entropyFluid = active.entropyType() == EntropyType.CHAOS ? Registration.CHAOS_FLUID.get() : Registration.ORDER_FLUID.get();
         entropyTank.drain(new FluidStack(entropyFluid, active.entropyCost()), IFluidHandler.FluidAction.EXECUTE);
@@ -307,12 +307,12 @@ public class EntropyChangeInducerBlockEntity extends BlockEntity implements Cont
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("block.temporalindustries.entropy_change_inducer");
+        return Component.translatable("block.temporalindustries.entropy_manipulator");
     }
 
     @Override
     public AbstractContainerMenu createMenu(int id, @NotNull Inventory inventory, @NotNull Player player) {
-        return new EntropyChangeInducerMenu(id, inventory, this);
+        return new EntropyManipulatorMenu(id, inventory, this);
     }
 
     @Override

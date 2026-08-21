@@ -25,12 +25,12 @@ import org.jetbrains.annotations.Nullable;
 import java.util.Optional;
 
 /**
- * A single step of the Entropy Change Inducer's transmutation chains: either an item ({@code
+ * A single step of the Entropy Manipulator's transmutation chains: either an item ({@code
  * input_item}) or a fluid ({@code input_fluid} + {@code fluid_amount}) consumed alongside
  * {@code entropy_cost} mB of liquid Order/Chaos over {@code process_ticks} to produce {@code
  * result}. Exactly one of input_item/input_fluid must be present in the JSON.
  */
-public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRecipe.Input> {
+public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe.Input> {
     private final EntropyType entropyType;
     @Nullable private final Ingredient inputItem;
     @Nullable private final Fluid inputFluid;
@@ -39,7 +39,7 @@ public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRe
     private final int processTicks;
     private final int entropyCost;
 
-    public EntropyChangeInducerRecipe(EntropyType entropyType, @Nullable Ingredient inputItem, @Nullable Fluid inputFluid,
+    public EntropyManipulatorRecipe(EntropyType entropyType, @Nullable Ingredient inputItem, @Nullable Fluid inputFluid,
                                        int fluidAmount, ItemStack result, int processTicks, int entropyCost) {
         if ((inputItem == null) == (inputFluid == null)) {
             throw new IllegalArgumentException("Recipe must specify exactly one of input_item or input_fluid");
@@ -73,15 +73,15 @@ public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRe
         return entropyCost;
     }
 
-    private ItemStack result() {
+    public ItemStack result() {
         return result;
     }
 
-    private Optional<Ingredient> inputItemOpt() {
+    public Optional<Ingredient> inputItemOpt() {
         return Optional.ofNullable(inputItem);
     }
 
-    private Optional<Fluid> inputFluidOpt() {
+    public Optional<Fluid> inputFluidOpt() {
         return Optional.ofNullable(inputFluid);
     }
 
@@ -111,12 +111,12 @@ public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRe
 
     @Override
     public RecipeSerializer<? extends Recipe<Input>> getSerializer() {
-        return Registration.ENTROPY_CHANGE_INDUCER_RECIPE_SERIALIZER.get();
+        return Registration.ENTROPY_MANIPULATOR_RECIPE_SERIALIZER.get();
     }
 
     @Override
     public RecipeType<? extends Recipe<Input>> getType() {
-        return Registration.ENTROPY_CHANGE_INDUCER_RECIPE_TYPE.get();
+        return Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
     }
 
     /** The input item slot's stack plus the liquid tank's current fluid; a recipe only ever reads one. */
@@ -132,19 +132,19 @@ public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRe
         }
     }
 
-    public static class Serializer implements RecipeSerializer<EntropyChangeInducerRecipe> {
-        public static final MapCodec<EntropyChangeInducerRecipe> CODEC = RecordCodecBuilder.mapCodec(inst -> inst.group(
-                        EntropyType.CODEC.fieldOf("entropy_type").forGetter(EntropyChangeInducerRecipe::entropyType),
-                        Ingredient.CODEC.optionalFieldOf("input_item").forGetter(EntropyChangeInducerRecipe::inputItemOpt),
-                        BuiltInRegistries.FLUID.byNameCodec().optionalFieldOf("input_fluid").forGetter(EntropyChangeInducerRecipe::inputFluidOpt),
-                        Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("fluid_amount", 1000).forGetter(EntropyChangeInducerRecipe::fluidAmount),
-                        ItemStack.STRICT_CODEC.fieldOf("result").forGetter(EntropyChangeInducerRecipe::result),
-                        Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("process_ticks", 100).forGetter(EntropyChangeInducerRecipe::processTicks),
-                        Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("entropy_cost", 100).forGetter(EntropyChangeInducerRecipe::entropyCost))
+    public static class Serializer implements RecipeSerializer<EntropyManipulatorRecipe> {
+        public static final MapCodec<EntropyManipulatorRecipe> CODEC = RecordCodecBuilder.mapCodec(inst -> inst.group(
+                        EntropyType.CODEC.fieldOf("entropy_type").forGetter(EntropyManipulatorRecipe::entropyType),
+                        Ingredient.CODEC.optionalFieldOf("input_item").forGetter(EntropyManipulatorRecipe::inputItemOpt),
+                        BuiltInRegistries.FLUID.byNameCodec().optionalFieldOf("input_fluid").forGetter(EntropyManipulatorRecipe::inputFluidOpt),
+                        Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("fluid_amount", 1000).forGetter(EntropyManipulatorRecipe::fluidAmount),
+                        ItemStack.STRICT_CODEC.fieldOf("result").forGetter(EntropyManipulatorRecipe::result),
+                        Codec.intRange(1, Integer.MAX_VALUE).optionalFieldOf("process_ticks", 100).forGetter(EntropyManipulatorRecipe::processTicks),
+                        Codec.intRange(0, Integer.MAX_VALUE).optionalFieldOf("entropy_cost", 100).forGetter(EntropyManipulatorRecipe::entropyCost))
                 .apply(inst, (type, itemOpt, fluidOpt, fluidAmount, result, processTicks, entropyCost) ->
-                        new EntropyChangeInducerRecipe(type, itemOpt.orElse(null), fluidOpt.orElse(null), fluidAmount, result, processTicks, entropyCost)));
+                        new EntropyManipulatorRecipe(type, itemOpt.orElse(null), fluidOpt.orElse(null), fluidAmount, result, processTicks, entropyCost)));
 
-        public static final StreamCodec<RegistryFriendlyByteBuf, EntropyChangeInducerRecipe> STREAM_CODEC = StreamCodec.of(
+        public static final StreamCodec<RegistryFriendlyByteBuf, EntropyManipulatorRecipe> STREAM_CODEC = StreamCodec.of(
                 (buf, recipe) -> {
                     EntropyType.STREAM_CODEC.encode(buf, recipe.entropyType);
                     ByteBufCodecs.optional(Ingredient.CONTENTS_STREAM_CODEC).encode(buf, Optional.ofNullable(recipe.inputItem));
@@ -162,16 +162,16 @@ public class EntropyChangeInducerRecipe implements Recipe<EntropyChangeInducerRe
                     ItemStack result = ItemStack.STREAM_CODEC.decode(buf);
                     int processTicks = ByteBufCodecs.VAR_INT.decode(buf);
                     int entropyCost = ByteBufCodecs.VAR_INT.decode(buf);
-                    return new EntropyChangeInducerRecipe(type, item.orElse(null), fluid.orElse(null), fluidAmount, result, processTicks, entropyCost);
+                    return new EntropyManipulatorRecipe(type, item.orElse(null), fluid.orElse(null), fluidAmount, result, processTicks, entropyCost);
                 });
 
         @Override
-        public MapCodec<EntropyChangeInducerRecipe> codec() {
+        public MapCodec<EntropyManipulatorRecipe> codec() {
             return CODEC;
         }
 
         @Override
-        public StreamCodec<RegistryFriendlyByteBuf, EntropyChangeInducerRecipe> streamCodec() {
+        public StreamCodec<RegistryFriendlyByteBuf, EntropyManipulatorRecipe> streamCodec() {
             return STREAM_CODEC;
         }
     }
