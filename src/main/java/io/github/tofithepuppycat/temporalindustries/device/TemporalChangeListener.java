@@ -3,7 +3,10 @@ package io.github.tofithepuppycat.temporalindustries.device;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService;
+import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
+import io.github.tofithepuppycat.temporalindustries.network.AnchorRewindEffectPacket;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
@@ -24,7 +27,6 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.common.util.BlockSnapshot;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
-import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
@@ -33,10 +35,7 @@ import net.neoforged.neoforge.server.ServerLifecycleHooks;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.UUID;
 
 /**
  * Central event hub. Replaces both TemporalAnchorEvents and the block-scanning
@@ -47,12 +46,12 @@ import java.util.UUID;
  *   - Buffer block changes for tracked chunks into TemporalWorldData.pendingBlockDeltas
  *   - Flush pending deltas into TemporalCommits every FLUSH_INTERVAL_TICKS
  *   - Track entity spawns/deaths in tracked chunks
- *   - Handle player death→respawn revert flow
+ *   - Intercept an armed player's death and rewind them via their Temporal Anchor, pre-empting
+ *     the death screen entirely
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalChangeListener {
     private static final int FLUSH_INTERVAL_TICKS = 20;
-    private static final Set<UUID> PENDING_REVERTS = new HashSet<>();
     // Entities interacted with this tick, snapshotted just before the interaction runs so the
     // effect (dyeing, shearing, taming, renaming, etc.) can be diffed once it's taken effect —
     // there's no generic "entity data changed" event to hook, so this stands in for one.
@@ -273,7 +272,8 @@ public final class TemporalChangeListener {
     }
 
     // -------------------------------------------------------------------------
-    // Player death / respawn (anchor revert)
+    // Player death (anchor rewind) — cancels the death outright rather than letting it happen and
+    // reverting on respawn, so the rewind pre-empts the death screen entirely.
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onPlayerDeath(LivingDeathEvent event) {
@@ -287,30 +287,20 @@ public final class TemporalChangeListener {
         PlayerTemporalState state = data.getPlayerState(player.getUUID());
         if (state == null || !state.isArmed()) return;
 
-        PENDING_REVERTS.add(player.getUUID());
-        // Clear inventory now so vanilla doesn't drop items at the death location;
-        // the checkpoint restore will put everything back on respawn.
-        player.getInventory().clearContent();
-    }
+        ItemStack anchor = TemporalAnchorItem.findChargedAnchor(player);
+        if (anchor == null) return; // not enough order banked anywhere -> vanilla death proceeds
 
-    @SubscribeEvent
-    public static void onPlayerRespawn(PlayerEvent.PlayerRespawnEvent event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!PENDING_REVERTS.remove(player.getUUID())) return;
-
-        MinecraftServer server = player.getServer();
-        if (server == null) return;
-
-        TemporalWorldData data = TemporalWorldData.get(server);
-        PlayerTemporalState state = data.getPlayerState(player.getUUID());
-        if (state == null || !state.isArmed()) return;
+        int mode = TemporalAnchorItem.getMode(anchor);
+        TemporalAnchorItem.setOrder(anchor, TemporalAnchorItem.getOrder(anchor) - TemporalAnchorItem.costForMode(mode));
+        event.setCanceled(true);
 
         PlayerSnapshot checkpoint = state.getCheckpoint();
         int reverted = state.revertWorldChanges(server);
         state.clearCheckpoint();
         data.setDirty();
 
-        checkpoint.applyTo(player);
+        checkpoint.applyTo(player, mode == TemporalAnchorItem.MODE_REWIND_ALL);
+        PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, new AnchorRewindEffectPacket(player.getId()));
 
         PacketDistributor.sendToPlayer(player,
                 new AnchorStatusPacket(
@@ -334,5 +324,6 @@ public final class TemporalChangeListener {
         if (gameTime % FLUSH_INTERVAL_TICKS != 0) return;
 
         TemporalWorldData.get(server).flushPendingDeltas(gameTime);
+        EntropyChargingService.tick(server);
     }
 }
