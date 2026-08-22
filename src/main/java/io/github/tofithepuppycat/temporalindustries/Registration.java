@@ -320,7 +320,7 @@ public class Registration {
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.temporalindustries"))
-                    .icon(() -> CHRONOVAULT_ITEM.toStack())
+                    .icon(() -> ECHO_RECORD_ITEM.toStack())
                     .displayItems((params, output) -> {
                         output.accept(CHRONOVAULT_ITEM);
                         output.accept(ECHO_PROJECTOR_ITEM);
