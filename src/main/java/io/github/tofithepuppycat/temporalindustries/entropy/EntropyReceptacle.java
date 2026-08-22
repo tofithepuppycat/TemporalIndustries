@@ -3,17 +3,32 @@ package io.github.tofithepuppycat.temporalindustries.entropy;
 import net.minecraft.world.item.ItemStack;
 
 /**
- * Implemented by items that can catch an {@link EntropyOrbEntity} out of the world — the
- * {@link io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem} (both types) and
- * the single-type Order/Chaos cells ({@link io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem}).
+ * Implemented by items that store liquid Order/Chaos on the stack and can catch an
+ * {@link EntropyOrbEntity} out of the world — the
+ * {@link io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem} (both types), the
+ * single-type Order/Chaos cells ({@link io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem})
+ * and the {@link io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem} (order only).
+ * All amounts are millibuckets of the matching fluid, so the same numbers flow straight into machine
+ * tanks — see {@link EntropyFluids#MB_PER_UNIT} for the orb-unit conversion.
  */
 public interface EntropyReceptacle {
-    /** Whether a stack of this item will attract/accept an orb of the given type. */
+    /** Whether a stack of this item will attract/accept liquid of the given type. */
     boolean accepts(EntropyType type);
 
-    /** Whether stack currently has spare capacity for the given type. */
-    boolean hasRoom(ItemStack stack, EntropyType type);
+    /** Per-type tank size in mB. */
+    int capacity(EntropyType type);
 
-    /** Adds amount of type into stack, respecting capacity. Returns whatever didn't fit. */
-    int insertOrb(ItemStack stack, EntropyType type, int amount);
+    /** How many mB of the given type the stack currently holds. */
+    int amount(ItemStack stack, EntropyType type);
+
+    /** Adds up to millibuckets of type into stack, respecting capacity. Returns how much went in. */
+    int fill(ItemStack stack, EntropyType type, int millibuckets);
+
+    /** Pulls up to millibuckets of type out of stack. Returns how much came out. */
+    int drain(ItemStack stack, EntropyType type, int millibuckets);
+
+    /** Whether stack currently has spare capacity for the given type. */
+    default boolean hasRoom(ItemStack stack, EntropyType type) {
+        return accepts(type) && amount(stack, type) < capacity(type);
+    }
 }

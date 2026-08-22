@@ -13,7 +13,7 @@ public class TemporalAnchorItemDecorator implements IItemDecorator {
     @Override
     public boolean render(GuiGraphics guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {
         int order = TemporalAnchorItem.getOrder(stack);
-        EntropyContainerItemDecorator.drawBar(guiGraphics, xOffset + 2, yOffset + 13, order, TemporalAnchorItem.MAX_ORDER, EntropyType.ORDER.color());
+        EntropyContainerItemDecorator.drawBar(guiGraphics, xOffset + 2, yOffset + 13, order, TemporalAnchorItem.MAX_ORDER_MB, EntropyType.ORDER.color());
         return true;
     }
 }

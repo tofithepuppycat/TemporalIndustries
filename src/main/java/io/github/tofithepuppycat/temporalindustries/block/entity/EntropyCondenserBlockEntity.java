@@ -1,14 +1,11 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
-import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -61,10 +58,9 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     private static final int ENERGY_MAX_RECEIVE = 500;
 
     private static final int TANK_CAPACITY = 8_000;
-    private static final int MB_PER_UNIT = 50;
     private static final int FE_PER_UNIT = 20;
-    private static final int CELL_DRAIN_PER_TICK = 5;
-    private static final int OUTPUT_FILL_PER_TICK = 5;
+    private static final int CELL_DRAIN_PER_TICK = 50; // mB moved between a slotted cell and the tanks per tick
+    private static final int OUTPUT_FILL_PER_TICK = 50;
     private static final int SLOT_COUNT = 2;
     public static final int CELL_SLOT = 0;
     public static final int OUTPUT_SLOT = 1;
@@ -254,7 +250,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         FluidTank tank = type == EntropyType.ORDER ? orderTank : chaosTank;
         var fluid = type == EntropyType.ORDER ? Registration.ORDER_FLUID.get() : Registration.CHAOS_FLUID.get();
 
-        int mbAmount = orb.getValue() * MB_PER_UNIT;
+        int mbAmount = EntropyFluids.toMillibuckets(orb.getValue());
         int feCost = orb.getValue() * FE_PER_UNIT;
 
         if (tank.getFluidAmount() + mbAmount > tank.getCapacity()) return;
@@ -272,56 +268,31 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
 
     private void drainCell() {
         ItemStack stack = items.get(CELL_SLOT);
-        if (stack.isEmpty()) return;
+        if (!(stack.getItem() instanceof EntropyReceptacle receptacle)) return;
 
-        if (stack.getItem() instanceof EntropyCellItem cellItem) {
-            drainSingleCell(stack, cellItem);
-        } else if (stack.getItem() instanceof DualEntropyCellItem) {
-            drainDualCell(stack);
+        int drained = 0;
+        for (EntropyType type : EntropyType.values()) {
+            drained += drainInto(receptacle, stack, type);
         }
-    }
-
-    private void drainSingleCell(ItemStack stack, EntropyCellItem cellItem) {
-        EntropyType type = cellItem.accepts(EntropyType.ORDER) ? EntropyType.ORDER : EntropyType.CHAOS;
-        BottleContents contents = EntropyCellItem.getContents(stack);
-        if (contents.amount() <= 0) return;
-
-        int drained = drainInto(type, contents.amount());
         if (drained <= 0) return;
 
-        stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(contents.amount() - drained));
         setChanged();
         syncToClients();
     }
 
-    private void drainDualCell(ItemStack stack) {
-        EntropyContents contents = DualEntropyCellItem.getContents(stack);
-        int drainedOrder = drainInto(EntropyType.ORDER, contents.order());
-        int drainedChaos = drainInto(EntropyType.CHAOS, contents.chaos());
-        if (drainedOrder <= 0 && drainedChaos <= 0) return;
-
-        EntropyContents updated = contents
-                .with(EntropyType.ORDER, contents.order() - drainedOrder)
-                .with(EntropyType.CHAOS, contents.chaos() - drainedChaos);
-        stack.set(Registration.ENTROPY_CONTENTS.get(), updated);
-        setChanged();
-        syncToClients();
-    }
-
-    /** Fills up to {@link #CELL_DRAIN_PER_TICK} of {@code type} into its tank, capped by both the
-     * cell's remaining contents and the tank's remaining space. Returns how much was actually drained. */
-    private int drainInto(EntropyType type, int available) {
-        if (available <= 0) return 0;
-
+    /** Moves up to {@link #CELL_DRAIN_PER_TICK} mB of {@code type} out of the cell and into its tank,
+     * capped by both the cell's contents and the tank's remaining space. Returns how much moved. */
+    private int drainInto(EntropyReceptacle receptacle, ItemStack stack, EntropyType type) {
         FluidTank tank = type == EntropyType.ORDER ? orderTank : chaosTank;
-        var fluid = type == EntropyType.ORDER ? Registration.ORDER_FLUID.get() : Registration.CHAOS_FLUID.get();
-
         int spaceInTank = tank.getCapacity() - tank.getFluidAmount();
-        int amount = Math.min(CELL_DRAIN_PER_TICK, Math.min(available, spaceInTank));
+        int amount = Math.min(CELL_DRAIN_PER_TICK, Math.min(receptacle.amount(stack, type), spaceInTank));
         if (amount <= 0) return 0;
 
-        tank.fill(new FluidStack(fluid, amount), IFluidHandler.FluidAction.EXECUTE);
-        return amount;
+        int drained = receptacle.drain(stack, type, amount);
+        if (drained <= 0) return 0;
+
+        tank.fill(EntropyFluids.stack(type, drained), IFluidHandler.FluidAction.EXECUTE);
+        return drained;
     }
 
     // -------------------------------------------------------------------------
@@ -341,20 +312,16 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         syncToClients();
     }
 
-    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} worth of mB from {@code tank} and inserts whatever
-     * the receptacle accepts. Returns how much was actually accepted. */
+    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} mB from {@code tank} into whatever the receptacle
+     * accepts. Returns how much was actually accepted. */
     private int fillFrom(FluidTank tank, EntropyType type, ItemStack stack, EntropyReceptacle receptacle) {
-        if (!receptacle.accepts(type) || !receptacle.hasRoom(stack, type)) return 0;
+        int available = Math.min(OUTPUT_FILL_PER_TICK, tank.getFluidAmount());
+        if (available <= 0) return 0;
 
-        int mbAvailable = Math.min(OUTPUT_FILL_PER_TICK * MB_PER_UNIT, tank.getFluidAmount());
-        int unitsAvailable = mbAvailable / MB_PER_UNIT;
-        if (unitsAvailable <= 0) return 0;
-
-        int leftover = receptacle.insertOrb(stack, type, unitsAvailable);
-        int accepted = unitsAvailable - leftover;
+        int accepted = receptacle.fill(stack, type, available);
         if (accepted <= 0) return 0;
 
-        tank.drain(accepted * MB_PER_UNIT, IFluidHandler.FluidAction.EXECUTE);
+        tank.drain(accepted, IFluidHandler.FluidAction.EXECUTE);
         return accepted;
     }
 

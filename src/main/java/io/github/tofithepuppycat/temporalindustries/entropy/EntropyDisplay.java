@@ -7,24 +7,25 @@ import net.minecraft.network.chat.TextColor;
 
 import java.util.Locale;
 
-/** Entropy and entropy-storage capacities are all tracked internally as plain ints (order/chaos
- * cell contents, machine balance, …); this only changes how those raw values are shown to the
- * player — scaled down by 10 with one decimal, so e.g. a raw amount of 100 reads as "10.0". */
+/** Formatting for the two entropy scales shown to players: liquid amounts in mB (cells, the anchor,
+ * machine tanks) and the machine order/chaos balance. */
 public final class EntropyDisplay {
     private static final TextColor ORDER_UNIT_COLOR = TextColor.fromRgb(0xcfa0f3);
     private static final TextColor CHAOS_UNIT_COLOR = TextColor.fromRgb(0x68f6ff);
 
     private EntropyDisplay() {}
 
-    public static String format(int raw) {
-        return String.format(Locale.ROOT, "%.1f", raw / 10.0);
-    }
-
     /** Machine order/chaos balance (Chronovault, Chronosphere, Chronodial) uses a wider 0-10000
-     * scale, shown with two decimals — e.g. a raw amount of 5000 reads as "50.00". Kept separate
-     * from {@link #format(int)}, which backs the unrelated 0-100/200 cell/anchor content scales. */
+     * scale, shown with two decimals - e.g. a raw amount of 5000 reads as "50.00". Unrelated to the
+     * mB amounts {@link #formatFluid(int)} handles. */
     public static String formatBalance(int raw) {
         return String.format(Locale.ROOT, "%.2f", raw / 100.0);
+    }
+
+    /** Liquid Order/Chaos amounts (cells, the anchor, machine tanks) are plain mB and are shown as
+     * such, group-separated - e.g. 5000 reads as "5,000". */
+    public static String formatFluid(int millibuckets) {
+        return String.format(Locale.ROOT, "%,d", millibuckets);
     }
 
     /** The colored "ORD" / "CHS" unit suffix, e.g. to append after a formatted amount. */

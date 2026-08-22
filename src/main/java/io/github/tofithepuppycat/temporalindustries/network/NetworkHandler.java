@@ -99,6 +99,11 @@ public class NetworkHandler {
                 AnchorModeCyclePacket.STREAM_CODEC,
                 AnchorModeCyclePacket::handle);
 
+        registrar.playToServer(
+                CellTransferAmountPacket.TYPE,
+                CellTransferAmountPacket.STREAM_CODEC,
+                CellTransferAmountPacket::handle);
+
         registrar.playToClient(
                 AnchorRewindEffectPacket.TYPE,
                 AnchorRewindEffectPacket.STREAM_CODEC,

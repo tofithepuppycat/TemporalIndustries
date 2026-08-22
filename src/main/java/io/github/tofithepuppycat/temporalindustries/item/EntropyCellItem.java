@@ -7,16 +7,19 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
 
 import java.util.List;
 
 /**
- * Single-type entropy storage — the Order Cell and Chaos Cell, both instances of
- * this class distinguished by {@link #type}. Smaller capacity than {@link DualEntropyCellItem}
- * ({@link BottleContents#CAPACITY}) and only attracts/accepts orbs of its own type.
+ * Single-type liquid entropy storage - the Order Cell and Chaos Cell, both instances of this class
+ * distinguished by {@link #type}. Holds up to {@link BottleContents#CAPACITY} mB of its own fluid,
+ * half of what {@link DualEntropyCellItem} holds per type, and only attracts/accepts orbs of its own
+ * type. Right-clicking a machine pours a dose into it - see {@link CellTransfer}.
  */
 @SuppressWarnings("null")
 public class EntropyCellItem extends Item implements EntropyReceptacle {
@@ -27,26 +30,52 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         this.type = type;
     }
 
+    public EntropyType getType() {
+        return type;
+    }
+
     @Override
     public boolean accepts(EntropyType type) {
         return this.type == type;
     }
 
     @Override
-    public boolean hasRoom(ItemStack stack, EntropyType type) {
-        return this.type == type && getContents(stack).amount() < BottleContents.CAPACITY;
+    public int capacity(EntropyType type) {
+        return this.type == type ? BottleContents.CAPACITY : 0;
     }
 
     @Override
-    public int insertOrb(ItemStack stack, EntropyType type, int amount) {
-        if (this.type != type || amount <= 0) return amount;
+    public int amount(ItemStack stack, EntropyType type) {
+        return this.type == type ? getContents(stack).amount() : 0;
+    }
+
+    @Override
+    public int fill(ItemStack stack, EntropyType type, int millibuckets) {
+        if (this.type != type || millibuckets <= 0) return 0;
 
         int current = getContents(stack).amount();
-        int accepted = Math.min(BottleContents.CAPACITY - current, amount);
-        if (accepted <= 0) return amount;
+        int filled = Math.min(BottleContents.CAPACITY - current, millibuckets);
+        if (filled <= 0) return 0;
 
-        stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(current + accepted));
-        return amount - accepted;
+        stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(current + filled));
+        return filled;
+    }
+
+    @Override
+    public int drain(ItemStack stack, EntropyType type, int millibuckets) {
+        if (this.type != type || millibuckets <= 0) return 0;
+
+        int current = getContents(stack).amount();
+        int drained = Math.min(current, millibuckets);
+        if (drained <= 0) return 0;
+
+        stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(current - drained));
+        return drained;
+    }
+
+    @Override
+    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
+        return CellTransfer.pourInto(context);
     }
 
     public static BottleContents getContents(ItemStack stack) {
@@ -58,7 +87,8 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        tooltip.add(Component.translatable(key, EntropyDisplay.format(amount), EntropyDisplay.format(BottleContents.CAPACITY)).withStyle(color)
+        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(BottleContents.CAPACITY)).withStyle(color)
                 .append(EntropyDisplay.unit(type)));
+        CellTransfer.appendTooltip(stack, tooltip);
     }
 }
