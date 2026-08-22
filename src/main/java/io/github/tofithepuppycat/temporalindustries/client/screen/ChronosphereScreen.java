@@ -648,15 +648,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-        boolean overlayOpen = mapOverlayOpen || settingsOverlayOpen;
-        // Normally the tabs are drawn BEFORE the panel background, so the panel's opaque texture
-        // paints over their small edge overlap and tucks them in — the same trick a vanilla
-        // recipe-book tab uses to look attached to, rather than stacked on top of, its GUI. While
-        // a modal overlay is open they're the only way to close it, so they're drawn on top of
-        // everything (below, after the overlay) instead, same as before.
-        if (!overlayOpen) {
-            renderTabs(guiGraphics, mouseX, mouseY);
-        }
+        // Tabs are always drawn BEFORE the panel background, so the panel's opaque texture paints
+        // over their small edge overlap and tucks them in — the same trick a vanilla recipe-book
+        // tab uses to look attached to, rather than stacked on top of, its GUI. This holds
+        // regardless of whether a modal overlay is open, so their z-order never shifts.
+        renderTabs(guiGraphics, mouseX, mouseY);
 
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
         renderLabels(guiGraphics, mouseX, mouseY);
@@ -668,9 +664,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             renderMapOverlay(guiGraphics);
         } else if (settingsOverlayOpen) {
             renderSettingsOverlay(guiGraphics, mouseX, mouseY);
-        }
-        if (overlayOpen) {
-            renderTabs(guiGraphics, mouseX, mouseY);
         }
 
         if (mapOverlayOpen) {

@@ -404,13 +404,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-        // Normally the tabs are drawn BEFORE the panel background, so the panel's opaque texture
-        // paints over their small edge overlap and tucks them in, same as a vanilla recipe-book
-        // tab. While the settings overlay is open it's the only way to close it, so it's drawn on
-        // top of everything instead (below, after the overlay), same as ChronosphereScreen.
-        if (!settingsOverlayOpen) {
-            renderTabs(guiGraphics, mouseX, mouseY);
-        }
+        // Tabs are always drawn BEFORE the panel background, so the panel's opaque texture paints
+        // over their small edge overlap and tucks them in, same as a vanilla recipe-book tab —
+        // regardless of whether the settings overlay is open, so its z-order never shifts.
+        renderTabs(guiGraphics, mouseX, mouseY);
 
         // Skip super.render() to avoid rendering inventory slots
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
@@ -421,7 +418,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         if (settingsOverlayOpen) {
             renderSettingsOverlay(guiGraphics, mouseX, mouseY);
-            renderTabs(guiGraphics, mouseX, mouseY);
             return;
         }
 
