@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
+import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
 import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
@@ -23,7 +24,6 @@ import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleCh
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -43,6 +43,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/base.png");
     private static final ResourceLocation ICON_CONFIG_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_config.png");
+    private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_eye.png");
+    private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_jump.png");
     private static final int ICON_CONFIG_SIZE = 26;
 
     private static final int IMAGE_WIDTH = 256;
@@ -83,6 +87,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int PREVIEW_CURRENT_Y_OFFSET = 176;
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
     private static final int BUTTON_ROW_Y_OFFSET = 200;
+    private static final int ACTION_BUTTON_SIZE = IconButtonRenderer.SIZE;
+    private static final int ACTION_BUTTON_GAP = 6;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
     /** How often the map overlay re-fetches terrain thumbnails while open, so it doesn't go stale
@@ -130,8 +136,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private final TimelineGraphWidget graphWidget = new TimelineGraphWidget();
 
-    private Button jumpButton;
-    private Button showChangesButton;
     private int ticksSinceSync = 0;
     private int ticksSinceMapSync = 0;
     private boolean mapOverlayOpen = false;
@@ -151,6 +155,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int settingsY;
     private int gridX;
     private int gridY;
+    private int showChangesX;
+    private int showChangesY;
+    private int jumpX;
+    private int jumpY;
 
     public ChronosphereScreen(ChronosphereMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -194,23 +202,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         gridX = panelX() + (CONTENT_SIZE - MAP_GRID.gridPixels()) / 2;
         gridY = panelY() + MAP_GRID_Y_OFFSET;
 
-        int buttonY = panelY() + BUTTON_ROW_Y_OFFSET;
-        int buttonWidth = 76;
-        int gap = 3;
-        int groupX = panelX() + (CONTENT_SIZE - (buttonWidth * 2 + gap)) / 2;
-
-        showChangesButton = Button.builder(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), btn -> toggleShowChanges())
-                .pos(groupX, buttonY)
-                .size(buttonWidth, 20)
-                .build();
-        addRenderableWidget(showChangesButton);
-
-        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.chronovault.jump"), btn -> jumpAndClose())
-                .pos(groupX + buttonWidth + gap, buttonY)
-                .size(buttonWidth, 20)
-                .build();
-        jumpButton.active = TimelineProjectionManager.hasSelection();
-        addRenderableWidget(jumpButton);
+        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 2 + ACTION_BUTTON_GAP)) / 2;
+        showChangesX = groupX;
+        jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
+        jumpY = showChangesY;
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
@@ -268,11 +264,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
         }
 
-        jumpButton.active = TimelineProjectionManager.hasSelection();
-        boolean overlayOpen = mapOverlayOpen || settingsOverlayOpen;
-        showChangesButton.visible = !overlayOpen;
-        jumpButton.visible = !overlayOpen;
-
         if (mapOverlayOpen) {
             ticksSinceMapSync++;
             if (ticksSinceMapSync >= MAP_SYNC_INTERVAL_TICKS) {
@@ -284,7 +275,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private void toggleShowChanges() {
         TimelineProjectionManager.toggleShowChanges();
-        showChangesButton.setMessage(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()));
     }
 
     /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
@@ -347,6 +337,35 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         graphWidget.render(guiGraphics, font, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight());
         renderEnergyBar(guiGraphics);
         renderEntropyBar(guiGraphics);
+
+        if (!mapOverlayOpen && !settingsOverlayOpen) {
+            renderActionButtons(guiGraphics, mouseX, mouseY);
+        }
+    }
+
+    /** Show Changes / Jump: small icon buttons (menu_icon_base_small.png + their own icon) in
+     * place of vanilla Buttons — Show Changes tints on while active, Jump dims while there's
+     * nothing selected to jump to. */
+    private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
+        int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
+        IconButtonRenderer.renderBackground(guiGraphics, showChangesX, showChangesY, showChangesTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_EYE_TEXTURE, showChangesX, showChangesY);
+
+        boolean jumpActive = TimelineProjectionManager.hasSelection();
+        int jumpTint = !jumpActive ? 0x80000000 : (isMouseOverJumpButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
+        IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
+    }
+
+    private boolean isMouseOverShowChangesButton(double mouseX, double mouseY) {
+        return mouseX >= showChangesX && mouseX <= showChangesX + ACTION_BUTTON_SIZE
+                && mouseY >= showChangesY && mouseY <= showChangesY + ACTION_BUTTON_SIZE;
+    }
+
+    private boolean isMouseOverJumpButton(double mouseX, double mouseY) {
+        return mouseX >= jumpX && mouseX <= jumpX + ACTION_BUTTON_SIZE
+                && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
     }
 
     private int graphTop() {
@@ -700,6 +719,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
         } else if (isMouseOverSettingsTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.settings_tooltip"), mouseX, mouseY);
+        } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
+        } else if (isMouseOverJumpButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         }
     }
 
@@ -776,6 +799,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 handleSettingsOverlayClick(mouseX, mouseY);
             }
             // Modal, same as the claim map overlay above.
+            return true;
+        }
+
+        if (button == 0 && isMouseOverShowChangesButton(mouseX, mouseY)) {
+            toggleShowChanges();
+            return true;
+        }
+
+        if (button == 0 && isMouseOverJumpButton(mouseX, mouseY)) {
+            jumpAndClose();
             return true;
         }
 
