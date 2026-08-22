@@ -29,7 +29,7 @@ public class ChronovaultMenu extends AbstractContainerMenu implements TimelineVi
     }
 
     public ChronovaultMenu(int id, Inventory playerInventory, BlockPos blockPos) {
-        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(13));
+        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(16));
     }
 
     public ChronovaultMenu(int id, Inventory playerInventory, ChronovaultBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -39,7 +39,7 @@ public class ChronovaultMenu extends AbstractContainerMenu implements TimelineVi
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 13);
+        checkContainerDataCount(data, 16);
         addDataSlots(data);
     }
 
@@ -91,6 +91,18 @@ public class ChronovaultMenu extends AbstractContainerMenu implements TimelineVi
 
     public int getEntropyMax() {
         return AbstractTimelineMachineBlockEntity.ENTROPY_MAX;
+    }
+
+    public int getOrderFluidAmount() {
+        return data.get(13);
+    }
+
+    public int getChaosFluidAmount() {
+        return data.get(14);
+    }
+
+    public int getEntropyTankCapacity() {
+        return data.get(15);
     }
 
     public ChronovaultBlockEntity getBlockEntity() {

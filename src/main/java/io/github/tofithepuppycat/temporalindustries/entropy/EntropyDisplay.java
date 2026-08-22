@@ -20,6 +20,13 @@ public final class EntropyDisplay {
         return String.format(Locale.ROOT, "%.1f", raw / 10.0);
     }
 
+    /** Machine order/chaos balance (Chronovault, Chronosphere, Chronodial) uses a wider 0-10000
+     * scale, shown with two decimals — e.g. a raw amount of 5000 reads as "50.00". Kept separate
+     * from {@link #format(int)}, which backs the unrelated 0-100/200 cell/anchor content scales. */
+    public static String formatBalance(int raw) {
+        return String.format(Locale.ROOT, "%.2f", raw / 100.0);
+    }
+
     /** The colored "ORD" / "CHS" unit suffix, e.g. to append after a formatted amount. */
     public static MutableComponent unit(EntropyType type) {
         TextColor color = type == EntropyType.ORDER ? ORDER_UNIT_COLOR : CHAOS_UNIT_COLOR;
