@@ -107,7 +107,7 @@ public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeH
         var font = Minecraft.getInstance().font;
 
         Component amount = Component.literal(recipe.entropyCost() + " mB");
-        guiGraphics.drawString(font, amount, AMOUNT_X, AMOUNT_Y, 0xFF000000 | recipe.entropyType().color(), false);
+        guiGraphics.drawString(font, amount, AMOUNT_X, AMOUNT_Y, 0xFF000000 | recipe.entropyType().tint_to(), false);
 
         Component time = Component.literal(String.format("%.1fs", recipe.processTicks() / 20f));
         guiGraphics.drawString(font, time, TIME_X, TIME_Y, 0xFF808080, false);
