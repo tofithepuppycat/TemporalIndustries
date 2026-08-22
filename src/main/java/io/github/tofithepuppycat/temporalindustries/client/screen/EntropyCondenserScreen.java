@@ -25,6 +25,8 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
             TemporalIndustries.MODID, "textures/gui/entropy_condenser.png");
     private static final ResourceLocation ICON_BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/menu_icon_base.png");
+    private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_eye.png");
 
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
@@ -99,8 +101,10 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         guiGraphics.drawCenteredString(font, rangeLabel, rangeX + ICON_SIZE / 2, y + (ICON_SIZE - 8) / 2, 0xFFFFFFFF);
 
         if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
-            guiGraphics.fill(showRangeX + 2, y + 2, showRangeX + ICON_SIZE - 2, y + ICON_SIZE - 2, 0x8055FF55);
+            guiGraphics.fill(showRangeX + 1, y + 1, showRangeX + ICON_SIZE - 1, y + ICON_SIZE - 1, 0x8055FF55);
         }
+        int eyeOffset = (ICON_SIZE - 16) / 2;
+        guiGraphics.blit(ICON_EYE_TEXTURE, showRangeX + eyeOffset, y + eyeOffset, 16, 16, 0.0F, 0.0F, 16, 16, 16, 16);
     }
 
     /** Blits menu_icon_base.png 1:1 at its own native resolution — the 6-arg blit overload assumes a
