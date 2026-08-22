@@ -10,13 +10,9 @@ import io.github.tofithepuppycat.temporalindustries.network.EntropyCondenserSetR
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
-import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
-import net.minecraft.world.inventory.InventoryMenu;
-import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
-import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
@@ -81,9 +77,9 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
         renderEnergyBar(guiGraphics, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
                 menu.getEnergyStored(), menu.getEnergyCapacity());
-        renderFluidBar(guiGraphics, leftPos + ORDER_BAR_X, topPos + TANK_BAR_Y,
+        FluidBarRenderer.renderVertical(guiGraphics, leftPos + ORDER_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT,
                 menu.getOrderFluidAmount(), menu.getTankCapacity(), Registration.ORDER_FLUID_TYPE.get(), EntropyType.ORDER.color());
-        renderFluidBar(guiGraphics, leftPos + CHAOS_BAR_X, topPos + TANK_BAR_Y,
+        FluidBarRenderer.renderVertical(guiGraphics, leftPos + CHAOS_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT,
                 menu.getChaosFluidAmount(), menu.getTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
 
         renderRangeIcons(guiGraphics);
@@ -119,32 +115,6 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         filled = Math.min(ENERGY_BAR_HEIGHT, filled);
         int bottom = y + ENERGY_BAR_HEIGHT;
         guiGraphics.fill(x, bottom - filled, x + ENERGY_BAR_WIDTH, bottom, ENERGY_COLOR);
-    }
-
-    /** Tiles the fluid's still texture (from the block atlas) bottom-up over the filled portion of
-     * the tank, tinted with the entropy color — same technique as EntropyManipulatorScreen. */
-    private void renderFluidBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
-        if (capacity <= 0 || amount <= 0) return;
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * TANK_BAR_HEIGHT));
-        filled = Math.min(TANK_BAR_HEIGHT, filled);
-
-        int bottom = y + TANK_BAR_HEIGHT;
-        int top = bottom - filled;
-
-        ResourceLocation stillTexture = IClientFluidTypeExtensions.of(fluidType).getStillTexture();
-        TextureAtlasSprite sprite = Minecraft.getInstance()
-                .getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
-                .apply(stillTexture);
-
-        float r = ((tintColor >> 16) & 0xFF) / 255f;
-        float g = ((tintColor >> 8) & 0xFF) / 255f;
-        float b = (tintColor & 0xFF) / 255f;
-
-        guiGraphics.enableScissor(x, top, x + TANK_BAR_WIDTH, bottom);
-        for (int drawY = bottom - 16; drawY > top - 16; drawY -= 16) {
-            guiGraphics.blit(x, drawY, 0, TANK_BAR_WIDTH, 16, sprite, r, g, b, 1f);
-        }
-        guiGraphics.disableScissor();
     }
 
     @Override

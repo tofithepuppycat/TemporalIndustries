@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
+import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
@@ -28,6 +29,9 @@ import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -48,21 +52,108 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     protected static final long UNSET_TIME = -1L;
 
     /** Entropy is a balance between ORD (0, order) and CHS ({@link #ENTROPY_MAX}, chaos), starting
-     * centered. Per IDEAS.md, a machine drifts toward chaos while its selected view sits away from
-     * the present and settles back toward balance once it's caught up — the bar this backs is
-     * purely observational for now; nothing yet gates a jump on it. */
-    public static final int ENTROPY_MAX = 1000;
+     * centered, physically backed by two FluidTanks whose contents always sum to ENTROPY_MAX (1 mB
+     * = 1 entropy unit — see orderTank/chaosTank). Per IDEAS.md, a machine drifts toward chaos while
+     * its selected view sits away from the present and settles back toward balance once it's caught
+     * up. Away-from-balance entropy raises jump FE cost and autotracking's per-tick FE drain, and a
+     * successful jump itself shifts the bar: past adds chaos, future adds order. */
+    public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
     private static final int ENTROPY_DRIFT_INTERVAL_TICKS = 20; // 1 second
+    private static final int ENTROPY_DRIFT_STEP = 10; // per interval tick
+    private static final int JUMP_ENTROPY_SHIFT = 250; // flat shift per successful jump
+    private static final double ENTROPY_COST_SCALE = 1.0; // jump-cost multiplier at max distance from balance
+    private static final int AUTOTRACK_BASE_FE_PER_TICK = 1;
+    private static final double AUTOTRACK_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
 
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
-    protected int entropy = ENTROPY_BALANCED;
     /** Whether this machine is currently recording DELTA commits for the chunks getAllChunks()
      * returns. Subclasses pick their own default: off for a Chronosphere (an idle claim shouldn't
      * silently accumulate history until the player opts in), on for a Chronovault (it only ever
      * has its own placed chunk, so there's no idle-claim concern). */
     protected boolean autoTrackingEnabled = false;
+
+    private final class MachineFluidHandler implements IFluidHandler {
+        @Override public int getTanks() { return 2; }
+
+        @Override public @NotNull FluidStack getFluidInTank(int tank) {
+            return tank == 0 ? orderTank.getFluid() : chaosTank.getFluid();
+        }
+
+        @Override public int getTankCapacity(int tank) {
+            return tank == 0 ? orderTank.getCapacity() : chaosTank.getCapacity();
+        }
+
+        @Override public boolean isFluidValid(int tank, @NotNull FluidStack stack) {
+            return tank == 0 ? orderTank.isFluidValid(stack) : chaosTank.isFluidValid(stack);
+        }
+
+        /** Filling one tank always displaces the same amount out of the other, so
+         * orderTank+chaosTank stays fixed at ENTROPY_MAX — the pair is a balance register, not two
+         * independent resource pools. */
+        @Override public int fill(FluidStack resource, FluidAction action) {
+            if (orderTank.isFluidValid(resource)) {
+                int accepted = Math.min(resource.getAmount(), chaosTank.getFluidAmount());
+                int filled = orderTank.fill(new FluidStack(resource.getFluid(), accepted), action);
+                if (filled > 0 && action.execute()) chaosTank.drain(filled, FluidAction.EXECUTE);
+                return filled;
+            }
+            if (chaosTank.isFluidValid(resource)) {
+                int accepted = Math.min(resource.getAmount(), orderTank.getFluidAmount());
+                int filled = chaosTank.fill(new FluidStack(resource.getFluid(), accepted), action);
+                if (filled > 0 && action.execute()) orderTank.drain(filled, FluidAction.EXECUTE);
+                return filled;
+            }
+            return 0;
+        }
+
+        /** Draining one tank grows the other by the same amount, for the same fixed-sum reason as
+         * {@link #fill}. */
+        @Override public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
+            if (!orderTank.getFluid().isEmpty() && orderTank.getFluid().getFluid().isSame(resource.getFluid())) {
+                return drainOrder(resource.getAmount(), action);
+            }
+            if (!chaosTank.getFluid().isEmpty() && chaosTank.getFluid().getFluid().isSame(resource.getFluid())) {
+                return drainChaos(resource.getAmount(), action);
+            }
+            return FluidStack.EMPTY;
+        }
+
+        @Override public @NotNull FluidStack drain(int maxDrain, FluidAction action) {
+            if (!orderTank.getFluid().isEmpty()) return drainOrder(maxDrain, action);
+            if (!chaosTank.getFluid().isEmpty()) return drainChaos(maxDrain, action);
+            return FluidStack.EMPTY;
+        }
+
+        private FluidStack drainOrder(int amount, FluidAction action) {
+            FluidStack drained = orderTank.drain(amount, action);
+            if (!drained.isEmpty() && action.execute()) {
+                chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), drained.getAmount()), FluidAction.EXECUTE);
+            }
+            return drained;
+        }
+
+        private FluidStack drainChaos(int amount, FluidAction action) {
+            FluidStack drained = chaosTank.drain(amount, action);
+            if (!drained.isEmpty() && action.execute()) {
+                orderTank.fill(new FluidStack(Registration.ORDER_FLUID.get(), drained.getAmount()), FluidAction.EXECUTE);
+            }
+            return drained;
+        }
+    }
+
+    private final FluidTank orderTank = new FluidTank(ENTROPY_MAX) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.ORDER_FLUID.get());
+        }
+    };
+    private final FluidTank chaosTank = new FluidTank(ENTROPY_MAX) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.CHAOS_FLUID.get());
+        }
+    };
+    private final MachineFluidHandler fluidHandler = new MachineFluidHandler();
 
     /** Named (rather than anonymous) so a jump's own cost can be deducted directly, bypassing the
      * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
@@ -96,6 +187,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                                                   int energyCapacity, int energyTransfer) {
         super(type, pos, state);
         this.energyStorage = new MachineEnergyStorage(energyCapacity, energyTransfer);
+        orderTank.setFluid(new FluidStack(Registration.ORDER_FLUID.get(), ENTROPY_BALANCED));
+        chaosTank.setFluid(new FluidStack(Registration.CHAOS_FLUID.get(), ENTROPY_BALANCED));
         this.data = new ContainerData() {
             @Override public int get(int index) {
                 return switch (index) {
@@ -111,12 +204,15 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                     case 9  -> longPart(selectedGameTime, 1);
                     case 10 -> longPart(selectedGameTime, 2);
                     case 11 -> longPart(selectedGameTime, 3);
-                    case 12 -> entropy;
+                    case 12 -> getEntropy();
+                    case 13 -> orderTank.getFluidAmount();
+                    case 14 -> chaosTank.getFluidAmount();
+                    case 15 -> ENTROPY_MAX;
                     default -> 0;
                 };
             }
             @Override public void set(int index, int value) {}
-            @Override public int getCount() { return 13; }
+            @Override public int getCount() { return 16; }
         };
     }
 
@@ -132,7 +228,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return data;
     }
 
-    public int getEntropy() { return entropy; }
+    /** The logical order/chaos balance scalar — 0 is pure order, {@link #ENTROPY_MAX} pure chaos.
+     * Always equal to the chaos tank's fill, since orderTank+chaosTank is held fixed at ENTROPY_MAX. */
+    public int getEntropy() { return chaosTank.getFluidAmount(); }
+
+    public IFluidHandler getFluidHandler() { return fluidHandler; }
+    public FluidTank getOrderTank() { return orderTank; }
+    public FluidTank getChaosTank() { return chaosTank; }
 
     @Override
     public List<Component> getEntropyTooltip() {
@@ -140,7 +242,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     @Override public boolean hasEntropyBalance() { return true; }
-    @Override public int getEntropyBalance() { return entropy; }
+    @Override public int getEntropyBalance() { return getEntropy(); }
     @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
 
     /** Mirrors {@link #driftEntropy}'s direction (drift is server-only, but placed/selected game
@@ -148,9 +250,37 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     public float getEntropyRatePerSecond() {
         if (level == null) return 0f;
+        int entropy = getEntropy();
         int target = selectedGameTime < level.getGameTime() ? ENTROPY_MAX : ENTROPY_BALANCED;
         if (entropy == target) return 0f;
-        return Integer.signum(target - entropy) / 10f;
+        return Integer.signum(target - entropy) * ENTROPY_DRIFT_STEP / 100f;
+    }
+
+    /** Transfers up to |delta| units from order to chaos (delta > 0) or chaos to order (delta < 0),
+     * clamped so neither tank leaves [0, ENTROPY_MAX]. Every entropy mutation (drift, jump, fluid
+     * I/O) funnels through here or {@link MachineFluidHandler} so the orderTank+chaosTank==ENTROPY_MAX
+     * invariant is enforced in one place. */
+    private void shiftEntropyToward(int delta) {
+        if (delta == 0) return;
+        int current = getEntropy();
+        int clamped = Math.max(0, Math.min(ENTROPY_MAX, current + delta)) - current;
+        if (clamped == 0) return;
+        if (clamped > 0) {
+            chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), clamped), IFluidHandler.FluidAction.EXECUTE);
+            orderTank.drain(clamped, IFluidHandler.FluidAction.EXECUTE);
+        } else {
+            orderTank.fill(new FluidStack(Registration.ORDER_FLUID.get(), -clamped), IFluidHandler.FluidAction.EXECUTE);
+            chaosTank.drain(-clamped, IFluidHandler.FluidAction.EXECUTE);
+        }
+        setChanged();
+        syncToClients();
+    }
+
+    /** Jump FE cost multiplier: 1x when balanced, rising to 1+{@link #ENTROPY_COST_SCALE} at either
+     * extreme — symmetric, so neither pure-order nor pure-chaos is favored for jump cost. */
+    private double jumpCostMultiplier() {
+        double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
+        return 1.0 + ENTROPY_COST_SCALE * distance;
     }
 
     /** Every chunk a jump on this machine moves together — one for a Time Machine, up to 25 for a
@@ -245,16 +375,31 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (now % ENTROPY_DRIFT_INTERVAL_TICKS == 0) {
             driftEntropy(now);
         }
+
+        if (autoTrackingEnabled) {
+            drainAutoTrackingEnergy();
+        }
     }
 
     /** Ticks entropy one step toward chaos while the selected view is behind the present, or one
-     * step back toward balance once it's caught up — see {@link #entropy}'s javadoc. */
+     * step back toward balance once it's caught up — see the ENTROPY_MAX field javadoc. */
     private void driftEntropy(long now) {
         int target = selectedGameTime < now ? ENTROPY_MAX : ENTROPY_BALANCED;
+        int entropy = getEntropy();
         if (entropy == target) return;
-        entropy += Integer.signum(target - entropy);
-        setChanged();
-        syncToClients();
+        int step = Integer.signum(target - entropy) * ENTROPY_DRIFT_STEP;
+        if (Math.abs(step) > Math.abs(target - entropy)) step = target - entropy;
+        shiftEntropyToward(step);
+    }
+
+    /** Constant per-tick FE drain while auto-tracking is on, scaled by how far entropy sits from
+     * balance — charged every tick, not just on the drift interval. Skips (rather than disabling
+     * tracking) when energy is insufficient, so a starved machine keeps recording history instead of
+     * silently losing it. */
+    private void drainAutoTrackingEnergy() {
+        double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
+        int feThisTick = (int) Math.round(AUTOTRACK_BASE_FE_PER_TICK + AUTOTRACK_ENTROPY_SCALE * distance);
+        energyStorage.consumeInternal(Math.min(feThisTick, energyStorage.getEnergyStored()));
     }
 
     // -------------------------------------------------------------------------
@@ -326,14 +471,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long clamped = Math.max(min, Math.min(max, targetGameTime));
         if (selectedGameTime == clamped && !applyToWorld) return JumpResult.SUCCESS;
 
+        long previousSelectedGameTime = selectedGameTime;
         selectedGameTime = clamped;
-        JumpResult result = applyToWorld ? applyTimelineView(clamped, targetCommitId) : JumpResult.SUCCESS;
+        JumpResult result = applyToWorld ? applyTimelineView(clamped, targetCommitId, previousSelectedGameTime) : JumpResult.SUCCESS;
         setChanged();
         return result;
     }
 
     /** Read-only total cost of jumping every chunk getAllChunks() returns to targetGameTime from
-     * its current head. */
+     * its current head, including the current entropy-based multiplier — kept in sync with
+     * {@link #applyTimelineView} so a previewed cost never diverges from what's actually charged. */
     public long computeTotalJumpCost(long targetGameTime, long targetCommitId) {
         if (level == null || level.getServer() == null) return 0L;
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
@@ -347,14 +494,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             long head = timeline.getChunkHeadId(chunk);
             total += timeline.computeJumpCost(chunk, targetGameTime, head, level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued);
         }
-        return total;
+        return Math.round(total * jumpCostMultiplier());
     }
 
     /** Checks out targetGameTime for every chunk getAllChunks() returns and applies it to the live
-     * world, paying the combined jump cost from the energy pool first. Does nothing but return
-     * INSUFFICIENT_ENERGY (and play a denial sound) if there isn't enough energy stored — callers
-     * with a player to notify (see RollbackChunkPacket) turn that into a chat message. */
-    public JumpResult applyTimelineView(long targetGameTime, long targetCommitId) {
+     * world, paying the combined jump cost (scaled by {@link #jumpCostMultiplier()}) from the energy
+     * pool first. Does nothing but return INSUFFICIENT_ENERGY (and play a denial sound) if there
+     * isn't enough energy stored — callers with a player to notify (see RollbackChunkPacket) turn
+     * that into a chat message. On success, shifts entropy toward chaos for a jump into the past
+     * (targetGameTime before what was previously selected) or toward order for a jump into the
+     * future. */
+    public JumpResult applyTimelineView(long targetGameTime, long targetCommitId, long previousSelectedGameTime) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
@@ -378,6 +528,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             previousHeads[i] = timeline.getChunkHeadId(chunks.get(i));
             totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued);
         }
+        totalCost = Math.round(totalCost * jumpCostMultiplier());
 
         if (totalCost > energyStorage.getEnergyStored()) {
             serverLevel.playSound(null, worldPosition, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
@@ -391,6 +542,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued);
         }
         worldData.setDirty();
+
+        if (targetGameTime != previousSelectedGameTime) {
+            shiftEntropyToward(targetGameTime < previousSelectedGameTime ? JUMP_ENTROPY_SHIFT : -JUMP_ENTROPY_SHIFT);
+        }
 
         serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
         return JumpResult.SUCCESS;
@@ -418,7 +573,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putLong("PlacedGameTime",   placedGameTime);
         tag.putLong("SelectedGameTime", selectedGameTime);
-        tag.putInt("Entropy", entropy);
+        tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
     }
 
@@ -428,7 +584,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("Energy"))           energyStorage.deserializeNBT(registries, tag.get("Energy"));
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
-        if (tag.contains("Entropy"))          entropy          = tag.getInt("Entropy");
+
+        if (tag.contains("OrderTank") && tag.contains("ChaosTank")) {
+            orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
+            chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        } else if (tag.contains("Entropy")) {
+            // Pre-rework save: entropy was a plain 0-1000 int. Rescale x10 into the new 0-10000
+            // tanks instead of resetting an existing world's machines back to 50/50.
+            int legacyChaos = (int) Math.clamp(tag.getInt("Entropy") * 10L, 0L, (long) ENTROPY_MAX);
+            orderTank.setFluid(new FluidStack(Registration.ORDER_FLUID.get(), ENTROPY_MAX - legacyChaos));
+            chaosTank.setFluid(new FluidStack(Registration.CHAOS_FLUID.get(), legacyChaos));
+        }
         // Absent (pre-existing save from before this tag existed) leaves the subclass constructor's
         // default in place, so old Chronospheres stay off and old Chronovaults stay always-on.
         if (tag.contains("AutoTrackingEnabled")) autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");

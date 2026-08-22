@@ -30,7 +30,7 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
     }
 
     public ChronosphereMenu(int id, Inventory playerInventory, BlockPos blockPos) {
-        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(13));
+        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(16));
     }
 
     public ChronosphereMenu(int id, Inventory playerInventory, ChronosphereBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -40,7 +40,7 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 13);
+        checkContainerDataCount(data, 16);
         addDataSlots(data);
     }
 
@@ -92,6 +92,18 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
 
     public int getEntropyMax() {
         return AbstractTimelineMachineBlockEntity.ENTROPY_MAX;
+    }
+
+    public int getOrderFluidAmount() {
+        return data.get(13);
+    }
+
+    public int getChaosFluidAmount() {
+        return data.get(14);
+    }
+
+    public int getEntropyTankCapacity() {
+        return data.get(15);
     }
 
     public ChronosphereBlockEntity getBlockEntity() {

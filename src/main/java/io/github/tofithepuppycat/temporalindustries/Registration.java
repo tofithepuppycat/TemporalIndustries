@@ -362,14 +362,20 @@ public class Registration {
     static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONOVAULT_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CHRONOVAULT_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONO_PROJECTOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CHRONO_PROJECTOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONODIAL_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CHRONODIAL_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, CHRONOSPHERE_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CHRONOSPHERE_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, SEEBECK_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, SCHRODINGER_GENERATOR_BLOCK_ENTITY.get(),
