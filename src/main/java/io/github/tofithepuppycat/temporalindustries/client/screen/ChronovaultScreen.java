@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
@@ -18,7 +19,6 @@ import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDelet
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -32,6 +32,8 @@ import net.neoforged.neoforge.network.PacketDistributor;
 public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> {
     private static final ResourceLocation INVENTORY_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/base.png");
     private static final ResourceLocation ICON_CONFIG_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_config.png");
+    private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_eye.png");
+    private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_jump.png");
     private static final int ICON_CONFIG_SIZE = 26;
     private static final int TEXTURE_WIDTH = 256;
     private static final int TEXTURE_HEIGHT = 256;
@@ -82,13 +84,13 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int PREVIEW_CURRENT_Y_OFFSET = 176;
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
     private static final int BUTTON_ROW_Y_OFFSET = 200;
+    private static final int ACTION_BUTTON_SIZE = IconButtonRenderer.SIZE;
+    private static final int ACTION_BUTTON_GAP = 6;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
     private final TimelineGraphWidget graphWidget = new TimelineGraphWidget();
 
-    private Button jumpButton;
-    private Button showChangesButton;
     private int ticksSinceSync = 0;
     private boolean settingsOverlayOpen = false;
     /** Whether the settings overlay is showing the "are you sure" step rather than the plain
@@ -99,6 +101,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private int autoTrackY;
     private int settingsX;
     private int settingsY;
+    private int showChangesX;
+    private int showChangesY;
+    private int jumpX;
+    private int jumpY;
 
     public ChronovaultScreen(ChronovaultMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -122,23 +128,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     protected void init() {
         super.init();
 
-        int buttonY = panelY() + BUTTON_ROW_Y_OFFSET;
-        int buttonWidth = 76;
-        int gap = 3;
-        int groupX = panelX() + (CONTENT_SIZE - (buttonWidth * 2 + gap)) / 2;
-
-        showChangesButton = Button.builder(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), btn -> toggleShowChanges())
-            .pos(groupX, buttonY)
-            .size(buttonWidth, 20)
-            .build();
-        addRenderableWidget(showChangesButton);
-
-        jumpButton = Button.builder(Component.translatable("gui.temporalindustries.chronovault.jump"), btn -> jumpAndClose())
-            .pos(groupX + buttonWidth + gap, buttonY)
-            .size(buttonWidth, 20)
-            .build();
-        jumpButton.active = TimelineProjectionManager.hasSelection();
-        addRenderableWidget(jumpButton);
+        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 2 + ACTION_BUTTON_GAP)) / 2;
+        showChangesX = groupX;
+        jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
+        jumpY = showChangesY;
 
         autoTrackX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         autoTrackY = panelY() + AUTO_TRACK_Y_OFFSET;
@@ -176,14 +170,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
                             TimelineProjectionManager.getPreviewVersion()));
         }
 
-        jumpButton.active = TimelineProjectionManager.hasSelection();
-        showChangesButton.visible = !settingsOverlayOpen;
-        jumpButton.visible = !settingsOverlayOpen;
     }
 
     private void toggleShowChanges() {
         TimelineProjectionManager.toggleShowChanges();
-        showChangesButton.setMessage(showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()));
     }
 
     /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
@@ -255,6 +245,35 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
 
         renderEntropyBar(guiGraphics);
+
+        if (!settingsOverlayOpen) {
+            renderActionButtons(guiGraphics, mouseX, mouseY);
+        }
+    }
+
+    /** Show Changes / Jump: small icon buttons (menu_icon_base_small.png + their own icon) in
+     * place of vanilla Buttons — Show Changes tints on while active, Jump dims while there's
+     * nothing selected to jump to. */
+    private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
+        int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
+        IconButtonRenderer.renderBackground(guiGraphics, showChangesX, showChangesY, showChangesTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_EYE_TEXTURE, showChangesX, showChangesY);
+
+        boolean jumpActive = TimelineProjectionManager.hasSelection();
+        int jumpTint = !jumpActive ? 0x80000000 : (isMouseOverJumpButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
+        IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
+    }
+
+    private boolean isMouseOverShowChangesButton(double mouseX, double mouseY) {
+        return mouseX >= showChangesX && mouseX <= showChangesX + ACTION_BUTTON_SIZE
+                && mouseY >= showChangesY && mouseY <= showChangesY + ACTION_BUTTON_SIZE;
+    }
+
+    private boolean isMouseOverJumpButton(double mouseX, double mouseY) {
+        return mouseX >= jumpX && mouseX <= jumpX + ACTION_BUTTON_SIZE
+                && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
     }
 
     private boolean isMouseOverEnergyBar(int mouseX, int mouseY) {
@@ -438,6 +457,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             guiGraphics.renderTooltip(font, tooltipComponent, mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+        } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
+        } else if (isMouseOverJumpButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         }
     }
 
@@ -473,6 +496,16 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             }
             // Modal: swallow every click on the panel while it's open so nothing underneath
             // (the graph, the buttons) reacts to it.
+            return true;
+        }
+
+        if (button == 0 && isMouseOverShowChangesButton(mouseX, mouseY)) {
+            toggleShowChanges();
+            return true;
+        }
+
+        if (button == 0 && isMouseOverJumpButton(mouseX, mouseY)) {
+            jumpAndClose();
             return true;
         }
 
