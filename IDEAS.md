@@ -26,3 +26,8 @@ Generators:
   Generators:
 - Withergenic reactor - large amounts of CHAOS
 
+
+#### Entropy Manipulator recipes:
+Spending CHAOS:
+Netherrack -> magma block -> obsidian -> crying obsidian -> nether star
+
