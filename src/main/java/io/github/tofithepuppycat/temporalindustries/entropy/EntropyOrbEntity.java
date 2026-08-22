@@ -240,11 +240,16 @@ public class EntropyOrbEntity extends Entity {
         ItemStack receptacle = findReceptacle(entity, getEntropyType());
         if (receptacle == null) return;
 
-        int leftover = ((EntropyReceptacle) receptacle.getItem()).insertOrb(receptacle, getEntropyType(), this.value);
-        int accepted = this.value - leftover;
-        if (accepted <= 0) return;
+        // Orbs only ever hand over whole units, so a receptacle with less than one unit of room
+        // left simply gets nothing rather than swallowing a fraction of this orb.
+        EntropyReceptacle item = (EntropyReceptacle) receptacle.getItem();
+        EntropyType type = getEntropyType();
+        int room = item.capacity(type) - item.amount(receptacle, type);
+        int units = Math.min(this.value, room / EntropyFluids.MB_PER_UNIT);
+        if (units <= 0) return;
 
-        this.value = leftover;
+        item.fill(receptacle, type, EntropyFluids.toMillibuckets(units));
+        this.value -= units;
         this.gameEvent(GameEvent.ENTITY_INTERACT, entity);
         this.level().playSound(null, this.blockPosition(), SoundEvents.EXPERIENCE_ORB_PICKUP, SoundSource.PLAYERS, 0.6F,
                 0.8F + this.random.nextFloat() * 0.4F);

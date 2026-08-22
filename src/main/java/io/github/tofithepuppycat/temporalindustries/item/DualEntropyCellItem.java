@@ -7,18 +7,22 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
+import net.minecraft.world.item.context.UseOnContext;
 
 import java.util.List;
 
 /**
- * Holds ORD (order) and CHS (chaos) picked up from {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity}
- * orbs, up to {@link EntropyContents#CAPACITY} of each. A player only attracts and picks up entropy
- * orbs while holding an {@link EntropyReceptacle} that accepts the orb's type — see
+ * Holds liquid ORD (order) and CHS (chaos) condensed out of the
+ * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity} orbs it catches, up
+ * to {@link EntropyContents#CAPACITY} mB of each. A player only attracts and picks up entropy orbs
+ * while holding an {@link EntropyReceptacle} that accepts the orb's type - see
  * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity#isHoldingReceptacle}.
- * The two fill levels are drawn as stacked bars over the item icon by
+ * Right-clicking a machine pours a dose of either fluid into it (see {@link CellTransfer}); the two
+ * fill levels are drawn as stacked bars over the item icon by
  * {@link io.github.tofithepuppycat.temporalindustries.client.EntropyContainerItemDecorator}.
  */
 @SuppressWarnings("null")
@@ -34,26 +38,44 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     }
 
     @Override
-    public boolean hasRoom(ItemStack stack, EntropyType type) {
-        return getContents(stack).amount(type) < EntropyContents.CAPACITY;
+    public int capacity(EntropyType type) {
+        return EntropyContents.CAPACITY;
     }
 
     @Override
-    public int insertOrb(ItemStack stack, EntropyType type, int amount) {
-        return insert(stack, type, amount);
+    public int amount(ItemStack stack, EntropyType type) {
+        return getContents(stack).amount(type);
     }
 
-    /** Adds amount of type into stack, respecting capacity. Returns whatever didn't fit. */
-    public static int insert(ItemStack stack, EntropyType type, int amount) {
-        if (!(stack.getItem() instanceof DualEntropyCellItem) || amount <= 0) return amount;
+    @Override
+    public int fill(ItemStack stack, EntropyType type, int millibuckets) {
+        if (!(stack.getItem() instanceof DualEntropyCellItem) || millibuckets <= 0) return 0;
 
         EntropyContents contents = getContents(stack);
         int current = contents.amount(type);
-        int accepted = Math.min(EntropyContents.CAPACITY - current, amount);
-        if (accepted <= 0) return amount;
+        int filled = Math.min(EntropyContents.CAPACITY - current, millibuckets);
+        if (filled <= 0) return 0;
 
-        stack.set(Registration.ENTROPY_CONTENTS.get(), contents.with(type, current + accepted));
-        return amount - accepted;
+        stack.set(Registration.ENTROPY_CONTENTS.get(), contents.with(type, current + filled));
+        return filled;
+    }
+
+    @Override
+    public int drain(ItemStack stack, EntropyType type, int millibuckets) {
+        if (!(stack.getItem() instanceof DualEntropyCellItem) || millibuckets <= 0) return 0;
+
+        EntropyContents contents = getContents(stack);
+        int current = contents.amount(type);
+        int drained = Math.min(current, millibuckets);
+        if (drained <= 0) return 0;
+
+        stack.set(Registration.ENTROPY_CONTENTS.get(), contents.with(type, current - drained));
+        return drained;
+    }
+
+    @Override
+    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
+        return CellTransfer.pourInto(context);
     }
 
     public static EntropyContents getContents(ItemStack stack) {
@@ -63,12 +85,13 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         EntropyContents contents = getContents(stack);
-        String capacity = EntropyDisplay.format(EntropyContents.CAPACITY);
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.format(contents.order()), capacity)
+        String capacity = EntropyDisplay.formatFluid(EntropyContents.CAPACITY);
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.formatFluid(contents.order()), capacity)
                 .withStyle(ChatFormatting.WHITE)
                 .append(EntropyDisplay.unit(EntropyType.ORDER)));
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.format(contents.chaos()), capacity)
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.formatFluid(contents.chaos()), capacity)
                 .withStyle(ChatFormatting.DARK_PURPLE)
                 .append(EntropyDisplay.unit(EntropyType.CHAOS)));
+        CellTransfer.appendTooltip(stack, tooltip);
     }
 }

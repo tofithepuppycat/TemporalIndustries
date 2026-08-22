@@ -29,6 +29,7 @@ import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyItemFluidHandler;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem;
@@ -48,6 +49,7 @@ import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.world.item.ArmorItem;
 import net.minecraft.world.item.ArmorMaterial;
@@ -102,6 +104,7 @@ public class Registration {
     public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS = DeferredRegister.create(Registries.ARMOR_MATERIAL, MODID);
     public static final DeferredRegister<RecipeType<?>> RECIPE_TYPES = DeferredRegister.create(Registries.RECIPE_TYPE, MODID);
     public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister.create(Registries.RECIPE_SERIALIZER, MODID);
+    public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
 
     public static final DeferredBlock<Chronovault> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
             () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
@@ -160,7 +163,8 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> BOTTLE_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "bottle_contents", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
-    // --- Temporal Anchor order bar/mode, and Temporal Glue's sub-durability charge progress ---
+    // --- Temporal Anchor order tank/mode, a cell's selected transfer step, and Temporal Glue's
+    // sub-durability charge progress ---
     // all reuse BottleContents (a plain persistent+networked int wrapper) rather than adding new records.
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_ORDER = DATA_COMPONENTS.registerComponentType(
@@ -168,6 +172,9 @@ public class Registration {
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_MODE = DATA_COMPONENTS.registerComponentType(
             "anchor_mode", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
+
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> CELL_TRANSFER_STEP = DATA_COMPONENTS.registerComponentType(
+            "cell_transfer_step", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> GLUE_CHARGE_PROGRESS = DATA_COMPONENTS.registerComponentType(
             "glue_charge_progress", builder -> builder.persistent(BottleContents.CODEC));
@@ -317,6 +324,9 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyManipulatorMenu>> ENTROPY_MANIPULATOR_MENU = MENUS.register("entropy_manipulator",
             () -> IMenuTypeExtension.create(EntropyManipulatorMenu::new));
 
+    public static final DeferredHolder<SoundEvent, SoundEvent> RETURN_BY_DEATH_SOUND = SOUND_EVENTS.register("return_by_death",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "return_by_death")));
+
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
                     .title(Component.translatable("itemGroup.temporalindustries"))
@@ -357,6 +367,7 @@ public class Registration {
         ARMOR_MATERIALS.register(modEventBus);
         RECIPE_TYPES.register(modEventBus);
         RECIPE_SERIALIZERS.register(modEventBus);
+        SOUND_EVENTS.register(modEventBus);
     }
 
     static void registerCapabilities(RegisterCapabilitiesEvent event) {
@@ -394,6 +405,11 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
+
+        // The cells and the anchor store liquid Order/Chaos on the stack, so they are fluid
+        // containers proper - fillable and drainable by anything that speaks IFluidHandler.
+        event.registerItem(Capabilities.FluidHandler.ITEM, (stack, ctx) -> new EntropyItemFluidHandler(stack),
+                ORDER_CELL_ITEM.get(), CHAOS_CELL_ITEM.get(), DUAL_ENTROPY_CELL_ITEM.get(), TEMPORAL_ANCHOR_ITEM.get());
     }
 
 }
