@@ -17,11 +17,14 @@ import org.jetbrains.annotations.NotNull;
 
 /** Container menu for the Entropy Condenser GUI: energy stored/capacity plus both tanks'
  * fill/capacity, packed into {@link ContainerData} 16-bit slots the same way as {@link ChronosphereMenu},
- * plus a Cell input slot (see {@link CrudeEntropyCondenserMenu} for its lower tier's identical slot). */
+ * plus a Cell input slot (see {@link CrudeEntropyCondenserMenu} for its lower tier's identical slot)
+ * and an output slot the tanks slowly fill an inserted Cell back out of. */
 @SuppressWarnings("null")
 public class EntropyCondenserMenu extends AbstractContainerMenu {
     private static final int CELL_SLOT_X = 80;
-    private static final int CELL_SLOT_Y = 19;
+    private static final int CELL_SLOT_Y = 20;
+    private static final int OUTPUT_SLOT_X = 80;
+    private static final int OUTPUT_SLOT_Y = 51;
     private static final int INVENTORY_X = 8;
     private static final int INVENTORY_Y = 84;
     private static final int HOTBAR_Y = 142;
@@ -50,6 +53,11 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
         addDataSlots(data);
 
         addSlot(new Slot(blockEntity, EntropyCondenserBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
+            @Override public boolean mayPlace(@NotNull ItemStack stack) {
+                return stack.getItem() instanceof EntropyReceptacle;
+            }
+        });
+        addSlot(new Slot(blockEntity, EntropyCondenserBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
             @Override public boolean mayPlace(@NotNull ItemStack stack) {
                 return stack.getItem() instanceof EntropyReceptacle;
             }
@@ -122,13 +130,14 @@ public class EntropyCondenserMenu extends AbstractContainerMenu {
         ItemStack result = stackInSlot.copy();
 
         int cellSlot = EntropyCondenserBlockEntity.CELL_SLOT;
-        int inventoryStart = cellSlot + 1;
+        int outputSlot = EntropyCondenserBlockEntity.OUTPUT_SLOT;
+        int inventoryStart = outputSlot + 1;
         int inventoryEnd = inventoryStart + 36;
 
-        if (index == cellSlot) {
+        if (index == cellSlot || index == outputSlot) {
             if (!moveItemStackTo(stackInSlot, inventoryStart, inventoryEnd, true)) return ItemStack.EMPTY;
         } else {
-            if (!(stackInSlot.getItem() instanceof EntropyReceptacle) || !moveItemStackTo(stackInSlot, cellSlot, cellSlot + 1, false)) {
+            if (!(stackInSlot.getItem() instanceof EntropyReceptacle) || !moveItemStackTo(stackInSlot, cellSlot, outputSlot + 1, false)) {
                 return ItemStack.EMPTY;
             }
         }
