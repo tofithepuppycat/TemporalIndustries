@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
@@ -50,7 +51,9 @@ import static io.github.tofithepuppycat.temporalindustries.block.EntropyCondense
  * range that starts at the block's front face and extends outward, and condenses its value into
  * liquid Order/Chaos fluid across two internal tanks, per IDEAS.md's Entropy Condenser. Also has a
  * single input slot that slowly drains an Order/Chaos Cell into the same tanks, the same unpowered
- * way {@link CrudeEntropyCondenserBlockEntity} works, for topping tanks off by hand.
+ * way {@link CrudeEntropyCondenserBlockEntity} works, for topping tanks off by hand, and an output
+ * slot that slowly fills any {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle}
+ * placed in it back out of the tanks.
  */
 @SuppressWarnings("null")
 public class EntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -61,8 +64,10 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     private static final int MB_PER_UNIT = 50;
     private static final int FE_PER_UNIT = 20;
     private static final int CELL_DRAIN_PER_TICK = 5;
-    private static final int SLOT_COUNT = 1;
+    private static final int OUTPUT_FILL_PER_TICK = 5;
+    private static final int SLOT_COUNT = 2;
     public static final int CELL_SLOT = 0;
+    public static final int OUTPUT_SLOT = 1;
 
     public static final int MIN_RANGE = 3;
     public static final int MAX_RANGE = 5;
@@ -202,6 +207,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         }
 
         be.drainCell();
+        be.fillOutput();
     }
 
     /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face
@@ -319,6 +325,40 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     }
 
     // -------------------------------------------------------------------------
+    // Output slot filling (unpowered; reverse of the cell slot draining above)
+
+    /** Tries to push Order then Chaos out of the tanks into whatever {@link EntropyReceptacle} sits
+     * in {@link #OUTPUT_SLOT}, up to {@link #OUTPUT_FILL_PER_TICK} of each per tick. */
+    private void fillOutput() {
+        ItemStack stack = items.get(OUTPUT_SLOT);
+        if (!(stack.getItem() instanceof EntropyReceptacle receptacle)) return;
+
+        int filledOrder = fillFrom(orderTank, EntropyType.ORDER, stack, receptacle);
+        int filledChaos = fillFrom(chaosTank, EntropyType.CHAOS, stack, receptacle);
+        if (filledOrder <= 0 && filledChaos <= 0) return;
+
+        setChanged();
+        syncToClients();
+    }
+
+    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} worth of mB from {@code tank} and inserts whatever
+     * the receptacle accepts. Returns how much was actually accepted. */
+    private int fillFrom(FluidTank tank, EntropyType type, ItemStack stack, EntropyReceptacle receptacle) {
+        if (!receptacle.accepts(type) || !receptacle.hasRoom(stack, type)) return 0;
+
+        int mbAvailable = Math.min(OUTPUT_FILL_PER_TICK * MB_PER_UNIT, tank.getFluidAmount());
+        int unitsAvailable = mbAvailable / MB_PER_UNIT;
+        if (unitsAvailable <= 0) return 0;
+
+        int leftover = receptacle.insertOrb(stack, type, unitsAvailable);
+        int accepted = unitsAvailable - leftover;
+        if (accepted <= 0) return 0;
+
+        tank.drain(accepted * MB_PER_UNIT, IFluidHandler.FluidAction.EXECUTE);
+        return accepted;
+    }
+
+    // -------------------------------------------------------------------------
     // Sync
 
     private void syncToClients() {
@@ -344,10 +384,10 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     }
 
     // -------------------------------------------------------------------------
-    // Container (single cell slot; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
+    // Container (cell input + output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
-    @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty(); }
+    @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty() && items.get(OUTPUT_SLOT).isEmpty(); }
     @Override public ItemStack getItem(int slot) { return items.get(slot); }
     @Override public ItemStack removeItem(int slot, int amount) {
         ItemStack result = ContainerHelper.removeItem(items, slot, amount);
