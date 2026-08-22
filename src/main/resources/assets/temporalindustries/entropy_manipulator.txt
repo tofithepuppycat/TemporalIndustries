@@ -1,0 +1,13 @@
+size: 176x166
+
+numbers mean position of upper left corner, in format X Y
+
+chaos bar: 10 8
+order bar: 18 8
+
+liquid input: 37 16, draw liquid below the GUI, there are transparency effects
+
+main input: 55 35
+output: 116 35
+
+progress bar: 74 26

@@ -20,11 +20,11 @@ import org.jetbrains.annotations.NotNull;
  * plus a Cell input slot (see {@link CrudeEntropyCondenserMenu} for its lower tier's identical slot). */
 @SuppressWarnings("null")
 public class EntropyCondenserMenu extends AbstractContainerMenu {
-    private static final int CELL_SLOT_X = 140;
-    private static final int CELL_SLOT_Y = 20;
+    private static final int CELL_SLOT_X = 80;
+    private static final int CELL_SLOT_Y = 19;
     private static final int INVENTORY_X = 8;
-    private static final int INVENTORY_Y = 140;
-    private static final int HOTBAR_Y = 202;
+    private static final int INVENTORY_Y = 84;
+    private static final int HOTBAR_Y = 142;
 
     private final EntropyCondenserBlockEntity blockEntity;
     private final BlockPos blockPos;
