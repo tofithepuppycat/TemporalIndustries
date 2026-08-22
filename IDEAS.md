@@ -30,4 +30,4 @@ Generators:
 #### Entropy Manipulator recipes:
 Spending CHAOS:
 Netherrack -> magma block -> obsidian -> crying obsidian -> nether star
-
+100mb -> 200mb -> 400mb -> 800mb -> 16 buckets
