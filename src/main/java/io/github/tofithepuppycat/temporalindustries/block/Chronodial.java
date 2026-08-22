@@ -89,6 +89,10 @@ public class Chronodial extends BaseEntityBlock {
                 player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.insufficient_energy"), true);
                 level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
             }
+            case ENTROPY_MAXED -> {
+                player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.entropy_maxed"), true);
+                level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
+            }
         }
         return InteractionResult.CONSUME;
     }

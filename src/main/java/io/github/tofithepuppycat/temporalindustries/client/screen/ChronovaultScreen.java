@@ -6,11 +6,11 @@ import org.jetbrains.annotations.NotNull;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
+import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
-import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
@@ -72,12 +72,13 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int ENERGY_BAR_WIDTH = 77;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
-    private static final int ENTROPY_BAR_X_OFFSET = 79;
+    /** Two small horizontal tank bars, side by side, filling the same strip the old single
+     * bidirectional bar occupied. */
+    private static final int ORDER_BAR_X_OFFSET = 79;
+    private static final int CHAOS_BAR_X_OFFSET = 106;
     private static final int ENTROPY_BAR_Y_OFFSET = 7;
-    private static final int ENTROPY_BAR_WIDTH = 52;
+    private static final int ENTROPY_BAR_WIDTH = 25;
     private static final int ENTROPY_BAR_HEIGHT = 8;
-    private static final int COLOR_ORDER = 0xFF000000 | EntropyType.ORDER.color();
-    private static final int COLOR_CHAOS = 0xFF000000 | EntropyType.CHAOS.color();
 
     private static final int PREVIEW_CURRENT_Y_OFFSET = 176;
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
@@ -263,32 +264,31 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
     }
 
-    /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
-     * order (below the midpoint) and dark purple toward chaos (above it). */
+    /** Two small tank bars — order and chaos — each filling left-to-right with the tiled fluid
+     * texture, replacing the old single bidirectional bar now that entropy is real ORD/CHS fluid. */
     private void renderEntropyBar(GuiGraphics guiGraphics) {
-        int barX = panelX() + ENTROPY_BAR_X_OFFSET;
+        int orderX = panelX() + ORDER_BAR_X_OFFSET;
+        int chaosX = panelX() + CHAOS_BAR_X_OFFSET;
         int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
-        int entropy = menu.getEntropy();
-        int max = menu.getEntropyMax();
+        int capacity = menu.getEntropyTankCapacity();
 
-        guiGraphics.fill(barX, barY, barX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
+        guiGraphics.fill(orderX, barY, orderX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
+        guiGraphics.fill(chaosX, barY, chaosX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
 
-        int mid = barX + ENTROPY_BAR_WIDTH / 2;
-        int half = ENTROPY_BAR_WIDTH / 2 - 1;
-        float balance = max > 0 ? (entropy - max / 2f) / (max / 2f) : 0f; // -1 (order) .. +1 (chaos)
-        int filled = Math.round(Math.abs(balance) * half);
-        if (filled > 0) {
-            if (balance >= 0) {
-                guiGraphics.fill(mid, barY + 1, mid + filled, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_CHAOS);
-            } else {
-                guiGraphics.fill(mid - filled, barY + 1, mid, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_ORDER);
-            }
-        }
-        guiGraphics.fill(mid, barY, mid + 1, barY + ENTROPY_BAR_HEIGHT, 0xFF888888);
+        FluidBarRenderer.renderHorizontal(guiGraphics, orderX + 1, barY + 1, ENTROPY_BAR_WIDTH - 2, ENTROPY_BAR_HEIGHT - 2,
+                menu.getOrderFluidAmount(), capacity, Registration.ORDER_FLUID_TYPE.get(), EntropyType.ORDER.color());
+        FluidBarRenderer.renderHorizontal(guiGraphics, chaosX + 1, barY + 1, ENTROPY_BAR_WIDTH - 2, ENTROPY_BAR_HEIGHT - 2,
+                menu.getChaosFluidAmount(), capacity, Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 
-    private boolean isMouseOverEntropyBar(int mouseX, int mouseY) {
-        int barX = panelX() + ENTROPY_BAR_X_OFFSET;
+    private boolean isMouseOverOrderBar(int mouseX, int mouseY) {
+        int barX = panelX() + ORDER_BAR_X_OFFSET;
+        int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
+        return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
+    }
+
+    private boolean isMouseOverChaosBar(int mouseX, int mouseY) {
+        int barX = panelX() + CHAOS_BAR_X_OFFSET;
         int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
         return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
     }
@@ -440,21 +440,16 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
             Component tooltipComponent = Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE");
             guiGraphics.renderTooltip(font, tooltipComponent, mouseX, mouseY);
-        } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+        } else if (isMouseOverOrderBar(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, tankTooltip(menu.getOrderFluidAmount(), menu.getEntropyTankCapacity(), "Order"), mouseX, mouseY);
+        } else if (isMouseOverChaosBar(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, tankTooltip(menu.getChaosFluidAmount(), menu.getEntropyTankCapacity(), "Chaos"), mouseX, mouseY);
         }
     }
 
-    /** Shared with {@link ChronosphereScreen}'s identical entropy bar tooltip. */
-    static Component entropyTooltip(int entropy, int max) {
-        int half = max / 2;
-        String displayEntropy = EntropyDisplay.format(entropy);
-        String displayMax = EntropyDisplay.format(max);
-        if (entropy == half) {
-            return Component.translatable("gui.temporalindustries.entropy.balanced", displayEntropy, displayMax);
-        }
-        String key = entropy > half ? "gui.temporalindustries.entropy.chaos" : "gui.temporalindustries.entropy.order";
-        return Component.translatable(key, displayEntropy, displayMax);
+    /** Shared with {@link ChronosphereScreen}'s identical per-tank hover tooltip. */
+    static Component tankTooltip(int amount, int capacity, String label) {
+        return Component.literal(amount + " / " + capacity + " mB " + label);
     }
 
     @Override
