@@ -1,0 +1,8 @@
+gui size 176 166
+
+10 8 FE energy bar, height 62 px
+
+61 15 order bar, width 8px, 48 px height
+
+105 15 chaos bar, same width and height
+80 15 item input (for cells)

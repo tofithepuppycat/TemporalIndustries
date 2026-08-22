@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.EntropyCondenserRangeClientState;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -8,7 +9,6 @@ import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.network.EntropyCondenserSetRangePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.client.renderer.texture.TextureAtlasSprite;
 import net.minecraft.network.chat.Component;
@@ -20,65 +20,41 @@ import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
-/** Minimal placeholder GUI: an FE bar, two fluid tank bars, a Cell input slot, a button cycling the
- * absorb range, and the player inventory — drawn with plain fills (no texture atlas yet), same
- * "no dedicated art" approach the rest of this mod's newer machines use. */
+/** Textured GUI for the Entropy Condenser: an FE energy bar, two vertical entropy tank bars
+ * (Order/Chaos), a Cell input slot, a button cycling the absorb range, and the player inventory —
+ * same layout/rendering technique as {@link EntropyManipulatorScreen}. */
 @SuppressWarnings("null")
 public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyCondenserMenu> {
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/entropy_condenser.png");
+    private static final ResourceLocation ICON_BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/menu_icon_base.png");
+
     private static final int IMAGE_WIDTH = 176;
-    private static final int IMAGE_HEIGHT = 218;
+    private static final int IMAGE_HEIGHT = 166;
 
-    private static final int ENERGY_BAR_X = 12;
-    private static final int ENERGY_BAR_Y = 20;
-    private static final int BAR_WIDTH = 16;
-    private static final int BAR_HEIGHT = 80;
+    private static final int ENERGY_BAR_X = 10;
+    private static final int ENERGY_BAR_Y = 8;
+    private static final int ENERGY_BAR_WIDTH = 4;
+    private static final int ENERGY_BAR_HEIGHT = 62;
+    private static final int ENERGY_COLOR = 0xFF3BFB98;
 
-    private static final int ORDER_BAR_X = 70;
-    private static final int CHAOS_BAR_X = 100;
+    private static final int ORDER_BAR_X = 57;
+    private static final int CHAOS_BAR_X = 109;
+    private static final int TANK_BAR_Y = 19;
+    private static final int TANK_BAR_WIDTH = 8;
+    private static final int TANK_BAR_HEIGHT = 48;
 
-    private static final int SLOT_X = 140;
-    private static final int SLOT_Y = 20;
-
-    private static final int RANGE_BUTTON_X = 12;
-    private static final int RANGE_BUTTON_Y = 106;
-    private static final int RANGE_BUTTON_WIDTH = 100;
-    private static final int RANGE_BUTTON_HEIGHT = 16;
-
-    private static final int SHOW_RANGE_BUTTON_X = 116;
-    private static final int SHOW_RANGE_BUTTON_Y = 106;
-    private static final int SHOW_RANGE_BUTTON_WIDTH = 48;
-    private static final int SHOW_RANGE_BUTTON_HEIGHT = 16;
-
-    private Button rangeButton;
-    private Button showRangeButton;
+    private static final int ICON_SIZE = 20;
+    private static final int ICON_Y = 66;
+    private static final int SHOW_RANGE_ICON_X = IMAGE_WIDTH - ICON_SIZE - 4;
+    private static final int RANGE_ICON_X = SHOW_RANGE_ICON_X - ICON_SIZE - 2;
 
     public EntropyCondenserScreen(EntropyCondenserMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
-        inventoryLabelY = imageHeight - 96;
-    }
-
-    @Override
-    protected void init() {
-        super.init();
-        rangeButton = Button.builder(rangeLabel(menu.getRange()), btn -> cycleRange())
-                .pos(leftPos + RANGE_BUTTON_X, topPos + RANGE_BUTTON_Y)
-                .size(RANGE_BUTTON_WIDTH, RANGE_BUTTON_HEIGHT)
-                .build();
-        addRenderableWidget(rangeButton);
-
-        showRangeButton = Button.builder(showRangeLabel(), btn -> toggleShowRange())
-                .pos(leftPos + SHOW_RANGE_BUTTON_X, topPos + SHOW_RANGE_BUTTON_Y)
-                .size(SHOW_RANGE_BUTTON_WIDTH, SHOW_RANGE_BUTTON_HEIGHT)
-                .build();
-        addRenderableWidget(showRangeButton);
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
-        rangeButton.setMessage(rangeLabel(menu.getRange()));
+        inventoryLabelY = imageHeight - 94;
     }
 
     private void cycleRange() {
@@ -93,58 +69,66 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         } else {
             EntropyCondenserRangeClientState.show(dimensionKey(), menu.getBlockPos());
         }
-        showRangeButton.setMessage(showRangeLabel());
     }
 
     private ResourceLocation dimensionKey() {
         return Minecraft.getInstance().level.dimension().location();
     }
 
-    private static Component rangeLabel(int range) {
-        return Component.literal("Range: " + range + "x" + range + "x" + range);
-    }
-
-    private Component showRangeLabel() {
-        boolean showing = EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos());
-        return Component.literal(showing ? "Hide Range" : "Show Range");
-    }
-
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, 0xFFC6C6C6);
+        guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-        guiGraphics.fill(leftPos + SLOT_X - 1, topPos + SLOT_Y - 1, leftPos + SLOT_X + 17, topPos + SLOT_Y + 17, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + SLOT_X, topPos + SLOT_Y, leftPos + SLOT_X + 16, topPos + SLOT_Y + 16, 0xFF373737);
-
-        renderBar(guiGraphics, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
-                menu.getEnergyStored(), menu.getEnergyCapacity(), 0xFF4DD0E1);
-        renderFluidBar(guiGraphics, leftPos + ORDER_BAR_X, topPos + ENERGY_BAR_Y,
+        renderEnergyBar(guiGraphics, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
+                menu.getEnergyStored(), menu.getEnergyCapacity());
+        renderFluidBar(guiGraphics, leftPos + ORDER_BAR_X, topPos + TANK_BAR_Y,
                 menu.getOrderFluidAmount(), menu.getTankCapacity(), Registration.ORDER_FLUID_TYPE.get(), EntropyType.ORDER.color());
-        renderFluidBar(guiGraphics, leftPos + CHAOS_BAR_X, topPos + ENERGY_BAR_Y,
+        renderFluidBar(guiGraphics, leftPos + CHAOS_BAR_X, topPos + TANK_BAR_Y,
                 menu.getChaosFluidAmount(), menu.getTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
+
+        renderRangeIcons(guiGraphics);
     }
 
-    private void renderBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, int color) {
-        guiGraphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xFF000000);
+    /** Range-cycle and show/hide-range controls, drawn as menu_icon_base.png square icons near the
+     * panel's right edge rather than vanilla Buttons, matching the mod's tab-icon look elsewhere. */
+    private void renderRangeIcons(GuiGraphics guiGraphics) {
+        int rangeX = leftPos + RANGE_ICON_X;
+        int showRangeX = leftPos + SHOW_RANGE_ICON_X;
+        int y = topPos + ICON_Y;
+
+        blitIconBase(guiGraphics, rangeX, y);
+        blitIconBase(guiGraphics, showRangeX, y);
+
+        Component rangeLabel = Component.literal(String.valueOf(menu.getRange()));
+        guiGraphics.drawCenteredString(font, rangeLabel, rangeX + ICON_SIZE / 2, y + (ICON_SIZE - 8) / 2, 0xFFFFFFFF);
+
+        if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
+            guiGraphics.fill(showRangeX + 2, y + 2, showRangeX + ICON_SIZE - 2, y + ICON_SIZE - 2, 0x8055FF55);
+        }
+    }
+
+    /** Blits menu_icon_base.png 1:1 at its own native resolution — the 6-arg blit overload assumes a
+     * 256x256 atlas when normalizing UVs, which would sample only a sliver of this small sprite. */
+    private void blitIconBase(GuiGraphics guiGraphics, int x, int y) {
+        guiGraphics.blit(ICON_BASE_TEXTURE, x, y, ICON_SIZE, ICON_SIZE, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+    }
+
+    private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity) {
         if (capacity <= 0 || amount <= 0) return;
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * (BAR_HEIGHT - 2)));
-        filled = Math.min(BAR_HEIGHT - 2, filled);
-        guiGraphics.fill(x + 1, y + BAR_HEIGHT - 1 - filled, x + BAR_WIDTH - 1, y + BAR_HEIGHT - 1, color);
+        int filled = Math.max(1, Math.round((amount / (float) capacity) * ENERGY_BAR_HEIGHT));
+        filled = Math.min(ENERGY_BAR_HEIGHT, filled);
+        int bottom = y + ENERGY_BAR_HEIGHT;
+        guiGraphics.fill(x, bottom - filled, x + ENERGY_BAR_WIDTH, bottom, ENERGY_COLOR);
     }
 
-    /** Tiles the fluid's still texture (from the block atlas, so its animation frames advance
-     * automatically) bottom-up over the filled portion of the tank, tinted with the entropy color -
-     * anchored/scissored rather than stretched so a 16px-square texture tile stays undistorted. */
+    /** Tiles the fluid's still texture (from the block atlas) bottom-up over the filled portion of
+     * the tank, tinted with the entropy color — same technique as EntropyManipulatorScreen. */
     private void renderFluidBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
-        guiGraphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xFF000000);
         if (capacity <= 0 || amount <= 0) return;
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * (BAR_HEIGHT - 2)));
-        filled = Math.min(BAR_HEIGHT - 2, filled);
+        int filled = Math.max(1, Math.round((amount / (float) capacity) * TANK_BAR_HEIGHT));
+        filled = Math.min(TANK_BAR_HEIGHT, filled);
 
-        int innerX = x + 1;
-        int innerWidth = BAR_WIDTH - 2;
-        int bottom = y + BAR_HEIGHT - 1;
+        int bottom = y + TANK_BAR_HEIGHT;
         int top = bottom - filled;
 
         ResourceLocation stillTexture = IClientFluidTypeExtensions.of(fluidType).getStillTexture();
@@ -156,9 +140,9 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         float g = ((tintColor >> 8) & 0xFF) / 255f;
         float b = (tintColor & 0xFF) / 255f;
 
-        guiGraphics.enableScissor(innerX, top, innerX + innerWidth, bottom);
+        guiGraphics.enableScissor(x, top, x + TANK_BAR_WIDTH, bottom);
         for (int drawY = bottom - 16; drawY > top - 16; drawY -= 16) {
-            guiGraphics.blit(innerX, drawY, 0, innerWidth, 16, sprite, r, g, b, 1f);
+            guiGraphics.blit(x, drawY, 0, TANK_BAR_WIDTH, 16, sprite, r, g, b, 1f);
         }
         guiGraphics.disableScissor();
     }
@@ -176,16 +160,37 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         renderTooltip(guiGraphics, mouseX, mouseY);
 
-        if (isOver(mouseX, mouseY, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y)) {
+        if (isOver(mouseX, mouseY, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
-        } else if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + ENERGY_BAR_Y)) {
+        } else if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getTankCapacity() + " mB Order"), mouseX, mouseY);
-        } else if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + ENERGY_BAR_Y)) {
+        } else if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getChaosFluidAmount() + " / " + menu.getTankCapacity() + " mB Chaos"), mouseX, mouseY);
+        } else if (isOver(mouseX, mouseY, leftPos + RANGE_ICON_X, topPos + ICON_Y, ICON_SIZE, ICON_SIZE)) {
+            int range = menu.getRange();
+            guiGraphics.renderTooltip(font, Component.literal("Range: " + range + "x" + range + "x" + range), mouseX, mouseY);
+        } else if (isOver(mouseX, mouseY, leftPos + SHOW_RANGE_ICON_X, topPos + ICON_Y, ICON_SIZE, ICON_SIZE)) {
+            boolean showing = EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos());
+            guiGraphics.renderTooltip(font, Component.literal(showing ? "Hide Range" : "Show Range"), mouseX, mouseY);
         }
     }
 
-    private boolean isOver(int mouseX, int mouseY, int barX, int barY) {
-        return mouseX >= barX && mouseX <= barX + BAR_WIDTH && mouseY >= barY && mouseY <= barY + BAR_HEIGHT;
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            if (isOver((int) mouseX, (int) mouseY, leftPos + RANGE_ICON_X, topPos + ICON_Y, ICON_SIZE, ICON_SIZE)) {
+                cycleRange();
+                return true;
+            }
+            if (isOver((int) mouseX, (int) mouseY, leftPos + SHOW_RANGE_ICON_X, topPos + ICON_Y, ICON_SIZE, ICON_SIZE)) {
+                toggleShowRange();
+                return true;
+            }
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    private boolean isOver(int mouseX, int mouseY, int x, int y, int width, int height) {
+        return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 }
