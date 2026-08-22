@@ -41,9 +41,9 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     private static final int ORDER_BAR_X = 57;
     private static final int CHAOS_BAR_X = 109;
-    private static final int TANK_BAR_Y = 19;
-    private static final int TANK_BAR_WIDTH = 8;
-    private static final int TANK_BAR_HEIGHT = 48;
+    private static final int TANK_BAR_Y = 20;
+    private static final int TANK_BAR_WIDTH = 9;
+    private static final int TANK_BAR_HEIGHT = 46;
 
     private static final int ICON_SIZE = 20;
     private static final int ICON_Y = 66;
