@@ -40,7 +40,6 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     private static final int BAR_Y = 8;
     private static final int BAR_WIDTH = 4;
     private static final int BAR_HEIGHT = 64;
-    private static final int BAR_ICON_SIZE = 8;
 
     private static final int LIQUID_X = 37;
     private static final int LIQUID_Y = 16;
@@ -51,8 +50,8 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
      * the same region as the progress bar icon. */
     public static final int PROGRESS_X = 74;
     public static final int PROGRESS_Y = 26;
-    public static final int PROGRESS_WIDTH = 24;
-    public static final int PROGRESS_HEIGHT = 24;
+    public static final int PROGRESS_WIDTH = 34;
+    public static final int PROGRESS_HEIGHT = 34;
 
     public EntropyManipulatorScreen(EntropyManipulatorMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -72,9 +71,6 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
                 menu.getChaosFluidAmount(), menu.getEntropyTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
         renderEntropyBar(guiGraphics, leftPos + ORDER_BAR_X, topPos + BAR_Y,
                 menu.getOrderFluidAmount(), menu.getEntropyTankCapacity(), Registration.ORDER_FLUID_TYPE.get(), EntropyType.ORDER.color());
-
-        guiGraphics.blit(CHAOS_ICON, leftPos + CHAOS_BAR_X, topPos + BAR_Y - 1, 0, 0, BAR_ICON_SIZE, BAR_ICON_SIZE, BAR_ICON_SIZE, BAR_ICON_SIZE);
-        guiGraphics.blit(ORDER_ICON, leftPos + ORDER_BAR_X, topPos + BAR_Y - 1, 0, 0, BAR_ICON_SIZE, BAR_ICON_SIZE, BAR_ICON_SIZE, BAR_ICON_SIZE);
 
         renderProgress(guiGraphics);
     }
