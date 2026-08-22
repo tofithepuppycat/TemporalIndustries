@@ -322,10 +322,10 @@ public class Registration {
                     .title(Component.translatable("itemGroup.temporalindustries"))
                     .icon(() -> ECHO_RECORD_ITEM.toStack())
                     .displayItems((params, output) -> {
-                        output.accept(CHRONOVAULT_ITEM);
-                        output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(CHRONODIAL_ITEM);
+                        output.accept(CHRONOVAULT_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
+                        output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(SCHRODINGER_GENERATOR_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
