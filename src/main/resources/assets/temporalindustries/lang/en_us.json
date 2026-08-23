@@ -29,7 +29,6 @@
 	"block.temporalindustries.echo_projector.glasses_active": "Looping",
 	"block.temporalindustries.echo_projector.glasses_paused": "Out of Energy",
 	"block.temporalindustries.echo_projector.glasses_energy_rate": "~%s FE/t to replay (up to %s FE/t)",
-	"block.temporalindustries.echo_projector.glasses_stored_energy": "Stored: %s / %s FE",
 	"item.temporalindustries.echo_record": "Echo Record",
 	"item.temporalindustries.echo_record.started": "Recording started...",
 	"item.temporalindustries.echo_record.saved": "Recording saved (%s s)",
