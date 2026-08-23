@@ -2,6 +2,8 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoRecording;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
@@ -9,6 +11,7 @@ import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -53,7 +56,7 @@ import java.util.Set;
  * when the loop starts, stops, or is paused/resumed for lack of energy.
  */
 @SuppressWarnings("null")
-public class ChronoProjectorBlockEntity extends BlockEntity implements Container {
+public class ChronoProjectorBlockEntity extends BlockEntity implements Container, EntropyInfoProvider {
     private static final int ENERGY_CAPACITY = 32_000;
     private static final int ENERGY_MAX_RECEIVE = 800;
     private static final int INVENTORY_SIZE = 9;
@@ -449,6 +452,27 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     public boolean isLoopActive() {
         return active;
+    }
+
+    /** Whether the loop is currently running or paused (out of energy), and — while it holds a
+     * saved recording — that recording's average and peak per-tick energy cost, so a player can
+     * tell at a glance whether their power supply can actually sustain it. Stored/max energy
+     * itself isn't duplicated here since the Entropy Glasses overlay doesn't render that either. */
+    @Override
+    public List<Component> getEntropyTooltip() {
+        if (cachedRecording == null) {
+            return List.of(Component.translatable("block.temporalindustries.echo_projector.glasses_no_recording")
+                    .withStyle(ChatFormatting.GRAY));
+        }
+
+        return List.of(
+                Component.translatable(active
+                                ? "block.temporalindustries.echo_projector.glasses_active"
+                                : "block.temporalindustries.echo_projector.glasses_paused")
+                        .withStyle(active ? ChatFormatting.GREEN : ChatFormatting.RED),
+                Component.translatable("block.temporalindustries.echo_projector.glasses_energy_rate",
+                        String.format("%.1f", cachedRecording.averageEnergyPerTick()), cachedRecording.peakEnergyPerTick())
+        );
     }
 
     /** Fractional position within the loop ([0, frameCount)) at gameTime + partialTick, or a

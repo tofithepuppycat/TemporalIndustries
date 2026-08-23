@@ -53,20 +53,6 @@ repositories {
         name = "ithundxr"
         url = "https://maven.ithundxr.dev/snapshots"
     }
-    // Modrinth's maven, used below to pull Jade into the dev/test environment and as an API
-    // dependency for the Jade integration (see client/jade). Restricted to maven.modrinth so it
-    // doesn't shadow other repos' artifacts of the same name.
-    exclusiveContent {
-        forRepository {
-            maven {
-                name = "modrinth"
-                url = "https://api.modrinth.com/maven"
-            }
-        }
-        filter {
-            includeGroup "maven.modrinth"
-        }
-    }
 }
 
 base {
