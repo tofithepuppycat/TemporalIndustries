@@ -51,7 +51,7 @@ public final class ChronoRecording {
 
     /** Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
      * any recorded actions on top. */
-    public static final int ENERGY_PER_TICK = 5;
+    public static final int ENERGY_PER_TICK = 15;
 
     /** Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
      * {@link #ENERGY_PER_TICK} — see {@link #averageEnergyPerTick()}. ATTACK is priced highest since
@@ -60,9 +60,9 @@ public final class ChronoRecording {
      * without needing a live projector instance. */
     public static int actionEnergyCost(ActionType type) {
         return switch (type) {
-            case ATTACK -> 15;
-            case BREAK, PLACE, MODIFY -> 6;
-            case INSERT, EXTRACT -> 3;
+            case ATTACK -> 45;
+            case BREAK, PLACE, MODIFY -> 18;
+            case INSERT, EXTRACT -> 9;
         };
     }
 
@@ -70,7 +70,7 @@ public final class ChronoRecording {
      * without this, a tick recording something like a sweeping-edge swing through a whole mob farm
      * could demand hundreds of FE in one instant and stall the loop indefinitely even with a
      * healthy average power supply. See {@link #energyCostAt(int)}. */
-    public static final int MAX_ENERGY_PER_TICK = 200;
+    public static final int MAX_ENERGY_PER_TICK = 500;
 
     /**
      * {@code item} is the block placed (PLACE) or the item transferred (INSERT/EXTRACT); the item
