@@ -27,6 +27,7 @@
 	"block.temporalindustries.echo_projector.no_recording": "Echo Record has no saved recording",
 	"jade.temporalindustries.echo_projector.no_recording": "No recording loaded",
 	"config.jade.plugin_temporalindustries.echo_projector": "Echo Projector",
+	"config.jade.plugin_temporalindustries.entropy_balance": "Entropy Balance",
 	"jade.temporalindustries.echo_projector.active": "Looping",
 	"jade.temporalindustries.echo_projector.paused": "Out of Energy",
 	"jade.temporalindustries.echo_projector.energy_rate": "~%s FE/t to replay (up to %s FE/t)",
