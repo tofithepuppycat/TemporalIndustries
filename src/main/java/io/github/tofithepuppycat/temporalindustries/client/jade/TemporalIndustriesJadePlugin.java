@@ -1,5 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.client.jade;
 
+import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
+import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
+import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
 import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import snownee.jade.api.IWailaClientRegistration;
 import snownee.jade.api.IWailaCommonRegistration;
@@ -22,5 +25,8 @@ public class TemporalIndustriesJadePlugin implements IWailaPlugin {
     @Override
     public void registerClient(IWailaClientRegistration registration) {
         registration.registerBlockComponent(ChronoProjectorComponentProvider.INSTANCE, EchoProjector.class);
+        registration.registerBlockComponent(EntropyBalanceComponentProvider.INSTANCE, Chronovault.class);
+        registration.registerBlockComponent(EntropyBalanceComponentProvider.INSTANCE, Chronosphere.class);
+        registration.registerBlockComponent(EntropyBalanceComponentProvider.INSTANCE, Chronodial.class);
     }
 }
