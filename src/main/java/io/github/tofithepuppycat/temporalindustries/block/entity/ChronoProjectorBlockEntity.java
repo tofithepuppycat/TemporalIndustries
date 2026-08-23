@@ -454,10 +454,9 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return active;
     }
 
-    /** Whether the loop is currently running or paused (out of energy), and — while it holds a
-     * saved recording — that recording's average and peak per-tick energy cost, so a player can
-     * tell at a glance whether their power supply can actually sustain it. Stored/max energy
-     * itself isn't duplicated here since the Entropy Glasses overlay doesn't render that either. */
+    /** Whether the loop is currently running or paused (out of energy), that recording's average
+     * and peak per-tick energy cost, and the projector's own stored/max energy, so a player can
+     * tell at a glance whether their power supply can actually sustain it. */
     @Override
     public List<Component> getEntropyTooltip() {
         if (cachedRecording == null) {
@@ -471,7 +470,9 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
                                 : "block.temporalindustries.echo_projector.glasses_paused")
                         .withStyle(active ? ChatFormatting.GREEN : ChatFormatting.RED),
                 Component.translatable("block.temporalindustries.echo_projector.glasses_energy_rate",
-                        String.format("%.1f", cachedRecording.averageEnergyPerTick()), cachedRecording.peakEnergyPerTick())
+                        String.format("%.1f", cachedRecording.averageEnergyPerTick()), cachedRecording.peakEnergyPerTick()),
+                Component.translatable("block.temporalindustries.echo_projector.glasses_stored_energy",
+                        energyStorage.getEnergyStored(), energyStorage.getMaxEnergyStored())
         );
     }
 
