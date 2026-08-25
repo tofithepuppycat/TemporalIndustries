@@ -126,12 +126,12 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
     public List<Component> getEntropyTooltip() {
         return List.of(
                 getDisplayName().copy().withStyle(ChatFormatting.WHITE),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid")
-                        .withStyle(ChatFormatting.GRAY)
-                        .append(EntropyDisplay.amountOverCapacity(orderTank.getFluidAmount(), orderTank.getCapacity(), EntropyType.ORDER)),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid")
-                        .withStyle(ChatFormatting.GRAY)
-                        .append(EntropyDisplay.amountOverCapacity(chaosTank.getFluidAmount(), chaosTank.getCapacity(), EntropyType.CHAOS)));
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(orderTank.getFluidAmount()), EntropyDisplay.formatFluid(orderTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.ORDER)),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, CrudeEntropyCondenserBlockEntity be) {
