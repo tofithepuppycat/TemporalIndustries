@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
 import net.minecraft.client.Minecraft;
@@ -170,15 +171,20 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         renderTooltip(guiGraphics, mouseX, mouseY);
 
         if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + BAR_Y, BAR_WIDTH, BAR_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getChaosFluidAmount() + " / " + menu.getEntropyTankCapacity() + " mB Chaos"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getEntropyTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + BAR_Y, BAR_WIDTH, BAR_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getEntropyTankCapacity() + " mB Order"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getEntropyTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + LIQUID_X, topPos + LIQUID_Y, LIQUID_WIDTH, LIQUID_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getLiquidFluidAmount() + " / " + menu.getLiquidTankCapacity() + " mB"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.literal(menu.getLiquidFluidAmount() + "/" + menu.getLiquidTankCapacity() + " mB"), mouseX, mouseY);
         }
     }
 
     private boolean isOver(int mouseX, int mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
+    private static Component fluidTooltip(int amount, int capacity, EntropyType type) {
+        return Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
+                .append(EntropyDisplay.unit(type));
     }
 }
