@@ -85,11 +85,8 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         int amount = getContents(stack).amount();
-        String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        boolean thousands = EntropyDisplay.isThousands(BottleContents.CAPACITY);
-        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluidScaled(amount), EntropyDisplay.formatFluidScaled(BottleContents.CAPACITY)).withStyle(color)
-                .append(EntropyDisplay.unit(type, thousands)));
+        tooltip.add(EntropyDisplay.amountOverCapacity(amount, BottleContents.CAPACITY, type).withStyle(color));
         CellTransfer.appendTooltip(stack, tooltip);
     }
 }

@@ -54,10 +54,10 @@ public final class EntropyDisplay {
         return unit(type, false);
     }
 
-    /** "<amount>/<capacity>" plus the colored unit suffix, both k-scaled together off the capacity
-     * so an amount and its capacity always share the same scale. */
+    /** "<amount>/<capacity>" plus the colored unit suffix, scaled off the current amount - not the
+     * capacity - so a near-empty tank reads e.g. "500/8,000 CHS" rather than "0.50/8.00k CHS". */
     public static MutableComponent amountOverCapacity(int amount, int capacity, EntropyType type) {
-        boolean thousands = isThousands(capacity);
+        boolean thousands = isThousands(amount);
         String amountText = thousands ? formatFluidScaled(amount) : formatFluid(amount);
         String capacityText = thousands ? formatFluidScaled(capacity) : formatFluid(capacity);
         return Component.literal(amountText + "/" + capacityText).append(unit(type, thousands));
