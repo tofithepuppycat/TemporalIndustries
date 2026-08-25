@@ -152,9 +152,9 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context,
                                 List<Component> tooltip, TooltipFlag flag) {
         tooltip.add(Component.translatable("item.temporalindustries.temporal_anchor.order",
-                        EntropyDisplay.formatFluid(getOrder(stack)), EntropyDisplay.formatFluid(MAX_ORDER_MB))
+                        EntropyDisplay.formatFluidScaled(getOrder(stack)), EntropyDisplay.formatFluidScaled(MAX_ORDER_MB))
                 .withStyle(ChatFormatting.WHITE)
-                .append(EntropyDisplay.unit(EntropyType.ORDER)));
+                .append(EntropyDisplay.unit(EntropyType.ORDER, EntropyDisplay.isThousands(MAX_ORDER_MB))));
 
         String modeKey = getMode(stack) == MODE_KEEP_INVENTORY
                 ? "item.temporalindustries.temporal_anchor.mode_keep_inventory"

@@ -87,8 +87,9 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(BottleContents.CAPACITY)).withStyle(color)
-                .append(EntropyDisplay.unit(type)));
+        boolean thousands = EntropyDisplay.isThousands(BottleContents.CAPACITY);
+        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluidScaled(amount), EntropyDisplay.formatFluidScaled(BottleContents.CAPACITY)).withStyle(color)
+                .append(EntropyDisplay.unit(type, thousands)));
         CellTransfer.appendTooltip(stack, tooltip);
     }
 }
