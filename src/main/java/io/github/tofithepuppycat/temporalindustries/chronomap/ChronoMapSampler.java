@@ -18,7 +18,7 @@ import net.minecraft.world.level.material.MapColor;
  * need vanilla's zoomed-out multi-chunk-per-pixel averaging) rather than routing through the real
  * {@link net.minecraft.world.level.saveddata.maps.MapItemSavedData}/{@code MapRenderer} pipeline,
  * which is built around a player physically holding a numbered map item and isn't practical to
- * stand up for a transient GUI overlay covering up to 25 chunks at once.
+ * stand up for a transient GUI overlay covering up to 121 chunks at once.
  */
 public final class ChronoMapSampler {
     public static final int SIZE = 16;

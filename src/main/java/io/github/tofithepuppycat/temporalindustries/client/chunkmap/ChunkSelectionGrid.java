@@ -8,25 +8,35 @@ import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Renders and hit-tests a circular grid of chunk cells centred on an anchor chunk — the chunk
- * selection map originally built for the Chronosphere's claim overlay ({@link
+ * Renders and hit-tests a grid of chunk cells centred on an anchor chunk — the chunk selection map
+ * originally built for the Chronosphere's claim overlay ({@link
  * io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}), extracted so the
  * Portable Chrono Marker's own area-select screen can present the exact same grid, colors-aside.
  * Purely layout/rendering/hit-testing; callers own what each cell actually means (claimed, blocked,
  * selected, terrain thumbnail, ...) via {@link CellPainter}.
  */
 public final class ChunkSelectionGrid {
-    public static final int CELL_SIZE = 32;
+    public static final int DEFAULT_CELL_SIZE = 32;
     public static final int CELL_GAP = 0;
 
     private final int radius;
+    private final ChunkArea.Shape shape;
+    private final int cellSize;
     private final int gridSize;
     private final int gridPixels;
 
+    /** A circular grid at the default cell size. */
     public ChunkSelectionGrid(int radius) {
+        this(radius, ChunkArea.Shape.CIRCLE, DEFAULT_CELL_SIZE);
+    }
+
+    /** {@code cellSize} lets a wide-radius grid shrink its cells to stay inside its host panel. */
+    public ChunkSelectionGrid(int radius, ChunkArea.Shape shape, int cellSize) {
         this.radius = radius;
+        this.shape = shape;
+        this.cellSize = cellSize;
         this.gridSize = radius * 2 + 1;
-        this.gridPixels = gridSize * CELL_SIZE + (gridSize - 1) * CELL_GAP;
+        this.gridPixels = gridSize * cellSize + (gridSize - 1) * CELL_GAP;
     }
 
     public int radius() {
@@ -37,9 +47,9 @@ public final class ChunkSelectionGrid {
         return gridPixels;
     }
 
-    /** Whether offset (dx, dz) from the anchor chunk falls within the circular selectable area. */
+    /** Whether offset (dx, dz) from the anchor chunk falls within the selectable area. */
     public boolean isWithinRadius(int dx, int dz) {
-        return ChunkArea.isWithinRadius(radius, dx, dz);
+        return shape.contains(radius, dx, dz);
     }
 
     /** Draws every in-radius cell tinted/textured per {@code painter} — either a flat status color,
@@ -53,19 +63,19 @@ public final class ChunkSelectionGrid {
                 int dz = row - radius;
                 if (!isWithinRadius(dx, dz)) continue;
 
-                int cellX = gridX + col * CELL_SIZE;
-                int cellY = gridY + row * CELL_SIZE;
+                int cellX = gridX + col * cellSize;
+                int cellY = gridY + row * cellSize;
                 long key = new ChunkPos(anchor.x + dx, anchor.z + dz).toLong();
 
                 int tint = painter.tint(dx, dz, key);
                 ResourceLocation terrain = painter.texture(key);
                 if (terrain != null) {
                     int size = ChronoMapSampler.SIZE;
-                    guiGraphics.blit(terrain, cellX, cellY, CELL_SIZE, CELL_SIZE, 0.0F, 0.0F, size, size, size, size);
+                    guiGraphics.blit(terrain, cellX, cellY, cellSize, cellSize, 0.0F, 0.0F, size, size, size, size);
                     // Status tint over the terrain, translucent so the sampled ground stays visible.
-                    guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, (0x80 << 24) | (tint & 0xFFFFFF));
+                    guiGraphics.fill(cellX, cellY, cellX + cellSize, cellY + cellSize, (0x80 << 24) | (tint & 0xFFFFFF));
                 } else {
-                    guiGraphics.fill(cellX, cellY, cellX + CELL_SIZE, cellY + CELL_SIZE, tint);
+                    guiGraphics.fill(cellX, cellY, cellX + cellSize, cellY + cellSize, tint);
                 }
             }
         }
@@ -77,13 +87,13 @@ public final class ChunkSelectionGrid {
         if (mouseX < gridX || mouseY < gridY || mouseX >= gridX + gridPixels || mouseY >= gridY + gridPixels) {
             return null;
         }
-        int col = (int) ((mouseX - gridX) / CELL_SIZE);
-        int row = (int) ((mouseY - gridY) / CELL_SIZE);
+        int col = (int) ((mouseX - gridX) / cellSize);
+        int row = (int) ((mouseY - gridY) / cellSize);
         if (col < 0 || col >= gridSize || row < 0 || row >= gridSize) return null;
 
         int dx = col - radius;
         int dz = row - radius;
-        if (!isWithinRadius(dx, dz)) return null; // outside the circle: not drawn, not clickable
+        if (!isWithinRadius(dx, dz)) return null; // outside the shape: not drawn, not clickable
 
         return new ChunkPos(anchor.x + dx, anchor.z + dz);
     }
