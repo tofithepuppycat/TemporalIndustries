@@ -117,8 +117,7 @@
 	"block.temporalindustries.entropy_manipulator.tooltip": "Transmutes items into the next item in a given entropy chain.",
 	"item.temporalindustries.entropy_glasses": "Entropy Glasses",
 	"item.temporalindustries.entropy_glasses.tooltip": "Shows entropy info about the block you're looking at.",
-	"overlay.temporalindustries.entropy_glasses.order": "Liquid Order: %s/%s mB",
-	"overlay.temporalindustries.entropy_glasses.chaos": "Liquid Chaos: %s/%s mB",
+	"overlay.temporalindustries.entropy_glasses.liquid": "Liquid: %s/%s",
 	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating": "Generating Order/Chaos",
 	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty": "Empty"
 }

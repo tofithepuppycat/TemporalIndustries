@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
@@ -170,10 +171,12 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     public List<Component> getEntropyTooltip() {
         return List.of(
                 getDisplayName().copy().withStyle(ChatFormatting.WHITE),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.order",
-                        orderTank.getFluidAmount(), orderTank.getCapacity()).withStyle(ChatFormatting.GRAY),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.chaos",
-                        chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(orderTank.getFluidAmount()), EntropyDisplay.formatFluid(orderTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.ORDER)),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, EntropyManipulatorBlockEntity be) {
