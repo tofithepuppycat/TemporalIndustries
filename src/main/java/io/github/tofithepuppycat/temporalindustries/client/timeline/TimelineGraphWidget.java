@@ -16,6 +16,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 
 /**
@@ -550,7 +551,7 @@ public final class TimelineGraphWidget {
         }
         OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.getId());
         if (jumpCost.isPresent()) {
-            tooltip.add(Component.literal("Jump cost: " + jumpCost.getAsLong() + " FE"));
+            tooltip.add(Component.literal("Jump cost: " + EnergyDisplay.format(jumpCost.getAsLong()) + " FE"));
         }
         return tooltip.stream().map(Component::getVisualOrderText).toList();
     }
