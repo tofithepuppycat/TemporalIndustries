@@ -35,12 +35,11 @@ public final class EntropyDisplay {
     }
 
     /** Liquid amounts of a thousand mB or more are shown k-scaled to pair with the "k" prefixed
-     * ORD/CHS unit - e.g. 8000 reads as "8", 12500 as "12.5". Smaller amounts are shown as-is,
-     * unscaled, since they'd otherwise round away to nothing. */
+     * ORD/CHS unit, always to two decimals - e.g. 8000 reads as "8.00", 12500 as "12.50". Smaller
+     * amounts are shown as-is, unscaled, since they'd otherwise round away to nothing. */
     public static String formatFluidScaled(int millibuckets) {
         if (!isThousands(millibuckets)) return formatFluid(millibuckets);
-        String text = String.format(Locale.ROOT, "%,.1f", millibuckets / 1000.0);
-        return text.endsWith(".0") ? text.substring(0, text.length() - 2) : text;
+        return String.format(Locale.ROOT, "%,.2f", millibuckets / 1000.0);
     }
 
     /** The colored "ORD" / "CHS" unit suffix, e.g. to append after a formatted amount - "kORD" /
