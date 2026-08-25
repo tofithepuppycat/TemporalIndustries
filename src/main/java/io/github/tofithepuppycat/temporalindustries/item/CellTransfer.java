@@ -85,7 +85,8 @@ public final class CellTransfer {
                 level.playSound(null, pos, SoundEvents.BUCKET_EMPTY, SoundSource.BLOCKS, 0.6F, 1.4F);
                 if (player != null) {
                     player.displayClientMessage(Component.translatable("item.temporalindustries.cell.poured",
-                            EntropyDisplay.formatFluid(accepted)).append(EntropyDisplay.unit(type)), true);
+                            EntropyDisplay.formatFluidScaled(accepted))
+                            .append(EntropyDisplay.unit(type, EntropyDisplay.isThousands(accepted))), true);
                 }
             }
             return InteractionResult.sidedSuccess(level.isClientSide);

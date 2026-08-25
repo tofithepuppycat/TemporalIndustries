@@ -184,7 +184,6 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     }
 
     private static Component fluidTooltip(int amount, int capacity, EntropyType type) {
-        return Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
-                .append(EntropyDisplay.unit(type));
+        return EntropyDisplay.amountOverCapacity(amount, capacity, type);
     }
 }

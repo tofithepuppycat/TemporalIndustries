@@ -182,11 +182,11 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         return List.of(
                 getDisplayName().copy().withStyle(ChatFormatting.WHITE),
                 Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
-                        EntropyDisplay.formatFluid(orderTank.getFluidAmount()), EntropyDisplay.formatFluid(orderTank.getCapacity()))
-                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.ORDER)),
+                        EntropyDisplay.formatFluidScaled(orderTank.getFluidAmount()), EntropyDisplay.formatFluidScaled(orderTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.ORDER, EntropyDisplay.isThousands(orderTank.getCapacity()))),
                 Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
-                        EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
-                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
+                        EntropyDisplay.formatFluidScaled(chaosTank.getFluidAmount()), EntropyDisplay.formatFluidScaled(chaosTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS, EntropyDisplay.isThousands(chaosTank.getCapacity()))));
     }
 
     public void setRange(int range) {
