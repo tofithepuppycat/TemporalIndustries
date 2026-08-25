@@ -7,6 +7,7 @@ import org.jetbrains.annotations.NotNull;
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
@@ -74,7 +75,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int ENERGY_BAR_WIDTH = 77;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
-    private static final int ENTROPY_BAR_X_OFFSET = 79;
+    private static final int ENTROPY_BAR_X_OFFSET = 6;
     private static final int ENTROPY_BAR_Y_OFFSET = 7;
     private static final int ENTROPY_BAR_WIDTH = 52;
     private static final int ENTROPY_BAR_HEIGHT = 8;
@@ -453,7 +454,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         if (!tooltip.isEmpty()) {
             guiGraphics.renderTooltip(font, tooltip, mouseX, mouseY);
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
-            Component tooltipComponent = Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE");
+            Component tooltipComponent = Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/" + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE");
             guiGraphics.renderTooltip(font, tooltipComponent, mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
@@ -466,14 +467,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     /** Shared with {@link ChronosphereScreen}'s identical entropy bar tooltip. */
     static Component entropyTooltip(int entropy, int max) {
-        int half = max / 2;
-        String displayEntropy = EntropyDisplay.formatBalance(entropy);
-        String displayMax = EntropyDisplay.formatBalance(max);
-        if (entropy == half) {
-            return Component.translatable("gui.temporalindustries.entropy.balanced", displayEntropy, displayMax);
-        }
-        String key = entropy > half ? "gui.temporalindustries.entropy.chaos" : "gui.temporalindustries.entropy.order";
-        return Component.translatable(key, displayEntropy, displayMax);
+        int offset = entropy - max / 2;
+        String sign = offset >= 0 ? "+" : "";
+        String display = sign + EntropyDisplay.formatBalance(offset);
+        return Component.translatable("gui.temporalindustries.entropy.value", display);
     }
 
     @Override
