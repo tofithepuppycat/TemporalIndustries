@@ -5,7 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientS
 import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerMapRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerMarkPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerSaveSelectionPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
@@ -19,18 +19,22 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.LinkedHashSet;
+import java.util.List;
 import java.util.Set;
 
 /**
  * Standalone (non-container) screen for the Portable Chrono Marker's sneak-right-click area select:
  * the same {@link ChunkSelectionGrid} the Chronosphere's claim overlay uses, letting the player pick
- * exactly which chunks around them get captured on confirm, instead of the plain right-click's fixed
- * square radius. Opened directly via {@link #open}, not through a container menu, since there's no
- * block/BlockEntity backing this item's action.
+ * exactly which chunks around them make up the marker's custom shape. Opened directly via
+ * {@link #open}, not through a container menu, since there's no block/BlockEntity backing this
+ * item's action.
  *
- * <p>Selection lives entirely client-side until "Mark" is pressed — unlike the Chronosphere's claim
- * map, there's no persistent server-side claim that other players/screens need to stay in sync with,
- * so nothing is sent to the server until the player confirms (see {@link ChronoMarkerMarkPacket}).
+ * <p>This screen only ever saves a selection onto the item (see {@link PortableChronoMarkerItem#saveOffsets}) —
+ * it never marks by itself. Only a plain right-click with the marker actually records a save point,
+ * using whatever shape was last saved here (or the fixed default square, if nothing has been saved
+ * yet). Selection lives entirely client-side until "Save" is pressed — unlike the Chronosphere's
+ * claim map, there's no persistent server-side claim that other players/screens need to stay in sync
+ * with, so nothing is sent to the server until the player confirms (see {@link ChronoMarkerSaveSelectionPacket}).
  */
 @SuppressWarnings("null")
 public class ChronoMarkerMapScreen extends Screen {
@@ -53,7 +57,8 @@ public class ChronoMarkerMapScreen extends Screen {
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 3;
 
-    private static final ChunkSelectionGrid GRID = new ChunkSelectionGrid(PortableChronoMarkerItem.MAP_RADIUS_CHUNKS);
+    private static final ChunkSelectionGrid GRID = new ChunkSelectionGrid(PortableChronoMarkerItem.MAP_RADIUS_CHUNKS,
+            PortableChronoMarkerItem.MAP_SHAPE, ChunkSelectionGrid.DEFAULT_CELL_SIZE);
 
     private final ChunkPos anchor;
     /** Chunk keys currently chosen for marking — always contains the anchor chunk, which can't be
@@ -93,7 +98,7 @@ public class ChronoMarkerMapScreen extends Screen {
                 .size(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
 
-        addRenderableWidget(Button.builder(Component.translatable("gui.temporalindustries.chrono_marker.mark_button"), btn -> confirmMark())
+        addRenderableWidget(Button.builder(Component.translatable("gui.temporalindustries.chrono_marker.save_button"), btn -> confirmSave())
                 .pos(groupX + BUTTON_WIDTH + BUTTON_GAP, buttonY)
                 .size(BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
@@ -133,8 +138,13 @@ public class ChronoMarkerMapScreen extends Screen {
         renderTransparentBackground(guiGraphics);
     }
 
-    private void confirmMark() {
-        PacketDistributor.sendToServer(new ChronoMarkerMarkPacket(new ArrayList<>(selected)));
+    private void confirmSave() {
+        List<PortableChronoMarkerItem.ChunkOffset> offsets = new ArrayList<>(selected.size());
+        for (long key : selected) {
+            ChunkPos pos = new ChunkPos(key);
+            offsets.add(new PortableChronoMarkerItem.ChunkOffset(pos.x - anchor.x, pos.z - anchor.z));
+        }
+        PacketDistributor.sendToServer(new ChronoMarkerSaveSelectionPacket(offsets));
         onClose();
     }
 
