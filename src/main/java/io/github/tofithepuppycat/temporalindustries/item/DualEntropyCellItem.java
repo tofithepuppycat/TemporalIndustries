@@ -85,8 +85,13 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         EntropyContents contents = getContents(stack);
-        tooltip.add(EntropyDisplay.amountOverCapacity(contents.order(), EntropyContents.CAPACITY, EntropyType.ORDER).withStyle(ChatFormatting.WHITE));
-        tooltip.add(EntropyDisplay.amountOverCapacity(contents.chaos(), EntropyContents.CAPACITY, EntropyType.CHAOS).withStyle(ChatFormatting.DARK_PURPLE));
+        String capacity = EntropyDisplay.formatFluid(EntropyContents.CAPACITY);
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.formatFluid(contents.order()), capacity)
+                .withStyle(ChatFormatting.WHITE)
+                .append(EntropyDisplay.unit(EntropyType.ORDER)));
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.formatFluid(contents.chaos()), capacity)
+                .withStyle(ChatFormatting.DARK_PURPLE)
+                .append(EntropyDisplay.unit(EntropyType.CHAOS)));
         CellTransfer.appendTooltip(stack, tooltip);
     }
 }
