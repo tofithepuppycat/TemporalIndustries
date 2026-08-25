@@ -4,6 +4,8 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.EntropyCondenserRangeClientState;
+import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.network.EntropyCondenserSetRangePacket;
@@ -23,8 +25,6 @@ import org.jetbrains.annotations.NotNull;
 public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyCondenserMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/entropy_condenser.png");
-    private static final ResourceLocation ICON_BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/menu_icon_base.png");
     private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/icon_eye.png");
 
@@ -43,7 +43,7 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
     private static final int TANK_BAR_WIDTH = 9;
     private static final int TANK_BAR_HEIGHT = 46;
 
-    private static final int ICON_SIZE = 20;
+    private static final int ICON_SIZE = IconButtonRenderer.SIZE;
     private static final int ICON_Y = 66;
     private static final int SHOW_RANGE_ICON_X = IMAGE_WIDTH - ICON_SIZE - 4;
     private static final int RANGE_ICON_X = SHOW_RANGE_ICON_X - ICON_SIZE - 2;
@@ -87,30 +87,21 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         renderRangeIcons(guiGraphics);
     }
 
-    /** Range-cycle and show/hide-range controls, drawn as menu_icon_base.png square icons near the
-     * panel's right edge rather than vanilla Buttons, matching the mod's tab-icon look elsewhere. */
+    /** Range-cycle and show/hide-range controls, drawn as menu_icon_base_small.png icon buttons near
+     * the panel's right edge rather than vanilla Buttons, matching the mod's inline-button look elsewhere. */
     private void renderRangeIcons(GuiGraphics guiGraphics) {
         int rangeX = leftPos + RANGE_ICON_X;
         int showRangeX = leftPos + SHOW_RANGE_ICON_X;
         int y = topPos + ICON_Y;
 
-        blitIconBase(guiGraphics, rangeX, y);
-        blitIconBase(guiGraphics, showRangeX, y);
+        IconButtonRenderer.renderBackground(guiGraphics, rangeX, y, 0);
 
         Component rangeLabel = Component.literal(String.valueOf(menu.getRange()));
         guiGraphics.drawCenteredString(font, rangeLabel, rangeX + ICON_SIZE / 2, y + (ICON_SIZE - 8) / 2, 0xFFFFFFFF);
 
-        if (EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos())) {
-            guiGraphics.fill(showRangeX + 1, y + 1, showRangeX + ICON_SIZE - 1, y + ICON_SIZE - 1, 0x8055FF55);
-        }
-        int eyeOffset = (ICON_SIZE - 16) / 2;
-        guiGraphics.blit(ICON_EYE_TEXTURE, showRangeX + eyeOffset, y + eyeOffset, 16, 16, 0.0F, 0.0F, 16, 16, 16, 16);
-    }
-
-    /** Blits menu_icon_base.png 1:1 at its own native resolution — the 6-arg blit overload assumes a
-     * 256x256 atlas when normalizing UVs, which would sample only a sliver of this small sprite. */
-    private void blitIconBase(GuiGraphics guiGraphics, int x, int y) {
-        guiGraphics.blit(ICON_BASE_TEXTURE, x, y, ICON_SIZE, ICON_SIZE, 0.0F, 0.0F, ICON_SIZE, ICON_SIZE, ICON_SIZE, ICON_SIZE);
+        boolean showing = EntropyCondenserRangeClientState.isShowing(dimensionKey(), menu.getBlockPos());
+        IconButtonRenderer.renderBackground(guiGraphics, showRangeX, y, showing ? 0x8055FF55 : 0);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_EYE_TEXTURE, showRangeX, y);
     }
 
     private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity) {
@@ -135,11 +126,11 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         renderTooltip(guiGraphics, mouseX, mouseY);
 
         if (isOver(mouseX, mouseY, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + "/" + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getTankCapacity() + " mB Order"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getChaosFluidAmount() + " / " + menu.getTankCapacity() + " mB Chaos"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + RANGE_ICON_X, topPos + ICON_Y, ICON_SIZE, ICON_SIZE)) {
             int range = menu.getRange();
             guiGraphics.renderTooltip(font, Component.literal("Range: " + range + "x" + range + "x" + range), mouseX, mouseY);
@@ -166,5 +157,10 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     private boolean isOver(int mouseX, int mouseY, int x, int y, int width, int height) {
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
+    }
+
+    private static Component fluidTooltip(int amount, int capacity, EntropyType type) {
+        return Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
+                .append(EntropyDisplay.unit(type));
     }
 }

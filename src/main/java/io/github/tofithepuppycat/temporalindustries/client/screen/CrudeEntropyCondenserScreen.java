@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import net.minecraft.client.Minecraft;
@@ -95,13 +96,18 @@ public class CrudeEntropyCondenserScreen extends AbstractContainerScreen<CrudeEn
         renderTooltip(guiGraphics, mouseX, mouseY);
 
         if (isOver(mouseX, mouseY, leftPos + ORDER_BAR_X, topPos + BAR_Y)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getOrderFluidAmount() + " / " + menu.getTankCapacity() + " mB Order"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + BAR_Y)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getChaosFluidAmount() + " / " + menu.getTankCapacity() + " mB Chaos"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
         }
     }
 
     private boolean isOver(int mouseX, int mouseY, int barX, int barY) {
         return mouseX >= barX && mouseX <= barX + BAR_WIDTH && mouseY >= barY && mouseY <= barY + BAR_HEIGHT;
+    }
+
+    private static Component fluidTooltip(int amount, int capacity, EntropyType type) {
+        return Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
+                .append(EntropyDisplay.unit(type));
     }
 }

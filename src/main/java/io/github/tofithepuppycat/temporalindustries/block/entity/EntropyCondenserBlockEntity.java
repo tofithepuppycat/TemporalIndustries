@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
@@ -180,10 +181,12 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     public List<Component> getEntropyTooltip() {
         return List.of(
                 getDisplayName().copy().withStyle(ChatFormatting.WHITE),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.order",
-                        orderTank.getFluidAmount(), orderTank.getCapacity()).withStyle(ChatFormatting.GRAY),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.chaos",
-                        chaosTank.getFluidAmount(), chaosTank.getCapacity()).withStyle(ChatFormatting.DARK_PURPLE));
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(orderTank.getFluidAmount()), EntropyDisplay.formatFluid(orderTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.ORDER)),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
     }
 
     public void setRange(int range) {
