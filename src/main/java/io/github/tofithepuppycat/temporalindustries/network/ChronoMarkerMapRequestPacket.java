@@ -2,7 +2,6 @@ package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler;
-import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -62,7 +61,7 @@ public class ChronoMarkerMapRequestPacket implements CustomPacketPayload {
             Map<Long, byte[]> thumbnails = new LinkedHashMap<>();
             for (int dx = -radius; dx <= radius; dx++) {
                 for (int dz = -radius; dz <= radius; dz++) {
-                    if (!ChunkArea.isWithinRadius(radius, dx, dz)) continue;
+                    if (!PortableChronoMarkerItem.MAP_SHAPE.contains(radius, dx, dz)) continue;
                     ChunkPos pos = new ChunkPos(anchor.x + dx, anchor.z + dz);
                     // Only sample chunks already loaded — this is a preview, not a reason to force
                     // remote/unclaimed chunks to generate.

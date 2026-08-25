@@ -85,9 +85,9 @@ public class NetworkHandler {
                 ChronoMarkerMapSyncPacket::handle);
 
         registrar.playToServer(
-                ChronoMarkerMarkPacket.TYPE,
-                ChronoMarkerMarkPacket.STREAM_CODEC,
-                ChronoMarkerMarkPacket::handle);
+                ChronoMarkerSaveSelectionPacket.TYPE,
+                ChronoMarkerSaveSelectionPacket.STREAM_CODEC,
+                ChronoMarkerSaveSelectionPacket::handle);
 
         registrar.playToServer(
                 EntropyCondenserSetRangePacket.TYPE,
