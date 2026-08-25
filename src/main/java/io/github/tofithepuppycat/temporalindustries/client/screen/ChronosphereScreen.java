@@ -8,6 +8,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
+import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
@@ -715,7 +716,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!tooltip.isEmpty()) {
             guiGraphics.renderTooltip(font, tooltip, mouseX, mouseY);
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + "/" + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/" + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE"), mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
