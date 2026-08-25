@@ -14,7 +14,7 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: claim or release one chunk in a Chronosphere's 5x5 map. Triggers an immediate
+/** Client -> server: claim or release one chunk in a Chronosphere's 11x11 map. Triggers an immediate
  * ChronosphereStateSyncPacket reply rather than waiting for the periodic poll, since the player is
  * actively looking at the map when they click a cell. */
 public class ChronosphereToggleChunkPacket implements CustomPacketPayload {

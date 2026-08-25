@@ -39,18 +39,18 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Block entity for the Chronosphere, the multi-chunk-tier time machine: the player claims up to a
- * 5x5 chunk area (centred on the block's own chunk, always included) from
+ * Block entity for the Chronosphere, the multi-chunk-tier time machine: the player claims up to an
+ * 11x11 chunk area (centred on the block's own chunk, always included) from
  * {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}'s map, and
  * a single jump moves every claimed chunk to the same target time, paid from one shared energy pool
  * (unlike the Time Machine, which is one energy pool per chunk). See
  * {@link AbstractTimelineMachineBlockEntity} for the jump/energy/re-snapshot logic shared between them.
  */
 public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
-    /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. a 5x5 box. */
-    public static final int MAX_RADIUS = 2;
-    /** Home chunk plus up to this many additional chunks = 25 chunks, a full 5x5 box. */
-    public static final int MAX_ADDITIONAL_CHUNKS = 24;
+    /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. an 11x11 box. */
+    public static final int MAX_RADIUS = 5;
+    /** Home chunk plus up to this many additional chunks = 121 chunks, a full 11x11 box. */
+    public static final int MAX_ADDITIONAL_CHUNKS = (MAX_RADIUS * 2 + 1) * (MAX_RADIUS * 2 + 1) - 1;
 
     private static final int ENERGY_CAPACITY = 500_000;
     private static final int ENERGY_TRANSFER  = 5_000;
@@ -119,14 +119,18 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return isWithinRadius(pos.x - home.x, pos.z - home.z);
     }
 
-    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable circle —
+    /** The claimable area's outline: a full square box, so every cell of the map grid is claimable
+     * (the Portable Chrono Marker's area-select map keeps the inscribed {@code CIRCLE} instead). */
+    public static final ChunkArea.Shape CLAIM_SHAPE = ChunkArea.Shape.SQUARE;
+
+    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable box —
      * shared with {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}
      * and {@link io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket}
      * so the map's drawn shape, click hit-testing, and the server's actual rule always agree. Delegates
-     * to {@link ChunkArea}, the same circular-radius math the Portable Chrono Marker's area-select map
-     * and its network handlers use. */
+     * to {@link ChunkArea}, the same radius math the Portable Chrono Marker's area-select map and its
+     * network handlers use. */
     public static boolean isWithinRadius(int dx, int dz) {
-        return ChunkArea.isWithinRadius(MAX_RADIUS, dx, dz);
+        return CLAIM_SHAPE.contains(MAX_RADIUS, dx, dz);
     }
 
     /** Every chunk this machine currently controls, home chunk first. */

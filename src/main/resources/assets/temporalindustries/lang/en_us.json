@@ -53,7 +53,7 @@
 	"block.temporalindustries.chronodial.glasses_fe_cost": "Restore cost: %s FE",
 	"block.temporalindustries.chronodial.glasses_entropy_cost": "Restore cost: +%s Entropy",
 	"block.temporalindustries.chronosphere": "Chronosphere",
-	"block.temporalindustries.chronosphere.tooltip": "Multi-chunk time machine.\nClaims up to a 5x5 area of chunks,\njumping them together from a shared energy pool.",
+	"block.temporalindustries.chronosphere.tooltip": "Multi-chunk time machine.\nClaims up to an 11x11 area of chunks,\njumping them together from a shared energy pool.",
 	"container.temporalindustries.chronosphere": "Chronosphere",
 	"block.temporalindustries.chronosphere.out_of_bounds": "That chunk is outside the claimable range",
 	"block.temporalindustries.chronosphere.already_tracked": "That chunk is already claimed by another machine",

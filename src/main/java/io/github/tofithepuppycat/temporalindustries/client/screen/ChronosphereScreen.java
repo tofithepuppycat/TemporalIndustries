@@ -35,7 +35,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 /** GUI for the Chronosphere block: the same timeline graph view as the Chronovault (via
  * {@link TimelineGraphWidget}), reading/jumping the home chunk's history exactly like a
  * Chronovault — except Jump moves every chunk this Chronosphere has claimed, not just the one shown.
- * The 5x5 claim map lives behind a square bookmark tab on the panel's side and opens as an
+ * The 11x11 claim map lives behind a square bookmark tab on the panel's side and opens as an
  * overlay, rather than occupying the main view. */
 @SuppressWarnings("null")
 public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu> {
@@ -77,7 +77,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int ENERGY_BAR_WIDTH = 77;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
-    private static final int ENTROPY_BAR_X_OFFSET = 79;
+    private static final int ENTROPY_BAR_X_OFFSET = 6;
     private static final int ENTROPY_BAR_Y_OFFSET = 7;
     private static final int ENTROPY_BAR_WIDTH = 52;
     private static final int ENTROPY_BAR_HEIGHT = 8;
@@ -118,10 +118,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
 
-    private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(ChronosphereBlockEntity.MAX_RADIUS);
+    /** 15px cells rather than the grid's 32px default: at MAX_RADIUS=5 the map is 11 cells across,
+     * and only this size leaves the title above and the three footer lines below room inside
+     * CONTENT_SIZE. */
+    private static final int MAP_CELL_SIZE = 15;
+    private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(
+            ChronosphereBlockEntity.MAX_RADIUS, ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
     private static final int TOTAL_CLAIMABLE = countClaimableCells();
 
-    // The map overlay's grid (172px tall at MAX_RADIUS=2) eats most of CONTENT_SIZE's 224px, so
+    // The map overlay's grid (165px tall at MAX_RADIUS=5) eats most of CONTENT_SIZE's 224px, so
     // its title/grid/footer are packed tighter than the settings overlay's equivalents.
     private static final int MAP_TITLE_Y_OFFSET = 6;
     private static final int MAP_GRID_Y_OFFSET = 18;
@@ -642,12 +647,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         int claimedCount = ChronosphereClientState.getSelectedCount();
         int footerY = gridY + MAP_GRID.gridPixels() + MAP_FOOTER_GAP;
         drawCenteredNoShadow(guiGraphics, Component.literal(
-                claimedCount + " / " + TOTAL_CLAIMABLE + " chunks claimed"),
+                claimedCount + "/" + TOTAL_CLAIMABLE + " chunks claimed"),
                 panelX() + CONTENT_SIZE / 2, footerY, TEXT_SECONDARY);
         int trackedCount = ChronosphereClientState.getTrackedCount();
         int trackedColor = trackedCount == claimedCount ? 0xFF2E8B45 : 0xFFB5701E;
         drawCenteredNoShadow(guiGraphics, Component.literal(
-                trackedCount + " / " + claimedCount + " chunks tracked"),
+                trackedCount + "/" + claimedCount + " chunks tracked"),
                 panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING, trackedColor);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
                 panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING * 2, TEXT_MUTED);
@@ -710,7 +715,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!tooltip.isEmpty()) {
             guiGraphics.renderTooltip(font, tooltip, mouseX, mouseY);
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + " / " + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.literal(menu.getEnergyStored() + "/" + menu.getEnergyCapacity() + " FE"), mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
