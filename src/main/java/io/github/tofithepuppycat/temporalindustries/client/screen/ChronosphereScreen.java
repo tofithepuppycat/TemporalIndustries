@@ -71,9 +71,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
      * which this height is sized to leave room for within CONTENT_SIZE. */
     private static final int GRAPH_HEIGHT = 154;
 
-    private static final int ENERGY_BAR_X_OFFSET = 140;
+    // Right edge stays anchored where it always was; only the left edge moved in, so the bar
+    // reads shorter without shifting away from the panel's right side.
+    private static final int ENERGY_BAR_X_OFFSET = 160;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
-    private static final int ENERGY_BAR_WIDTH = 77;
+    private static final int ENERGY_BAR_WIDTH = 57;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
     private static final int ENTROPY_BAR_X_OFFSET = 6;
