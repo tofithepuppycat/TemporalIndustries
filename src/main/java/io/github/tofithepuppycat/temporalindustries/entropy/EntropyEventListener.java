@@ -4,7 +4,9 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.projectile.ThrownPotion;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
@@ -20,8 +22,8 @@ import net.neoforged.neoforge.event.level.block.CropGrowEvent;
 /**
  * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events, as opposed to the
  * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger Generator). ORDER:
- * obsidian/basalt/cobblestone generation, crop growth, items despawning. CHAOS: player death,
- * splash/lingering potions.
+ * obsidian/basalt/cobblestone generation, crop growth, items despawning, passive/neutral mob death.
+ * CHAOS: player death, splash/lingering potions, hostile mob death.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class EntropyEventListener {
@@ -34,6 +36,8 @@ public final class EntropyEventListener {
     private static final int PLAYER_DEATH_CHAOS = 3;
     private static final int SPLASH_POTION_CHAOS = 1;
     private static final int LINGERING_POTION_CHAOS = 2;
+    private static final int HOSTILE_MOB_DEATH_CHAOS = 1;
+    private static final int PASSIVE_MOB_DEATH_ORDER = 1;
 
     private EntropyEventListener() {}
 
@@ -69,12 +73,19 @@ public final class EntropyEventListener {
     }
 
     @SubscribeEvent
-    public static void onPlayerDeath(LivingDeathEvent event) {
+    public static void onLivingDeath(LivingDeathEvent event) {
         if (event.isCanceled()) return;
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!(player.level() instanceof ServerLevel level)) return;
+        LivingEntity entity = event.getEntity();
+        if (!(entity.level() instanceof ServerLevel level)) return;
 
-        EntropyOrbEntity.spawn(level, player.getX(), player.getY() + 0.5, player.getZ(), EntropyType.CHAOS, PLAYER_DEATH_CHAOS);
+        if (entity instanceof ServerPlayer player) {
+            EntropyOrbEntity.spawn(level, player.getX(), player.getY() + 0.5, player.getZ(), EntropyType.CHAOS, PLAYER_DEATH_CHAOS);
+            return;
+        }
+
+        EntropyType type = entity instanceof Enemy ? EntropyType.CHAOS : EntropyType.ORDER;
+        int value = entity instanceof Enemy ? HOSTILE_MOB_DEATH_CHAOS : PASSIVE_MOB_DEATH_ORDER;
+        EntropyOrbEntity.spawn(level, entity.getX(), entity.getY() + 0.5, entity.getZ(), type, value);
     }
 
     @SubscribeEvent
