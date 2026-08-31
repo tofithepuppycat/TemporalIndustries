@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
+import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
@@ -59,8 +60,9 @@ import java.util.UUID;
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
     private static final int RADIUS_CHUNKS = 2;
-    /** Radius (in chunks) offered by the sneak-right-click area-select map. */
-    public static final int MAP_RADIUS_CHUNKS = 2;
+    /** Radius (in chunks) offered by the sneak-right-click area-select map — matches the
+     * Chronosphere's own claim radius, so a saved shape can always mirror any Chronosphere claim. */
+    public static final int MAP_RADIUS_CHUNKS = ChronosphereBlockEntity.MAX_RADIUS;
     /** The area-select map's claimable outline — a full square box, matching the Chronosphere's own
      * claim shape (see {@link io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity#CLAIM_SHAPE}),
      * rather than an inscribed circle. */
