@@ -45,8 +45,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int CONTENT_MARGIN = 16;
     private static final int CONTENT_SIZE = TEXTURE_WIDTH - 2 * CONTENT_MARGIN;
 
-    private static final int TEXT_PRIMARY = 0xFFFFFFFF;
-    private static final int TEXT_SECONDARY = 0xFFC0C0C0;
+    // base.png is a light panel, so text/UI accents are tuned for a light background — matches
+    // ChronosphereScreen's palette.
+    private static final int TEXT_PRIMARY = 0xFF2B2B2B;
+    private static final int TEXT_SECONDARY = 0xFF5A5A5A;
     private static final int COLOR_BORDER = 0xFF000000;
 
     // Auto-track/settings tabs: a vertical stack mostly overlapping the panel's right edge,
@@ -70,9 +72,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
      * which this height is sized to leave room for within CONTENT_SIZE. */
     private static final int GRAPH_HEIGHT = 154;
 
-    private static final int ENERGY_BAR_X_OFFSET = 140;
+    // Right edge stays anchored where it always was; only the left edge moved in, so the bar
+    // reads shorter without shifting away from the panel's right side — matches ChronosphereScreen.
+    private static final int ENERGY_BAR_X_OFFSET = 160;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
-    private static final int ENERGY_BAR_WIDTH = 77;
+    private static final int ENERGY_BAR_WIDTH = 57;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
     private static final int ENTROPY_BAR_X_OFFSET = 6;
@@ -367,7 +371,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         if (deleteHistoryConfirmPending) {
             drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
-                    panelX() + CONTENT_SIZE / 2, buttonY - 14, 0xFFFF6B6B);
+                    panelX() + CONTENT_SIZE / 2, buttonY - 14, 0xFFB03030);
 
             int confirmX = panelX() + (CONTENT_SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
             int cancelX = confirmX + CONFIRM_BUTTON_WIDTH + 6;
@@ -550,7 +554,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         drawCenteredNoShadow(guiGraphics, Component.translatable("block.temporalindustries.chronovault"), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), panelX() + 8, panelY() + PREVIEW_CURRENT_Y_OFFSET, 0xFFFFFF, false);
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), panelX() + 8, panelY() + PREVIEW_CURRENT_Y_OFFSET, TEXT_PRIMARY, false);
 
         if (TimelineProjectionManager.hasSelection()) {
             long selected = TimelineProjectionManager.getSelectedGameTime();
@@ -558,7 +562,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             String direction = diff <= 0L
                     ? "gui.temporalindustries.chronovault.preview_past"
                     : "gui.temporalindustries.chronovault.preview_future";
-            guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), panelX() + 8, panelY() + PREVIEW_DIFF_Y_OFFSET, 0xFFFFFF, false);
+            guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), panelX() + 8, panelY() + PREVIEW_DIFF_Y_OFFSET, TEXT_PRIMARY, false);
         }
     }
 
