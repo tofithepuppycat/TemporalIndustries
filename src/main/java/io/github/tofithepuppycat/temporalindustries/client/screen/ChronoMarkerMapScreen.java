@@ -57,8 +57,12 @@ public class ChronoMarkerMapScreen extends Screen {
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 3;
 
+    /** 15px cells rather than the grid's 32px default: at MAP_RADIUS_CHUNKS=5 (matching the
+     * Chronosphere's own claim radius) the map is 11 cells across, and only this size keeps the
+     * grid inside the 256px panel alongside the title and footer/buttons below it. */
+    private static final int GRID_CELL_SIZE = 15;
     private static final ChunkSelectionGrid GRID = new ChunkSelectionGrid(PortableChronoMarkerItem.MAP_RADIUS_CHUNKS,
-            PortableChronoMarkerItem.MAP_SHAPE, ChunkSelectionGrid.DEFAULT_CELL_SIZE);
+            PortableChronoMarkerItem.MAP_SHAPE, GRID_CELL_SIZE);
 
     private final ChunkPos anchor;
     /** Chunk keys currently chosen for marking — always contains the anchor chunk, which can't be
@@ -88,7 +92,7 @@ public class ChronoMarkerMapScreen extends Screen {
         leftPos = (width - IMAGE_WIDTH) / 2;
         topPos = (height - IMAGE_HEIGHT) / 2;
         gridX = leftPos + (IMAGE_WIDTH - GRID.gridPixels()) / 2;
-        gridY = topPos + 44;
+        gridY = topPos + 26;
 
         int buttonY = topPos + 224;
         int groupX = leftPos + (IMAGE_WIDTH - (BUTTON_WIDTH * 2 + BUTTON_GAP)) / 2;
@@ -153,7 +157,7 @@ public class ChronoMarkerMapScreen extends Screen {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-        guiGraphics.drawString(font, title, leftPos + (IMAGE_WIDTH - font.width(title)) / 2, topPos + 16, TEXT_PRIMARY, false);
+        guiGraphics.drawString(font, title, leftPos + (IMAGE_WIDTH - font.width(title)) / 2, topPos + 10, TEXT_PRIMARY, false);
 
         GRID.render(guiGraphics, gridX, gridY, anchor, new ChunkSelectionGrid.CellPainter() {
             @Override
@@ -169,7 +173,7 @@ public class ChronoMarkerMapScreen extends Screen {
             }
         });
 
-        int footerY = gridY + GRID.gridPixels() + 10;
+        int footerY = gridY + GRID.gridPixels() + 6;
         Component count = Component.translatable("gui.temporalindustries.chrono_marker.map_count", selected.size());
         guiGraphics.drawString(font, count, leftPos + (IMAGE_WIDTH - font.width(count)) / 2, footerY, TEXT_MUTED, false);
 

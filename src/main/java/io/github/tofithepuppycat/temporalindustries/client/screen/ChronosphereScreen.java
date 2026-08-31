@@ -1,10 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.jetbrains.annotations.NotNull;
-import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
@@ -96,14 +94,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
      * for a player who leaves it open and keeps building nearby. */
     private static final int MAP_SYNC_INTERVAL_TICKS = 100;
 
-    // Chunk timeline tabs: a thin strip along the top of the graph — "All" (the shared/merged view
-    // across every claimed chunk) plus one small tab per claimed chunk, so the graph can show
-    // either the whole picture or drill into a single chunk's own history.
-    private static final int TAB_STRIP_HEIGHT = 11;
-    private static final int TAB_GAP = 1;
-    private static final int TAB_MIN_WIDTH = 8;
-    private static final int TAB_MAX_WIDTH = 26;
-
     // Bookmark/auto-track/settings tabs: a vertical stack mostly overlapping the panel's right
     // edge, protruding outward, like a vanilla recipe-book tab attached to a crafting GUI — see
     // IconTabRenderer for the layered sprite, and render()'s z-order note for why they're drawn
@@ -149,9 +139,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     /** Whether the settings overlay is showing the "are you sure" step rather than the plain
      * Delete All History button — reset whenever the overlay itself closes. */
     private boolean deleteHistoryConfirmPending = false;
-    /** null = the shared "All" view; otherwise the packed key of one claimed chunk's own tab. */
-    @Nullable
-    private Long selectedViewChunkKey = null;
 
     private int bookmarkX;
     private int bookmarkY;
@@ -217,38 +204,22 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
         ChronosphereClientState.setActiveMachine(menu.getBlockPos());
-        selectedViewChunkKey = null;
         TimelineProjectionManager.setSelectedViewChunk(null);
 
         requestTimelineView(true);
         PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
     }
 
-    /** Requests the currently selected tab's commit graph — the shared "All" view when
-     * selectedViewChunkKey is null, or that one chunk's own view otherwise. forceFull bypasses the
+    /** Requests the shared "All" view's commit graph — every claimed chunk's history merged
+     * together (see {@link ChronosphereBlockEntity#getChunkCommits}). forceFull bypasses the
      * "nothing changed since lastKnownHeadCommitId" skip on the server, which matters right after
-     * switching tabs: the previous tab's cached head id could otherwise coincidentally match the
-     * new tab's and cause the server to (wrongly) skip replying with its actual data. */
+     * opening the screen: a stale cached head id could otherwise coincidentally match the current
+     * one and cause the server to (wrongly) skip replying with its actual data. */
     private void requestTimelineView(boolean forceFull) {
-        ChunkPos viewChunk = selectedViewChunkKey == null ? null : new ChunkPos(selectedViewChunkKey);
         long lastKnownHead = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getHeadCommitId();
         long lastKnownPreviewVersion = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getPreviewVersion();
         PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(
-                menu.getBlockPos(), lastKnownHead, lastKnownPreviewVersion, viewChunk));
-    }
-
-    /** Every claimed chunk's packed key, home chunk first then ascending — a stable order for the
-     * tab strip regardless of the (unordered) set ChronosphereClientState syncs. */
-    private List<Long> getOrderedTabChunkKeys() {
-        long homeKey = new ChunkPos(menu.getBlockPos()).toLong();
-        List<Long> keys = new ArrayList<>(ChronosphereClientState.getSelectedChunks());
-        keys.sort((a, b) -> {
-            if (a.equals(b)) return 0;
-            if (a == homeKey) return -1;
-            if (b == homeKey) return 1;
-            return Long.compare(a, b);
-        });
-        return keys;
+                menu.getBlockPos(), lastKnownHead, lastKnownPreviewVersion, null));
     }
 
     @Override
@@ -339,7 +310,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
-        if (!mapOverlayOpen) renderChunkTabs(guiGraphics, mouseX, mouseY);
         graphWidget.render(guiGraphics, font, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight());
         renderEnergyBar(guiGraphics);
         renderEntropyBar(guiGraphics);
@@ -375,69 +345,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private int graphTop() {
-        return panelY() + GRAPH_Y_OFFSET + TAB_STRIP_HEIGHT;
+        return panelY() + GRAPH_Y_OFFSET;
     }
 
     private int graphHeight() {
-        return GRAPH_HEIGHT - TAB_STRIP_HEIGHT;
+        return GRAPH_HEIGHT;
     }
-
-    /** Renders the "All" + per-claimed-chunk tab strip along the top of the graph, sized to fit
-     * however many chunks are currently claimed within GRAPH_WIDTH. */
-    private void renderChunkTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        List<Long> chunkKeys = getOrderedTabChunkKeys();
-        int tabCount = chunkKeys.size() + 1; // + the "All" tab
-        int stripX = panelX() + GRAPH_X_OFFSET;
-        int stripY = panelY() + GRAPH_Y_OFFSET;
-        int tabWidth = Math.max(TAB_MIN_WIDTH, Math.min(TAB_MAX_WIDTH, (GRAPH_WIDTH - (tabCount - 1) * TAB_GAP) / tabCount));
-
-        long homeKey = new ChunkPos(menu.getBlockPos()).toLong();
-        int x = stripX;
-        x = renderTab(guiGraphics, x, stripY, tabWidth, "S", selectedViewChunkKey == null, mouseX, mouseY, null);
-        for (long key : chunkKeys) {
-            if (x >= stripX + GRAPH_WIDTH) break; // out of room: remaining chunks are click-reachable only via scroll (future work)
-            String label = key == homeKey ? "H" : "";
-            boolean selected = selectedViewChunkKey != null && selectedViewChunkKey == key;
-            x = renderTab(guiGraphics, x, stripY, tabWidth, label, selected, mouseX, mouseY, key);
-        }
-    }
-
-    /** Draws one tab and returns the x position the next tab should start at. */
-    private int renderTab(GuiGraphics guiGraphics, int x, int y, int width, String label, boolean selected,
-                           int mouseX, int mouseY, @Nullable Long chunkKey) {
-        boolean hovered = mouseX >= x && mouseX < x + width && mouseY >= y && mouseY < y + TAB_STRIP_HEIGHT;
-        int bg = selected ? COLOR_SELECTED : (hovered ? 0xFFB8B8B8 : 0xFFCFCFCF);
-        guiGraphics.fill(x, y, x + width, y + TAB_STRIP_HEIGHT, COLOR_BORDER);
-        guiGraphics.fill(x + 1, y + 1, x + width - 1, y + TAB_STRIP_HEIGHT - 1, bg);
-        if (!label.isEmpty() && width >= 10) {
-            int textColor = selected ? 0xFFF0FAFF : TEXT_PRIMARY;
-            drawCenteredNoShadow(guiGraphics, label, x + width / 2, y + 2, textColor);
-        }
-        return x + width + TAB_GAP;
-    }
-
-    /** Which tab (null = "All", -1L sentinel meaning "no tab" via a boolean out-param would be
-     * awkward, so this returns Optional-like via a wrapper) is under the cursor, or null if none —
-     * used for both click handling and tooltips. */
-    @Nullable
-    private TabHit getTabAt(double mouseX, double mouseY) {
-        int stripY = panelY() + GRAPH_Y_OFFSET;
-        if (mouseY < stripY || mouseY >= stripY + TAB_STRIP_HEIGHT) return null;
-
-        List<Long> chunkKeys = getOrderedTabChunkKeys();
-        int tabCount = chunkKeys.size() + 1;
-        int stripX = panelX() + GRAPH_X_OFFSET;
-        int tabWidth = Math.max(TAB_MIN_WIDTH, Math.min(TAB_MAX_WIDTH, (GRAPH_WIDTH - (tabCount - 1) * TAB_GAP) / tabCount));
-
-        if (mouseX < stripX || mouseX >= stripX + GRAPH_WIDTH) return null;
-        int index = (int) ((mouseX - stripX) / (tabWidth + TAB_GAP));
-        if (index == 0) return new TabHit(null);
-        int chunkIndex = index - 1;
-        if (chunkIndex < 0 || chunkIndex >= chunkKeys.size()) return null;
-        return new TabHit(chunkKeys.get(chunkIndex));
-    }
-
-    private record TabHit(@Nullable Long chunkKey) {}
 
     private void renderEnergyBar(GuiGraphics guiGraphics) {
         int energyStored = menu.getEnergyStored();
@@ -703,15 +616,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             return;
         }
 
-        TabHit hoveredTab = getTabAt(mouseX, mouseY);
-        if (hoveredTab != null) {
-            Component label = hoveredTab.chunkKey() == null
-                    ? Component.literal("Shared history (all claimed chunks)")
-                    : Component.literal("Chunk " + new ChunkPos(hoveredTab.chunkKey()).x + ", " + new ChunkPos(hoveredTab.chunkKey()).z);
-            guiGraphics.renderTooltip(font, label, mouseX, mouseY);
-            return;
-        }
-
         List<FormattedCharSequence> tooltip = graphWidget.getTooltipAt(mouseX, mouseY);
         if (!tooltip.isEmpty()) {
             guiGraphics.renderTooltip(font, tooltip, mouseX, mouseY);
@@ -816,20 +720,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (button == 0 && isMouseOverJumpButton(mouseX, mouseY)) {
             jumpAndClose();
             return true;
-        }
-
-        if (button == 0) {
-            TabHit tabHit = getTabAt(mouseX, mouseY);
-            if (tabHit != null) {
-                if (!java.util.Objects.equals(selectedViewChunkKey, tabHit.chunkKey())) {
-                    selectedViewChunkKey = tabHit.chunkKey();
-                    TimelineProjectionManager.setSelectedViewChunk(
-                            selectedViewChunkKey == null ? null : new ChunkPos(selectedViewChunkKey));
-                    TimelineProjectionManager.clearSelectedCommit();
-                    requestTimelineView(true);
-                }
-                return true;
-            }
         }
 
         if (button == 0 && graphWidget.mouseClicked(mouseX, mouseY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
