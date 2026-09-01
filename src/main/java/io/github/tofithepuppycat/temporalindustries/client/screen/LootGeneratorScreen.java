@@ -52,37 +52,37 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     // Header starts below the machine title (drawn at y=6, ~9px tall) rather than right against it.
     private static final int FIELD_X = 8;
-    private static final int FIELD_Y = 18;
+    private static final int FIELD_Y = 16;
     private static final int FIELD_WIDTH = 160;
     private static final int FIELD_HEIGHT = 12;
 
     private static final int ICON_SIZE = IconButtonRenderer.SIZE;
     private static final int PLAY_ICON_X = 8;
-    private static final int PLAY_ICON_Y = 32;
+    private static final int PLAY_ICON_Y = 30;
     private static final int MODE_ICON_X = PLAY_ICON_X + ICON_SIZE + 2;
-    private static final int MODE_ICON_Y = 32;
+    private static final int MODE_ICON_Y = 30;
 
     private static final int CHAOS_BAR_X = MODE_ICON_X + ICON_SIZE + 2;
-    private static final int CHAOS_BAR_Y = 32;
+    private static final int CHAOS_BAR_Y = 30;
     private static final int CHAOS_BAR_WIDTH = 168 - CHAOS_BAR_X;
     private static final int CHAOS_BAR_HEIGHT = ICON_SIZE;
 
     private static final int PROGRESS_BAR_X = 8;
-    private static final int PROGRESS_BAR_Y = 49;
-    private static final int PROGRESS_BAR_WIDTH = 142;
+    private static final int PROGRESS_BAR_Y = 47;
+    private static final int PROGRESS_BAR_WIDTH = 139;
     private static final int PROGRESS_BAR_HEIGHT = 6;
 
     // Sits in the leftover header strip below the progress bar and left of the roll icon (which
-    // occupies x152-168 down to y64).
+    // occupies x152-168 down to y62).
     private static final int LUCK_SLIDER_X = 8;
-    private static final int LUCK_SLIDER_Y = 57;
-    private static final int LUCK_SLIDER_WIDTH = 144;
+    private static final int LUCK_SLIDER_Y = 55;
+    private static final int LUCK_SLIDER_WIDTH = 141;
     private static final int LUCK_SLIDER_HEIGHT = 8;
 
     // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
     // (leftPos + 168), and spans down to the luck slider's bottom edge.
     private static final int ROLL_ICON_X = 152;
-    private static final int ROLL_ICON_Y = 49;
+    private static final int ROLL_ICON_Y = 47;
     private static final int ROLL_ICON_SIZE = 16;
 
     // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
