@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -31,7 +32,12 @@ public class LootTableSuggestionsRequestPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            List<ResourceLocation> ids = new ArrayList<>(sender.server.reloadableRegistries().getKeys(Registries.LOOT_TABLE));
+            List<ResourceLocation> ids = new ArrayList<>();
+            for (ResourceLocation id : sender.server.reloadableRegistries().getKeys(Registries.LOOT_TABLE)) {
+                if (LootGeneratorBlockEntity.isChestLootTable(id)) {
+                    ids.add(id);
+                }
+            }
             PacketDistributor.sendToPlayer(sender, new LootTableSuggestionsSyncPacket(ids));
         });
     }

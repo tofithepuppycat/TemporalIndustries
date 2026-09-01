@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.LootGeneratorStructure;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
@@ -141,7 +142,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     public List<BlockPos> findMissing() {
         List<BlockPos> missing = new ArrayList<>();
         if (level == null) return missing;
-        for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition)) {
+        for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition, getBlockState().getValue(LootGenerator.FACING))) {
             if (!level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get())) {
                 missing.add(pos);
             }
@@ -149,13 +150,21 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return missing;
     }
 
-    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients if it changed. */
+    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients if it changed -
+     * including pushing {@link LootGenerator#FORMED} into the actual block state so the front-face
+     * model swaps between its animated and frozen-last-frame textures. */
     public boolean checkStructure() {
         boolean wasFormed = formed;
         formed = findMissing().isEmpty();
         if (formed != wasFormed) {
             setChanged();
             syncToClients();
+            if (level != null && !level.isClientSide) {
+                BlockState state = getBlockState();
+                if (state.hasProperty(LootGenerator.FORMED)) {
+                    level.setBlock(worldPosition, state.setValue(LootGenerator.FORMED, formed), Block.UPDATE_CLIENTS);
+                }
+            }
         }
         return formed;
     }
@@ -185,7 +194,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     public void startRoll() {
         if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
 
-        LootTable table = resolveLootTable(serverLevel, selectedLootTable);
+        LootTable table = isChestLootTable(selectedLootTable) ? resolveLootTable(serverLevel, selectedLootTable) : LootTable.EMPTY;
         if (table == LootTable.EMPTY) {
             lastSelectionValid = false;
             setChanged();
@@ -233,7 +242,14 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     }
 
     private boolean resolvesToRealTable(ResourceLocation id) {
-        return level instanceof ServerLevel serverLevel && resolveLootTable(serverLevel, id) != LootTable.EMPTY;
+        return isChestLootTable(id) && level instanceof ServerLevel serverLevel && resolveLootTable(serverLevel, id) != LootTable.EMPTY;
+    }
+
+    /** Restricts selectable tables to the {@code chests/} folder (vanilla convention for
+     * dungeon/structure/village loot) so players can't roll a block's block-drop table - e.g.
+     * {@code minecraft:blocks/chest} - for infinite free blocks. */
+    public static boolean isChestLootTable(ResourceLocation id) {
+        return id.getPath().startsWith("chests/");
     }
 
     private static LootTable resolveLootTable(ServerLevel serverLevel, ResourceLocation id) {
