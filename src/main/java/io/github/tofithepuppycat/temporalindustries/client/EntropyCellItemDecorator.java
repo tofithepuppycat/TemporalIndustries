@@ -19,7 +19,7 @@ public class EntropyCellItemDecorator implements IItemDecorator {
     @Override
     public boolean render(GuiGraphics guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {
         int amount = EntropyCellItem.getContents(stack).amount();
-        EntropyContainerItemDecorator.drawBar(guiGraphics, xOffset + 2, yOffset + 11, amount, BottleContents.CAPACITY, type.color());
+        EntropyContainerItemDecorator.drawBar(guiGraphics, xOffset + 2, yOffset + 13, amount, BottleContents.CAPACITY, type.color());
         return true;
     }
 }
