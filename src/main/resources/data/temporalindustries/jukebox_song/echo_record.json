@@ -1,0 +1,8 @@
+{
+  "sound_event": "temporalindustries:arcade",
+  "description": {
+    "translate": "jukebox_song.temporalindustries.echo_record"
+  },
+  "length_in_seconds": 68.6,
+  "comparator_output": 7
+}
