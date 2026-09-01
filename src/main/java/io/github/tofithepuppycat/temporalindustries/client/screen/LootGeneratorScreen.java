@@ -428,6 +428,13 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // The suggestions dropdown always covers the luck slider's row when shown (see
+        // renderSuggestions), and relying on flush()+fill() to paint over the slider's already-queued
+        // "Luck: x/y" text is unreliable across render-type batches - just skip drawing the slider
+        // for this frame instead of fighting the draw order.
+        boolean suggestionsShown = lootTableField.isFocused() && !matchingSuggestions(lootTableField.getValue()).isEmpty();
+        luckSlider.visible = !suggestionsShown;
+
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
         super.render(guiGraphics, mouseX, mouseY, partialTick);
         renderSuggestions(guiGraphics, mouseX, mouseY);
