@@ -6,7 +6,7 @@
     "south": "temporalindustries:block/machine_base",
     "west": "temporalindustries:block/machine_base_up",
     "east": "temporalindustries:block/machine_base_up",
-    "up": "temporalindustries:block/machine_base_up",
+    "up": "temporalindustries:block/echo_projector_top",
     "down": "temporalindustries:block/machine_base_down"
   }
 }
