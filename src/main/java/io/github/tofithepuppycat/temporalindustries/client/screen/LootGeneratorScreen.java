@@ -29,14 +29,14 @@ import java.util.Objects;
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
  * state), a Generate button, a Chaos tank bar, and a roll-progress bar all in the header above the
  * chest slots - see {@code textures/gui/loot_generator.png} for the panel art (chest slots start at
- * 8,60; player inventory at 8,126; header controls at 8,8). */
+ * 8,68; player inventory at 8,126; header controls at 8,8). */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/loot_generator.png");
 
     private static final int IMAGE_WIDTH = 176;
-    private static final int IMAGE_HEIGHT = 208;
+    private static final int IMAGE_HEIGHT = 216;
 
     // Header starts below the machine title (drawn at y=6, ~9px tall) rather than right against it.
     private static final int FIELD_X = 8;
@@ -59,10 +59,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int PROGRESS_BAR_WIDTH = 142;
     private static final int PROGRESS_BAR_HEIGHT = 6;
 
-    // Icon sits right of the progress bar, vertically centered on it, sharing its right edge with
-    // the field/chaos-bar above (leftPos + 168).
+    // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
+    // (leftPos + 168).
     private static final int ROLL_ICON_X = 152;
-    private static final int ROLL_ICON_Y = 41;
+    private static final int ROLL_ICON_Y = 47;
     private static final int ROLL_ICON_SIZE = 16;
 
     // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
@@ -93,7 +93,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
-        inventoryLabelY = 116; // just above the player inventory grid, which starts at y=126
+        inventoryLabelY = 124; // just above the player inventory grid, which starts at y=126
     }
 
     @Override
@@ -265,7 +265,6 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
         int x = leftPos + ROLL_ICON_X;
         int y = topPos + ROLL_ICON_Y;
-        guiGraphics.fill(x - 1, y - 1, x + ROLL_ICON_SIZE + 1, y + ROLL_ICON_SIZE + 1, 0xFF000000);
         guiGraphics.renderItem(display, x, y);
     }
 

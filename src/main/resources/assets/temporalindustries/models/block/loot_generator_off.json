@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "temporalindustries:block/loot_generator_front_off",
+    "north": "temporalindustries:block/loot_generator_front_off",
+    "south": "temporalindustries:block/machine_base",
+    "east": "temporalindustries:block/machine_base",
+    "west": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
+  }
+}
