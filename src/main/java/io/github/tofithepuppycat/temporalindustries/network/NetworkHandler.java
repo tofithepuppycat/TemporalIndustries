@@ -108,5 +108,25 @@ public class NetworkHandler {
                 AnchorRewindEffectPacket.TYPE,
                 AnchorRewindEffectPacket.STREAM_CODEC,
                 AnchorRewindEffectPacket::handle);
+
+        registrar.playToServer(
+                LootGeneratorSetTablePacket.TYPE,
+                LootGeneratorSetTablePacket.STREAM_CODEC,
+                LootGeneratorSetTablePacket::handle);
+
+        registrar.playToServer(
+                LootGeneratorTriggerRollPacket.TYPE,
+                LootGeneratorTriggerRollPacket.STREAM_CODEC,
+                LootGeneratorTriggerRollPacket::handle);
+
+        registrar.playToServer(
+                LootTableSuggestionsRequestPacket.TYPE,
+                LootTableSuggestionsRequestPacket.STREAM_CODEC,
+                LootTableSuggestionsRequestPacket::handle);
+
+        registrar.playToClient(
+                LootTableSuggestionsSyncPacket.TYPE,
+                LootTableSuggestionsSyncPacket.STREAM_CODEC,
+                LootTableSuggestionsSyncPacket::handle);
     }
 }
