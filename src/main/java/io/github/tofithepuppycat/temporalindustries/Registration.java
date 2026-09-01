@@ -7,6 +7,8 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
+import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
+import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
@@ -16,6 +18,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlo
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
@@ -39,6 +42,7 @@ import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.recipe.EntropyManipulatorRecipe;
 import net.minecraft.ChatFormatting;
@@ -48,6 +52,7 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.inventory.MenuType;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
 import net.minecraft.sounds.SoundEvents;
@@ -56,6 +61,7 @@ import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -121,8 +127,13 @@ public class Registration {
     public static final DeferredItem<Item> ECHO_PROJECTOR_ITEM = ITEMS.register("echo_projector",
             () -> new DescribedBlockItem(ECHO_PROJECTOR_BLOCK.get(), new Item.Properties().rarity(ECHO_RARITY.getValue())));
 
+    // Datapack entry lives at data/temporalindustries/jukebox_song/echo_record.json.
+    public static final ResourceKey<JukeboxSong> ECHO_RECORD_SONG = ResourceKey.create(Registries.JUKEBOX_SONG,
+            ResourceLocation.fromNamespaceAndPath(MODID, "echo_record"));
+
     public static final DeferredItem<Item> ECHO_RECORD_ITEM = ITEMS.register("echo_record",
-            () -> new EchoRecordItem(new Item.Properties().stacksTo(1).rarity(ECHO_RARITY.getValue())));
+            () -> new EchoRecordItem(new Item.Properties().stacksTo(1).rarity(ECHO_RARITY.getValue())
+                    .jukeboxPlayable(ECHO_RECORD_SONG)));
 
     public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
             () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
@@ -282,6 +293,20 @@ public class Registration {
     public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<EntropyManipulatorRecipe>> ENTROPY_MANIPULATOR_RECIPE_SERIALIZER =
             RECIPE_SERIALIZERS.register("entropy_manipulator", () -> new EntropyManipulatorRecipe.Serializer());
 
+    // --- Loot Generator: spends liquid Chaos to roll a chosen loot table into its own inventory ---
+
+    public static final DeferredBlock<LootGenerator> LOOT_GENERATOR_BLOCK = BLOCKS.register("loot_generator",
+            () -> new LootGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> LOOT_GENERATOR_ITEM = ITEMS.register("loot_generator",
+            () -> new DescribedBlockItem(LOOT_GENERATOR_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<MachineFrame> MACHINE_FRAME_BLOCK = BLOCKS.register("machine_frame",
+            () -> new MachineFrame(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
+            () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
@@ -309,6 +334,9 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyManipulatorBlockEntity>> ENTROPY_MANIPULATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_manipulator",
             () -> BlockEntityType.Builder.of(EntropyManipulatorBlockEntity::new, ENTROPY_MANIPULATOR_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LootGeneratorBlockEntity>> LOOT_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("loot_generator",
+            () -> BlockEntityType.Builder.of(LootGeneratorBlockEntity::new, LOOT_GENERATOR_BLOCK.get()).build(null));
+
     public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
             () -> IMenuTypeExtension.create(ChronovaultMenu::new));
 
@@ -324,8 +352,14 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyManipulatorMenu>> ENTROPY_MANIPULATOR_MENU = MENUS.register("entropy_manipulator",
             () -> IMenuTypeExtension.create(EntropyManipulatorMenu::new));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<LootGeneratorMenu>> LOOT_GENERATOR_MENU = MENUS.register("loot_generator",
+            () -> IMenuTypeExtension.create(LootGeneratorMenu::new));
+
     public static final DeferredHolder<SoundEvent, SoundEvent> RETURN_BY_DEATH_SOUND = SOUND_EVENTS.register("return_by_death",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "return_by_death")));
+
+    public static final DeferredHolder<SoundEvent, SoundEvent> ARCADE_SOUND = SOUND_EVENTS.register("arcade",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "arcade")));
 
     public static final DeferredHolder<CreativeModeTab, CreativeModeTab> TEMPORAL_INDUSTRIES_TAB = CREATIVE_MODE_TABS.register("temporal_industries",
             () -> CreativeModeTab.builder()
@@ -341,6 +375,8 @@ public class Registration {
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
+                        output.accept(LOOT_GENERATOR_ITEM);
+                        output.accept(MACHINE_FRAME_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
@@ -404,6 +440,10 @@ public class Registration {
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
 
         // The cells and the anchor store liquid Order/Chaos on the stack, so they are fluid

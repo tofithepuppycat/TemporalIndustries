@@ -6,6 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereSc
 import io.github.tofithepuppycat.temporalindustries.client.screen.CrudeEntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyManipulatorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyCondenserScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronovaultScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -32,6 +33,7 @@ public class ClientModEvents {
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
         event.register(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), CrudeEntropyCondenserScreen::new);
         event.register(Registration.ENTROPY_MANIPULATOR_MENU.get(), EntropyManipulatorScreen::new);
+        event.register(Registration.LOOT_GENERATOR_MENU.get(), LootGeneratorScreen::new);
     }
 
     @SuppressWarnings("null")
