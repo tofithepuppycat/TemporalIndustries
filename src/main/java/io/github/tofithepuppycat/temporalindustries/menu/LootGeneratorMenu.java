@@ -41,7 +41,7 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
     }
 
     public LootGeneratorMenu(int id, Inventory playerInventory, LootGeneratorBlockEntity blockEntity) {
-        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(5));
+        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(7));
     }
 
     public LootGeneratorMenu(int id, Inventory playerInventory, LootGeneratorBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -51,7 +51,7 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 5);
+        checkContainerDataCount(data, 7);
         addDataSlots(data);
 
         for (int row = 0; row < 3; row++) {
@@ -85,6 +85,8 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
         data.set(2, blockEntity.getProgress());
         data.set(3, blockEntity.getMaxProgress());
         data.set(4, blockEntity.getLuck());
+        data.set(5, blockEntity.isRunning() ? 1 : 0);
+        data.set(6, blockEntity.isRepeatMode() ? 1 : 0);
     }
 
     public int getChaosFluidAmount() {
@@ -113,6 +115,14 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
 
     public int getItemCost() {
         return LootGeneratorBlockEntity.ITEM_COST + getLuck() * LootGeneratorBlockEntity.LUCK_ITEM_COST;
+    }
+
+    public boolean isRunning() {
+        return data.get(5) != 0;
+    }
+
+    public boolean isRepeatMode() {
+        return data.get(6) != 0;
     }
 
     @Nullable

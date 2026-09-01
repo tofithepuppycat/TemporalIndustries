@@ -125,6 +125,16 @@ public class NetworkHandler {
                 LootGeneratorSetLuckPacket::handle);
 
         registrar.playToServer(
+                LootGeneratorStopPacket.TYPE,
+                LootGeneratorStopPacket.STREAM_CODEC,
+                LootGeneratorStopPacket::handle);
+
+        registrar.playToServer(
+                LootGeneratorToggleRepeatPacket.TYPE,
+                LootGeneratorToggleRepeatPacket.STREAM_CODEC,
+                LootGeneratorToggleRepeatPacket::handle);
+
+        registrar.playToServer(
                 LootTableSuggestionsRequestPacket.TYPE,
                 LootTableSuggestionsRequestPacket.STREAM_CODEC,
                 LootTableSuggestionsRequestPacket::handle);
