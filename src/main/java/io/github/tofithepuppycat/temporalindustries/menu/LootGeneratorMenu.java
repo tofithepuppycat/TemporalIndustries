@@ -28,8 +28,8 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
     private static final int SLOT_X = 8;
     private static final int SLOT_Y = 68;
     private static final int INVENTORY_X = 8;
-    private static final int INVENTORY_Y = 126;
-    private static final int HOTBAR_Y = 184;
+    private static final int INVENTORY_Y = 134;
+    private static final int HOTBAR_Y = 192;
 
     private final LootGeneratorBlockEntity blockEntity;
     private final BlockPos blockPos;

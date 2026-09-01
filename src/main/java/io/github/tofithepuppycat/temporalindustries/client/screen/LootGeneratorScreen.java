@@ -29,7 +29,7 @@ import java.util.Objects;
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
  * state), a Generate button, a Chaos tank bar, and a roll-progress bar all in the header above the
  * chest slots - see {@code textures/gui/loot_generator.png} for the panel art (chest slots start at
- * 8,68; player inventory at 8,126; header controls at 8,8). */
+ * 8,68; player inventory at 8,134; header controls at 8,8). */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
