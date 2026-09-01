@@ -9,8 +9,10 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
@@ -43,6 +45,7 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.NotNull;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -88,6 +91,16 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     private int maxProgress = PROCESS_TICKS;
     private boolean formed = false;
     private int ticksSinceStructureCheck = 0;
+
+    private static final DustParticleOptions FORMED_PARTICLE = buildFormedParticle();
+
+    private static DustParticleOptions buildFormedParticle() {
+        int color = EntropyType.ORDER.color();
+        float r = ((color >> 16) & 0xFF) / 255F;
+        float g = ((color >> 8) & 0xFF) / 255F;
+        float b = (color & 0xFF) / 255F;
+        return new DustParticleOptions(new Vector3f(r, g, b), 1.0F);
+    }
 
     public LootGeneratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.LOOT_GENERATOR_BLOCK_ENTITY.get(), pos, state);
@@ -138,12 +151,16 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame} block. */
+    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame} block.
+     * Also re-points the block entity of any frame already present back at this controller, so
+     * right-clicking that frame block can forward the interaction here - see {@link MachineFrameBlockEntity}. */
     public List<BlockPos> findMissing() {
         List<BlockPos> missing = new ArrayList<>();
         if (level == null) return missing;
         for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition, getBlockState().getValue(LootGenerator.FACING))) {
-            if (!level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get())) {
+            if (level.getBlockEntity(pos) instanceof MachineFrameBlockEntity frameBe) {
+                frameBe.setController(worldPosition);
+            } else if (!level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get())) {
                 missing.add(pos);
             }
         }
@@ -164,9 +181,23 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
                 if (state.hasProperty(LootGenerator.FORMED)) {
                     level.setBlock(worldPosition, state.setValue(LootGenerator.FORMED, formed), Block.UPDATE_CLIENTS);
                 }
+                if (formed && level instanceof ServerLevel serverLevel) {
+                    spawnFormedParticles(serverLevel);
+                }
             }
         }
         return formed;
+    }
+
+    /** ORD-colored (see {@link EntropyType#ORDER}) puff at the controller and every frame position,
+     * fired once when the structure transitions from unformed to formed. */
+    private void spawnFormedParticles(ServerLevel serverLevel) {
+        Direction facing = getBlockState().getValue(LootGenerator.FACING);
+        List<BlockPos> positions = new ArrayList<>(LootGeneratorStructure.framePositions(worldPosition, facing));
+        positions.add(worldPosition);
+        for (BlockPos pos : positions) {
+            serverLevel.sendParticles(FORMED_PARTICLE, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 6, 0.25D, 0.25D, 0.25D, 0.01D);
+        }
     }
 
     @Override
