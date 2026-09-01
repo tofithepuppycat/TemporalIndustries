@@ -76,7 +76,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     // occupies x152-168 down to y62).
     private static final int LUCK_SLIDER_X = 8;
     private static final int LUCK_SLIDER_Y = 55;
-    private static final int LUCK_SLIDER_WIDTH = 141;
+    private static final int LUCK_SLIDER_WIDTH = 139;
     private static final int LUCK_SLIDER_HEIGHT = 8;
 
     // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
@@ -93,10 +93,13 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int ROLL_SPIN_TICKS_FAST = 3;
     private static final int ROLL_SPIN_TICKS_SLOW = 6;
 
-    private static final int MAX_SUGGESTIONS = 4;
+    // Total matches gathered for filtering/tab-cycling; only VISIBLE_SUGGESTIONS of these are shown
+    // on screen at once, the rest reachable by scrolling.
+    private static final int MAX_SUGGESTIONS = 50;
+    private static final int VISIBLE_SUGGESTIONS = 4;
     private static final int SUGGESTION_ROW_HEIGHT = 10;
-    // Wider than the panel itself (which cuts loot table ids off awkwardly) - overhangs the right
-    // edge since there's nothing else drawn out there to clash with.
+    // Wider than the panel itself (which cuts loot table ids off awkwardly) - overhangs both edges
+    // symmetrically since there's nothing else drawn out there to clash with.
     private static final int SUGGESTIONS_WIDTH = 240;
 
     private EditBox lootTableField;
@@ -109,6 +112,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private String tabCycleBase = null;
     private int tabCycleIndex = -1;
     private boolean applyingTabCompletion = false;
+
+    // Index of the first suggestion row currently drawn, when there are more matches than fit in
+    // the dropdown at once - see #renderSuggestions.
+    private int suggestionScrollOffset = 0;
 
     // Advances every client tick the screen is open, purely to drive the roll-animation's icon
     // cycling - not synced, not persisted.
@@ -214,6 +221,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private void resetTabCycle() {
         tabCycleBase = null;
         tabCycleIndex = -1;
+        suggestionScrollOffset = 0;
     }
 
     /** Loot table ids matching {@code text}, ranked prefix-matches-first, capped to
@@ -256,6 +264,11 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         tabCycleIndex = tabCycleIndex < 0
                 ? (reverse ? matches.size() - 1 : 0)
                 : Math.floorMod(tabCycleIndex + (reverse ? -1 : 1), matches.size());
+        if (tabCycleIndex < suggestionScrollOffset) {
+            suggestionScrollOffset = tabCycleIndex;
+        } else if (tabCycleIndex >= suggestionScrollOffset + VISIBLE_SUGGESTIONS) {
+            suggestionScrollOffset = tabCycleIndex - VISIBLE_SUGGESTIONS + 1;
+        }
 
         applyingTabCompletion = true;
         lootTableField.setValue(matches.get(tabCycleIndex));
@@ -449,21 +462,38 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
+    /** Clamps {@link #suggestionScrollOffset} so the window of {@link #VISIBLE_SUGGESTIONS} rows it
+     * defines always stays within {@code matchCount} (called whenever the match list or the scroll
+     * offset itself may have changed). */
+    private void clampSuggestionScroll(int matchCount) {
+        int maxOffset = Math.max(0, matchCount - VISIBLE_SUGGESTIONS);
+        suggestionScrollOffset = Math.max(0, Math.min(suggestionScrollOffset, maxOffset));
+    }
+
     /** Dropdown of matching loot table ids under the search field, drawn on top of everything else
      * while the field is focused and holds partial text (hidden once the text already exactly
-     * matches a table, or once tab-cycling has landed on one - see {@link #matchingSuggestions}). */
+     * matches a table, or once tab-cycling has landed on one - see {@link #matchingSuggestions}).
+     * Centered under the field/panel, and scrollable when there are more matches than fit. */
     private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (!lootTableField.isFocused()) return;
         List<String> matches = matchingSuggestions(lootTableField.getValue());
         if (matches.isEmpty()) return;
+        clampSuggestionScroll(matches.size());
 
-        int x = leftPos + FIELD_X;
+        int x = leftPos + (IMAGE_WIDTH - SUGGESTIONS_WIDTH) / 2;
         int y = topPos + FIELD_Y + FIELD_HEIGHT;
-        int height = matches.size() * SUGGESTION_ROW_HEIGHT;
+        int visibleCount = Math.min(VISIBLE_SUGGESTIONS, matches.size());
+        int height = visibleCount * SUGGESTION_ROW_HEIGHT;
+
+        // Flush any text already queued by earlier widgets (e.g. the luck slider's label) before
+        // drawing our opaque background, otherwise that queued text flushes after our fill and
+        // shows through it instead of being covered.
+        guiGraphics.flush();
         guiGraphics.fill(x, y, x + SUGGESTIONS_WIDTH, y + height, 0xF0000000);
 
-        for (int i = 0; i < matches.size(); i++) {
-            int rowY = y + i * SUGGESTION_ROW_HEIGHT;
+        for (int row = 0; row < visibleCount; row++) {
+            int i = suggestionScrollOffset + row;
+            int rowY = y + row * SUGGESTION_ROW_HEIGHT;
             boolean hovered = isOver(mouseX, mouseY, x, rowY, SUGGESTIONS_WIDTH, SUGGESTION_ROW_HEIGHT);
             boolean tabSelected = i == tabCycleIndex && tabCycleBase != null;
             if (hovered || tabSelected) {
@@ -471,6 +501,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             }
             guiGraphics.drawString(font, trimToWidth(matches.get(i), SUGGESTIONS_WIDTH - 4), x + 2, rowY + 1, 0xFFFFFFFF, false);
         }
+        guiGraphics.flush();
     }
 
     private String trimToWidth(String text, int maxWidth) {
@@ -492,13 +523,15 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
         if (lootTableField.isFocused()) {
             List<String> matches = matchingSuggestions(lootTableField.getValue());
-            int x = leftPos + FIELD_X;
+            clampSuggestionScroll(matches.size());
+            int x = leftPos + (IMAGE_WIDTH - SUGGESTIONS_WIDTH) / 2;
             int y = topPos + FIELD_Y + FIELD_HEIGHT;
-            for (int i = 0; i < matches.size(); i++) {
-                int rowY = y + i * SUGGESTION_ROW_HEIGHT;
+            int visibleCount = Math.min(VISIBLE_SUGGESTIONS, matches.size());
+            for (int row = 0; row < visibleCount; row++) {
+                int rowY = y + row * SUGGESTION_ROW_HEIGHT;
                 if (isOver((int) mouseX, (int) mouseY, x, rowY, SUGGESTIONS_WIDTH, SUGGESTION_ROW_HEIGHT)) {
                     applyingTabCompletion = true;
-                    lootTableField.setValue(matches.get(i));
+                    lootTableField.setValue(matches.get(suggestionScrollOffset + row));
                     applyingTabCompletion = false;
                     lootTableField.moveCursorToEnd(false);
                     resetTabCycle();
@@ -512,6 +545,23 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
+    }
+
+    @Override
+    public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (lootTableField.isFocused()) {
+            List<String> matches = matchingSuggestions(lootTableField.getValue());
+            int x = leftPos + (IMAGE_WIDTH - SUGGESTIONS_WIDTH) / 2;
+            int y = topPos + FIELD_Y + FIELD_HEIGHT;
+            int visibleCount = Math.min(VISIBLE_SUGGESTIONS, matches.size());
+            int height = visibleCount * SUGGESTION_ROW_HEIGHT;
+            if (!matches.isEmpty() && isOver((int) mouseX, (int) mouseY, x, y, SUGGESTIONS_WIDTH, height)) {
+                suggestionScrollOffset -= (int) Math.signum(scrollY);
+                clampSuggestionScroll(matches.size());
+                return true;
+            }
+        }
+        return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
     private boolean isOver(int mouseX, int mouseY, int x, int y, int width, int height) {
