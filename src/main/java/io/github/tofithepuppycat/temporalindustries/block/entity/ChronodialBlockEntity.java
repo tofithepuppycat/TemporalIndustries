@@ -11,7 +11,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.NbtOps;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
@@ -242,6 +246,7 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         markerBlockEntityTag = targetBe != null ? targetBe.saveWithFullMetadata(level.registryAccess()) : null;
         markerGameTime = level.getGameTime();
         setChanged();
+        syncToClients();
     }
 
     /** Restores the target block to its marked state, paying the jump's energy cost first (scaled
@@ -274,8 +279,34 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), JUMP_ENTROPY_SHIFT), IFluidHandler.FluidAction.EXECUTE);
         orderTank.drain(JUMP_ENTROPY_SHIFT, IFluidHandler.FluidAction.EXECUTE);
         setChanged();
+        syncToClients();
 
         return JumpResult.SUCCESS;
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
     }
 
     // -------------------------------------------------------------------------
