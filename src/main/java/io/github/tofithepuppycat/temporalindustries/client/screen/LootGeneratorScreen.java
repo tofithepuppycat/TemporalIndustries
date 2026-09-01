@@ -3,17 +3,19 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.LootTableSuggestionsClientState;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
+import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetLuckPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetTablePacket;
+import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorStopPacket;
+import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorToggleRepeatPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorTriggerRollPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootTableSuggestionsRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetLuckPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -29,13 +31,21 @@ import java.util.List;
 import java.util.Objects;
 
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
- * state), a Generate button, a Chaos tank bar, and a roll-progress bar all in the header above the
- * chest slots - see {@code textures/gui/loot_generator.png} for the panel art (chest slots start at
- * 8,68; player inventory at 8,134; header controls at 8,8). */
+ * state), play/stop and single/repeat icon buttons, a Chaos tank bar, and a roll-progress bar all
+ * in the header above the chest slots - see {@code textures/gui/loot_generator.png} for the panel
+ * art (chest slots start at 8,68; player inventory at 8,134; header controls at 8,8). */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/loot_generator.png");
+    private static final ResourceLocation ICON_DIE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_die.png");
+    private static final ResourceLocation ICON_STOP = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_stop.png");
+    private static final ResourceLocation ICON_ARROW_RIGHT = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_arrow_right.png");
+    private static final ResourceLocation ICON_LOOP = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_loop.png");
 
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 216;
@@ -46,32 +56,33 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int FIELD_WIDTH = 160;
     private static final int FIELD_HEIGHT = 12;
 
-    private static final int BUTTON_X = 8;
-    private static final int BUTTON_Y = 32;
-    private static final int BUTTON_WIDTH = 70;
-    private static final int BUTTON_HEIGHT = 12;
+    private static final int ICON_SIZE = IconButtonRenderer.SIZE;
+    private static final int PLAY_ICON_X = 8;
+    private static final int PLAY_ICON_Y = 32;
+    private static final int MODE_ICON_X = PLAY_ICON_X + ICON_SIZE + 2;
+    private static final int MODE_ICON_Y = 32;
 
-    private static final int CHAOS_BAR_X = 84;
+    private static final int CHAOS_BAR_X = MODE_ICON_X + ICON_SIZE + 2;
     private static final int CHAOS_BAR_Y = 32;
-    private static final int CHAOS_BAR_WIDTH = 84;
-    private static final int CHAOS_BAR_HEIGHT = 12;
+    private static final int CHAOS_BAR_WIDTH = 168 - CHAOS_BAR_X;
+    private static final int CHAOS_BAR_HEIGHT = ICON_SIZE;
 
     private static final int PROGRESS_BAR_X = 8;
-    private static final int PROGRESS_BAR_Y = 46;
+    private static final int PROGRESS_BAR_Y = 49;
     private static final int PROGRESS_BAR_WIDTH = 142;
     private static final int PROGRESS_BAR_HEIGHT = 6;
 
     // Sits in the leftover header strip below the progress bar and left of the roll icon (which
-    // occupies x152-168 down to y63).
+    // occupies x152-168 down to y64).
     private static final int LUCK_SLIDER_X = 8;
-    private static final int LUCK_SLIDER_Y = 55;
+    private static final int LUCK_SLIDER_Y = 57;
     private static final int LUCK_SLIDER_WIDTH = 144;
     private static final int LUCK_SLIDER_HEIGHT = 8;
 
     // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
-    // (leftPos + 168).
+    // (leftPos + 168), and spans down to the luck slider's bottom edge.
     private static final int ROLL_ICON_X = 152;
-    private static final int ROLL_ICON_Y = 47;
+    private static final int ROLL_ICON_Y = 49;
     private static final int ROLL_ICON_SIZE = 16;
 
     // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
@@ -124,11 +135,6 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             if (!applyingTabCompletion) resetTabCycle();
         });
         addRenderableWidget(lootTableField);
-
-        addRenderableWidget(Button.builder(Component.translatable("gui.temporalindustries.loot_generator.generate"),
-                        btn -> sendGenerate())
-                .bounds(leftPos + BUTTON_X, topPos + BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT)
-                .build());
 
         lastSentLuck = menu.getLuck();
         luckSlider = new LuckSlider(leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y,
@@ -262,9 +268,21 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         PacketDistributor.sendToServer(new LootGeneratorSetTablePacket(menu.getBlockPos(), text));
     }
 
-    private void sendGenerate() {
-        sendTableUpdateIfChanged();
-        PacketDistributor.sendToServer(new LootGeneratorTriggerRollPacket(menu.getBlockPos()));
+    /** Play/stop icon: starts generation (single roll, or a self-continuing chain in repeat mode -
+     * see {@link LootGeneratorBlockEntity}) if idle, otherwise halts whatever's in flight. */
+    private void togglePlayStop() {
+        if (menu.isRunning()) {
+            PacketDistributor.sendToServer(new LootGeneratorStopPacket(menu.getBlockPos()));
+        } else {
+            sendTableUpdateIfChanged();
+            PacketDistributor.sendToServer(new LootGeneratorTriggerRollPacket(menu.getBlockPos()));
+        }
+    }
+
+    /** Single/repeat icon: just flips the mode for whenever generation is next started - doesn't
+     * itself start or stop anything. */
+    private void toggleRepeatMode() {
+        PacketDistributor.sendToServer(new LootGeneratorToggleRepeatPacket(menu.getBlockPos()));
     }
 
     @Override
@@ -302,9 +320,25 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
         lootTableField.setTextColor(menu.isSelectionValid() ? 0xFFFFFFFF : 0xFFFF5555);
 
+        renderControlIcons(guiGraphics);
         renderChaosBar(guiGraphics);
         renderProgressBar(guiGraphics);
         renderRollAnimation(guiGraphics);
+    }
+
+    /** Play/stop and single/repeat icon buttons, drawn as menu_icon_base_small.png icon buttons
+     * rather than vanilla Buttons, matching the mod's inline-button look elsewhere (see
+     * EntropyCondenserScreen's range controls). */
+    private void renderControlIcons(GuiGraphics guiGraphics) {
+        int playX = leftPos + PLAY_ICON_X;
+        int modeX = leftPos + MODE_ICON_X;
+        int y = topPos + PLAY_ICON_Y;
+
+        IconButtonRenderer.renderBackground(guiGraphics, playX, y, 0);
+        IconButtonRenderer.renderIcon(guiGraphics, menu.isRunning() ? ICON_STOP : ICON_DIE, playX, y);
+
+        IconButtonRenderer.renderBackground(guiGraphics, modeX, y, 0);
+        IconButtonRenderer.renderIcon(guiGraphics, menu.isRepeatMode() ? ICON_LOOP : ICON_ARROW_RIGHT, modeX, y);
     }
 
     private void renderChaosBar(GuiGraphics guiGraphics) {
@@ -374,6 +408,16 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         renderSuggestions(guiGraphics, mouseX, mouseY);
         renderTooltip(guiGraphics, mouseX, mouseY);
 
+        if (isOver(mouseX, mouseY, leftPos + PLAY_ICON_X, topPos + PLAY_ICON_Y, ICON_SIZE, ICON_SIZE)) {
+            guiGraphics.renderTooltip(font, Component.translatable(menu.isRunning()
+                    ? "gui.temporalindustries.loot_generator.stop"
+                    : "gui.temporalindustries.loot_generator.generate"), mouseX, mouseY);
+        }
+        if (isOver(mouseX, mouseY, leftPos + MODE_ICON_X, topPos + MODE_ICON_Y, ICON_SIZE, ICON_SIZE)) {
+            guiGraphics.renderTooltip(font, Component.translatable(menu.isRepeatMode()
+                    ? "gui.temporalindustries.loot_generator.mode_repeat"
+                    : "gui.temporalindustries.loot_generator.mode_single"), mouseX, mouseY);
+        }
         if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + CHAOS_BAR_Y, CHAOS_BAR_WIDTH, CHAOS_BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getChaosTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
         }
@@ -433,6 +477,16 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0) {
+            if (isOver((int) mouseX, (int) mouseY, leftPos + PLAY_ICON_X, topPos + PLAY_ICON_Y, ICON_SIZE, ICON_SIZE)) {
+                togglePlayStop();
+                return true;
+            }
+            if (isOver((int) mouseX, (int) mouseY, leftPos + MODE_ICON_X, topPos + MODE_ICON_Y, ICON_SIZE, ICON_SIZE)) {
+                toggleRepeatMode();
+                return true;
+            }
+        }
         if (lootTableField.isFocused()) {
             List<String> matches = matchingSuggestions(lootTableField.getValue());
             int x = leftPos + FIELD_X;

@@ -12,30 +12,30 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: press the Loot Generator's play icon, triggering
- * {@link LootGeneratorBlockEntity#beginGeneration()}. */
-public class LootGeneratorTriggerRollPacket implements CustomPacketPayload {
-    public static final Type<LootGeneratorTriggerRollPacket> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_trigger_roll"));
+/** Client -> server: press the Loot Generator's single/repeat mode icon, flipping
+ * {@link LootGeneratorBlockEntity#isRepeatMode()}. */
+public class LootGeneratorToggleRepeatPacket implements CustomPacketPayload {
+    public static final Type<LootGeneratorToggleRepeatPacket> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_toggle_repeat"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, LootGeneratorTriggerRollPacket> STREAM_CODEC =
-            StreamCodec.of(LootGeneratorTriggerRollPacket::encode, LootGeneratorTriggerRollPacket::decode);
+    public static final StreamCodec<RegistryFriendlyByteBuf, LootGeneratorToggleRepeatPacket> STREAM_CODEC =
+            StreamCodec.of(LootGeneratorToggleRepeatPacket::encode, LootGeneratorToggleRepeatPacket::decode);
 
     private final BlockPos machinePos;
 
-    public LootGeneratorTriggerRollPacket(BlockPos machinePos) {
+    public LootGeneratorToggleRepeatPacket(BlockPos machinePos) {
         this.machinePos = machinePos;
     }
 
-    public static void encode(RegistryFriendlyByteBuf buf, LootGeneratorTriggerRollPacket packet) {
+    public static void encode(RegistryFriendlyByteBuf buf, LootGeneratorToggleRepeatPacket packet) {
         buf.writeBlockPos(packet.machinePos);
     }
 
-    public static LootGeneratorTriggerRollPacket decode(RegistryFriendlyByteBuf buf) {
-        return new LootGeneratorTriggerRollPacket(buf.readBlockPos());
+    public static LootGeneratorToggleRepeatPacket decode(RegistryFriendlyByteBuf buf) {
+        return new LootGeneratorToggleRepeatPacket(buf.readBlockPos());
     }
 
-    public static void handle(LootGeneratorTriggerRollPacket packet, IPayloadContext context) {
+    public static void handle(LootGeneratorToggleRepeatPacket packet, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer sender)) {
             return;
         }
@@ -47,7 +47,7 @@ public class LootGeneratorTriggerRollPacket implements CustomPacketPayload {
             BlockEntity be = sender.level().getBlockEntity(packet.machinePos);
             if (!(be instanceof LootGeneratorBlockEntity generator)) return;
 
-            generator.beginGeneration();
+            generator.setRepeatMode(!generator.isRepeatMode());
         });
     }
 
