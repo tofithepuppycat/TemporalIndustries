@@ -124,12 +124,10 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     }
 
     private static Component entropyBalanceText(int entropy, int max) {
-        int half = max / 2;
-        String displayEntropy = EntropyDisplay.formatBalance(entropy);
-        String displayMax = EntropyDisplay.formatBalance(max);
-        if (entropy == half) return Component.translatable("gui.temporalindustries.entropy.balanced", displayEntropy, displayMax);
-        String key = entropy > half ? "gui.temporalindustries.entropy.chaos" : "gui.temporalindustries.entropy.order";
-        return Component.translatable(key, displayEntropy, displayMax);
+        int offset = entropy - max / 2;
+        String sign = offset >= 0 ? "+" : "";
+        String display = sign + EntropyDisplay.formatBalance(offset);
+        return Component.translatable("gui.temporalindustries.entropy.value", display);
     }
 
     private static Component entropyRateText(float ratePerSecond) {

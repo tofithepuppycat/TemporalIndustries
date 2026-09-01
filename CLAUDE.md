@@ -3,3 +3,5 @@ create git commits, group changes into sufficiently large commits. use semantic 
 Shorthand terms:
     PCM = Portable Chrono Marker
     CS = Chronosphere
+
+We dont need to show FE stored in the Entropy Glasses HUD
