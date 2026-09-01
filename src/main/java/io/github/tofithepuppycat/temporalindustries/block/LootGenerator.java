@@ -32,7 +32,6 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
-import java.util.ArrayList;
 import java.util.List;
 
 /** Spends liquid Chaos to roll a player-chosen loot table into its own chest-sized inventory; see
@@ -144,38 +143,13 @@ public class LootGenerator extends BaseEntityBlock {
     }
 
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
-
-    /** Points, in [0,1] cube-local space, spaced along the 12 edges of a unit cube - used to draw a
-     * small-particle outline around each missing frame position rather than a burst at its center. */
-    private static final List<Vector3f> CUBE_EDGE_POINTS = buildCubeEdgePoints();
-
-    private static List<Vector3f> buildCubeEdgePoints() {
-        float[][] corners = {
-                {0, 0, 0}, {1, 0, 0}, {0, 1, 0}, {0, 0, 1},
-                {1, 1, 0}, {1, 0, 1}, {0, 1, 1}, {1, 1, 1}
-        };
-        int[][] edges = {
-                {0, 1}, {1, 5}, {5, 3}, {3, 0}, // bottom face
-                {2, 4}, {4, 7}, {7, 6}, {6, 2}, // top face
-                {0, 2}, {1, 4}, {3, 6}, {5, 7}  // verticals
-        };
-        List<Vector3f> points = new ArrayList<>();
-        int stepsPerEdge = 5;
-        for (int[] edge : edges) {
-            float[] a = corners[edge[0]];
-            float[] b = corners[edge[1]];
-            for (int i = 0; i <= stepsPerEdge; i++) {
-                float t = i / (float) stepsPerEdge;
-                points.add(new Vector3f(a[0] + (b[0] - a[0]) * t, a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t));
-            }
-        }
-        return points;
-    }
+    private static final double EDGE_PARTICLE_SPACING = 0.2;
 
     private static void highlightMissing(ServerLevel level, List<BlockPos> missing, ServerPlayer player) {
         for (BlockPos pos : missing) {
-            for (Vector3f point : CUBE_EDGE_POINTS) {
-                level.sendParticles(MISSING_FRAME_PARTICLE, pos.getX() + point.x(), pos.getY() + point.y(), pos.getZ() + point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            for (Vector3f point : BoxEdgeParticles.outline(pos.getX(), pos.getY(), pos.getZ(),
+                    pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, EDGE_PARTICLE_SPACING)) {
+                level.sendParticles(MISSING_FRAME_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
             }
         }
         player.displayClientMessage(Component.translatable("block.temporalindustries.loot_generator.missing_frame", missing.size()), true);
