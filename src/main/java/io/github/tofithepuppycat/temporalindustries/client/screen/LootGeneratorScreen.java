@@ -31,9 +31,10 @@ import java.util.List;
 import java.util.Objects;
 
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
- * state), play/stop and single/repeat icon buttons, a Chaos tank bar, and a roll-progress bar all
- * in the header above the chest slots - see {@code textures/gui/loot_generator.png} for the panel
- * art (chest slots start at 8,68; player inventory at 8,134; header controls at 8,8). */
+ * state) with a vertical Chaos tank bar riding alongside it, a luck slider, a roll-progress bar,
+ * and centered play/stop and single/repeat icon buttons, stacked in that order in the header above
+ * the chest slots - see {@code textures/gui/loot_generator.png} for the panel art (chest slots
+ * start at 8,68; player inventory at 8,134; header controls at 8,8). */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -51,39 +52,47 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int IMAGE_HEIGHT = 216;
 
     // Header starts below the machine title (drawn at y=6, ~9px tall) rather than right against it.
+    // Rows top to bottom: search field (with the vertical Chaos bar riding alongside it, right-
+    // flush against the panel edge at x=168), luck slider, progress bar, then the play/mode icons
+    // centered in the last row.
     private static final int FIELD_X = 8;
     private static final int FIELD_Y = 16;
-    private static final int FIELD_WIDTH = 160;
     private static final int FIELD_HEIGHT = 12;
+    // Usable header width between the left inset and the panel's right edge (leftPos + 168).
+    private static final int CONTENT_WIDTH = 160;
 
-    private static final int ICON_SIZE = IconButtonRenderer.SIZE;
-    private static final int PLAY_ICON_X = 8;
-    private static final int PLAY_ICON_Y = 30;
-    private static final int MODE_ICON_X = PLAY_ICON_X + ICON_SIZE + 2;
-    private static final int MODE_ICON_Y = 30;
+    private static final int CHAOS_BAR_WIDTH = 10;
+    // Flush against the field's right edge (168, shared with the luck slider/progress bar below) -
+    // shortening the field to make room rather than floating the bar further out.
+    private static final int CHAOS_BAR_X = FIELD_X + CONTENT_WIDTH - CHAOS_BAR_WIDTH;
+    private static final int CHAOS_BAR_Y = FIELD_Y;
+    private static final int FIELD_WIDTH = CHAOS_BAR_X - FIELD_X - 2;
 
-    private static final int CHAOS_BAR_X = MODE_ICON_X + ICON_SIZE + 2;
-    private static final int CHAOS_BAR_Y = 30;
-    private static final int CHAOS_BAR_WIDTH = 168 - CHAOS_BAR_X;
-    private static final int CHAOS_BAR_HEIGHT = ICON_SIZE;
-
-    private static final int PROGRESS_BAR_X = 8;
-    private static final int PROGRESS_BAR_Y = 47;
-    private static final int PROGRESS_BAR_WIDTH = 139;
-    private static final int PROGRESS_BAR_HEIGHT = 6;
-
-    // Sits in the leftover header strip below the progress bar and left of the roll icon (which
-    // occupies x152-168 down to y62).
-    private static final int LUCK_SLIDER_X = 8;
-    private static final int LUCK_SLIDER_Y = 55;
-    private static final int LUCK_SLIDER_WIDTH = 139;
+    private static final int LUCK_SLIDER_X = FIELD_X;
+    private static final int LUCK_SLIDER_Y = FIELD_Y + FIELD_HEIGHT + 2;
+    private static final int LUCK_SLIDER_WIDTH = FIELD_WIDTH;
     private static final int LUCK_SLIDER_HEIGHT = 8;
 
-    // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
-    // (leftPos + 168), and spans down to the luck slider's bottom edge.
-    private static final int ROLL_ICON_X = 152;
-    private static final int ROLL_ICON_Y = 47;
+    private static final int PROGRESS_BAR_X = FIELD_X;
+    private static final int PROGRESS_BAR_Y = LUCK_SLIDER_Y + LUCK_SLIDER_HEIGHT + 2;
+    private static final int PROGRESS_BAR_WIDTH = FIELD_WIDTH;
+    private static final int PROGRESS_BAR_HEIGHT = 6;
+
+    // Spans the field, luck slider and progress bar rows it rides alongside.
+    private static final int CHAOS_BAR_HEIGHT = PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT - CHAOS_BAR_Y;
+
+    private static final int ICON_SIZE = IconButtonRenderer.SIZE;
+    private static final int BUTTONS_Y = PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT + 3;
+    private static final int PLAY_ICON_X = FIELD_X + (CONTENT_WIDTH - (ICON_SIZE * 2 + 2)) / 2;
+    private static final int PLAY_ICON_Y = BUTTONS_Y;
+    private static final int MODE_ICON_X = PLAY_ICON_X + ICON_SIZE + 2;
+    private static final int MODE_ICON_Y = BUTTONS_Y;
+
+    // Shares the buttons row and the panel's right edge (168), off to the side of the centered
+    // play/mode icons.
     private static final int ROLL_ICON_SIZE = 16;
+    private static final int ROLL_ICON_X = FIELD_X + CONTENT_WIDTH - ROLL_ICON_SIZE;
+    private static final int ROLL_ICON_Y = BUTTONS_Y;
 
     // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
     // actually about to be placed instead of still cycling through the possible-items sample.
@@ -361,7 +370,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         int x = leftPos + CHAOS_BAR_X;
         int y = topPos + CHAOS_BAR_Y;
         guiGraphics.fill(x, y, x + CHAOS_BAR_WIDTH, y + CHAOS_BAR_HEIGHT, 0xFF000000);
-        FluidBarRenderer.renderHorizontal(guiGraphics, x + 1, y + 1, CHAOS_BAR_WIDTH - 2, CHAOS_BAR_HEIGHT - 2,
+        FluidBarRenderer.renderVertical(guiGraphics, x + 1, y + 1, CHAOS_BAR_WIDTH - 2, CHAOS_BAR_HEIGHT - 2,
                 menu.getChaosFluidAmount(), menu.getChaosTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 
