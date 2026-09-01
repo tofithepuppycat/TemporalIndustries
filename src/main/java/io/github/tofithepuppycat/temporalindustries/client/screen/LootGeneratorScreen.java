@@ -17,6 +17,7 @@ import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
@@ -37,25 +38,40 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 208;
 
+    // Header starts below the machine title (drawn at y=6, ~9px tall) rather than right against it.
     private static final int FIELD_X = 8;
-    private static final int FIELD_Y = 8;
+    private static final int FIELD_Y = 18;
     private static final int FIELD_WIDTH = 160;
     private static final int FIELD_HEIGHT = 12;
 
     private static final int BUTTON_X = 8;
-    private static final int BUTTON_Y = 22;
+    private static final int BUTTON_Y = 32;
     private static final int BUTTON_WIDTH = 70;
     private static final int BUTTON_HEIGHT = 12;
 
     private static final int CHAOS_BAR_X = 84;
-    private static final int CHAOS_BAR_Y = 22;
+    private static final int CHAOS_BAR_Y = 32;
     private static final int CHAOS_BAR_WIDTH = 84;
     private static final int CHAOS_BAR_HEIGHT = 12;
 
     private static final int PROGRESS_BAR_X = 8;
-    private static final int PROGRESS_BAR_Y = 36;
-    private static final int PROGRESS_BAR_WIDTH = 160;
+    private static final int PROGRESS_BAR_Y = 46;
+    private static final int PROGRESS_BAR_WIDTH = 142;
     private static final int PROGRESS_BAR_HEIGHT = 6;
+
+    // Icon sits right of the progress bar, vertically centered on it, sharing its right edge with
+    // the field/chaos-bar above (leftPos + 168).
+    private static final int ROLL_ICON_X = 152;
+    private static final int ROLL_ICON_Y = 41;
+    private static final int ROLL_ICON_SIZE = 16;
+
+    // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
+    // actually about to be placed instead of still cycling through the possible-items sample.
+    private static final int ROLL_LOCK_TICKS = 4;
+    // Cycle speed (client ticks per icon) slows down once past the halfway point, for a rough
+    // deceleration into the landed item rather than an abrupt stop.
+    private static final int ROLL_SPIN_TICKS_FAST = 3;
+    private static final int ROLL_SPIN_TICKS_SLOW = 6;
 
     private static final int MAX_SUGGESTIONS = 4;
     private static final int SUGGESTION_ROW_HEIGHT = 10;
@@ -68,6 +84,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private String tabCycleBase = null;
     private int tabCycleIndex = -1;
     private boolean applyingTabCompletion = false;
+
+    // Advances every client tick the screen is open, purely to drive the roll-animation's icon
+    // cycling - not synced, not persisted.
+    private int rollAnimTick = 0;
 
     public LootGeneratorScreen(LootGeneratorMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -93,7 +113,6 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             if (!applyingTabCompletion) resetTabCycle();
         });
         addRenderableWidget(lootTableField);
-        setInitialFocus(lootTableField);
 
         addRenderableWidget(Button.builder(Component.translatable("gui.temporalindustries.loot_generator.generate"),
                         btn -> sendGenerate())
@@ -198,6 +217,12 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     }
 
     @Override
+    protected void containerTick() {
+        super.containerTick();
+        rollAnimTick++;
+    }
+
+    @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
@@ -205,6 +230,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
         renderChaosBar(guiGraphics);
         renderProgressBar(guiGraphics);
+        renderRollAnimation(guiGraphics);
     }
 
     private void renderChaosBar(GuiGraphics guiGraphics) {
@@ -229,6 +255,38 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         guiGraphics.fill(x + 1, y + 1, x + 1 + filled, y + PROGRESS_BAR_HEIGHT - 1, 0xFF55FF55);
     }
 
+    /** While a roll is in progress, spins the icon through the possible-items sample rolled
+     * server-side, slowing down past the halfway mark and locking onto the item that's actually
+     * about to be placed for the last {@link #ROLL_LOCK_TICKS} ticks - a slot-machine "deciding the
+     * loot" effect that resolves right as the progress bar fills. */
+    private void renderRollAnimation(GuiGraphics guiGraphics) {
+        ItemStack display = currentRollDisplayStack();
+        if (display.isEmpty()) return;
+
+        int x = leftPos + ROLL_ICON_X;
+        int y = topPos + ROLL_ICON_Y;
+        guiGraphics.fill(x - 1, y - 1, x + ROLL_ICON_SIZE + 1, y + ROLL_ICON_SIZE + 1, 0xFF000000);
+        guiGraphics.renderItem(display, x, y);
+    }
+
+    /** Empty if no roll is in progress; otherwise whichever stack the animation should show this
+     * frame (spinning sample item, or the real upcoming item once landed). */
+    private ItemStack currentRollDisplayStack() {
+        ItemStack next = menu.getNextRollItem();
+        if (next.isEmpty()) return ItemStack.EMPTY;
+
+        int progress = menu.getProgress();
+        int maxProgress = menu.getMaxProgress();
+        if (maxProgress <= 0 || progress >= maxProgress - ROLL_LOCK_TICKS) return next;
+
+        List<ItemStack> possible = menu.getPossibleItems();
+        if (possible.isEmpty()) return next;
+
+        int spinTicks = progress > maxProgress / 2 ? ROLL_SPIN_TICKS_SLOW : ROLL_SPIN_TICKS_FAST;
+        int index = (rollAnimTick / spinTicks) % possible.size();
+        return possible.get(index);
+    }
+
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Component machineTitle = Component.translatable("block.temporalindustries.loot_generator");
@@ -245,6 +303,25 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
         if (isOver(mouseX, mouseY, leftPos + CHAOS_BAR_X, topPos + CHAOS_BAR_Y, CHAOS_BAR_WIDTH, CHAOS_BAR_HEIGHT)) {
             guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getChaosTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
+        }
+        if (isOver(mouseX, mouseY, leftPos + ROLL_ICON_X, topPos + ROLL_ICON_Y, ROLL_ICON_SIZE, ROLL_ICON_SIZE)) {
+            renderRollIconTooltip(guiGraphics, mouseX, mouseY);
+        }
+    }
+
+    /** The real item's tooltip once the spin has landed on it; a "still deciding" placeholder while
+     * it's still cycling through the sample, so the tooltip doesn't spoil the result early. */
+    private void renderRollIconTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        ItemStack next = menu.getNextRollItem();
+        if (next.isEmpty()) return;
+
+        int progress = menu.getProgress();
+        int maxProgress = menu.getMaxProgress();
+        boolean landed = maxProgress > 0 && progress >= maxProgress - ROLL_LOCK_TICKS;
+        if (landed) {
+            guiGraphics.renderTooltip(font, next, mouseX, mouseY);
+        } else {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.loot_generator.deciding"), mouseX, mouseY);
         }
     }
 
@@ -293,6 +370,11 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
                     resetTabCycle();
                     return true;
                 }
+            }
+            // Clicking anywhere outside the field (slots, buttons, empty panel) unfocuses it -
+            // otherwise, once focused, there was no way to click away from it.
+            if (!lootTableField.isMouseOver(mouseX, mouseY)) {
+                lootTableField.setFocused(false);
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);
