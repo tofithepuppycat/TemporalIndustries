@@ -10,7 +10,6 @@ import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetTablePacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorTriggerRollPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootTableSuggestionsRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetLuckPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
@@ -65,9 +64,9 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     // Sits in the leftover header strip below the progress bar and left of the roll icon (which
     // occupies x152-168 down to y63).
     private static final int LUCK_SLIDER_X = 8;
-    private static final int LUCK_SLIDER_Y = 53;
+    private static final int LUCK_SLIDER_Y = 55;
     private static final int LUCK_SLIDER_WIDTH = 144;
-    private static final int LUCK_SLIDER_HEIGHT = 12;
+    private static final int LUCK_SLIDER_HEIGHT = 8;
 
     // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
     // (leftPos + 168).
@@ -89,6 +88,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private EditBox lootTableField;
     private String lastSentText = "";
     private int lastSentLuck;
+    private LuckSlider luckSlider;
 
     // Tab-completion cycles through the matches for whatever text was in the field before the first
     // Tab press in a run, rather than re-filtering against its own output on every subsequent press.
@@ -131,10 +131,36 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
                 .build());
 
         lastSentLuck = menu.getLuck();
-        addRenderableWidget(new LuckSlider(leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y,
-                LUCK_SLIDER_WIDTH, LUCK_SLIDER_HEIGHT, menu.getLuck()));
+        luckSlider = new LuckSlider(leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y,
+                LUCK_SLIDER_WIDTH, LUCK_SLIDER_HEIGHT, menu.getLuck());
+        addRenderableWidget(luckSlider);
 
         PacketDistributor.sendToServer(LootTableSuggestionsRequestPacket.INSTANCE);
+    }
+
+    // AbstractContainerScreen#mouseDragged is fully overridden for slot quick-crafting and never
+    // forwards to child widgets (ContainerEventHandler#mouseDragged, which vanilla Screen relies on
+    // for e.g. options sliders, is never called) - without this override, dragging the luck slider
+    // would only ever jump to the initial click position and ignore all subsequent movement.
+    @Override
+    public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (getFocused() == luckSlider && isDragging()) {
+            return luckSlider.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        }
+        return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+    }
+
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        rollAnimTick++;
+        // The client's container data starts at 0 until the server's first post-open broadcast
+        // lands, which can arrive after init() already built the slider from a stale read - keep it
+        // in sync with the real value except while the player has it focused (mid-drag or just
+        // clicked), so we don't fight their input.
+        if (luckSlider != null && !luckSlider.isFocused()) {
+            luckSlider.syncFromServer(menu.getLuck());
+        }
     }
 
     /** Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}), fed into the loot
@@ -164,6 +190,15 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             if (luck == lastSentLuck) return;
             lastSentLuck = luck;
             PacketDistributor.sendToServer(new LootGeneratorSetLuckPacket(menu.getBlockPos(), luck));
+        }
+
+        /** Pulls the slider's handle to match a value that arrived from the server (initial sync, or
+         * another client's change) without re-sending it back out via {@link #applyValue}. */
+        void syncFromServer(int luck) {
+            if (luck == lastSentLuck) return;
+            lastSentLuck = luck;
+            value = luck / (double) LootGeneratorBlockEntity.MAX_LUCK;
+            updateMessage();
         }
     }
 
@@ -259,12 +294,6 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     public void removed() {
         super.removed();
         sendTableUpdateIfChanged();
-    }
-
-    @Override
-    protected void containerTick() {
-        super.containerTick();
-        rollAnimTick++;
     }
 
     @Override
