@@ -449,6 +449,12 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
+        // Frame parts forward item/fluid capability requests to their controller, so the loot
+        // generator multiblock can be fed and emptied from any of its faces, not just the controller.
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, MACHINE_FRAME_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, MACHINE_FRAME_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
 
         // The cells and the anchor store liquid Order/Chaos on the stack, so they are fluid
         // containers proper - fillable and drainable by anything that speaks IFluidHandler.
