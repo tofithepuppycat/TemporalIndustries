@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:crying_obsidian"
+  },
+  "result": {
+    "id": "minecraft:nether_star",
+    "count": 1
+  },
+  "entropy_cost": 8000
+}

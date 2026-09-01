@@ -31,3 +31,6 @@ Generators:
 Spending CHAOS:
 Netherrack -> magma block -> obsidian -> crying obsidian -> nether star
 100mb -> 200mb -> 400mb -> 800mb -> 16 buckets
+
+
+make cells and temporal anchor contain liquid order/chaos instead of current impl. make cells be able to insert the liquids into machines by right clicking. When crouching and scroling, the user sets how much should be pulled out with one right click
