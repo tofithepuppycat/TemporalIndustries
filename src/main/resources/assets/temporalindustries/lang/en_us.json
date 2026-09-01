@@ -125,6 +125,8 @@
 	"gui.temporalindustries.loot_generator.table_hint": "namespace:path/to/table",
 	"gui.temporalindustries.loot_generator.generate": "Generate",
 	"gui.temporalindustries.loot_generator.deciding": "Deciding...",
+	"gui.temporalindustries.loot_generator.luck": "Luck: %s/%s",
+	"gui.temporalindustries.loot_generator.luck_cost": "Roll: %s CHS  Per item: %s CHS",
 	"item.temporalindustries.entropy_glasses": "Entropy Glasses",
 	"item.temporalindustries.entropy_glasses.tooltip": "Shows entropy info about the block you're looking at.",
 	"overlay.temporalindustries.entropy_glasses.liquid": "%s/%s",
