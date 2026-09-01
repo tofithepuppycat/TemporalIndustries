@@ -1,0 +1,13 @@
+{
+  "return_by_death": {
+    "sounds": [
+      "temporalindustries:return_by_death"
+    ]
+  },
+  "arcade": {
+    "sounds": [
+      "temporalindustries:tofi_-_arcade"
+    ],
+    "stream": true
+  }
+}
