@@ -53,6 +53,18 @@ repositories {
         name = "ithundxr"
         url = "https://maven.ithundxr.dev/snapshots"
     }
+    // Modrinth's maven, used below to pull in Fusion (connected textures library).
+    exclusiveContent {
+        forRepository {
+            maven {
+                name = "Modrinth"
+                url = "https://api.modrinth.com/maven"
+            }
+        }
+        filter {
+            includeGroup "maven.modrinth"
+        }
+    }
 }
 
 base {
@@ -149,6 +161,11 @@ dependencies {
     // actually exercise it. No dependency on it is published with the built mod.
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
     localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
+
+    // Fusion: connected-textures library used for the multiblock frame/casing textures (see
+    // machine_frame's model). Embedded via Jar-in-Jar so players don't need to install it
+    // separately -- see the "fusion" dependency entry in neoforge.mods.toml.
+    jarJar(implementation("maven.modrinth:fusion-connected-textures:${fusion_version}"))
 
     // Create (plus its Ponder/Flywheel/Registrate dependencies), for the dev/test environment
     // only: no integration is implemented against it, it's just available in-game via
