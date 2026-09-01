@@ -19,6 +19,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCon
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.MachineFrameBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
@@ -336,6 +337,9 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LootGeneratorBlockEntity>> LOOT_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("loot_generator",
             () -> BlockEntityType.Builder.of(LootGeneratorBlockEntity::new, LOOT_GENERATOR_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MachineFrameBlockEntity>> MACHINE_FRAME_BLOCK_ENTITY = BLOCK_ENTITIES.register("machine_frame",
+            () -> BlockEntityType.Builder.of(MachineFrameBlockEntity::new, MACHINE_FRAME_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
             () -> IMenuTypeExtension.create(ChronovaultMenu::new));
