@@ -1,8 +1,10 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.block.BoxEdgeParticles;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.LootGeneratorStructure;
+import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -78,6 +80,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
     private static final int POSSIBLE_ITEMS_SAMPLES = 12;
     private static final int MAX_POSSIBLE_ITEMS = 16;
+    private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
 
     private final FluidTank chaosTank = new FluidTank(TANK_CAPACITY) {
         @Override public boolean isFluidValid(FluidStack stack) {
@@ -119,7 +122,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         float r = ((color >> 16) & 0xFF) / 255F;
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
-        return new DustParticleOptions(new Vector3f(r, g, b), 1.0F);
+        return new DustParticleOptions(new Vector3f(r, g, b), 2.0F);
     }
 
     public LootGeneratorBlockEntity(BlockPos pos, BlockState state) {
@@ -260,6 +263,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
                 if (state.hasProperty(LootGenerator.FORMED)) {
                     level.setBlock(worldPosition, state.setValue(LootGenerator.FORMED, formed), Block.UPDATE_CLIENTS);
                 }
+                updateFrameConnectivity(formed);
                 if (formed && level instanceof ServerLevel serverLevel) {
                     spawnFormedParticles(serverLevel);
                 }
@@ -268,14 +272,33 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** ORD-colored (see {@link EntropyType#ORDER}) puff at the controller and every frame position,
-     * fired once when the structure transitions from unformed to formed. */
+    /** Pushes {@link MachineFrame#CONNECTED} to every present frame position, so the Fusion
+     * connected-textures casing only shows on frames confirmed part of *this* formed structure -
+     * rather than any frame block happening to sit next to one. */
+    private void updateFrameConnectivity(boolean connected) {
+        Direction facing = getBlockState().getValue(LootGenerator.FACING);
+        for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition, facing)) {
+            MachineFrame.setConnected(level, pos, connected);
+        }
+    }
+
+    /** ORD-colored (see {@link EntropyType#ORDER}) outline traced along the edges of the whole
+     * formed structure's bounding box - not just at the controller - fired once when the structure
+     * transitions from unformed to formed. */
     private void spawnFormedParticles(ServerLevel serverLevel) {
         Direction facing = getBlockState().getValue(LootGenerator.FACING);
         List<BlockPos> positions = new ArrayList<>(LootGeneratorStructure.framePositions(worldPosition, facing));
         positions.add(worldPosition);
-        for (BlockPos pos : positions) {
-            serverLevel.sendParticles(FORMED_PARTICLE, pos.getX() + 0.5D, pos.getY() + 0.5D, pos.getZ() + 0.5D, 6, 0.25D, 0.25D, 0.25D, 0.01D);
+
+        int minX = positions.stream().mapToInt(BlockPos::getX).min().orElseThrow();
+        int minY = positions.stream().mapToInt(BlockPos::getY).min().orElseThrow();
+        int minZ = positions.stream().mapToInt(BlockPos::getZ).min().orElseThrow();
+        int maxX = positions.stream().mapToInt(BlockPos::getX).max().orElseThrow();
+        int maxY = positions.stream().mapToInt(BlockPos::getY).max().orElseThrow();
+        int maxZ = positions.stream().mapToInt(BlockPos::getZ).max().orElseThrow();
+
+        for (Vector3f point : BoxEdgeParticles.outline(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1, FORMED_EDGE_PARTICLE_SPACING)) {
+            serverLevel.sendParticles(FORMED_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 

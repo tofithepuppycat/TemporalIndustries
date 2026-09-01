@@ -1,5 +1,6 @@
 {
   "variants": {
-    "": { "model": "temporalindustries:block/machine_frame" }
+    "connected=true": { "model": "temporalindustries:block/machine_frame" },
+    "connected=false": { "model": "temporalindustries:block/machine_frame_disconnected" }
   }
 }
