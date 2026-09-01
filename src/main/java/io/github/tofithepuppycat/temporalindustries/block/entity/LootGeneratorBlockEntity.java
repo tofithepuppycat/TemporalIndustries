@@ -1,0 +1,423 @@
+package io.github.tofithepuppycat.temporalindustries.block.entity;
+
+import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.block.LootGeneratorStructure;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
+import net.minecraft.ChatFormatting;
+import net.minecraft.core.BlockPos;
+import net.minecraft.core.HolderLookup;
+import net.minecraft.core.NonNullList;
+import net.minecraft.core.registries.Registries;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Container;
+import net.minecraft.world.ContainerHelper;
+import net.minecraft.world.MenuProvider;
+import net.minecraft.world.entity.player.Inventory;
+import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.storage.loot.LootParams;
+import net.minecraft.world.level.storage.loot.LootTable;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParamSets;
+import net.minecraft.world.level.storage.loot.parameters.LootContextParams;
+import net.minecraft.world.phys.Vec3;
+import org.jetbrains.annotations.Nullable;
+import net.neoforged.neoforge.fluids.capability.IFluidHandler;
+import net.neoforged.neoforge.fluids.FluidStack;
+import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.items.wrapper.InvWrapper;
+import org.jetbrains.annotations.NotNull;
+
+import java.util.ArrayList;
+import java.util.List;
+
+/**
+ * Spends liquid Chaos to roll a player-chosen loot table (vanilla or modded) into its own
+ * chest-sized inventory, one item at a time on a tick-driven progress bar - a fixed cost to start
+ * the roll, plus a further cost per item actually placed. See {@link EntropyManipulatorBlockEntity}
+ * for the ticked-consumption idiom this mirrors.
+ */
+@SuppressWarnings("null")
+public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
+    public static final int TANK_CAPACITY = 8_000;
+    public static final int ROLL_COST = 500;
+    public static final int ITEM_COST = 50;
+    public static final int PROCESS_TICKS = 40;
+
+    private static final int SLOT_COUNT = 27;
+    private static final int STRUCTURE_RECHECK_INTERVAL = 20;
+    private static final int POSSIBLE_ITEMS_SAMPLES = 12;
+    private static final int MAX_POSSIBLE_ITEMS = 16;
+
+    private final FluidTank chaosTank = new FluidTank(TANK_CAPACITY) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.CHAOS_FLUID.get());
+        }
+    };
+
+    // Implementing Container directly (not only IItemHandler) is what lets vanilla hoppers push/pull
+    // items here; inventory wraps this same backing list as an IItemHandler for modded item pipes.
+    private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
+    private final IItemHandler inventory = new InvWrapper(this);
+
+    @Nullable
+    private ResourceLocation selectedLootTable;
+    private boolean lastSelectionValid = false;
+    private List<ItemStack> pendingRoll = new ArrayList<>();
+    // Sampled by re-rolling the table a handful of extra times when a roll starts, purely so the
+    // client can spin through icons of things this table could plausibly produce (see
+    // LootGeneratorScreen) - not itself consumed or placed anywhere.
+    private List<ItemStack> possibleItems = new ArrayList<>();
+    private int progress = 0;
+    private int maxProgress = PROCESS_TICKS;
+    private boolean formed = false;
+    private int ticksSinceStructureCheck = 0;
+
+    public LootGeneratorBlockEntity(BlockPos pos, BlockState state) {
+        super(Registration.LOOT_GENERATOR_BLOCK_ENTITY.get(), pos, state);
+    }
+
+    public IItemHandler getItemHandler() {
+        return inventory;
+    }
+
+    public IFluidHandler getFluidHandler() {
+        return chaosTank;
+    }
+
+    public FluidTank getChaosTank() {
+        return chaosTank;
+    }
+
+    @Nullable
+    public ResourceLocation getSelectedLootTable() {
+        return selectedLootTable;
+    }
+
+    public boolean isSelectionValid() {
+        return lastSelectionValid;
+    }
+
+    public int getProgress() {
+        return progress;
+    }
+
+    /** Sampled items this table could plausibly produce, for the client's roll animation - not the
+     * actual queued results. */
+    public List<ItemStack> getPossibleItems() {
+        return possibleItems;
+    }
+
+    /** The item that will actually be placed when the current roll's progress bar fills, or empty
+     * if no roll is in progress. */
+    public ItemStack getNextRollItem() {
+        return pendingRoll.isEmpty() ? ItemStack.EMPTY : pendingRoll.get(0);
+    }
+
+    public int getMaxProgress() {
+        return maxProgress;
+    }
+
+    public boolean isFormed() {
+        return formed;
+    }
+
+    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame} block. */
+    public List<BlockPos> findMissing() {
+        List<BlockPos> missing = new ArrayList<>();
+        if (level == null) return missing;
+        for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition)) {
+            if (!level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get())) {
+                missing.add(pos);
+            }
+        }
+        return missing;
+    }
+
+    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients if it changed. */
+    public boolean checkStructure() {
+        boolean wasFormed = formed;
+        formed = findMissing().isEmpty();
+        if (formed != wasFormed) {
+            setChanged();
+            syncToClients();
+        }
+        return formed;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        return List.of(
+                getDisplayName().copy().withStyle(ChatFormatting.WHITE),
+                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                        EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
+                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
+    }
+
+    /** Sets the selected loot table id (or clears it, if {@code id} is null) and re-validates it
+     * against the server's actually-registered loot tables, so a stale/typoed id is flagged rather
+     * than silently accepted. */
+    public void setSelectedLootTable(@Nullable ResourceLocation id) {
+        this.selectedLootTable = id;
+        this.lastSelectionValid = id != null && resolvesToRealTable(id);
+        setChanged();
+        syncToClients();
+    }
+
+    /** Drains {@link #ROLL_COST} and rolls the selected loot table, queuing the results to be placed
+     * one at a time by {@link #processTick()}. No-ops if a roll is already in progress, the selection
+     * doesn't resolve to a real loot table, or there isn't enough Chaos to start one. */
+    public void startRoll() {
+        if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
+
+        LootTable table = resolveLootTable(serverLevel, selectedLootTable);
+        if (table == LootTable.EMPTY) {
+            lastSelectionValid = false;
+            setChanged();
+            syncToClients();
+            return;
+        }
+        if (chaosTank.getFluidAmount() < ROLL_COST) return;
+
+        chaosTank.drain(ROLL_COST, IFluidHandler.FluidAction.EXECUTE);
+        LootParams params = new LootParams.Builder(serverLevel)
+                .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(worldPosition))
+                .create(LootContextParamSets.CHEST);
+        List<ItemStack> firstRoll = table.getRandomItems(params);
+        pendingRoll = new ArrayList<>(firstRoll);
+        possibleItems = samplePossibleItems(table, params, firstRoll);
+        progress = 0;
+        setChanged();
+        syncToClients();
+    }
+
+    /** Re-rolls {@code table} a few extra times and dedupes the results into a small pool of items
+     * this table could plausibly produce, so the client has something to spin through while a roll
+     * is in progress instead of just the one outcome that actually got queued. */
+    private static List<ItemStack> samplePossibleItems(LootTable table, LootParams params, List<ItemStack> firstRoll) {
+        List<ItemStack> pool = new ArrayList<>();
+        addDistinct(pool, firstRoll);
+        for (int i = 0; i < POSSIBLE_ITEMS_SAMPLES && pool.size() < MAX_POSSIBLE_ITEMS; i++) {
+            addDistinct(pool, table.getRandomItems(params));
+        }
+        return pool;
+    }
+
+    private static void addDistinct(List<ItemStack> pool, List<ItemStack> items) {
+        for (ItemStack stack : items) {
+            if (stack.isEmpty() || pool.size() >= MAX_POSSIBLE_ITEMS) continue;
+            boolean exists = false;
+            for (ItemStack existing : pool) {
+                if (ItemStack.isSameItemSameComponents(existing, stack)) {
+                    exists = true;
+                    break;
+                }
+            }
+            if (!exists) pool.add(stack.copyWithCount(1));
+        }
+    }
+
+    private boolean resolvesToRealTable(ResourceLocation id) {
+        return level instanceof ServerLevel serverLevel && resolveLootTable(serverLevel, id) != LootTable.EMPTY;
+    }
+
+    private static LootTable resolveLootTable(ServerLevel serverLevel, ResourceLocation id) {
+        ResourceKey<LootTable> key = ResourceKey.create(Registries.LOOT_TABLE, id);
+        return serverLevel.getServer().reloadableRegistries().getLootTable(key);
+    }
+
+    public static void tick(Level level, BlockPos pos, BlockState state, LootGeneratorBlockEntity be) {
+        if (level.isClientSide) return;
+        be.processTick();
+    }
+
+    private void processTick() {
+        if (++ticksSinceStructureCheck >= STRUCTURE_RECHECK_INTERVAL) {
+            ticksSinceStructureCheck = 0;
+            checkStructure();
+        }
+        if (!formed) return;
+
+        if (pendingRoll.isEmpty()) {
+            if (progress != 0) {
+                progress = 0;
+                setChanged();
+                syncToClients();
+            }
+            return;
+        }
+
+        // Paused (not aborted) when short on Chaos or inventory space - resumes on its own once
+        // either frees up, rather than dropping loot on the ground or losing the roll.
+        if (chaosTank.getFluidAmount() < ITEM_COST || !canPlace(pendingRoll.get(0))) {
+            return;
+        }
+
+        progress++;
+        if (progress >= maxProgress) {
+            chaosTank.drain(ITEM_COST, IFluidHandler.FluidAction.EXECUTE);
+            placeStack(pendingRoll.remove(0));
+            progress = 0;
+        }
+        setChanged();
+        syncToClients();
+    }
+
+    private boolean canPlace(ItemStack stack) {
+        for (ItemStack existing : items) {
+            if (existing.isEmpty()) return true;
+            if (ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) return true;
+        }
+        return false;
+    }
+
+    private void placeStack(ItemStack stack) {
+        for (ItemStack existing : items) {
+            if (!existing.isEmpty() && ItemStack.isSameItemSameComponents(existing, stack)) {
+                int move = Math.min(existing.getMaxStackSize() - existing.getCount(), stack.getCount());
+                if (move > 0) {
+                    existing.grow(move);
+                    stack.shrink(move);
+                    if (stack.isEmpty()) return;
+                }
+            }
+        }
+        for (int i = 0; i < items.size(); i++) {
+            if (items.get(i).isEmpty()) {
+                items.set(i, stack);
+                return;
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Sync
+
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
+    // -------------------------------------------------------------------------
+    // Container (27-slot chest inventory; see ChronoProjectorBlockEntity for why both this and
+    // IItemHandler exist)
+
+    @Override public int getContainerSize() { return items.size(); }
+    @Override public boolean isEmpty() {
+        for (ItemStack stack : items) if (!stack.isEmpty()) return false;
+        return true;
+    }
+    @Override public ItemStack getItem(int slot) { return items.get(slot); }
+    @Override public ItemStack removeItem(int slot, int amount) {
+        ItemStack result = ContainerHelper.removeItem(items, slot, amount);
+        if (!result.isEmpty()) setChanged();
+        return result;
+    }
+    @Override public ItemStack removeItemNoUpdate(int slot) { return ContainerHelper.takeItem(items, slot); }
+    @Override public void setItem(int slot, ItemStack stack) {
+        items.set(slot, stack);
+        if (stack.getCount() > getMaxStackSize()) stack.setCount(getMaxStackSize());
+        setChanged();
+    }
+    @Override public boolean stillValid(Player player) { return Container.stillValidBlockEntity(this, player); }
+    @Override public void clearContent() { items.clear(); }
+
+    @Override
+    public Component getDisplayName() {
+        return Component.translatable("block.temporalindustries.loot_generator");
+    }
+
+    @Override
+    public AbstractContainerMenu createMenu(int id, @NotNull Inventory inventory, @NotNull Player player) {
+        return new LootGeneratorMenu(id, inventory, this);
+    }
+
+    @Override
+    protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
+        super.saveAdditional(tag, registries);
+        tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        ContainerHelper.saveAllItems(tag, items, registries);
+        if (selectedLootTable != null) tag.putString("SelectedLootTable", selectedLootTable.toString());
+        tag.putBoolean("SelectionValid", lastSelectionValid);
+        tag.putBoolean("Formed", formed);
+        tag.putInt("Progress", progress);
+
+        NonNullList<ItemStack> pendingList = NonNullList.withSize(pendingRoll.size(), ItemStack.EMPTY);
+        for (int i = 0; i < pendingRoll.size(); i++) pendingList.set(i, pendingRoll.get(i));
+        CompoundTag pendingTag = new CompoundTag();
+        ContainerHelper.saveAllItems(pendingTag, pendingList, registries);
+        pendingTag.putInt("Count", pendingList.size());
+        tag.put("PendingRoll", pendingTag);
+
+        NonNullList<ItemStack> possibleList = NonNullList.withSize(possibleItems.size(), ItemStack.EMPTY);
+        for (int i = 0; i < possibleItems.size(); i++) possibleList.set(i, possibleItems.get(i));
+        CompoundTag possibleTag = new CompoundTag();
+        ContainerHelper.saveAllItems(possibleTag, possibleList, registries);
+        possibleTag.putInt("Count", possibleList.size());
+        tag.put("PossibleItems", possibleTag);
+    }
+
+    @Override
+    protected void loadAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
+        super.loadAdditional(tag, registries);
+        if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        items.clear();
+        ContainerHelper.loadAllItems(tag, items, registries);
+        selectedLootTable = tag.contains("SelectedLootTable") ? ResourceLocation.tryParse(tag.getString("SelectedLootTable")) : null;
+        lastSelectionValid = tag.getBoolean("SelectionValid");
+        formed = tag.getBoolean("Formed");
+        progress = tag.getInt("Progress");
+
+        pendingRoll = new ArrayList<>();
+        if (tag.contains("PendingRoll")) {
+            CompoundTag pendingTag = tag.getCompound("PendingRoll");
+            NonNullList<ItemStack> pendingList = NonNullList.withSize(pendingTag.getInt("Count"), ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(pendingTag, pendingList, registries);
+            for (ItemStack stack : pendingList) {
+                if (!stack.isEmpty()) pendingRoll.add(stack);
+            }
+        }
+
+        possibleItems = new ArrayList<>();
+        if (tag.contains("PossibleItems")) {
+            CompoundTag possibleTag = tag.getCompound("PossibleItems");
+            NonNullList<ItemStack> possibleList = NonNullList.withSize(possibleTag.getInt("Count"), ItemStack.EMPTY);
+            ContainerHelper.loadAllItems(possibleTag, possibleList, registries);
+            for (ItemStack stack : possibleList) {
+                if (!stack.isEmpty()) possibleItems.add(stack);
+            }
+        }
+    }
+}
