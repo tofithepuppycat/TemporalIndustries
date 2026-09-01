@@ -6,11 +6,14 @@
       "type": "or",
       "predicates": [
         {
-          "type": "is_same_block"
+          "type": "match_state",
+          "block": "temporalindustries:machine_frame",
+          "properties": { "connected": "true" }
         },
         {
-          "type": "match_block",
-          "block": "temporalindustries:loot_generator"
+          "type": "match_state",
+          "block": "temporalindustries:loot_generator",
+          "properties": { "formed": "true" }
         }
       ]
     }

@@ -95,6 +95,9 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     private static final int MAX_SUGGESTIONS = 4;
     private static final int SUGGESTION_ROW_HEIGHT = 10;
+    // Wider than the panel itself (which cuts loot table ids off awkwardly) - overhangs the right
+    // edge since there's nothing else drawn out there to clash with.
+    private static final int SUGGESTIONS_WIDTH = 240;
 
     private EditBox lootTableField;
     private String lastSentText = "";
@@ -457,16 +460,16 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         int x = leftPos + FIELD_X;
         int y = topPos + FIELD_Y + FIELD_HEIGHT;
         int height = matches.size() * SUGGESTION_ROW_HEIGHT;
-        guiGraphics.fill(x, y, x + FIELD_WIDTH, y + height, 0xF0000000);
+        guiGraphics.fill(x, y, x + SUGGESTIONS_WIDTH, y + height, 0xF0000000);
 
         for (int i = 0; i < matches.size(); i++) {
             int rowY = y + i * SUGGESTION_ROW_HEIGHT;
-            boolean hovered = isOver(mouseX, mouseY, x, rowY, FIELD_WIDTH, SUGGESTION_ROW_HEIGHT);
+            boolean hovered = isOver(mouseX, mouseY, x, rowY, SUGGESTIONS_WIDTH, SUGGESTION_ROW_HEIGHT);
             boolean tabSelected = i == tabCycleIndex && tabCycleBase != null;
             if (hovered || tabSelected) {
-                guiGraphics.fill(x, rowY, x + FIELD_WIDTH, rowY + SUGGESTION_ROW_HEIGHT, 0xFF5555FF);
+                guiGraphics.fill(x, rowY, x + SUGGESTIONS_WIDTH, rowY + SUGGESTION_ROW_HEIGHT, 0xFF5555FF);
             }
-            guiGraphics.drawString(font, trimToWidth(matches.get(i), FIELD_WIDTH - 4), x + 2, rowY + 1, 0xFFFFFFFF, false);
+            guiGraphics.drawString(font, trimToWidth(matches.get(i), SUGGESTIONS_WIDTH - 4), x + 2, rowY + 1, 0xFFFFFFFF, false);
         }
     }
 
@@ -493,7 +496,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             int y = topPos + FIELD_Y + FIELD_HEIGHT;
             for (int i = 0; i < matches.size(); i++) {
                 int rowY = y + i * SUGGESTION_ROW_HEIGHT;
-                if (isOver((int) mouseX, (int) mouseY, x, rowY, FIELD_WIDTH, SUGGESTION_ROW_HEIGHT)) {
+                if (isOver((int) mouseX, (int) mouseY, x, rowY, SUGGESTIONS_WIDTH, SUGGESTION_ROW_HEIGHT)) {
                     applyingTabCompletion = true;
                     lootTableField.setValue(matches.get(i));
                     applyingTabCompletion = false;
