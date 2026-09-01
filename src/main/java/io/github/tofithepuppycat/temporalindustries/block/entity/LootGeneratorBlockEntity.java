@@ -54,7 +54,8 @@ import java.util.List;
  * Spends liquid Chaos to roll a player-chosen loot table (vanilla or modded) into its own
  * chest-sized inventory, one item at a time on a tick-driven progress bar - a fixed cost to start
  * the roll, plus a further cost per item actually placed. See {@link EntropyManipulatorBlockEntity}
- * for the ticked-consumption idiom this mirrors.
+ * for the ticked-consumption idiom this mirrors. A luck slider (0-{@link #MAX_LUCK}) feeds into the
+ * roll as the loot table's luck parameter for better results, at a Chaos surcharge on both costs.
  */
 @SuppressWarnings("null")
 public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -62,6 +63,13 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     public static final int ROLL_COST = 500;
     public static final int ITEM_COST = 50;
     public static final int PROCESS_TICKS = 40;
+
+    // Luck slider: 0 (default, no extra cost) up to MAX_LUCK, fed straight into the loot table roll
+    // as LootContextParams.LUCK so tables with quality-weighted pools/functions skew toward better
+    // results, at a Chaos surcharge that scales with how far the slider is pushed.
+    public static final int MAX_LUCK = 10;
+    public static final int LUCK_ROLL_COST = 100;
+    public static final int LUCK_ITEM_COST = 20;
 
     private static final int SLOT_COUNT = 27;
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
@@ -82,6 +90,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     @Nullable
     private ResourceLocation selectedLootTable;
     private boolean lastSelectionValid = false;
+    private int luck = 0;
     private List<ItemStack> pendingRoll = new ArrayList<>();
     // Sampled by re-rolling the table a handful of extra times when a roll starts, purely so the
     // client can spin through icons of things this table could plausibly produce (see
@@ -125,6 +134,28 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
 
     public boolean isSelectionValid() {
         return lastSelectionValid;
+    }
+
+    public int getLuck() {
+        return luck;
+    }
+
+    /** Clamps to [0, {@link #MAX_LUCK}] rather than trusting the client's slider position, since the
+     * packet that calls this comes straight from the GUI. */
+    public void setLuck(int luck) {
+        this.luck = Math.clamp(luck, 0, MAX_LUCK);
+        setChanged();
+        syncToClients();
+    }
+
+    /** Chaos needed to start a roll at the current luck setting. */
+    public int getRollCost() {
+        return ROLL_COST + luck * LUCK_ROLL_COST;
+    }
+
+    /** Chaos needed to place the next item at the current luck setting. */
+    public int getItemCost() {
+        return ITEM_COST + luck * LUCK_ITEM_COST;
     }
 
     public int getProgress() {
@@ -232,11 +263,13 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
             syncToClients();
             return;
         }
-        if (chaosTank.getFluidAmount() < ROLL_COST) return;
+        int rollCost = getRollCost();
+        if (chaosTank.getFluidAmount() < rollCost) return;
 
-        chaosTank.drain(ROLL_COST, IFluidHandler.FluidAction.EXECUTE);
+        chaosTank.drain(rollCost, IFluidHandler.FluidAction.EXECUTE);
         LootParams params = new LootParams.Builder(serverLevel)
                 .withParameter(LootContextParams.ORIGIN, Vec3.atCenterOf(worldPosition))
+                .withLuck(luck)
                 .create(LootContextParamSets.CHEST);
         List<ItemStack> firstRoll = table.getRandomItems(params);
         pendingRoll = new ArrayList<>(firstRoll);
@@ -311,13 +344,14 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
 
         // Paused (not aborted) when short on Chaos or inventory space - resumes on its own once
         // either frees up, rather than dropping loot on the ground or losing the roll.
-        if (chaosTank.getFluidAmount() < ITEM_COST || !canPlace(pendingRoll.get(0))) {
+        int itemCost = getItemCost();
+        if (chaosTank.getFluidAmount() < itemCost || !canPlace(pendingRoll.get(0))) {
             return;
         }
 
         progress++;
         if (progress >= maxProgress) {
-            chaosTank.drain(ITEM_COST, IFluidHandler.FluidAction.EXECUTE);
+            chaosTank.drain(itemCost, IFluidHandler.FluidAction.EXECUTE);
             placeStack(pendingRoll.remove(0));
             progress = 0;
         }
@@ -420,6 +454,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         tag.putBoolean("SelectionValid", lastSelectionValid);
         tag.putBoolean("Formed", formed);
         tag.putInt("Progress", progress);
+        tag.putInt("Luck", luck);
 
         NonNullList<ItemStack> pendingList = NonNullList.withSize(pendingRoll.size(), ItemStack.EMPTY);
         for (int i = 0; i < pendingRoll.size(); i++) pendingList.set(i, pendingRoll.get(i));
@@ -446,6 +481,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         lastSelectionValid = tag.getBoolean("SelectionValid");
         formed = tag.getBoolean("Formed");
         progress = tag.getInt("Progress");
+        luck = Math.clamp(tag.getInt("Luck"), 0, MAX_LUCK);
 
         pendingRoll = new ArrayList<>();
         if (tag.contains("PendingRoll")) {
