@@ -32,9 +32,10 @@ import java.util.Objects;
 
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
  * state) with a vertical Chaos tank bar riding alongside it, a luck slider, a roll-progress bar,
- * and centered play/stop and single/repeat icon buttons, stacked in that order in the header above
- * the chest slots - see {@code textures/gui/loot_generator.png} for the panel art (chest slots
- * start at 8,68; player inventory at 8,134; header controls at 8,8). */
+ * and play/stop and single/repeat icon buttons right-aligned next to the cosmetic roll-preview
+ * slot, stacked in that order in the header above the chest slots - see
+ * {@code textures/gui/loot_generator.png} for the panel art (chest slots start at 8,68; player
+ * inventory at 8,134; header controls at 8,8). */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -83,16 +84,17 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     private static final int ICON_SIZE = IconButtonRenderer.SIZE;
     private static final int BUTTONS_Y = PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT + 3;
-    private static final int PLAY_ICON_X = FIELD_X + (CONTENT_WIDTH - (ICON_SIZE * 2 + 2)) / 2;
-    private static final int PLAY_ICON_Y = BUTTONS_Y;
-    private static final int MODE_ICON_X = PLAY_ICON_X + ICON_SIZE + 2;
-    private static final int MODE_ICON_Y = BUTTONS_Y;
 
-    // Shares the buttons row and the panel's right edge (168), off to the side of the centered
-    // play/mode icons.
+    // Right-aligned on the buttons row, sitting directly beside the cosmetic roll-preview slot
+    // (rightmost) rather than centered in the row.
     private static final int ROLL_ICON_SIZE = 16;
     private static final int ROLL_ICON_X = FIELD_X + CONTENT_WIDTH - ROLL_ICON_SIZE;
     private static final int ROLL_ICON_Y = BUTTONS_Y;
+
+    private static final int MODE_ICON_X = ROLL_ICON_X - ICON_SIZE - 2;
+    private static final int MODE_ICON_Y = BUTTONS_Y;
+    private static final int PLAY_ICON_X = MODE_ICON_X - ICON_SIZE - 2;
+    private static final int PLAY_ICON_Y = BUTTONS_Y;
 
     // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
     // actually about to be placed instead of still cycling through the possible-items sample.
@@ -397,7 +399,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         if (display.isEmpty()) return;
 
         int x = leftPos + ROLL_ICON_X;
-        int y = topPos + ROLL_ICON_Y;
+        int y = topPos + ROLL_ICON_Y - 1;
         guiGraphics.renderItem(display, x, y);
     }
 
@@ -423,6 +425,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Component machineTitle = Component.translatable("block.temporalindustries.loot_generator");
         guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
+        guiGraphics.drawString(font, "Output", 8, 63, 0xFF3F3F3F, false);
         guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
 
