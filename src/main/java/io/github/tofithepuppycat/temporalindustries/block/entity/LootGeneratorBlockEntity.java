@@ -56,6 +56,9 @@ import java.util.List;
  * the roll, plus a further cost per item actually placed. See {@link EntropyManipulatorBlockEntity}
  * for the ticked-consumption idiom this mirrors. A luck slider (0-{@link #MAX_LUCK}) feeds into the
  * roll as the loot table's luck parameter for better results, at a Chaos surcharge on both costs.
+ * A play/stop toggle ({@link #beginGeneration()}/{@link #stopGeneration()}) starts and halts
+ * generation, and a single/repeat toggle ({@link #setRepeatMode}) picks whether one press produces
+ * one roll or keeps rolling for as long as Chaos holds out.
  */
 @SuppressWarnings("null")
 public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -91,6 +94,14 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     private ResourceLocation selectedLootTable;
     private boolean lastSelectionValid = false;
     private int luck = 0;
+    // Whether the GUI's play/stop icon shows "stop" - true from pressing play until either the
+    // player presses stop or (single-shot mode) the in-flight roll finishes placing everything.
+    private boolean running = false;
+    // false: one full roll (which may itself contain several items) per press of play, then stops.
+    // true: presses play once and keeps starting a fresh roll every time the previous one finishes,
+    // until stopped or Chaos runs out - resuming on its own once the tank refills, same as the
+    // existing mid-roll pause behavior.
+    private boolean repeatMode = false;
     private List<ItemStack> pendingRoll = new ArrayList<>();
     // Sampled by re-rolling the table a handful of extra times when a roll starts, purely so the
     // client can spin through icons of things this table could plausibly produce (see
@@ -156,6 +167,43 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     /** Chaos needed to place the next item at the current luck setting. */
     public int getItemCost() {
         return ITEM_COST + luck * LUCK_ITEM_COST;
+    }
+
+    /** Whether the GUI's play/stop icon should currently show "stop". */
+    public boolean isRunning() {
+        return running;
+    }
+
+    public boolean isRepeatMode() {
+        return repeatMode;
+    }
+
+    public void setRepeatMode(boolean repeatMode) {
+        this.repeatMode = repeatMode;
+        setChanged();
+        syncToClients();
+    }
+
+    /** Presses "play": no-ops if already running, otherwise marks the generator running and kicks
+     * off the first roll (which itself no-ops harmlessly if there isn't enough Chaos yet or the
+     * selection is invalid - {@link #processTick()} keeps retrying every tick while running). */
+    public void beginGeneration() {
+        if (running) return;
+        running = true;
+        setChanged();
+        syncToClients();
+        startRoll();
+    }
+
+    /** Presses "stop": halts immediately, discarding any roll that hasn't finished placing its items
+     * yet (the Chaos already spent to start that roll is not refunded). */
+    public void stopGeneration() {
+        if (!running && pendingRoll.isEmpty()) return;
+        running = false;
+        pendingRoll.clear();
+        progress = 0;
+        setChanged();
+        syncToClients();
     }
 
     public int getProgress() {
@@ -250,10 +298,12 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Drains {@link #ROLL_COST} and rolls the selected loot table, queuing the results to be placed
-     * one at a time by {@link #processTick()}. No-ops if a roll is already in progress, the selection
-     * doesn't resolve to a real loot table, or there isn't enough Chaos to start one. */
-    public void startRoll() {
+    /** Drains {@link #ROLL_COST} (plus luck surcharge) and rolls the selected loot table, queuing the
+     * results to be placed one at a time by {@link #processTick()}. No-ops if a roll is already in
+     * progress, the selection doesn't resolve to a real loot table, or there isn't enough Chaos to
+     * start one - called from {@link #beginGeneration()} and, in repeat mode, again by
+     * {@link #processTick()} every time the previous roll finishes. */
+    private void startRoll() {
         if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
 
         LootTable table = isChestLootTable(selectedLootTable) ? resolveLootTable(serverLevel, selectedLootTable) : LootTable.EMPTY;
@@ -338,6 +388,17 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
                 progress = 0;
                 setChanged();
                 syncToClients();
+            }
+            if (running) {
+                if (repeatMode) {
+                    // No-ops harmlessly (insufficient Chaos, invalid selection, ...) - just retried
+                    // again next tick, same as the mid-roll pause below.
+                    startRoll();
+                } else {
+                    running = false;
+                    setChanged();
+                    syncToClients();
+                }
             }
             return;
         }
@@ -455,6 +516,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         tag.putBoolean("Formed", formed);
         tag.putInt("Progress", progress);
         tag.putInt("Luck", luck);
+        tag.putBoolean("Running", running);
+        tag.putBoolean("RepeatMode", repeatMode);
 
         NonNullList<ItemStack> pendingList = NonNullList.withSize(pendingRoll.size(), ItemStack.EMPTY);
         for (int i = 0; i < pendingRoll.size(); i++) pendingList.set(i, pendingRoll.get(i));
@@ -482,6 +545,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         formed = tag.getBoolean("Formed");
         progress = tag.getInt("Progress");
         luck = Math.clamp(tag.getInt("Luck"), 0, MAX_LUCK);
+        running = tag.getBoolean("Running");
+        repeatMode = tag.getBoolean("RepeatMode");
 
         pendingRoll = new ArrayList<>();
         if (tag.contains("PendingRoll")) {
