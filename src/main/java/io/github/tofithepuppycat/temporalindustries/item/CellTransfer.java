@@ -58,8 +58,10 @@ public final class CellTransfer {
         return STEPS[index];
     }
 
-    /** Pours one dose into the clicked block's fluid handler, ORD first then CHS. Returns PASS when
-     * there is nothing to pour or nowhere to pour it, so the click falls through to the block. */
+    /** Pours one dose into the clicked block's fluid handler. Single-type cells always pour their
+     * own type; dual cells pour ORD, or CHS while sneaking, with no fallback to the other type.
+     * Returns PASS when there is nothing to pour or nowhere to pour it, so the click falls through
+     * to the block. */
     public static InteractionResult pourInto(UseOnContext context) {
         ItemStack stack = context.getItemInHand();
         Level level = context.getLevel();
@@ -70,8 +72,13 @@ public final class CellTransfer {
         IFluidHandler target = level.getCapability(Capabilities.FluidHandler.BLOCK, pos, context.getClickedFace());
         if (target == null) return InteractionResult.PASS;
 
+        boolean dual = receptacle.accepts(EntropyType.ORDER) && receptacle.accepts(EntropyType.CHAOS);
+        EntropyType[] typesToTry = dual
+                ? new EntropyType[]{player != null && player.isShiftKeyDown() ? EntropyType.CHAOS : EntropyType.ORDER}
+                : EntropyType.values();
+
         int dose = amount(stack);
-        for (EntropyType type : EntropyType.values()) {
+        for (EntropyType type : typesToTry) {
             int available = Math.min(dose, receptacle.amount(stack, type));
             if (available <= 0) continue;
 
