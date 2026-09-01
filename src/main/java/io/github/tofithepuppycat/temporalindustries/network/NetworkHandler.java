@@ -120,6 +120,11 @@ public class NetworkHandler {
                 LootGeneratorTriggerRollPacket::handle);
 
         registrar.playToServer(
+                LootGeneratorSetLuckPacket.TYPE,
+                LootGeneratorSetLuckPacket.STREAM_CODEC,
+                LootGeneratorSetLuckPacket::handle);
+
+        registrar.playToServer(
                 LootTableSuggestionsRequestPacket.TYPE,
                 LootTableSuggestionsRequestPacket.STREAM_CODEC,
                 LootTableSuggestionsRequestPacket::handle);

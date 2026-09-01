@@ -10,7 +10,10 @@ import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetTablePacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorTriggerRollPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootTableSuggestionsRequestPacket;
+import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorSetLuckPacket;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -59,6 +62,13 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int PROGRESS_BAR_WIDTH = 142;
     private static final int PROGRESS_BAR_HEIGHT = 6;
 
+    // Sits in the leftover header strip below the progress bar and left of the roll icon (which
+    // occupies x152-168 down to y63).
+    private static final int LUCK_SLIDER_X = 8;
+    private static final int LUCK_SLIDER_Y = 53;
+    private static final int LUCK_SLIDER_WIDTH = 144;
+    private static final int LUCK_SLIDER_HEIGHT = 12;
+
     // Icon sits right of the progress bar, sharing its right edge with the field/chaos-bar above
     // (leftPos + 168).
     private static final int ROLL_ICON_X = 152;
@@ -78,6 +88,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     private EditBox lootTableField;
     private String lastSentText = "";
+    private int lastSentLuck;
 
     // Tab-completion cycles through the matches for whatever text was in the field before the first
     // Tab press in a run, rather than re-filtering against its own output on every subsequent press.
@@ -119,7 +130,41 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
                 .bounds(leftPos + BUTTON_X, topPos + BUTTON_Y, BUTTON_WIDTH, BUTTON_HEIGHT)
                 .build());
 
+        lastSentLuck = menu.getLuck();
+        addRenderableWidget(new LuckSlider(leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y,
+                LUCK_SLIDER_WIDTH, LUCK_SLIDER_HEIGHT, menu.getLuck()));
+
         PacketDistributor.sendToServer(LootTableSuggestionsRequestPacket.INSTANCE);
+    }
+
+    /** Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}), fed into the loot
+     * roll as the vanilla loot-table luck parameter so quality-weighted pools/functions skew toward
+     * better results - at a Chaos surcharge that scales with the setting (see
+     * {@link LootGeneratorMenu#getRollCost()}/{@link LootGeneratorMenu#getItemCost()}). Only pushes a
+     * packet when the discrete luck level actually changes, not on every pixel of drag. */
+    private class LuckSlider extends AbstractSliderButton {
+        LuckSlider(int x, int y, int width, int height, int initialLuck) {
+            super(x, y, width, height, Component.empty(), initialLuck / (double) LootGeneratorBlockEntity.MAX_LUCK);
+            updateMessage();
+        }
+
+        private int luckFromValue() {
+            return (int) Math.round(value * LootGeneratorBlockEntity.MAX_LUCK);
+        }
+
+        @Override
+        protected void updateMessage() {
+            setMessage(Component.translatable("gui.temporalindustries.loot_generator.luck",
+                    luckFromValue(), LootGeneratorBlockEntity.MAX_LUCK));
+        }
+
+        @Override
+        protected void applyValue() {
+            int luck = luckFromValue();
+            if (luck == lastSentLuck) return;
+            lastSentLuck = luck;
+            PacketDistributor.sendToServer(new LootGeneratorSetLuckPacket(menu.getBlockPos(), luck));
+        }
     }
 
     private void resetTabCycle() {
@@ -305,6 +350,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
         if (isOver(mouseX, mouseY, leftPos + ROLL_ICON_X, topPos + ROLL_ICON_Y, ROLL_ICON_SIZE, ROLL_ICON_SIZE)) {
             renderRollIconTooltip(guiGraphics, mouseX, mouseY);
+        }
+        if (isOver(mouseX, mouseY, leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y, LUCK_SLIDER_WIDTH, LUCK_SLIDER_HEIGHT)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.loot_generator.luck_cost",
+                    menu.getRollCost(), menu.getItemCost()), mouseX, mouseY);
         }
     }
 
