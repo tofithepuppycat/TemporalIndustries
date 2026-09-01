@@ -11,7 +11,6 @@ import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.CuriosCapability;
 import top.theillusivec4.curios.api.SlotResult;
 import top.theillusivec4.curios.api.type.capability.ICurio;
-import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 /**
  * Isolates every reference to Curios' (optional, compileOnly) API for the "cell" curio slot —
@@ -44,23 +43,5 @@ public final class CuriosCellCompat {
                     return null;
                 })
                 .orElse(null);
-    }
-
-    /** Equips a copy of stack into the first empty "cell" curio slot, if there is one. Does not
-     * touch the source stack - callers are responsible for shrinking/clearing it on success. */
-    public static boolean equipInEmptySlot(Player player, ItemStack stack) {
-        return CuriosApi.getCuriosInventory(player)
-                .flatMap(inventory -> inventory.getStacksHandler("cell"))
-                .map(stacksHandler -> {
-                    IDynamicStackHandler stacks = stacksHandler.getStacks();
-                    for (int i = 0; i < stacks.getSlots(); i++) {
-                        if (stacks.getStackInSlot(i).isEmpty()) {
-                            stacks.setStackInSlot(i, stack.copy());
-                            return true;
-                        }
-                    }
-                    return false;
-                })
-                .orElse(false);
     }
 }

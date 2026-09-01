@@ -1,23 +1,17 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
 import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
-import net.minecraft.world.InteractionResultHolder;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.item.context.UseOnContext;
-import net.minecraft.world.level.Level;
-import net.neoforged.fml.ModList;
 
 import java.util.List;
 
@@ -82,18 +76,6 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
         return CellTransfer.pourInto(context);
-    }
-
-    /** Right-clicking air equips this cell into an empty Cell curio slot, if Curios is loaded and
-     * there's room - a shortcut for what would otherwise be a shift-click in the Curios UI. */
-    @Override
-    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
-        ItemStack stack = player.getItemInHand(hand);
-        if (!level.isClientSide && ModList.get().isLoaded("curios") && CuriosCellCompat.equipInEmptySlot(player, stack)) {
-            stack.shrink(1);
-            return InteractionResultHolder.success(stack);
-        }
-        return InteractionResultHolder.pass(stack);
     }
 
     public static BottleContents getContents(ItemStack stack) {
