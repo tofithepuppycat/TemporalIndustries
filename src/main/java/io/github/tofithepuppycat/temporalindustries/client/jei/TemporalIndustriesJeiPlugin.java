@@ -70,7 +70,7 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
         List<RecipeHolder<EntropyManipulatorRecipe>> recipes =
                 level.getRecipeManager().getAllRecipesFor(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
         registration.addRecipes(ENTROPY_MANIPULATOR_RECIPE_TYPE.get(), recipes);
-        registration.addRecipes(ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE, buildChains(recipes));
+        registration.addRecipes(ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE, buildChains(recipes, level.registryAccess()));
     }
 
     /**
@@ -80,7 +80,8 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
      * one chaos-typed and one order-typed edge), so a leaf-to-leaf walk following unvisited
      * neighbors is sufficient; it isn't a general graph solver.
      */
-    private static List<EntropyManipulatorChain> buildChains(List<RecipeHolder<EntropyManipulatorRecipe>> recipes) {
+    private static List<EntropyManipulatorChain> buildChains(
+            List<RecipeHolder<EntropyManipulatorRecipe>> recipes, net.minecraft.core.HolderLookup.Provider registries) {
         record TypedCost(EntropyType type, int cost) {
         }
 
@@ -90,16 +91,18 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
 
         for (RecipeHolder<EntropyManipulatorRecipe> holder : recipes) {
             EntropyManipulatorRecipe recipe = holder.value();
-            // A tag-result recipe rolls one of several possible outputs, so it has no single "to"
-            // item to draw an edge to; it stays visible only in the single-step category instead.
-            if (recipe.isFluidRecipe() || recipe.isTagResult()) continue;
+            if (recipe.isFluidRecipe()) continue;
             java.util.Optional<Ingredient> inputOpt = recipe.inputItemOpt();
             if (inputOpt.isEmpty()) continue;
             ItemStack[] matching = inputOpt.get().getItems();
             if (matching.length == 0) continue;
 
             Item from = matching[0].getItem();
-            Item to = recipe.resultOpt().orElseThrow().getItem();
+            // A tag-result recipe rolls one of several possible outputs; use the same
+            // "first matching item" representative that tag-input edges already use above.
+            ItemStack resultStack = recipe.getResultItem(registries);
+            if (resultStack.isEmpty()) continue;
+            Item to = resultStack.getItem();
             if (from == to) continue;
 
             directed.computeIfAbsent(from, k -> new LinkedHashMap<>()).put(to, new TypedCost(recipe.entropyType(), recipe.entropyCost()));
