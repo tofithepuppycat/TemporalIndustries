@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "minecraft:glass_bottle" },
+    { "item": "minecraft:gunpowder" },
+    { "item": "minecraft:gunpowder" }
+  ],
+  "result": { "id": "temporalindustries:chaos_cell", "count": 1 }
+}

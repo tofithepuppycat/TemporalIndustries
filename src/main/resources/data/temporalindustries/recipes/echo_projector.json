@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "EGE",
+    "GJG",
+    "EAE"
+  ],
+  "key": {
+    "E": { "item": "minecraft:echo_shard" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "J": { "item": "minecraft:jukebox" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "id": "temporalindustries:echo_projector", "count": 1 }
+}
