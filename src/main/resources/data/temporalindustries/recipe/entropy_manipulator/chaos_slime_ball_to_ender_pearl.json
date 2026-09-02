@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:slime_ball"
+  },
+  "result": {
+    "id": "minecraft:ender_pearl",
+    "count": 1
+  }
+}

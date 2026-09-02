@@ -117,6 +117,7 @@
 	"block.temporalindustries.crude_entropy_condenser.tooltip": "Unpowered lower tier of the Entropy Condenser.\nSlowly drains an Order/Chaos Cell in its\ninput slot into liquid Order/Chaos.",
 	"block.temporalindustries.entropy_manipulator": "Entropy Manipulator",
 	"block.temporalindustries.entropy_manipulator.tooltip": "Transmutes items into the next item in a given entropy chain.",
+	"jei.temporalindustries.entropy_manipulator_chain": "Entropy Chain",
 	"block.temporalindustries.loot_generator": "Loot Generator",
 	"block.temporalindustries.loot_generator.tooltip": "Spends liquid Chaos to roll a chosen loot table\n(vanilla or modded) into its own chest-sized inventory.\nRequires a Basic Machine Frame structure to function.",
 	"block.temporalindustries.loot_generator.missing_frame": "Missing %s Basic Machine Frame block(s)",
