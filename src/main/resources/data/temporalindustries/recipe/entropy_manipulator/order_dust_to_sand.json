@@ -2,7 +2,7 @@
   "type": "temporalindustries:entropy_manipulator",
   "entropy_type": "order",
   "input_item": {
-    "item": "minecraft:redstone"
+    "tag": "c:dusts"
   },
   "result": {
     "id": "minecraft:sand",
