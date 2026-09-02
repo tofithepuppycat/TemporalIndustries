@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "EGE",
+    "GCG",
+    "EAE"
+  ],
+  "key": {
+    "E": { "item": "minecraft:echo_shard" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "C": { "item": "temporalindustries:chronodial" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "id": "temporalindustries:chronovault", "count": 1 }
+}

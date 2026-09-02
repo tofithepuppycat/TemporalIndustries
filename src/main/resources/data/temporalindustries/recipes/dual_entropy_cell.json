@@ -1,0 +1,9 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "temporalindustries:order_cell" },
+    { "item": "temporalindustries:chaos_cell" },
+    { "item": "minecraft:gold_nugget" }
+  ],
+  "result": { "id": "temporalindustries:dual_entropy_cell", "count": 1 }
+}

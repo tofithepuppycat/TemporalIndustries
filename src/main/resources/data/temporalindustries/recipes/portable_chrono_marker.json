@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GDG",
+    "DCD",
+    "GAG"
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "D": { "item": "minecraft:deepslate" },
+    "C": { "item": "minecraft:clock" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "id": "temporalindustries:portable_chrono_marker", "count": 1 }
+}
