@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.device;
 
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -11,6 +12,8 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.neoforged.fml.ModList;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A full capture of a player's state (position, vitals, inventory) taken the moment a
@@ -33,11 +36,14 @@ public class PlayerSnapshot {
     private final int totalXp;
     private final ListTag effects;
     private final ListTag inventory;
+    @Nullable
+    private final ListTag curiosInventory;
     private final long gameTime;
 
     public PlayerSnapshot(double x, double y, double z, float yRot, float xRot, ResourceLocation dimension,
             float health, int foodLevel, float saturation, float exhaustion,
-            int xpLevel, float xpProgress, int totalXp, ListTag effects, ListTag inventory, long gameTime) {
+            int xpLevel, float xpProgress, int totalXp, ListTag effects, ListTag inventory,
+            @Nullable ListTag curiosInventory, long gameTime) {
         this.x = x;
         this.y = y;
         this.z = z;
@@ -53,6 +59,7 @@ public class PlayerSnapshot {
         this.totalXp = totalXp;
         this.effects = effects;
         this.inventory = inventory;
+        this.curiosInventory = curiosInventory;
         this.gameTime = gameTime;
     }
 
@@ -66,6 +73,8 @@ public class PlayerSnapshot {
             effects.add(effect.save());
         }
 
+        ListTag curiosInventory = ModList.get().isLoaded("curios") ? CuriosCompat.saveCurios(player) : null;
+
         return new PlayerSnapshot(
                 player.getX(), player.getY(), player.getZ(), player.getYRot(), player.getXRot(),
                 player.level().dimension().location(),
@@ -74,6 +83,7 @@ public class PlayerSnapshot {
                 player.experienceLevel, player.experienceProgress, player.totalExperience,
                 effects,
                 player.getInventory().save(new ListTag()),
+                curiosInventory,
                 player.level().getGameTime());
     }
 
@@ -112,6 +122,9 @@ public class PlayerSnapshot {
         if (restoreInventory) {
             player.getInventory().clearContent();
             player.getInventory().load(inventory);
+            if (curiosInventory != null && ModList.get().isLoaded("curios")) {
+                CuriosCompat.loadCurios(player, curiosInventory);
+            }
         }
     }
 
@@ -132,6 +145,9 @@ public class PlayerSnapshot {
         tag.putInt("TotalXp", totalXp);
         tag.put("Effects", effects);
         tag.put("Inventory", inventory);
+        if (curiosInventory != null) {
+            tag.put("CuriosInventory", curiosInventory);
+        }
         tag.putLong("GameTime", gameTime);
         return tag;
     }
@@ -146,6 +162,7 @@ public class PlayerSnapshot {
                 tag.getInt("XpLevel"), tag.getFloat("XpProgress"), tag.getInt("TotalXp"),
                 tag.getList("Effects", Tag.TAG_COMPOUND),
                 tag.getList("Inventory", Tag.TAG_COMPOUND),
+                tag.contains("CuriosInventory") ? tag.getList("CuriosInventory", Tag.TAG_COMPOUND) : null,
                 tag.getLong("GameTime"));
     }
 
