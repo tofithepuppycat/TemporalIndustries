@@ -214,18 +214,19 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         var recipeType = Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
 
         ItemStack input = items.get(INPUT_SLOT);
-        if (!input.isEmpty()) {
-            EntropyManipulatorRecipe.Input recipeInput = new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY);
-            return recipeManager.getRecipeFor(recipeType, recipeInput, level)
-                    .map(RecipeHolder::value)
-                    .filter(this::canProcess)
-                    .orElse(null);
-        }
+        EntropyManipulatorRecipe.Input recipeInput = !input.isEmpty()
+                ? new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY)
+                : new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
 
-        EntropyManipulatorRecipe.Input recipeInput = new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
-        return recipeManager.getRecipeFor(recipeType, recipeInput, level)
+        // Chains pair a chaos recipe and an order recipe on the same input item (e.g. cobblestone
+        // ferments to gravel via chaos, or reverts to stone via order), so matches() alone (which
+        // only tests the item) is ambiguous between them. Resolve the ambiguity here by picking
+        // whichever candidate the manipulator actually has the entropy fluid to run.
+        return recipeManager.getAllRecipesFor(recipeType).stream()
                 .map(RecipeHolder::value)
+                .filter(recipe -> recipe.matches(recipeInput, level))
                 .filter(this::canProcess)
+                .findFirst()
                 .orElse(null);
     }
 
