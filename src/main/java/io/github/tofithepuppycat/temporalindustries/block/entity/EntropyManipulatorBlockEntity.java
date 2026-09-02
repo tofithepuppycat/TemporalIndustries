@@ -231,12 +231,17 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     }
 
     private boolean canProcess(EntropyManipulatorRecipe recipe) {
-        return canOutput(recipe.getResultItem(level.registryAccess()).getItem()) && hasEntropy(recipe.entropyType(), recipe.entropyCost());
+        return canOutput(recipe) && hasEntropy(recipe.entropyType(), recipe.entropyCost());
     }
 
-    private boolean canOutput(Item output) {
+    private boolean canOutput(EntropyManipulatorRecipe recipe) {
         ItemStack current = items.get(OUTPUT_SLOT);
-        return current.isEmpty() || (current.getItem() == output && current.getCount() < current.getMaxStackSize());
+        if (current.isEmpty()) return true;
+        // A tag-result recipe rolls a random item on completion, which can't be predicted ahead of
+        // time to check it'll stack with what's already there, so only let it start into an empty slot.
+        if (recipe.isTagResult()) return false;
+        Item output = recipe.getResultItem(level.registryAccess()).getItem();
+        return current.getItem() == output && current.getCount() < current.getMaxStackSize();
     }
 
     private boolean hasEntropy(EntropyType type, int cost) {
@@ -255,7 +260,7 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
             items.get(INPUT_SLOT).shrink(1);
         }
 
-        ItemStack result = active.getResultItem(level.registryAccess());
+        ItemStack result = active.rollResult(level.registryAccess(), level.random);
         ItemStack output = items.get(OUTPUT_SLOT);
         if (output.isEmpty()) {
             items.set(OUTPUT_SLOT, result.copy());

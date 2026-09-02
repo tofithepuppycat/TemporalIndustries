@@ -90,14 +90,16 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
 
         for (RecipeHolder<EntropyManipulatorRecipe> holder : recipes) {
             EntropyManipulatorRecipe recipe = holder.value();
-            if (recipe.isFluidRecipe()) continue;
+            // A tag-result recipe rolls one of several possible outputs, so it has no single "to"
+            // item to draw an edge to; it stays visible only in the single-step category instead.
+            if (recipe.isFluidRecipe() || recipe.isTagResult()) continue;
             java.util.Optional<Ingredient> inputOpt = recipe.inputItemOpt();
             if (inputOpt.isEmpty()) continue;
             ItemStack[] matching = inputOpt.get().getItems();
             if (matching.length == 0) continue;
 
             Item from = matching[0].getItem();
-            Item to = recipe.result().getItem();
+            Item to = recipe.resultOpt().orElseThrow().getItem();
             if (from == to) continue;
 
             directed.computeIfAbsent(from, k -> new LinkedHashMap<>()).put(to, new TypedCost(recipe.entropyType(), recipe.entropyCost()));

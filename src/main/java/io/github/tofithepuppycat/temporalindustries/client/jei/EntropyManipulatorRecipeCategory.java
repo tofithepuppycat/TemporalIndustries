@@ -86,9 +86,13 @@ public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeH
             recipe.inputItemOpt().ifPresent(inputSlot::addIngredients);
         }
 
-        builder.addSlot(RecipeIngredientRole.OUTPUT, OUTPUT_X + 1, OUTPUT_Y + 1)
-                .setStandardSlotBackground()
-                .addItemStack(recipe.result());
+        IRecipeSlotBuilder outputSlot = builder.addSlot(RecipeIngredientRole.OUTPUT, OUTPUT_X + 1, OUTPUT_Y + 1)
+                .setStandardSlotBackground();
+        if (recipe.isTagResult()) {
+            outputSlot.addItemStacks(recipe.possibleResults(Minecraft.getInstance().level.registryAccess()));
+        } else {
+            recipe.resultOpt().ifPresent(outputSlot::addItemStack);
+        }
 
         Fluid entropyFluid = recipe.entropyType() == EntropyType.CHAOS
                 ? Registration.CHAOS_FLUID.get()
