@@ -1,10 +1,12 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
-import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.DeltaTracker;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
@@ -12,20 +14,22 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.LayeredDraw;
 import net.minecraft.client.gui.screens.inventory.tooltip.TooltipRenderUtil;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.entity.EquipmentSlot;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.phys.BlockHitResult;
 import net.minecraft.world.phys.HitResult;
 import net.neoforged.fml.ModList;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /** Draws the block the player is looking at's entropy info to the right of the crosshair, on a
- * vanilla tooltip-style background, while Entropy Glasses are worn in the helmet slot -- or, if
- * Curios is installed, its head slot (see CuriosCompat). See EntropyInfoProvider for which block
- * entities report info. */
+ * vanilla tooltip-style background, while Entropy Glasses are worn -- Curios' head slot is the only
+ * way to wear them (see CuriosCompat). Sneaking also draws the equipped cells' Order/Chaos fill
+ * levels to the left of the crosshair (see CuriosCellCompat). See EntropyInfoProvider for which
+ * block entities report info. */
 public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
@@ -47,6 +51,14 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         Player player = minecraft.player;
         if (player == null || !isWearingEntropyGlasses(player)) return;
 
+        if (player.isCrouching()) {
+            renderCellStatus(guiGraphics, minecraft.font, player);
+        }
+
+        renderBlockInfo(guiGraphics, minecraft);
+    }
+
+    private void renderBlockInfo(GuiGraphics guiGraphics, Minecraft minecraft) {
         Level level = minecraft.level;
         if (level == null || !(minecraft.hitResult instanceof BlockHitResult blockHit) || blockHit.getType() != HitResult.Type.BLOCK) return;
 
@@ -95,8 +107,48 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     }
 
     private static boolean isWearingEntropyGlasses(Player player) {
-        if (player.getItemBySlot(EquipmentSlot.HEAD).is(Registration.ENTROPY_GLASSES_ITEM.get())) return true;
         return ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player);
+    }
+
+    /** Panel of the cells equipped in Curios' "cell" slots' Order/Chaos fill levels, drawn to the
+     * left of the crosshair (mirroring {@link #renderBlockInfo}) while the player is sneaking. */
+    private static void renderCellStatus(GuiGraphics guiGraphics, Font font, Player player) {
+        if (!ModList.get().isLoaded("curios")) return;
+
+        List<Component> lines = cellStatusLines(CuriosCellCompat.cellsInCurioSlots(player));
+        if (lines.isEmpty()) return;
+
+        int contentWidth = 0;
+        for (Component line : lines) contentWidth = Math.max(contentWidth, font.width(line));
+        int contentHeight = lines.size() * (font.lineHeight + LINE_GAP) - LINE_GAP;
+
+        int right = guiGraphics.guiWidth() / 2 - CROSSHAIR_GAP;
+        int left = right - contentWidth;
+        int top = guiGraphics.guiHeight() / 2 - contentHeight / 2;
+
+        TooltipRenderUtil.renderTooltipBackground(guiGraphics, left, top, contentWidth, contentHeight, 0);
+
+        int y = top;
+        for (Component line : lines) {
+            y = drawLine(guiGraphics, font, line, left, y);
+        }
+    }
+
+    private static List<Component> cellStatusLines(List<ItemStack> cells) {
+        List<Component> lines = new ArrayList<>();
+        for (ItemStack stack : cells) {
+            if (!(stack.getItem() instanceof EntropyReceptacle receptacle)) continue;
+
+            lines.add(stack.getHoverName().copy().withStyle(ChatFormatting.WHITE));
+            for (EntropyType type : EntropyType.values()) {
+                if (!receptacle.accepts(type)) continue;
+                ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
+                lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+                                EntropyDisplay.formatFluid(receptacle.amount(stack, type)), EntropyDisplay.formatFluid(receptacle.capacity(type)))
+                        .withStyle(color).append(EntropyDisplay.unit(type)));
+            }
+        }
+        return lines;
     }
 
     private static int drawLine(GuiGraphics guiGraphics, Font font, Component line, int x, int y) {

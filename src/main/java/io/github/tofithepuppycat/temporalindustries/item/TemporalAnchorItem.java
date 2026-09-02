@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.device.PlayerSnapshot;
@@ -21,6 +22,7 @@ import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 import net.minecraft.world.level.Level;
+import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
@@ -109,8 +111,9 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         return drained;
     }
 
-    /** First Temporal Anchor stack (main inventory or offhand) carrying enough order to pay for
-     * its own mode's cost, or null if none qualifies — the anchor that pays for a death rewind. */
+    /** First Temporal Anchor stack (main inventory, offhand, or Curios charm slot) carrying enough
+     * order to pay for its own mode's cost, or null if none qualifies — the anchor that pays for a
+     * death rewind. */
     @Nullable
     public static ItemStack findChargedAnchor(Player player) {
         for (ItemStack stack : player.getInventory().items) {
@@ -118,6 +121,10 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         }
         ItemStack offhand = player.getOffhandItem();
         if (isCharged(offhand)) return offhand;
+        if (ModList.get().isLoaded("curios")) {
+            ItemStack curioAnchor = CuriosCompat.findEquippedTemporalAnchor(player);
+            if (curioAnchor != null && isCharged(curioAnchor)) return curioAnchor;
+        }
         return null;
     }
 

@@ -56,15 +56,11 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
-import net.minecraft.sounds.SoundEvents;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.item.Rarity;
-import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.RecipeSerializer;
 import net.minecraft.world.item.crafting.RecipeType;
 import net.neoforged.fml.common.asm.enumextension.EnumProxy;
@@ -88,9 +84,6 @@ import net.neoforged.neoforge.registries.DeferredItem;
 import net.neoforged.neoforge.registries.DeferredRegister;
 import net.neoforged.neoforge.registries.NeoForgeRegistries;
 
-import java.util.List;
-import java.util.Map;
-
 @SuppressWarnings("null")
 public class Registration {
 
@@ -108,7 +101,6 @@ public class Registration {
     public static final DeferredRegister<FluidType> FLUID_TYPES = DeferredRegister.create(NeoForgeRegistries.Keys.FLUID_TYPES, MODID);
     public static final DeferredRegister<Fluid> FLUIDS = DeferredRegister.create(Registries.FLUID, MODID);
     public static final DeferredRegister<CreativeModeTab> CREATIVE_MODE_TABS = DeferredRegister.create(Registries.CREATIVE_MODE_TAB, MODID);
-    public static final DeferredRegister<ArmorMaterial> ARMOR_MATERIALS = DeferredRegister.create(Registries.ARMOR_MATERIAL, MODID);
     public static final DeferredRegister<RecipeType<?>> RECIPE_TYPES = DeferredRegister.create(Registries.RECIPE_TYPE, MODID);
     public static final DeferredRegister<RecipeSerializer<?>> RECIPE_SERIALIZERS = DeferredRegister.create(Registries.RECIPE_SERIALIZER, MODID);
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
@@ -142,17 +134,11 @@ public class Registration {
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
 
-    // --- Entropy Glasses: no defense, lets the wearer see EntropyInfoProvider block entities' state ---
-
-    public static final DeferredHolder<ArmorMaterial, ArmorMaterial> ENTROPY_GLASSES_MATERIAL = ARMOR_MATERIALS.register("entropy_glasses",
-            () -> new ArmorMaterial(Map.of(ArmorItem.Type.HELMET, 0), 9, SoundEvents.ARMOR_EQUIP_LEATHER,
-                    () -> Ingredient.of(net.minecraft.world.item.Items.GLASS),
-                    List.of(new ArmorMaterial.Layer(ResourceLocation.fromNamespaceAndPath(MODID, "entropy_glasses"))),
-                    0.0F, 0.0F));
+    // --- Entropy Glasses: no defense, lets the wearer see EntropyInfoProvider block entities' state.
+    // Not wearable as vanilla armor - only in Curios' head slot (see compat/curios/CuriosCompat). ---
 
     public static final DeferredItem<Item> ENTROPY_GLASSES_ITEM = ITEMS.register("entropy_glasses",
-            () -> new EntropyGlassesItem(ENTROPY_GLASSES_MATERIAL, ArmorItem.Type.HELMET,
-                    new Item.Properties().stacksTo(1)));
+            () -> new EntropyGlassesItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredBlock<Chronodial> CHRONODIAL_BLOCK = BLOCKS.register("chronodial",
             () -> new Chronodial(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.5F, 6.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops()));
@@ -404,7 +390,6 @@ public class Registration {
         FLUID_TYPES.register(modEventBus);
         FLUIDS.register(modEventBus);
         CREATIVE_MODE_TABS.register(modEventBus);
-        ARMOR_MATERIALS.register(modEventBus);
         RECIPE_TYPES.register(modEventBus);
         RECIPE_SERIALIZERS.register(modEventBus);
         SOUND_EVENTS.register(modEventBus);
