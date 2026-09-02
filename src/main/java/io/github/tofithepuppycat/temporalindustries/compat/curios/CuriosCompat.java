@@ -20,10 +20,12 @@ import top.theillusivec4.curios.api.type.capability.ICurio;
 public final class CuriosCompat {
     private CuriosCompat() {}
 
-    /** Lets Curios accept the Entropy Glasses in its "head" slot (declared in
-     * data/curios/tags/item/head.json) and the Temporal Anchor in its "charm" slot (declared in
-     * data/curios/tags/item/charm.json) — neither item is vanilla armor, so without this Curios has
-     * no way to know they're wearable curios at all. */
+    /** Lets Curios accept the Entropy Glasses in its "head" slot (an external slot other mods
+     * provide - opportunistically tagged via data/curios/tags/item/head.json) and the Temporal
+     * Anchor in the "charm" slot this mod declares itself (see
+     * data/temporalindustries/curios/slots/charm.json and its player.json entry, mirroring the
+     * "cell" slot in {@link CuriosCellCompat}) — neither item is vanilla armor, so without this
+     * Curios has no way to know they're wearable curios at all. */
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerItem(CuriosCapability.ITEM, (stack, ctx) -> (ICurio) () -> stack,
                 Registration.ENTROPY_GLASSES_ITEM.get(), Registration.TEMPORAL_ANCHOR_ITEM.get());
