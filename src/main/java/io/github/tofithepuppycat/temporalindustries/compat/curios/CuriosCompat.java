@@ -2,7 +2,13 @@ package io.github.tofithepuppycat.temporalindustries.compat.curios;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
+import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
+import org.jetbrains.annotations.Nullable;
 import top.theillusivec4.curios.api.CuriosApi;
+import top.theillusivec4.curios.api.CuriosCapability;
+import top.theillusivec4.curios.api.SlotResult;
+import top.theillusivec4.curios.api.type.capability.ICurio;
 
 /**
  * Isolates every reference to Curios' (optional, compileOnly) API in one class, so that class is
@@ -14,9 +20,30 @@ import top.theillusivec4.curios.api.CuriosApi;
 public final class CuriosCompat {
     private CuriosCompat() {}
 
+    /** Lets Curios accept the Entropy Glasses in its "head" slot (declared in
+     * data/curios/tags/item/head.json) and the Temporal Anchor in its "charm" slot (declared in
+     * data/curios/tags/item/charm.json) — neither item is vanilla armor, so without this Curios has
+     * no way to know they're wearable curios at all. */
+    public static void registerCapabilities(RegisterCapabilitiesEvent event) {
+        event.registerItem(CuriosCapability.ITEM, (stack, ctx) -> (ICurio) () -> stack,
+                Registration.ENTROPY_GLASSES_ITEM.get(), Registration.TEMPORAL_ANCHOR_ITEM.get());
+    }
+
     public static boolean isWearingEntropyGlasses(Player player) {
         return CuriosApi.getCuriosInventory(player)
                 .map(inventory -> inventory.isEquipped(Registration.ENTROPY_GLASSES_ITEM.get()))
                 .orElse(false);
+    }
+
+    /** Temporal Anchor equipped in a Curios charm slot, or null - so calibration payment
+     * ({@link io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem#findChargedAnchor})
+     * and passive order charging ({@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService})
+     * see it the same as one carried in the main inventory or offhand. */
+    @Nullable
+    public static ItemStack findEquippedTemporalAnchor(Player player) {
+        return CuriosApi.getCuriosInventory(player)
+                .flatMap(inventory -> inventory.findFirstCurio(Registration.TEMPORAL_ANCHOR_ITEM.get()))
+                .map(SlotResult::stack)
+                .orElse(null);
     }
 }

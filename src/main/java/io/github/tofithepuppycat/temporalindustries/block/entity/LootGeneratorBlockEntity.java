@@ -304,11 +304,33 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
 
     @Override
     public List<Component> getEntropyTooltip() {
-        return List.of(
-                getDisplayName().copy().withStyle(ChatFormatting.WHITE),
-                Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
+        List<Component> lines = new ArrayList<>();
+        lines.add(getDisplayName().copy().withStyle(ChatFormatting.WHITE));
+        lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
                         EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(chaosTank.getCapacity()))
-                        .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
+                .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
+
+        if (selectedLootTable == null) {
+            lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.loot_generator.no_table")
+                    .withStyle(ChatFormatting.GRAY));
+        } else {
+            String key = lastSelectionValid
+                    ? "overlay.temporalindustries.entropy_glasses.loot_generator.table"
+                    : "overlay.temporalindustries.entropy_glasses.loot_generator.invalid_table";
+            ChatFormatting color = lastSelectionValid ? ChatFormatting.GRAY : ChatFormatting.RED;
+            lines.add(Component.translatable(key, selectedLootTable.toString()).withStyle(color));
+        }
+
+        if (luck > 0) {
+            lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.loot_generator.luck", luck, MAX_LUCK)
+                    .withStyle(ChatFormatting.GRAY));
+        }
+
+        lines.add(running
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.loot_generator.running").withStyle(ChatFormatting.YELLOW)
+                : Component.translatable("overlay.temporalindustries.entropy_glasses.loot_generator.stopped").withStyle(ChatFormatting.GRAY));
+
+        return lines;
     }
 
     /** Sets the selected loot table id (or clears it, if {@code id} is null) and re-validates it
