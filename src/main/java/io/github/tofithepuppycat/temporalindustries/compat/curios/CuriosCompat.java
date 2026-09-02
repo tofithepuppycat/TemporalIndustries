@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.compat.curios;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import net.minecraft.nbt.ListTag;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.capabilities.RegisterCapabilitiesEvent;
@@ -48,5 +49,21 @@ public final class CuriosCompat {
                 .flatMap(inventory -> inventory.findFirstCurio(Registration.TEMPORAL_ANCHOR_ITEM.get()))
                 .map(SlotResult::stack)
                 .orElse(null);
+    }
+
+    /** Snapshot of every curio slot's contents, for {@link
+     * io.github.tofithepuppycat.temporalindustries.device.PlayerSnapshot} to restore on a Temporal
+     * Anchor rewind — without this, a second anchor equipped in a curio slot after calibration
+     * would survive a "Rewind All" untouched, letting a player duplicate Temporal Anchors instead
+     * of losing them like the rest of their inventory does. */
+    @Nullable
+    public static ListTag saveCurios(Player player) {
+        return CuriosApi.getCuriosInventory(player)
+                .map(inventory -> inventory.saveInventory(false))
+                .orElse(null);
+    }
+
+    public static void loadCurios(Player player, ListTag data) {
+        CuriosApi.getCuriosInventory(player).ifPresent(inventory -> inventory.loadInventory(data));
     }
 }

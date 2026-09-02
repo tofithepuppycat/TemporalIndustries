@@ -158,6 +158,9 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context,
                                 List<Component> tooltip, TooltipFlag flag) {
+        tooltip.add(Component.translatable("item.temporalindustries.temporal_anchor.quote")
+                .withStyle(ChatFormatting.ITALIC, ChatFormatting.GRAY));
+
         tooltip.add(Component.translatable("item.temporalindustries.temporal_anchor.order",
                         EntropyDisplay.formatFluid(getOrder(stack)), EntropyDisplay.formatFluid(MAX_ORDER_MB))
                 .withStyle(ChatFormatting.WHITE)
