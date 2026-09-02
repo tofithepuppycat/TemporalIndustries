@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "AGA",
+    "PGP"
+  ],
+  "key": {
+    "A": { "item": "minecraft:amethyst_shard" },
+    "G": { "item": "minecraft:gold_nugget" },
+    "P": { "item": "minecraft:glass_pane" }
+  },
+  "result": { "id": "temporalindustries:entropy_glasses", "count": 1 }
+}

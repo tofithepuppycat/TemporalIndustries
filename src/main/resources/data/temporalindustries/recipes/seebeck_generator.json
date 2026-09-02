@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GEG",
+    "CMC",
+    "GEG"
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "E": { "item": "minecraft:echo_shard" },
+    "C": { "item": "minecraft:copper_ingot" },
+    "M": { "item": "temporalindustries:machine_frame" }
+  },
+  "result": { "id": "temporalindustries:seebeck_generator", "count": 1 }
+}

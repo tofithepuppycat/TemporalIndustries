@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "AEA",
+    "EME",
+    "GAG"
+  ],
+  "key": {
+    "A": { "item": "minecraft:amethyst_shard" },
+    "E": { "item": "minecraft:echo_shard" },
+    "M": { "item": "temporalindustries:machine_frame" },
+    "G": { "item": "minecraft:gold_ingot" }
+  },
+  "result": { "id": "temporalindustries:entropy_manipulator", "count": 1 }
+}

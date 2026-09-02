@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DGD",
+    "GAG",
+    "DWD"
+  ],
+  "key": {
+    "D": { "item": "minecraft:deepslate" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "W": { "item": "minecraft:cobweb" }
+  },
+  "result": { "id": "temporalindustries:schrodinger_generator", "count": 1 }
+}

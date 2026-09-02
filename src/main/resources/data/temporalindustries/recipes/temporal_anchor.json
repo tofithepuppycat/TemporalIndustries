@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "AEA",
+    "ETE",
+    "AGA"
+  ],
+  "key": {
+    "A": { "item": "minecraft:amethyst_shard" },
+    "E": { "item": "minecraft:echo_shard" },
+    "T": { "item": "minecraft:totem_of_undying" },
+    "G": { "item": "minecraft:gold_ingot" }
+  },
+  "result": { "id": "temporalindustries:temporal_anchor", "count": 1 }
+}

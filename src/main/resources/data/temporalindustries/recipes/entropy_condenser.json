@@ -1,0 +1,15 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "EGE",
+    "GMG",
+    "EAE"
+  ],
+  "key": {
+    "E": { "item": "minecraft:echo_shard" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "M": { "item": "temporalindustries:machine_frame" },
+    "A": { "item": "minecraft:amethyst_shard" }
+  },
+  "result": { "id": "temporalindustries:entropy_condenser", "count": 1 }
+}
