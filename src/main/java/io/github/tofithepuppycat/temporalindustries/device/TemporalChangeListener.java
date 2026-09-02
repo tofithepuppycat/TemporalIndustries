@@ -298,10 +298,12 @@ public final class TemporalChangeListener {
 
         PlayerSnapshot checkpoint = state.getCheckpoint();
         int reverted = state.revertWorldChanges(server);
-        state.clearCheckpoint();
         data.setDirty();
 
         checkpoint.applyTo(player, mode == TemporalAnchorItem.MODE_REWIND_ALL);
+
+        // Re-arm at the just-restored spot so repeated rewinds don't require manual recalibration.
+        state.setCheckpoint(PlayerSnapshot.capture(player));
         PacketDistributor.sendToPlayersTrackingEntityAndSelf(player, new AnchorRewindEffectPacket(player.getId()));
         player.level().playSound(null, player.blockPosition(),
                 Registration.RETURN_BY_DEATH_SOUND.get(), SoundSource.PLAYERS, 1.0F, 1.0F);
