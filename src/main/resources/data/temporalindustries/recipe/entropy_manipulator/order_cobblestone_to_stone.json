@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:cobblestone"
+  },
+  "result": {
+    "id": "minecraft:stone",
+    "count": 1
+  }
+}
