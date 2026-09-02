@@ -4,8 +4,6 @@
   "input_item": {
     "item": "minecraft:sand"
   },
-  "result": {
-    "id": "minecraft:redstone",
-    "count": 1
-  }
+  "result_tag": "c:dusts",
+  "result_count": 1
 }
