@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:sand"
+  },
+  "result": {
+    "id": "minecraft:gravel",
+    "count": 1
+  }
+}

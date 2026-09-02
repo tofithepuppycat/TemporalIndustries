@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:crying_obsidian"
+  },
+  "result": {
+    "id": "minecraft:obsidian",
+    "count": 1
+  },
+  "entropy_cost": 800
+}

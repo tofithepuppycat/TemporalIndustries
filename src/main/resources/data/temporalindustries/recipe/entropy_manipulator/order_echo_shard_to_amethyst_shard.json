@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:echo_shard"
+  },
+  "result": {
+    "id": "minecraft:amethyst_shard",
+    "count": 1
+  }
+}
