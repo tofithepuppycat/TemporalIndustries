@@ -126,13 +126,19 @@
 	"gui.temporalindustries.loot_generator.generate": "Generate",
 	"gui.temporalindustries.loot_generator.stop": "Stop",
 	"gui.temporalindustries.loot_generator.mode_single": "Single: generate once",
-	"gui.temporalindustries.loot_generator.mode_repeat": "Repeat: keep generating while Chaos lasts",
+	"gui.temporalindustries.loot_generator.mode_repeat": "Repeat: keep generating",
 	"gui.temporalindustries.loot_generator.deciding": "Deciding...",
 	"gui.temporalindustries.loot_generator.luck": "Luck: %s/%s",
 	"gui.temporalindustries.loot_generator.luck_cost": "Roll: %s CHS  Per item: %s CHS",
 	"item.temporalindustries.entropy_glasses": "Entropy Glasses",
-	"item.temporalindustries.entropy_glasses.tooltip": "Shows entropy info about the block you're looking at.",
+	"item.temporalindustries.entropy_glasses.tooltip": "Shows entropy info about the block you're looking at.\nWorn in a Curios head slot - sneak to also see the\nstatus of any entropy cells in your curio slots.",
 	"overlay.temporalindustries.entropy_glasses.liquid": "%s/%s",
 	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating": "Generating Order/Chaos",
-	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty": "Empty"
+	"overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty": "Empty",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.no_table": "No table selected",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.table": "Table: %s",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.invalid_table": "Invalid table: %s",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.luck": "Luck: %s/%s",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.running": "Generating...",
+	"overlay.temporalindustries.entropy_glasses.loot_generator.stopped": "Stopped"
 }

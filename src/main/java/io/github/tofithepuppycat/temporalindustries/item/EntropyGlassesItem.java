@@ -1,20 +1,19 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
-import net.minecraft.core.Holder;
 import net.minecraft.network.chat.Component;
-import net.minecraft.world.item.ArmorItem;
-import net.minecraft.world.item.ArmorMaterial;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
 
-/** Worn in the helmet slot; grants no defense, only lets the wearer see entropy info about the block
- * they're looking at (see EntropyGlassesOverlay client-side and EntropyInfoProvider on block entities). */
-public class EntropyGlassesItem extends ArmorItem {
-    public EntropyGlassesItem(Holder<ArmorMaterial> material, Type type, Properties properties) {
-        super(material, type, properties);
+/** Grants no defense, isn't wearable as vanilla armor - only in Curios' head slot, when Curios is
+ * installed (see compat/curios/CuriosCompat) - and only lets the wearer see entropy info about the
+ * block they're looking at (see EntropyGlassesOverlay client-side and EntropyInfoProvider on block
+ * entities). */
+public class EntropyGlassesItem extends Item {
+    public EntropyGlassesItem(Properties properties) {
+        super(properties);
     }
 
     @Override

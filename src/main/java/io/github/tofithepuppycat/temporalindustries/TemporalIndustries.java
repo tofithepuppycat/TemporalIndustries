@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries;
 
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
@@ -31,6 +32,7 @@ public class TemporalIndustries
 
         if (ModList.get().isLoaded("curios")) {
             modEventBus.addListener(CuriosCellCompat::registerCapabilities);
+            modEventBus.addListener(CuriosCompat::registerCapabilities);
         }
 
         modContainer.registerConfig(ModConfig.Type.COMMON, TemporalIndustriesConfig.SPEC);

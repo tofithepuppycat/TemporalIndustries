@@ -12,6 +12,9 @@ import top.theillusivec4.curios.api.CuriosCapability;
 import top.theillusivec4.curios.api.SlotResult;
 import top.theillusivec4.curios.api.type.capability.ICurio;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Isolates every reference to Curios' (optional, compileOnly) API for the "cell" curio slot —
  * see {@link CuriosCompat} for the class-isolation rationale this mirrors. Callers must only
@@ -43,5 +46,19 @@ public final class CuriosCellCompat {
                     return null;
                 })
                 .orElse(null);
+    }
+
+    /** Every non-empty cell currently equipped in the "cell" curio slots, for the Entropy Glasses
+     * sneak-status overlay - unlike {@link #findCellInCurioSlot}, this doesn't filter by type/room. */
+    public static List<ItemStack> cellsInCurioSlots(Player player) {
+        return CuriosApi.getCuriosInventory(player)
+                .map(inventory -> {
+                    List<ItemStack> cells = new ArrayList<>();
+                    for (SlotResult result : inventory.findCurios("cell")) {
+                        if (!result.stack().isEmpty()) cells.add(result.stack());
+                    }
+                    return cells;
+                })
+                .orElseGet(List::of);
     }
 }

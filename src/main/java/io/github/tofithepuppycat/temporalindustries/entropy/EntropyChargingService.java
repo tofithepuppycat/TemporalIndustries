@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.entropy;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellCompat;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
@@ -38,14 +39,17 @@ public final class EntropyChargingService {
         List<ItemStack> cells = new ArrayList<>();
         for (ItemStack stack : player.getInventory().items) collectCell(stack, cells);
         collectCell(player.getOffhandItem(), cells);
+        ItemStack curioAnchor = null;
         if (ModList.get().isLoaded("curios")) {
             ItemStack curioCell = CuriosCellCompat.findCellInCurioSlot(player, EntropyType.ORDER);
             if (curioCell != null) collectCell(curioCell, cells);
+            curioAnchor = CuriosCompat.findEquippedTemporalAnchor(player);
         }
         if (cells.isEmpty()) return;
 
         for (ItemStack stack : player.getInventory().items) chargeTarget(stack, cells);
         chargeTarget(player.getOffhandItem(), cells);
+        if (curioAnchor != null) chargeTarget(curioAnchor, cells);
     }
 
     /** Only the cells count as a source - the anchor is a receptacle too, but it is a charge target
