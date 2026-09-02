@@ -104,9 +104,11 @@ public class LootGenerator extends BaseEntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /** Opens the loot generator's GUI if its frame is (or can be auto-filled to be) formed, otherwise
-     * highlights what's missing. Shared by both a direct click on the controller and a click on one
-     * of its {@link MachineFrame} satellites forwarding here via its stored controller position. */
+    /** Opens the loot generator's GUI if its frame is already formed, otherwise auto-fills what it can
+     * from the player's inventory (without opening the GUI that same click, so completing the frame
+     * doesn't immediately throw the player into the menu) or highlights what's still missing. Shared
+     * by both a direct click on the controller and a click on one of its {@link MachineFrame}
+     * satellites forwarding here via its stored controller position. */
     static InteractionResult interact(Level level, BlockPos pos, LootGeneratorBlockEntity be, ServerPlayer serverPlayer) {
         if (be.checkStructure()) {
             serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));
@@ -114,10 +116,7 @@ public class LootGenerator extends BaseEntityBlock {
         }
 
         fillFromInventory(level, be, serverPlayer);
-        if (be.checkStructure()) {
-            serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));
-            return InteractionResult.CONSUME;
-        }
+        if (be.checkStructure()) return InteractionResult.CONSUME;
 
         highlightMissing((ServerLevel) level, be.findMissing(), serverPlayer);
         return InteractionResult.CONSUME;
