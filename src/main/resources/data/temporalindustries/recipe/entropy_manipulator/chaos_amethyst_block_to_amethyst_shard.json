@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:amethyst_block"
+  },
+  "result": {
+    "id": "minecraft:amethyst_shard",
+    "count": 4
+  },
+  "entropy_cost": 150
+}

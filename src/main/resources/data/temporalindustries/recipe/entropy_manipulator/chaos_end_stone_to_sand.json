@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:end_stone"
+  },
+  "result": {
+    "id": "minecraft:sand",
+    "count": 1
+  },
+  "entropy_cost": 150
+}
