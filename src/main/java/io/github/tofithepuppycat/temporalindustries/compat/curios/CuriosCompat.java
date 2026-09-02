@@ -22,9 +22,10 @@ public final class CuriosCompat {
 
     /** Lets Curios accept the Entropy Glasses in its "head" slot (an external slot other mods
      * provide - opportunistically tagged via data/curios/tags/item/head.json) and the Temporal
-     * Anchor in the "charm" slot this mod declares itself (see
-     * data/temporalindustries/curios/slots/charm.json and its player.json entry, mirroring the
-     * "cell" slot in {@link CuriosCellCompat}) — neither item is vanilla armor, so without this
+     * Anchor in Curios' own built-in "charm" slot (tagged via data/curios/tags/item/charm.json,
+     * granted to the player via data/temporalindustries/curios/entities/player.json — unlike the
+     * "cell" slot in {@link CuriosCellCompat}, "charm" is a slot type Curios already defines, so
+     * we don't declare our own slot type for it) — neither item is vanilla armor, so without this
      * Curios has no way to know they're wearable curios at all. */
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerItem(CuriosCapability.ITEM, (stack, ctx) -> (ICurio) () -> stack,
