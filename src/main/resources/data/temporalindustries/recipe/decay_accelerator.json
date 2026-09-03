@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "WGW",
+    "GCG",
+    "WGW"
+  ],
+  "key": {
+    "W": { "item": "minecraft:oak_planks" },
+    "G": { "item": "minecraft:gold_nugget" },
+    "C": { "item": "minecraft:composter" }
+  },
+  "result": { "id": "temporalindustries:decay_accelerator", "count": 1 }
+}
