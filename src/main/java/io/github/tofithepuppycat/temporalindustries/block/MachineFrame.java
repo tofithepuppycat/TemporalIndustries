@@ -2,8 +2,8 @@ package io.github.tofithepuppycat.temporalindustries.block;
 
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.MachineFrameBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.MachineFrameController;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -78,8 +78,8 @@ public class MachineFrame extends BaseEntityBlock {
         BlockPos controllerPos = frameBe.getController();
         if (controllerPos == null) return InteractionResult.PASS;
 
-        if (level.getBlockEntity(controllerPos) instanceof LootGeneratorBlockEntity controllerBe && player instanceof ServerPlayer serverPlayer) {
-            return LootGenerator.interact(level, controllerPos, controllerBe, serverPlayer);
+        if (level.getBlockEntity(controllerPos) instanceof MachineFrameController controller && player instanceof ServerPlayer serverPlayer) {
+            return controller.onFrameInteract(level, controllerPos, serverPlayer);
         }
         return InteractionResult.PASS;
     }
