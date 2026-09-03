@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:exposed_copper"
+  },
+  "result": {
+    "id": "minecraft:copper_block",
+    "count": 1
+  },
+  "entropy_cost": 200
+}

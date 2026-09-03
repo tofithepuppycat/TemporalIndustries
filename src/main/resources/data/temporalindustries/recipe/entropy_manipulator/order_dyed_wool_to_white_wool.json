@@ -1,0 +1,11 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "tag": "temporalindustries:dyed_wool"
+  },
+  "result": {
+    "id": "minecraft:white_wool",
+    "count": 1
+  }
+}

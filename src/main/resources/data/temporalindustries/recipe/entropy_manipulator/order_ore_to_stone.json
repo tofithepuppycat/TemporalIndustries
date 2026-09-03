@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "tag": "c:ores"
+  },
+  "result": {
+    "id": "minecraft:stone",
+    "count": 1
+  },
+  "entropy_cost": 300
+}

@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:coal"
+  },
+  "result": {
+    "id": "minecraft:diamond",
+    "count": 1
+  },
+  "entropy_cost": 8000
+}
