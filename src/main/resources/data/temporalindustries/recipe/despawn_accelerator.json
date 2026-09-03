@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "IEI",
+    "EGE",
+    "IEI"
+  ],
+  "key": {
+    "I": { "item": "minecraft:iron_ingot" },
+    "E": { "item": "minecraft:ender_pearl" },
+    "G": { "item": "minecraft:gold_ingot" }
+  },
+  "result": { "id": "temporalindustries:despawn_accelerator", "count": 1 }
+}
