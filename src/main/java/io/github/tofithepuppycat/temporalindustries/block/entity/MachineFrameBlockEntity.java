@@ -40,23 +40,20 @@ public class MachineFrameBlockEntity extends BlockEntity {
     }
 
     @Nullable
-    private LootGeneratorBlockEntity getControllerBlockEntity() {
+    private MachineFrameController getControllerBlockEntity() {
         if (controller == null || level == null) return null;
-        if (level.getBlockEntity(controller) instanceof LootGeneratorBlockEntity lootGenerator) {
-            return lootGenerator;
-        }
-        return null;
+        return level.getBlockEntity(controller) instanceof MachineFrameController mfc ? mfc : null;
     }
 
     @Nullable
     public IItemHandler getItemHandler() {
-        LootGeneratorBlockEntity controllerBe = getControllerBlockEntity();
+        MachineFrameController controllerBe = getControllerBlockEntity();
         return controllerBe == null ? null : controllerBe.getItemHandler();
     }
 
     @Nullable
     public IFluidHandler getFluidHandler() {
-        LootGeneratorBlockEntity controllerBe = getControllerBlockEntity();
+        MachineFrameController controllerBe = getControllerBlockEntity();
         return controllerBe == null ? null : controllerBe.getFluidHandler();
     }
 

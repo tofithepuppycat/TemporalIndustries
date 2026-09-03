@@ -109,7 +109,7 @@ public class LootGenerator extends BaseEntityBlock {
      * doesn't immediately throw the player into the menu) or highlights what's still missing. Shared
      * by both a direct click on the controller and a click on one of its {@link MachineFrame}
      * satellites forwarding here via its stored controller position. */
-    static InteractionResult interact(Level level, BlockPos pos, LootGeneratorBlockEntity be, ServerPlayer serverPlayer) {
+    public static InteractionResult interact(Level level, BlockPos pos, LootGeneratorBlockEntity be, ServerPlayer serverPlayer) {
         if (be.checkStructure()) {
             serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));
             return InteractionResult.CONSUME;
