@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:oxidized_copper"
+  },
+  "result": {
+    "id": "minecraft:weathered_copper",
+    "count": 1
+  },
+  "entropy_cost": 800
+}
