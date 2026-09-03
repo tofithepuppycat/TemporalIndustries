@@ -20,17 +20,11 @@ Machines:
 Generators:
 - Schrodinger's box - early game entropy generator - need to trap a neutral mob inside, will generate small amounts of CHS
 - Seebeck Generator - hot block from left, cold from the right, cold block melts of possible, and the hot block extinguishes/dissapears after a long time. Generates electricity based on the temperature difference, releases chaos and order orbs.
+- [x] Decay Accelerator - feed compostable items, consumes them over time -> generates CHAOS.
+- [x] Despawn Accelerator - Order variant of the Decay Accelerator, consumes ANY item/block -> generates ORDER. Balances the Order economy which currently leans on running Entropy Manipulator recipes backward.
+- [x] Furnace refinement recipes that "simplify" a material (stone -> smooth stone, sand -> glass, etc) have a chance to drop ORD orbs on smelt, passive ambient Order source tied to vanilla furnace usage.
 #### Late game:
   Machines:
 - Chronosphere - multiple chunk time travel, requires huge amounts of chaos and order to balance its functions
   Generators:
-- Withergenic reactor - large amounts of CHAOS
-
-
-#### Entropy Manipulator recipes:
-Spending CHAOS:
-Netherrack -> magma block -> obsidian -> crying obsidian -> nether star
-100mb -> 200mb -> 400mb -> 800mb -> 16 buckets
-
-
-make cells and temporal anchor contain liquid order/chaos instead of current impl. make cells be able to insert the liquids into machines by right clicking. When crouching and scroling, the user sets how much should be pulled out with one right click
+- Withergenic reactor - large amounts of CHAOS, multiblock requires a captured wither as part of the structure
