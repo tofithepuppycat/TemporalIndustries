@@ -7,6 +7,7 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
+import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
@@ -20,6 +21,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlo
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
@@ -35,6 +37,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyItemFluidHandler;
@@ -316,6 +319,14 @@ public class Registration {
     public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
             () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
 
+    // --- Entropic Pylon: routes liquid Order/Chaos between player-marked blocks ---
+
+    public static final DeferredBlock<EntropicPylon> ENTROPIC_PYLON_BLOCK = BLOCKS.register("entropic_pylon",
+            () -> new EntropicPylon(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> ENTROPIC_PYLON_ITEM = ITEMS.register("entropic_pylon",
+            () -> new EntropicPylonItem(ENTROPIC_PYLON_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
@@ -354,6 +365,9 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MachineFrameBlockEntity>> MACHINE_FRAME_BLOCK_ENTITY = BLOCK_ENTITIES.register("machine_frame",
             () -> BlockEntityType.Builder.of(MachineFrameBlockEntity::new, MACHINE_FRAME_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ENTROPIC_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropic_pylon",
+            () -> BlockEntityType.Builder.of(EntropicPylonBlockEntity::new, ENTROPIC_PYLON_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
             () -> IMenuTypeExtension.create(ChronovaultMenu::new));
@@ -403,6 +417,7 @@ public class Registration {
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
+                        output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);

@@ -24,7 +24,9 @@ import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.Container;
+import net.minecraft.world.InteractionResult;
 import net.minecraft.world.ContainerHelper;
 import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
@@ -63,7 +65,7 @@ import java.util.List;
  * one roll or keeps rolling for as long as Chaos holds out.
  */
 @SuppressWarnings("null")
-public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
+public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider, MachineFrameController {
     public static final int TANK_CAPACITY = 8_000;
     public static final int ROLL_COST = 500;
     public static final int ITEM_COST = 50;
@@ -135,6 +137,11 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
 
     public IFluidHandler getFluidHandler() {
         return chaosTank;
+    }
+
+    @Override
+    public InteractionResult onFrameInteract(Level level, BlockPos controllerPos, ServerPlayer player) {
+        return LootGenerator.interact(level, controllerPos, this, player);
     }
 
     public FluidTank getChaosTank() {
