@@ -1,17 +1,21 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.block.BoxEdgeParticles;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.Level;
@@ -24,6 +28,7 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -43,6 +48,19 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
     /** mB of whichever fluid is present, moved per input->output pair each tick. */
     private static final int TRANSFER_RATE_MB = 50;
+
+    private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
+    private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
+    private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
+    private static final DustParticleOptions FORMED_PARTICLE = buildFormedParticle();
+
+    private static DustParticleOptions buildFormedParticle() {
+        int color = EntropyType.ORDER.color();
+        float r = ((color >> 16) & 0xFF) / 255F;
+        float g = ((color >> 8) & 0xFF) / 255F;
+        float b = (color & 0xFF) / 255F;
+        return new DustParticleOptions(new Vector3f(r, g, b), 2.0F);
+    }
 
     private List<BlockPos> inputs = new ArrayList<>();
     private List<BlockPos> outputs = new ArrayList<>();
@@ -107,9 +125,38 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
                     level.setBlock(worldPosition, state.setValue(EntropicPylon.FORMED, formed), Block.UPDATE_CLIENTS);
                 }
                 MachineFrame.setConnected(level, framePos, formed);
+                if (formed && level instanceof ServerLevel serverLevel) {
+                    spawnFormedParticles(serverLevel, framePos);
+                }
             }
         }
         return formed;
+    }
+
+    /** ORD-colored (see {@link EntropyType#ORDER}) outline traced along the edges of the pylon and
+     * its completing frame's bounding box, fired once when the structure transitions from unformed
+     * to formed - same idiom as {@link LootGeneratorBlockEntity#spawnFormedParticles}. */
+    private void spawnFormedParticles(ServerLevel serverLevel, BlockPos framePos) {
+        int minX = Math.min(worldPosition.getX(), framePos.getX());
+        int minY = Math.min(worldPosition.getY(), framePos.getY());
+        int minZ = Math.min(worldPosition.getZ(), framePos.getZ());
+        int maxX = Math.max(worldPosition.getX(), framePos.getX());
+        int maxY = Math.max(worldPosition.getY(), framePos.getY());
+        int maxZ = Math.max(worldPosition.getZ(), framePos.getZ());
+
+        for (Vector3f point : BoxEdgeParticles.outline(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1, FORMED_EDGE_PARTICLE_SPACING)) {
+            serverLevel.sendParticles(FORMED_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        }
+    }
+
+    /** Red outline traced along the edges of the still-missing frame position directly above -
+     * mirrors {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator#highlightMissing}. */
+    private void highlightMissing(ServerLevel serverLevel) {
+        BlockPos pos = framePos();
+        for (Vector3f point : BoxEdgeParticles.outline(pos.getX(), pos.getY(), pos.getZ(),
+                pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, MISSING_EDGE_PARTICLE_SPACING)) {
+            serverLevel.sendParticles(MISSING_FRAME_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        }
     }
 
     // -------------------------------------------------------------------------
@@ -166,6 +213,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     @Override
     public InteractionResult onFrameInteract(Level level, BlockPos controllerPos, ServerPlayer player) {
         checkStructure();
+        if (!formed && level instanceof ServerLevel serverLevel) {
+            highlightMissing(serverLevel);
+        }
         Component formedComponent = formed
                 ? Component.translatable("block.temporalindustries.entropic_pylon.formed").withStyle(ChatFormatting.GREEN)
                 : Component.translatable("block.temporalindustries.entropic_pylon.unformed").withStyle(ChatFormatting.RED);

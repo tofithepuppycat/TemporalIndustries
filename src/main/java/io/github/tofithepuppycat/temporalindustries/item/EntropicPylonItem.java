@@ -47,20 +47,24 @@ public class EntropicPylonItem extends BlockItem {
         super(block, properties);
     }
 
+    /** Runs before the target block gets any say in the interaction (its GUI-opening
+     * {@code useWithoutItem}, in particular) - without this, right-clicking a machine to mark it as
+     * an input/output would just open that machine's own menu instead. Falls through to normal
+     * placement ({@link #useOn}) for anything that isn't a valid mark target. */
     @Override
-    public InteractionResult useOn(UseOnContext context) {
+    public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
         Level level = context.getLevel();
         Player player = context.getPlayer();
         BlockPos pos = context.getClickedPos();
 
         if (player != null && isValidTarget(level, pos)) {
             if (!level.isClientSide) {
-                mark(context.getItemInHand(), pos, player.isShiftKeyDown(), player);
+                mark(stack, pos, player.isShiftKeyDown(), player);
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
 
-        return super.useOn(context);
+        return InteractionResult.PASS;
     }
 
     private static boolean isValidTarget(Level level, BlockPos pos) {
