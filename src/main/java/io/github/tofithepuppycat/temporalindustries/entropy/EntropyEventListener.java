@@ -4,10 +4,12 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.entity.monster.Enemy;
 import net.minecraft.world.entity.projectile.ThrownPotion;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.item.Items;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -16,14 +18,18 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
 import net.neoforged.neoforge.event.entity.item.ItemExpireEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
+import net.neoforged.neoforge.event.entity.player.PlayerEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
 import net.neoforged.neoforge.event.level.block.CropGrowEvent;
+
+import java.util.Set;
 
 /**
  * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events, as opposed to the
  * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger Generator). ORDER:
- * obsidian/basalt/cobblestone generation, crop growth, items despawning, passive/neutral mob death.
- * CHAOS: player death, splash/lingering potions, hostile mob death.
+ * obsidian/basalt/cobblestone generation, crop growth, items despawning, passive/neutral mob death,
+ * furnace "simplification" smelts (IDEAS.md). CHAOS: player death, splash/lingering potions, hostile
+ * mob death.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class EntropyEventListener {
@@ -38,6 +44,13 @@ public final class EntropyEventListener {
     private static final int LINGERING_POTION_CHAOS = 2;
     private static final int HOSTILE_MOB_DEATH_CHAOS = 1;
     private static final int PASSIVE_MOB_DEATH_ORDER = 1;
+
+    /** Outputs of vanilla furnace recipes that "simplify" a material, per IDEAS.md - identified by
+     * the smelted result alone since each is unique to one vanilla smelting recipe. */
+    private static final Set<Item> SIMPLIFICATION_RESULTS = Set.of(
+            Items.STONE, Items.SMOOTH_STONE, Items.GLASS, Items.BRICK,
+            Items.SMOOTH_SANDSTONE, Items.SMOOTH_RED_SANDSTONE, Items.SMOOTH_QUARTZ, Items.DEEPSLATE);
+    private static final float SMELT_ORDER_CHANCE = 0.15F;
 
     private EntropyEventListener() {}
 
@@ -95,5 +108,21 @@ public final class EntropyEventListener {
 
         int value = potion.getItem().is(Items.LINGERING_POTION) ? LINGERING_POTION_CHAOS : SPLASH_POTION_CHAOS;
         EntropyOrbEntity.spawn(level, potion.getX(), potion.getY(), potion.getZ(), EntropyType.CHAOS, value);
+    }
+
+    @SubscribeEvent
+    public static void onItemSmelted(PlayerEvent.ItemSmeltedEvent event) {
+        if (!SIMPLIFICATION_RESULTS.contains(event.getSmelting().getItem())) return;
+
+        ServerPlayer player = event.getEntity() instanceof ServerPlayer serverPlayer ? serverPlayer : null;
+        if (player == null || !(player.level() instanceof ServerLevel level)) return;
+
+        RandomSource random = level.getRandom();
+        int rolls = Math.min(event.getSmelting().getCount(), 64);
+        int value = 0;
+        for (int i = 0; i < rolls; i++) {
+            if (random.nextFloat() < SMELT_ORDER_CHANCE) value++;
+        }
+        EntropyOrbEntity.spawn(level, player.getX(), player.getY() + 0.5, player.getZ(), EntropyType.ORDER, value);
     }
 }
