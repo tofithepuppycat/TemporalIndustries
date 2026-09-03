@@ -5,6 +5,8 @@ import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
+import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
+import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
@@ -16,6 +18,8 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjector
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAcceleratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
@@ -41,6 +45,8 @@ import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.DecayAcceleratorMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.DespawnAcceleratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
@@ -266,6 +272,22 @@ public class Registration {
     public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
             () -> new DescribedBlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
+    // --- Decay Accelerator: early/mid game CHAOS generator, feed it compostable items ---
+
+    public static final DeferredBlock<DecayAccelerator> DECAY_ACCELERATOR_BLOCK = BLOCKS.register("decay_accelerator",
+            () -> new DecayAccelerator(BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(2.5F, 3.5F).sound(SoundType.WOOD)));
+
+    public static final DeferredItem<Item> DECAY_ACCELERATOR_ITEM = ITEMS.register("decay_accelerator",
+            () -> new DescribedBlockItem(DECAY_ACCELERATOR_BLOCK.get(), new Item.Properties()));
+
+    // --- Despawn Accelerator: ORDER counterpart, feed it any item/block ---
+
+    public static final DeferredBlock<DespawnAccelerator> DESPAWN_ACCELERATOR_BLOCK = BLOCKS.register("despawn_accelerator",
+            () -> new DespawnAccelerator(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> DESPAWN_ACCELERATOR_ITEM = ITEMS.register("despawn_accelerator",
+            () -> new DescribedBlockItem(DESPAWN_ACCELERATOR_BLOCK.get(), new Item.Properties()));
+
     // --- Entropy Manipulator: spends liquid Order/Chaos to transmute items/blocks/liquids ---
 
     public static final DeferredBlock<EntropyManipulator> ENTROPY_MANIPULATOR_BLOCK = BLOCKS.register("entropy_manipulator",
@@ -318,6 +340,12 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
             () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DecayAcceleratorBlockEntity>> DECAY_ACCELERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("decay_accelerator",
+            () -> BlockEntityType.Builder.of(DecayAcceleratorBlockEntity::new, DECAY_ACCELERATOR_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DespawnAcceleratorBlockEntity>> DESPAWN_ACCELERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("despawn_accelerator",
+            () -> BlockEntityType.Builder.of(DespawnAcceleratorBlockEntity::new, DESPAWN_ACCELERATOR_BLOCK.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyManipulatorBlockEntity>> ENTROPY_MANIPULATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_manipulator",
             () -> BlockEntityType.Builder.of(EntropyManipulatorBlockEntity::new, ENTROPY_MANIPULATOR_BLOCK.get()).build(null));
 
@@ -338,6 +366,12 @@ public class Registration {
 
     public static final DeferredHolder<MenuType<?>, MenuType<CrudeEntropyCondenserMenu>> CRUDE_ENTROPY_CONDENSER_MENU = MENUS.register("crude_entropy_condenser",
             () -> IMenuTypeExtension.create(CrudeEntropyCondenserMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<DecayAcceleratorMenu>> DECAY_ACCELERATOR_MENU = MENUS.register("decay_accelerator",
+            () -> IMenuTypeExtension.create(DecayAcceleratorMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<DespawnAcceleratorMenu>> DESPAWN_ACCELERATOR_MENU = MENUS.register("despawn_accelerator",
+            () -> IMenuTypeExtension.create(DespawnAcceleratorMenu::new));
 
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyManipulatorMenu>> ENTROPY_MANIPULATOR_MENU = MENUS.register("entropy_manipulator",
             () -> IMenuTypeExtension.create(EntropyManipulatorMenu::new));
@@ -364,6 +398,8 @@ public class Registration {
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
+                        output.accept(DECAY_ACCELERATOR_ITEM);
+                        output.accept(DESPAWN_ACCELERATOR_ITEM);
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
@@ -426,6 +462,10 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DECAY_ACCELERATOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DESPAWN_ACCELERATOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(),

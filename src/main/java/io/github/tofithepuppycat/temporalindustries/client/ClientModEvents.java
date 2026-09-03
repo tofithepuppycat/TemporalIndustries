@@ -4,6 +4,8 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.CrudeEntropyCondenserScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.DecayAcceleratorScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.DespawnAcceleratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyManipulatorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen;
@@ -32,6 +34,8 @@ public class ClientModEvents {
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
         event.register(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), CrudeEntropyCondenserScreen::new);
+        event.register(Registration.DECAY_ACCELERATOR_MENU.get(), DecayAcceleratorScreen::new);
+        event.register(Registration.DESPAWN_ACCELERATOR_MENU.get(), DespawnAcceleratorScreen::new);
         event.register(Registration.ENTROPY_MANIPULATOR_MENU.get(), EntropyManipulatorScreen::new);
         event.register(Registration.LOOT_GENERATOR_MENU.get(), LootGeneratorScreen::new);
     }
