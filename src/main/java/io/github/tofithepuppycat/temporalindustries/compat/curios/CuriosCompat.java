@@ -10,6 +10,8 @@ import top.theillusivec4.curios.api.CuriosApi;
 import top.theillusivec4.curios.api.CuriosCapability;
 import top.theillusivec4.curios.api.SlotResult;
 import top.theillusivec4.curios.api.type.capability.ICurio;
+import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
+import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 /**
  * Isolates every reference to Curios' (optional, compileOnly) API in one class, so that class is
@@ -63,7 +65,20 @@ public final class CuriosCompat {
                 .orElse(null);
     }
 
+    /** Curios' own {@code loadInventory} only ever fills slots that are currently empty — a slot
+     * still holding a curio from after the checkpoint has its item shoved back into the player's
+     * main inventory as an "invalid stack" *without* removing it from the curio slot, and the
+     * snapshotted item for that slot is silently dropped. That duplicates whatever was equipped at
+     * death, so every slot is emptied first to force Curios to actually apply the snapshot. */
     public static void loadCurios(Player player, ListTag data) {
-        CuriosApi.getCuriosInventory(player).ifPresent(inventory -> inventory.loadInventory(data));
+        CuriosApi.getCuriosInventory(player).ifPresent(inventory -> {
+            for (ICurioStacksHandler handler : inventory.getCurios().values()) {
+                IDynamicStackHandler stacks = handler.getStacks();
+                for (int i = 0; i < stacks.getSlots(); i++) {
+                    stacks.setStackInSlot(i, ItemStack.EMPTY);
+                }
+            }
+            inventory.loadInventory(data);
+        });
     }
 }
