@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
@@ -178,8 +179,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
     /** One transfer attempt per marked input, against the next marked output in rotation - so with
      * equal counts every input/output pair gets visited over time instead of always favoring the
-     * first output. Moves whatever fluid is actually present (Order or Chaos);
-     * {@link FluidUtil#tryFluidTransfer} already refuses anything the destination tank rejects. */
+     * first output. Moves whatever fluid is actually present (Order or Chaos) - see
+     * {@link #transferAnyTank} for why this doesn't just call {@link FluidUtil#tryFluidTransfer}. */
     private void transferOnce() {
         for (BlockPos inPos : inputs) {
             IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
@@ -190,7 +191,30 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
             IFluidHandler dest = level.getCapability(Capabilities.FluidHandler.BLOCK, outPos, null);
             if (dest == null) continue;
 
-            FluidUtil.tryFluidTransfer(dest, source, TRANSFER_RATE_MB, true);
+            transferAnyTank(source, dest);
+        }
+    }
+
+    /** Tries every tank in {@code source} individually rather than {@link FluidUtil#tryFluidTransfer},
+     * which drains via the ambiguous {@code IFluidHandler#drain(int, FluidAction)} overload - dual-fluid
+     * handlers like {@link EntropyCondenserBlockEntity}'s resolve that call to whichever tank they check
+     * first (Order), so Chaos would never move and nothing offering only Order could ever fill a
+     * Chaos-only destination like {@link LootGeneratorBlockEntity}. Draining by explicit
+     * {@link FluidStack} instead lets each tank's actual contents get offered on their own. */
+    private void transferAnyTank(IFluidHandler source, IFluidHandler dest) {
+        for (int i = 0; i < source.getTanks(); i++) {
+            FluidStack inTank = source.getFluidInTank(i);
+            if (inTank.isEmpty()) continue;
+
+            FluidStack wanted = inTank.copyWithAmount(Math.min(TRANSFER_RATE_MB, inTank.getAmount()));
+            FluidStack simulated = source.drain(wanted, IFluidHandler.FluidAction.SIMULATE);
+            if (simulated.isEmpty()) continue;
+
+            int filled = dest.fill(simulated, IFluidHandler.FluidAction.SIMULATE);
+            if (filled <= 0) continue;
+
+            FluidStack drained = source.drain(simulated.copyWithAmount(filled), IFluidHandler.FluidAction.EXECUTE);
+            if (!drained.isEmpty()) dest.fill(drained, IFluidHandler.FluidAction.EXECUTE);
         }
     }
 
