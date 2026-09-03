@@ -1,0 +1,9 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:white_wool"
+  },
+  "result_tag": "temporalindustries:dyed_wool",
+  "result_count": 1
+}
