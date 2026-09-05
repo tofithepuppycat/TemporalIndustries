@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.BoxEdgeParticles;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -53,14 +54,20 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    private static final DustParticleOptions FORMED_PARTICLE = buildFormedParticle();
+    private static final DustParticleOptions FORMED_PARTICLE = buildParticle(EntropyType.ORDER, 2.0F);
+    /** How many evenly-spaced pulses trail along each input->pylon / pylon->output leg. */
+    private static final int TRANSMIT_PULSE_COUNT = 3;
+    /** Ticks for a pulse to travel the full length of a leg, however long it is. */
+    private static final int TRANSMIT_CYCLE_TICKS = 20;
+    private static final DustParticleOptions ORDER_TRANSMIT_PARTICLE = buildParticle(EntropyType.ORDER, 1.0F);
+    private static final DustParticleOptions CHAOS_TRANSMIT_PARTICLE = buildParticle(EntropyType.CHAOS, 1.0F);
 
-    private static DustParticleOptions buildFormedParticle() {
-        int color = EntropyType.ORDER.color();
+    private static DustParticleOptions buildParticle(EntropyType type, float scale) {
+        int color = type.color();
         float r = ((color >> 16) & 0xFF) / 255F;
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
-        return new DustParticleOptions(new Vector3f(r, g, b), 2.0F);
+        return new DustParticleOptions(new Vector3f(r, g, b), scale);
     }
 
     private List<BlockPos> inputs = new ArrayList<>();
@@ -205,7 +212,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
             IFluidHandler dest = level.getCapability(Capabilities.FluidHandler.BLOCK, outPos, null);
             if (dest == null) continue;
 
-            transferAnyTank(source, dest);
+            transferAnyTank(source, dest, inPos, outPos);
         }
     }
 
@@ -215,7 +222,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * first (Order), so Chaos would never move and nothing offering only Order could ever fill a
      * Chaos-only destination like {@link LootGeneratorBlockEntity}. Draining by explicit
      * {@link FluidStack} instead lets each tank's actual contents get offered on their own. */
-    private void transferAnyTank(IFluidHandler source, IFluidHandler dest) {
+    private void transferAnyTank(IFluidHandler source, IFluidHandler dest, BlockPos inPos, BlockPos outPos) {
         for (int i = 0; i < source.getTanks(); i++) {
             FluidStack inTank = source.getFluidInTank(i);
             if (inTank.isEmpty()) continue;
@@ -228,8 +235,35 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
             if (filled <= 0) continue;
 
             FluidStack drained = source.drain(simulated.copyWithAmount(filled), IFluidHandler.FluidAction.EXECUTE);
-            if (!drained.isEmpty()) dest.fill(drained, IFluidHandler.FluidAction.EXECUTE);
+            if (drained.isEmpty()) continue;
+            dest.fill(drained, IFluidHandler.FluidAction.EXECUTE);
+
+            EntropyType type = EntropyFluids.typeOf(drained.getFluid());
+            if (type != null && level instanceof ServerLevel serverLevel) {
+                spawnTransmitParticles(serverLevel, type, inPos, worldPosition);
+                spawnTransmitParticles(serverLevel, type, worldPosition, outPos);
+            }
         }
+    }
+
+    /** A handful of pulses trailing along the straight line from {@code from} to {@code to}, colored
+     * by {@code type} - drawn every tick a transfer actually moves fluid, so the flow direction (input
+     * into the pylon, or pylon out to an output) reads at a glance. Their position along the line
+     * scrolls with {@link ServerLevel#getGameTime()} so they visibly travel rather than sit static. */
+    private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
+        DustParticleOptions particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
+        Vector3f start = centerOf(from);
+        Vector3f end = centerOf(to);
+        double phase = (serverLevel.getGameTime() % TRANSMIT_CYCLE_TICKS) / (double) TRANSMIT_CYCLE_TICKS;
+        for (int i = 0; i < TRANSMIT_PULSE_COUNT; i++) {
+            float t = (float) ((phase + i / (double) TRANSMIT_PULSE_COUNT) % 1.0);
+            Vector3f point = new Vector3f(start).lerp(end, t);
+            serverLevel.sendParticles(particle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+        }
+    }
+
+    private static Vector3f centerOf(BlockPos pos) {
+        return new Vector3f(pos.getX() + 0.5F, pos.getY() + 0.5F, pos.getZ() + 0.5F);
     }
 
     // -------------------------------------------------------------------------
