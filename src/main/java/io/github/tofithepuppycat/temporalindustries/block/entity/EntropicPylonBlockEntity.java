@@ -101,6 +101,20 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return worldPosition.above();
     }
 
+    /** The frame position above this pylon, if it still needs a {@link MachineFrame} block - empty
+     * once one's present, for {@link MachineFrame#fillFromInventory} to consume from the player's
+     * inventory just like {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator}'s
+     * larger structure does. */
+    public List<BlockPos> findMissing() {
+        if (level == null) return List.of();
+        BlockPos framePos = framePos();
+        if (level.getBlockEntity(framePos) instanceof MachineFrameBlockEntity frameBe) {
+            frameBe.setController(worldPosition);
+            return List.of();
+        }
+        return level.getBlockState(framePos).is(Registration.MACHINE_FRAME_BLOCK.get()) ? List.of() : List.of(framePos);
+    }
+
     /** Re-checks for a {@link MachineFrame} directly above and updates {@link #formed}, syncing to
      * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed - same
      * idiom as {@link LootGeneratorBlockEntity#checkStructure()}, just for a single fixed position
@@ -236,7 +250,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
     @Override
     public InteractionResult onFrameInteract(Level level, BlockPos controllerPos, ServerPlayer player) {
-        checkStructure();
+        if (!checkStructure()) {
+            MachineFrame.fillFromInventory(level, findMissing(), player);
+            checkStructure();
+        }
         if (!formed && level instanceof ServerLevel serverLevel) {
             highlightMissing(serverLevel);
         }
