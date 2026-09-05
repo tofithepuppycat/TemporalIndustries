@@ -8,6 +8,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
@@ -19,6 +20,8 @@ import net.minecraft.world.level.block.state.properties.BooleanProperty;
 import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+
+import java.util.List;
 
 /** Generic structural filler block used to complete multiblock machines, starting with the
  * {@link LootGenerator}. Carries no behavior of its own beyond forwarding clicks to whatever
@@ -57,6 +60,28 @@ public class MachineFrame extends BaseEntityBlock {
         if (state.is(Registration.MACHINE_FRAME_BLOCK.get()) && state.getValue(CONNECTED) != connected) {
             level.setBlock(pos, state.setValue(CONNECTED, connected), Block.UPDATE_CLIENTS);
         }
+    }
+
+    /** Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from {@code player}'s inventory to fill
+     * as many of {@code missing} positions as they can currently afford - shared by every
+     * frame-completed controller (see {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator#interact}
+     * and {@link io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity#onFrameInteract}),
+     * so none of them have to duplicate the inventory scan. */
+    public static void fillFromInventory(Level level, List<BlockPos> missing, ServerPlayer player) {
+        for (BlockPos pos : missing) {
+            if (!takeOneMachineFrame(player)) return;
+            level.setBlockAndUpdate(pos, Registration.MACHINE_FRAME_BLOCK.get().defaultBlockState());
+        }
+    }
+
+    private static boolean takeOneMachineFrame(ServerPlayer player) {
+        for (ItemStack stack : player.getInventory().items) {
+            if (stack.is(Registration.MACHINE_FRAME_ITEM.get())) {
+                stack.shrink(1);
+                return true;
+            }
+        }
+        return false;
     }
 
     @Override
