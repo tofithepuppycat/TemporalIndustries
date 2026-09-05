@@ -1,6 +1,6 @@
 {
   "variants": {
     "formed=true": { "model": "temporalindustries:block/entropic_pylon" },
-    "formed=false": { "model": "temporalindustries:block/entropic_pylon" }
+    "formed=false": { "model": "temporalindustries:block/entropic_pylon_off" }
   }
 }
