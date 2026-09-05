@@ -134,6 +134,7 @@
 	"block.temporalindustries.entropic_pylon.unformed": "unformed",
 	"item.temporalindustries.entropic_pylon.marked_input": "Marked input (%s/%s)",
 	"item.temporalindustries.entropic_pylon.marked_output": "Marked output (%s/%s)",
+	"item.temporalindustries.entropic_pylon.cleared": "Cleared all marks",
 	"gui.temporalindustries.loot_generator.table_field": "Loot Table",
 	"gui.temporalindustries.loot_generator.table_hint": "namespace:path/to/table",
 	"gui.temporalindustries.loot_generator.generate": "Generate",
