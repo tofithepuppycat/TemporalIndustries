@@ -8,7 +8,9 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.Item;
@@ -71,6 +73,26 @@ public class EntropicPylonItem extends BlockItem {
         return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null) != null;
     }
 
+    /** Right-clicking in the air (nothing for {@link #onItemUseFirst}/{@link #useOn} to mark or
+     * place against) wipes every recorded input/output mark instead, giving players a way to start
+     * over without needing to re-mark the opposite list on every block first. */
+    @Override
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        if (!level.isClientSide) {
+            clearMarks(stack, player);
+        }
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
+    private static void clearMarks(ItemStack stack, Player player) {
+        CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
+        data.remove(TAG_INPUTS);
+        data.remove(TAG_OUTPUTS);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+        player.displayClientMessage(Component.translatable("item.temporalindustries.entropic_pylon.cleared"), true);
+    }
+
     /** Adds {@code pos} to the input list (plain click) or output list (shift click), removing it
      * from the other list first - a block can't be both at once. Once a list is at {@link #MAX_MARKS},
      * the oldest mark is dropped to make room for the new one. */
@@ -92,6 +114,18 @@ public class EntropicPylonItem extends BlockItem {
         player.displayClientMessage(Component.translatable(output
                 ? "item.temporalindustries.entropic_pylon.marked_output"
                 : "item.temporalindustries.entropic_pylon.marked_input", same.size(), MAX_MARKS), true);
+    }
+
+    /** Currently marked input positions on {@code stack}, for
+     * {@link io.github.tofithepuppycat.temporalindustries.client.EntropicPylonMarkRenderer} to
+     * outline while the item is held. */
+    public static List<BlockPos> getInputs(ItemStack stack) {
+        return readList(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag(), TAG_INPUTS);
+    }
+
+    /** Currently marked output positions on {@code stack} - see {@link #getInputs}. */
+    public static List<BlockPos> getOutputs(ItemStack stack) {
+        return readList(stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag(), TAG_OUTPUTS);
     }
 
     @Override
