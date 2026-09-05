@@ -11,7 +11,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -115,30 +114,11 @@ public class LootGenerator extends BaseEntityBlock {
             return InteractionResult.CONSUME;
         }
 
-        fillFromInventory(level, be, serverPlayer);
+        MachineFrame.fillFromInventory(level, be.findMissing(), serverPlayer);
         if (be.checkStructure()) return InteractionResult.CONSUME;
 
         highlightMissing((ServerLevel) level, be.findMissing(), serverPlayer);
         return InteractionResult.CONSUME;
-    }
-
-    /** Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from the player's inventory to fill as
-     * many missing frame positions as they can currently afford. */
-    private static void fillFromInventory(Level level, LootGeneratorBlockEntity be, ServerPlayer player) {
-        for (BlockPos missing : be.findMissing()) {
-            if (!takeOneMachineFrame(player)) continue;
-            level.setBlockAndUpdate(missing, Registration.MACHINE_FRAME_BLOCK.get().defaultBlockState());
-        }
-    }
-
-    private static boolean takeOneMachineFrame(ServerPlayer player) {
-        for (ItemStack stack : player.getInventory().items) {
-            if (stack.is(Registration.MACHINE_FRAME_ITEM.get())) {
-                stack.shrink(1);
-                return true;
-            }
-        }
-        return false;
     }
 
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
