@@ -91,7 +91,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int ROLL_ICON_X = FIELD_X + CONTENT_WIDTH - ROLL_ICON_SIZE;
     private static final int ROLL_ICON_Y = BUTTONS_Y;
 
-    private static final int MODE_ICON_X = ROLL_ICON_X - ICON_SIZE - 2;
+    private static final int MODE_ICON_X = ROLL_ICON_X - ICON_SIZE - 3;
     private static final int MODE_ICON_Y = BUTTONS_Y;
     private static final int PLAY_ICON_X = MODE_ICON_X - ICON_SIZE - 2;
     private static final int PLAY_ICON_Y = BUTTONS_Y;
@@ -425,7 +425,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Component machineTitle = Component.translatable("block.temporalindustries.loot_generator");
         guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
-        guiGraphics.drawString(font, "Output", 8, 63, 0xFF3F3F3F, false);
+        guiGraphics.drawString(font, "Output", 8, 58, 0xFF3F3F3F, false);
         guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
 
