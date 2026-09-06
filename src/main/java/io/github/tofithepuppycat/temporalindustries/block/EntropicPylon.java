@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -21,6 +22,8 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.function.Supplier;
+
 /** Routes liquid Order/Chaos between blocks the player marked ahead of time by right-clicking with
  * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem} in hand - see
  * {@link EntropicPylonBlockEntity} for the actual transfer. Like {@link LootGenerator}, only runs
@@ -32,8 +35,21 @@ public class EntropicPylon extends BaseEntityBlock {
 
     private static final MapCodec<EntropicPylon> CODEC = simpleCodec(EntropicPylon::new);
 
+    /** Which entropy type this pylon is restricted to, or {@code null} for the dual pylon - handed
+     * straight to {@link EntropicPylonBlockEntity} on construction. */
+    @Nullable
+    private final EntropyType filter;
+    private final Supplier<BlockEntityType<EntropicPylonBlockEntity>> blockEntityType;
+
     public EntropicPylon(Properties properties) {
+        this(properties, null, Registration.ENTROPIC_PYLON_BLOCK_ENTITY);
+    }
+
+    protected EntropicPylon(Properties properties, @Nullable EntropyType filter,
+                             Supplier<BlockEntityType<EntropicPylonBlockEntity>> blockEntityType) {
         super(properties);
+        this.filter = filter;
+        this.blockEntityType = blockEntityType;
         registerDefaultState(stateDefinition.any().setValue(FORMED, false));
     }
 
@@ -55,13 +71,13 @@ public class EntropicPylon extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return createTickerHelper(type, Registration.ENTROPIC_PYLON_BLOCK_ENTITY.get(), EntropicPylonBlockEntity::tick);
+        return createTickerHelper(type, blockEntityType.get(), EntropicPylonBlockEntity::tick);
     }
 
     @Nullable
     @Override
     public BlockEntity newBlockEntity(@NotNull BlockPos pos, @NotNull BlockState state) {
-        return new EntropicPylonBlockEntity(pos, state);
+        return new EntropicPylonBlockEntity(blockEntityType.get(), pos, state, filter);
     }
 
     @Override

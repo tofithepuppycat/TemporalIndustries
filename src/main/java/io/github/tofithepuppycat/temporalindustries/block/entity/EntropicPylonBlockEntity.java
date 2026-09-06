@@ -10,9 +10,11 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -22,6 +24,7 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -54,7 +57,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    private static final DustParticleOptions FORMED_PARTICLE = buildParticle(EntropyType.ORDER, 2.0F);
     /** How many evenly-spaced pulses trail along each input->pylon / pylon->output leg. */
     private static final int TRANSMIT_PULSE_COUNT = 3;
     /** Ticks for a pulse to travel the full length of a leg, however long it is. */
@@ -76,8 +78,21 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private int ticksSinceStructureCheck = 0;
     private int outputCursor = 0;
 
+    /** Which entropy type this pylon is restricted to, or {@code null} for the original dual pylon,
+     * which routes whichever of Order/Chaos is actually present - see {@link #acceptsFluid} and
+     * {@link io.github.tofithepuppycat.temporalindustries.block.ChaosPylon}/{@link io.github.tofithepuppycat.temporalindustries.block.OrderPylon}. */
+    @Nullable
+    private final EntropyType filter;
+    private final DustParticleOptions formedParticle;
+
     public EntropicPylonBlockEntity(BlockPos pos, BlockState state) {
-        super(Registration.ENTROPIC_PYLON_BLOCK_ENTITY.get(), pos, state);
+        this(Registration.ENTROPIC_PYLON_BLOCK_ENTITY.get(), pos, state, null);
+    }
+
+    public EntropicPylonBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state, @Nullable EntropyType filter) {
+        super(type, pos, state);
+        this.filter = filter;
+        this.formedParticle = buildParticle(filter != null ? filter : EntropyType.ORDER, 2.0F);
     }
 
     public List<BlockPos> getInputs() {
@@ -167,7 +182,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         int maxZ = Math.max(worldPosition.getZ(), framePos.getZ());
 
         for (Vector3f point : BoxEdgeParticles.outline(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1, FORMED_EDGE_PARTICLE_SPACING)) {
-            serverLevel.sendParticles(FORMED_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+            serverLevel.sendParticles(formedParticle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 
@@ -222,10 +237,17 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * first (Order), so Chaos would never move and nothing offering only Order could ever fill a
      * Chaos-only destination like {@link LootGeneratorBlockEntity}. Draining by explicit
      * {@link FluidStack} instead lets each tank's actual contents get offered on their own. */
+    /** Whether {@code stack} is allowed to move through this pylon - {@code true} for anything on
+     * the original dual pylon ({@link #filter} is {@code null}), or only the matching entropy type
+     * on {@link io.github.tofithepuppycat.temporalindustries.block.ChaosPylon}/{@link io.github.tofithepuppycat.temporalindustries.block.OrderPylon}. */
+    private boolean acceptsFluid(FluidStack stack) {
+        return filter == null || EntropyFluids.typeOf(stack.getFluid()) == filter;
+    }
+
     private void transferAnyTank(IFluidHandler source, IFluidHandler dest, BlockPos inPos, BlockPos outPos) {
         for (int i = 0; i < source.getTanks(); i++) {
             FluidStack inTank = source.getFluidInTank(i);
-            if (inTank.isEmpty()) continue;
+            if (inTank.isEmpty() || !acceptsFluid(inTank)) continue;
 
             FluidStack wanted = inTank.copyWithAmount(Math.min(TRANSFER_RATE_MB, inTank.getAmount()));
             FluidStack simulated = source.drain(wanted, IFluidHandler.FluidAction.SIMULATE);
@@ -291,10 +313,12 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         if (!formed && level instanceof ServerLevel serverLevel) {
             highlightMissing(serverLevel);
         }
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(getBlockState().getBlock());
+        String prefix = "block." + key.getNamespace() + "." + key.getPath();
         Component formedComponent = formed
-                ? Component.translatable("block.temporalindustries.entropic_pylon.formed").withStyle(ChatFormatting.GREEN)
-                : Component.translatable("block.temporalindustries.entropic_pylon.unformed").withStyle(ChatFormatting.RED);
-        player.displayClientMessage(Component.translatable("block.temporalindustries.entropic_pylon.status",
+                ? Component.translatable(prefix + ".formed").withStyle(ChatFormatting.GREEN)
+                : Component.translatable(prefix + ".unformed").withStyle(ChatFormatting.RED);
+        player.displayClientMessage(Component.translatable(prefix + ".status",
                 inputs.size(), outputs.size(), formedComponent), true);
         return InteractionResult.CONSUME;
     }

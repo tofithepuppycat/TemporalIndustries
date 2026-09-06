@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "temporalindustries:block/order_pylon",
+    "north": "temporalindustries:block/order_pylon",
+    "south": "temporalindustries:block/order_pylon",
+    "east": "temporalindustries:block/order_pylon",
+    "west": "temporalindustries:block/order_pylon",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
+  }
+}
