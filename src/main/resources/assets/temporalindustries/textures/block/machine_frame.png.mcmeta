@@ -14,6 +14,15 @@
           "type": "match_state",
           "block": "temporalindustries:loot_generator",
           "properties": { "formed": "true" }
+        },
+        {
+          "type": "match_state",
+          "blocks": [
+            "temporalindustries:entropic_pylon",
+            "temporalindustries:chaos_pylon",
+            "temporalindustries:order_pylon"
+          ],
+          "properties": { "formed": "true" }
         }
       ]
     }
