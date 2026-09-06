@@ -9,7 +9,9 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongArrayTag;
@@ -61,8 +63,13 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final int TRANSMIT_PULSE_COUNT = 3;
     /** Ticks for a pulse to travel the full length of a leg, however long it is. */
     private static final int TRANSMIT_CYCLE_TICKS = 20;
-    private static final DustParticleOptions ORDER_TRANSMIT_PARTICLE = buildParticle(EntropyType.ORDER, 1.0F);
-    private static final DustParticleOptions CHAOS_TRANSMIT_PARTICLE = buildParticle(EntropyType.CHAOS, 1.0F);
+    /** Glowing wisp texture rather than {@link #MISSING_FRAME_PARTICLE}/{@link #formedParticle}'s flat
+     * dust square, so the flow of fluid along a leg reads as distinct from the structure outlines. */
+    private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
+    private static final ColorParticleOption CHAOS_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.CHAOS);
+    /** Raises transmit particles to the height of the {@link MachineFrame} above the pylon, rather
+     * than the pylon's own body, so the transfer effect reads at frame height for every pylon variant. */
+    private static final double TRANSMIT_HEIGHT_OFFSET = 1.0D;
 
     private static DustParticleOptions buildParticle(EntropyType type, float scale) {
         int color = type.color();
@@ -70,6 +77,14 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
         return new DustParticleOptions(new Vector3f(r, g, b), scale);
+    }
+
+    private static ColorParticleOption buildColorParticle(EntropyType type) {
+        int color = type.color();
+        float r = ((color >> 16) & 0xFF) / 255F;
+        float g = ((color >> 8) & 0xFF) / 255F;
+        float b = (color & 0xFF) / 255F;
+        return ColorParticleOption.create(ParticleTypes.ENTITY_EFFECT, r, g, b);
     }
 
     private List<BlockPos> inputs = new ArrayList<>();
@@ -273,9 +288,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * into the pylon, or pylon out to an output) reads at a glance. Their position along the line
      * scrolls with {@link ServerLevel#getGameTime()} so they visibly travel rather than sit static. */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
-        DustParticleOptions particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
-        Vector3f start = centerOf(from);
-        Vector3f end = centerOf(to);
+        ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
+        Vector3f start = centerOf(from).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
+        Vector3f end = centerOf(to).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
         double phase = (serverLevel.getGameTime() % TRANSMIT_CYCLE_TICKS) / (double) TRANSMIT_CYCLE_TICKS;
         for (int i = 0; i < TRANSMIT_PULSE_COUNT; i++) {
             float t = (float) ((phase + i / (double) TRANSMIT_PULSE_COUNT) % 1.0);
