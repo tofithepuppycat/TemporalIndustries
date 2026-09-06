@@ -22,6 +22,7 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -59,10 +60,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    /** How many evenly-spaced pulses trail along each input->pylon / pylon->output leg. */
-    private static final int TRANSMIT_PULSE_COUNT = 3;
-    /** Ticks for a pulse to travel the full length of a leg, however long it is. */
-    private static final int TRANSMIT_CYCLE_TICKS = 20;
     /** Glowing wisp texture rather than {@link #MISSING_FRAME_PARTICLE}/{@link #formedParticle}'s flat
      * dust square, so the flow of fluid along a leg reads as distinct from the structure outlines. */
     private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
@@ -70,6 +67,12 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     /** Raises transmit particles to the height of the {@link MachineFrame} above the pylon, rather
      * than the pylon's own body, so the transfer effect reads at frame height for every pylon variant. */
     private static final double TRANSMIT_HEIGHT_OFFSET = 1.0D;
+    /** Interior joints in the jagged transmit bolt, not counting its two fixed endpoints. */
+    private static final int LIGHTNING_SEGMENTS = 6;
+    /** Max perpendicular displacement of an interior joint off the straight line, in blocks. */
+    private static final double LIGHTNING_JITTER = 0.25D;
+    /** Target distance between consecutive particles along each jagged segment, in blocks. */
+    private static final double LIGHTNING_PARTICLE_SPACING = 0.15D;
 
     private static DustParticleOptions buildParticle(EntropyType type, float scale) {
         int color = type.color();
@@ -283,20 +286,57 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** A handful of pulses trailing along the straight line from {@code from} to {@code to}, colored
-     * by {@code type} - drawn every tick a transfer actually moves fluid, so the flow direction (input
-     * into the pylon, or pylon out to an output) reads at a glance. Their position along the line
-     * scrolls with {@link ServerLevel#getGameTime()} so they visibly travel rather than sit static. */
+    /** A jagged bolt from {@code from} to {@code to}, colored by {@code type} - drawn every tick a
+     * transfer actually moves fluid, so the flow direction (input into the pylon, or pylon out to an
+     * output) reads at a glance. Re-jittered fresh each call so the bolt flickers between different
+     * jagged shapes tick to tick, like real lightning, rather than sitting static. */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
         ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
         Vector3f start = centerOf(from).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
         Vector3f end = centerOf(to).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
-        double phase = (serverLevel.getGameTime() % TRANSMIT_CYCLE_TICKS) / (double) TRANSMIT_CYCLE_TICKS;
-        for (int i = 0; i < TRANSMIT_PULSE_COUNT; i++) {
-            float t = (float) ((phase + i / (double) TRANSMIT_PULSE_COUNT) % 1.0);
-            Vector3f point = new Vector3f(start).lerp(end, t);
+        for (Vector3f point : lightningArc(start, end, serverLevel.getRandom())) {
             serverLevel.sendParticles(particle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
+    }
+
+    /** Builds a jagged path of points from {@code start} to {@code end}: {@link #LIGHTNING_SEGMENTS}
+     * straight sub-segments whose interior joints are each nudged by a random amount perpendicular to
+     * the line (up to {@link #LIGHTNING_JITTER} blocks), then densely resampled at
+     * {@link #LIGHTNING_PARTICLE_SPACING} so the zigzag reads as a continuous bolt rather than a few
+     * bent joints. */
+    private static List<Vector3f> lightningArc(Vector3f start, Vector3f end, RandomSource random) {
+        Vector3f direction = new Vector3f(end).sub(start);
+        if (direction.lengthSquared() < 1.0E-6F) return List.of(start);
+        direction.normalize();
+
+        Vector3f reference = Math.abs(direction.y()) > 0.99F ? new Vector3f(1, 0, 0) : new Vector3f(0, 1, 0);
+        Vector3f right = new Vector3f(direction).cross(reference).normalize();
+        Vector3f up = new Vector3f(direction).cross(right).normalize();
+
+        Vector3f[] joints = new Vector3f[LIGHTNING_SEGMENTS + 1];
+        joints[0] = start;
+        joints[LIGHTNING_SEGMENTS] = end;
+        for (int i = 1; i < LIGHTNING_SEGMENTS; i++) {
+            float t = i / (float) LIGHTNING_SEGMENTS;
+            float rightOffset = (random.nextFloat() - 0.5F) * 2F * (float) LIGHTNING_JITTER;
+            float upOffset = (random.nextFloat() - 0.5F) * 2F * (float) LIGHTNING_JITTER;
+            joints[i] = new Vector3f(start).lerp(end, t)
+                    .add(new Vector3f(right).mul(rightOffset))
+                    .add(new Vector3f(up).mul(upOffset));
+        }
+
+        List<Vector3f> points = new ArrayList<>();
+        for (int i = 0; i < LIGHTNING_SEGMENTS; i++) {
+            Vector3f a = joints[i];
+            Vector3f b = joints[i + 1];
+            double segmentLength = new Vector3f(b).sub(a).length();
+            int steps = Math.max(1, (int) Math.round(segmentLength / LIGHTNING_PARTICLE_SPACING));
+            for (int s = (i == 0 ? 0 : 1); s <= steps; s++) {
+                float t = s / (float) steps;
+                points.add(new Vector3f(a).lerp(b, t));
+            }
+        }
+        return points;
     }
 
     private static Vector3f centerOf(BlockPos pos) {
