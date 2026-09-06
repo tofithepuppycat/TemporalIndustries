@@ -61,7 +61,7 @@ public class EntropicPylonItem extends BlockItem {
 
         if (player != null && isValidTarget(level, pos)) {
             if (!level.isClientSide) {
-                mark(stack, pos, player.isShiftKeyDown(), player);
+                mark(stack, pos, player.isShiftKeyDown(), player, translationPrefix());
             }
             return InteractionResult.sidedSuccess(level.isClientSide);
         }
@@ -80,23 +80,31 @@ public class EntropicPylonItem extends BlockItem {
     public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
         ItemStack stack = player.getItemInHand(hand);
         if (!level.isClientSide) {
-            clearMarks(stack, player);
+            clearMarks(stack, player, translationPrefix());
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
     }
 
-    private static void clearMarks(ItemStack stack, Player player) {
+    /** {@code "item.temporalindustries.entropic_pylon"} (or {@code chaos_pylon}/{@code order_pylon}
+     * for the single-liquid variants) - derived from this item's own registry name so the shared
+     * marking logic below reports status using the right block's translations. */
+    private String translationPrefix() {
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(getBlock());
+        return "item." + key.getNamespace() + "." + key.getPath();
+    }
+
+    private static void clearMarks(ItemStack stack, Player player, String translationPrefix) {
         CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         data.remove(TAG_INPUTS);
         data.remove(TAG_OUTPUTS);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
-        player.displayClientMessage(Component.translatable("item.temporalindustries.entropic_pylon.cleared"), true);
+        player.displayClientMessage(Component.translatable(translationPrefix + ".cleared"), true);
     }
 
     /** Adds {@code pos} to the input list (plain click) or output list (shift click), removing it
      * from the other list first - a block can't be both at once. Once a list is at {@link #MAX_MARKS},
      * the oldest mark is dropped to make room for the new one. */
-    private static void mark(ItemStack stack, BlockPos pos, boolean output, Player player) {
+    private static void mark(ItemStack stack, BlockPos pos, boolean output, Player player, String translationPrefix) {
         CompoundTag data = stack.getOrDefault(DataComponents.CUSTOM_DATA, CustomData.EMPTY).copyTag();
         List<BlockPos> same = readList(data, output ? TAG_OUTPUTS : TAG_INPUTS);
         List<BlockPos> opposite = readList(data, output ? TAG_INPUTS : TAG_OUTPUTS);
@@ -111,9 +119,8 @@ public class EntropicPylonItem extends BlockItem {
         writeList(data, output ? TAG_INPUTS : TAG_OUTPUTS, opposite);
         stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
 
-        player.displayClientMessage(Component.translatable(output
-                ? "item.temporalindustries.entropic_pylon.marked_output"
-                : "item.temporalindustries.entropic_pylon.marked_input", same.size(), MAX_MARKS), true);
+        player.displayClientMessage(Component.translatable(translationPrefix + (output ? ".marked_output" : ".marked_input"),
+                same.size(), MAX_MARKS), true);
     }
 
     /** Currently marked input positions on {@code stack}, for

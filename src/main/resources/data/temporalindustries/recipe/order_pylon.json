@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "DGD",
+    "GAG",
+    "DGD"
+  ],
+  "key": {
+    "D": { "item": "minecraft:deepslate" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "A": { "item": "temporalindustries:order_cell" }
+  },
+  "result": { "id": "temporalindustries:order_pylon", "count": 1 }
+}

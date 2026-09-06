@@ -1,0 +1,6 @@
+{
+  "variants": {
+    "formed=true": { "model": "temporalindustries:block/chaos_pylon" },
+    "formed=false": { "model": "temporalindustries:block/chaos_pylon_off" }
+  }
+}

@@ -7,7 +7,9 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
+import io.github.tofithepuppycat.temporalindustries.block.ChaosPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
+import io.github.tofithepuppycat.temporalindustries.block.OrderPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
@@ -327,6 +329,18 @@ public class Registration {
     public static final DeferredItem<Item> ENTROPIC_PYLON_ITEM = ITEMS.register("entropic_pylon",
             () -> new EntropicPylonItem(ENTROPIC_PYLON_BLOCK.get(), new Item.Properties()));
 
+    public static final DeferredBlock<ChaosPylon> CHAOS_PYLON_BLOCK = BLOCKS.register("chaos_pylon",
+            () -> new ChaosPylon(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> CHAOS_PYLON_ITEM = ITEMS.register("chaos_pylon",
+            () -> new EntropicPylonItem(CHAOS_PYLON_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<OrderPylon> ORDER_PYLON_BLOCK = BLOCKS.register("order_pylon",
+            () -> new OrderPylon(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> ORDER_PYLON_ITEM = ITEMS.register("order_pylon",
+            () -> new EntropicPylonItem(ORDER_PYLON_BLOCK.get(), new Item.Properties()));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
@@ -368,6 +382,20 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ENTROPIC_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropic_pylon",
             () -> BlockEntityType.Builder.of(EntropicPylonBlockEntity::new, ENTROPIC_PYLON_BLOCK.get()).build(null));
+
+    // Assigned as a side effect of CHAOS_PYLON_BLOCK_ENTITY/ORDER_PYLON_BLOCK_ENTITY's own registration
+    // below - the factory lambda passed to BlockEntityType.Builder.of needs the type it's building for,
+    // but referencing the DeferredHolder field being initialized from within its own initializer is a
+    // compile error, so a plain mutable field stands in; it's populated before any block entity is
+    // actually constructed in-game.
+    private static BlockEntityType<EntropicPylonBlockEntity> chaosPylonBlockEntityType;
+    private static BlockEntityType<EntropicPylonBlockEntity> orderPylonBlockEntityType;
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> CHAOS_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("chaos_pylon",
+            () -> chaosPylonBlockEntityType = BlockEntityType.Builder.of((pos, state) -> new EntropicPylonBlockEntity(chaosPylonBlockEntityType, pos, state, EntropyType.CHAOS), CHAOS_PYLON_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ORDER_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("order_pylon",
+            () -> orderPylonBlockEntityType = BlockEntityType.Builder.of((pos, state) -> new EntropicPylonBlockEntity(orderPylonBlockEntityType, pos, state, EntropyType.ORDER), ORDER_PYLON_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
             () -> IMenuTypeExtension.create(ChronovaultMenu::new));
@@ -418,6 +446,8 @@ public class Registration {
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
                         output.accept(ENTROPIC_PYLON_ITEM);
+                        output.accept(CHAOS_PYLON_ITEM);
+                        output.accept(ORDER_PYLON_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
