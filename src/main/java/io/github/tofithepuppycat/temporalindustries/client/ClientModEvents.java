@@ -21,6 +21,7 @@ import net.neoforged.neoforge.client.event.EntityRenderersEvent;
 import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterItemDecorationsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
+import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
@@ -69,6 +70,12 @@ public class ClientModEvents {
         event.register(Registration.ORDER_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.ORDER));
         event.register(Registration.CHAOS_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.CHAOS));
         event.register(Registration.TEMPORAL_ANCHOR_ITEM.get(), new TemporalAnchorItemDecorator());
+    }
+
+    @SuppressWarnings("null")
+    @SubscribeEvent
+    public static void onRegisterParticleProviders(RegisterParticleProvidersEvent event) {
+        event.registerSpriteSet(Registration.TRANSMIT_SPARK.get(), TransmitSparkParticle.Provider::new);
     }
 
     @SubscribeEvent

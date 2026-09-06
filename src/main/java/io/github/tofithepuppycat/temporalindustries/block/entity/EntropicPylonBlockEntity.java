@@ -11,7 +11,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
-import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.LongArrayTag;
@@ -87,7 +86,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         float r = ((color >> 16) & 0xFF) / 255F;
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
-        return ColorParticleOption.create(ParticleTypes.ENTITY_EFFECT, r, g, b);
+        return ColorParticleOption.create(Registration.TRANSMIT_SPARK.get(), r, g, b);
     }
 
     private List<BlockPos> inputs = new ArrayList<>();
