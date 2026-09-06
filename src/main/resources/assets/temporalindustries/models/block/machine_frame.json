@@ -1,6 +1,32 @@
 {
+  "loader": "fusion:model",
+  "type": "connecting",
   "parent": "minecraft:block/cube_all",
   "textures": {
     "all": "temporalindustries:block/machine_frame"
+  },
+  "connections": {
+    "type": "or",
+    "predicates": [
+      {
+        "type": "match_state",
+        "block": "temporalindustries:machine_frame",
+        "properties": { "connected": "true" }
+      },
+      {
+        "type": "match_state",
+        "block": "temporalindustries:loot_generator",
+        "properties": { "formed": "true" }
+      },
+      {
+        "type": "match_state",
+        "blocks": [
+          "temporalindustries:entropic_pylon",
+          "temporalindustries:chaos_pylon",
+          "temporalindustries:order_pylon"
+        ],
+        "properties": { "formed": "true" }
+      }
+    ]
   }
 }
