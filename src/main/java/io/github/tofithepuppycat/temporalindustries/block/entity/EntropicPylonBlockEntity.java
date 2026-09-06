@@ -59,13 +59,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    /** Glowing wisp texture rather than {@link #MISSING_FRAME_PARTICLE}/{@link #formedParticle}'s flat
-     * dust square, so the flow of fluid along a leg reads as distinct from the structure outlines. */
+    /** Spark texture rather than {@link #MISSING_FRAME_PARTICLE}/{@link #formedParticle}'s flat dust
+     * square, so the flow of fluid along a leg reads as distinct from the structure outlines. */
     private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
     private static final ColorParticleOption CHAOS_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.CHAOS);
-    /** Raises transmit particles to the height of the {@link MachineFrame} above the pylon, rather
-     * than the pylon's own body, so the transfer effect reads at frame height for every pylon variant. */
-    private static final double TRANSMIT_HEIGHT_OFFSET = 1.0D;
     /** Interior joints in the jagged transmit bolt, not counting its two fixed endpoints. */
     private static final int LIGHTNING_SEGMENTS = 6;
     /** Max perpendicular displacement of an interior joint off the straight line, in blocks. */
@@ -279,8 +276,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
             EntropyType type = EntropyFluids.typeOf(drained.getFluid());
             if (type != null && level instanceof ServerLevel serverLevel) {
-                spawnTransmitParticles(serverLevel, type, inPos, worldPosition);
-                spawnTransmitParticles(serverLevel, type, worldPosition, outPos);
+                BlockPos framePos = framePos();
+                spawnTransmitParticles(serverLevel, type, inPos, framePos);
+                spawnTransmitParticles(serverLevel, type, framePos, outPos);
             }
         }
     }
@@ -288,11 +286,15 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     /** A jagged bolt from {@code from} to {@code to}, colored by {@code type} - drawn every tick a
      * transfer actually moves fluid, so the flow direction (input into the pylon, or pylon out to an
      * output) reads at a glance. Re-jittered fresh each call so the bolt flickers between different
-     * jagged shapes tick to tick, like real lightning, rather than sitting static. */
+     * jagged shapes tick to tick, like real lightning, rather than sitting static. {@code from}/{@code to}
+     * are passed in already at the height they should render at - see {@link #transferAnyTank}, which
+     * uses {@link #framePos()} rather than {@link #worldPosition} for the pylon's own end of each leg,
+     * so the bolt meets the machine frame above the pylon without also lifting the input/output ends
+     * off their own blocks. */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
         ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
-        Vector3f start = centerOf(from).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
-        Vector3f end = centerOf(to).add(0.0F, (float) TRANSMIT_HEIGHT_OFFSET, 0.0F);
+        Vector3f start = centerOf(from);
+        Vector3f end = centerOf(to);
         for (Vector3f point : lightningArc(start, end, serverLevel.getRandom())) {
             serverLevel.sendParticles(particle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
