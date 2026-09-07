@@ -118,9 +118,6 @@ public class PortableChronoMarkerItem extends Item {
         spawnWave(player, serverLevel, visualRadius);
     }
 
-    // -------------------------------------------------------------------------
-    // Marking
-
     /** Records a save point across {@code chunks} purely from two point-in-time captures — no
      * continuous background tracking involved. For each chunk: ensures it has a baseline (first
      * time it's ever marked), then either diffs a fresh {@link ChunkSnapshot} against that chunk's
@@ -166,9 +163,6 @@ public class PortableChronoMarkerItem extends Item {
         level.sendParticles(ParticleTypes.SONIC_BOOM, player.getX(), player.getY() + 1.0D, player.getZ(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         ACTIVE_WAVE_START.put(player.getUUID(), level.getGameTime());
     }
-
-    // -------------------------------------------------------------------------
-    // Shape — fixed default square radius, or a player-saved custom selection
 
     private static List<ChunkPos> chunksInRadius(ChunkPos center) {
         List<ChunkPos> chunks = new ArrayList<>();
@@ -234,9 +228,6 @@ public class PortableChronoMarkerItem extends Item {
         }
         return radius;
     }
-
-    // -------------------------------------------------------------------------
-    // Visuals
 
     /** Sparse particle grid along the edges of the capture square, so the player can see where
      * tracking currently ends. */

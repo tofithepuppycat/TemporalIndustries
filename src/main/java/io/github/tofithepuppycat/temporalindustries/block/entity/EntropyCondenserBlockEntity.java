@@ -266,7 +266,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         syncToClients();
     }
 
-    // -------------------------------------------------------------------------
     // Cell slot draining (unpowered; see CrudeEntropyCondenserBlockEntity for the same logic)
 
     private void drainCell() {
@@ -298,7 +297,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         return drained;
     }
 
-    // -------------------------------------------------------------------------
     // Output slot filling (unpowered; reverse of the cell slot draining above)
 
     /** Tries to push Order then Chaos out of the tanks into whatever {@link EntropyReceptacle} sits
@@ -328,9 +326,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         return accepted;
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -353,7 +348,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // -------------------------------------------------------------------------
     // Container (cell input + output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }

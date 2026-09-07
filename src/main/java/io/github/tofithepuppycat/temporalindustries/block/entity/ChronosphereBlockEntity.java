@@ -64,9 +64,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
     }
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-
     @Override
     public void onLoad() {
         super.onLoad();
@@ -106,9 +103,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         if (level.isClientSide) return;
         be.commonTick(level);
     }
-
-    // -------------------------------------------------------------------------
-    // Chunk selection
 
     public ChunkPos getHomeChunkPos() {
         return new ChunkPos(worldPosition);
@@ -334,9 +328,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return snapshots;
     }
 
-    // -------------------------------------------------------------------------
-    // MenuProvider
-
     @Override
     public Component getDisplayName() {
         return Component.translatable("container.temporalindustries.chronosphere");
@@ -348,9 +339,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return new ChronosphereMenu(id, playerInventory, this,
                 ContainerLevelAccess.create(Objects.requireNonNull(level), worldPosition), getContainerData());
     }
-
-    // -------------------------------------------------------------------------
-    // NBT
 
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {

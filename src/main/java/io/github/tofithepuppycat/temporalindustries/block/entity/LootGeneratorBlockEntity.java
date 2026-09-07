@@ -499,9 +499,6 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -524,7 +521,6 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // -------------------------------------------------------------------------
     // Container (27-slot chest inventory; see ChronoProjectorBlockEntity for why both this and
     // IItemHandler exist)
 

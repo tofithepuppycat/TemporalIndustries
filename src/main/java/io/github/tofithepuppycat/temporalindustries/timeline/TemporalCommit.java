@@ -184,7 +184,6 @@ public final class TemporalCommit {
         return new TemporalCommit(id, parentId, type, gameTime, chunks, Collections.emptyList(), branchChunkPos, playerMarked);
     }
 
-    // -------------------------------------------------------------------------
     // Shared chunk-scoped graph traversal — used identically by the server (TemporalTimeline,
     // to actually resolve/apply a rollback) and the client (TimelineProjectionManager, to preview
     // one) so the two can never compute a different result for the same chunk-scoped commit list.

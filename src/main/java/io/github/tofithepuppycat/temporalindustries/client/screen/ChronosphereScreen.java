@@ -305,9 +305,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return minecraft.level.getGameTime();
     }
 
-    // -------------------------------------------------------------------------
-    // Rendering
-
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
@@ -660,9 +657,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.drawString(font, Component.translatable(direction, formatSincePlaced(Math.abs(diff))), panelX() + 8, panelY() + PREVIEW_DIFF_Y_OFFSET, TEXT_PRIMARY, false);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Interaction
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {

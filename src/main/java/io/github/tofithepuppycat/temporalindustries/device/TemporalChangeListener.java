@@ -63,7 +63,6 @@ public final class TemporalChangeListener {
 
     private TemporalChangeListener() {}
 
-    // -------------------------------------------------------------------------
     // Block events
 
     @SubscribeEvent
@@ -199,7 +198,6 @@ public final class TemporalChangeListener {
         TemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
     }
 
-    // -------------------------------------------------------------------------
     // Entity events
 
     @SubscribeEvent
@@ -273,7 +271,6 @@ public final class TemporalChangeListener {
         PENDING_ENTITY_CHECKS.clear();
     }
 
-    // -------------------------------------------------------------------------
     // Player death (anchor rewind) — cancels the death outright rather than letting it happen and
     // reverting on respawn, so the rewind pre-empts the death screen entirely.
 
@@ -316,7 +313,6 @@ public final class TemporalChangeListener {
                         player.getFoodData().getExhaustionLevel()));
     }
 
-    // -------------------------------------------------------------------------
     // Flush loop
 
     @SubscribeEvent
