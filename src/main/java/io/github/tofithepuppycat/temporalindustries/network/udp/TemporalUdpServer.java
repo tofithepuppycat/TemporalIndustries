@@ -51,9 +51,6 @@ public final class TemporalUdpServer {
     // playerUUID → InetSocketAddress (populated on HANDSHAKE_REQ)
     private final Map<UUID, InetSocketAddress> playerAddresses = new ConcurrentHashMap<>();
 
-    // -------------------------------------------------------------------------
-    // Server lifecycle
-
     @SubscribeEvent
     public static void onServerStarted(ServerStartedEvent event) {
         int minecraftPort = event.getServer().getPort();
@@ -91,9 +88,6 @@ public final class TemporalUdpServer {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-
     /**
      * Compresses and sends payload to the given player via UDP.
      * The client must have already performed the handshake (i.e. opened the GUI that
@@ -120,7 +114,6 @@ public final class TemporalUdpServer {
             byte[] ack = UdpFrame.buildHandshakeAck(sessionId, session.getTotalFragments(), session.payloadLength());
             send(ack, addr);
 
-            // Send all fragments; retransmit loop handles losses via NACK
             for (int i = 0; i < session.getTotalFragments(); i++) {
                 send(session.buildFragment(i), addr);
             }
@@ -129,9 +122,6 @@ public final class TemporalUdpServer {
             outboundSessions.remove(sessionId);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Receive loop
 
     private void receiveLoop() {
         byte[] buf = new byte[RECEIVE_BUFFER];
@@ -198,9 +188,6 @@ public final class TemporalUdpServer {
         DatagramPacket packet = new DatagramPacket(data, data.length, addr);
         socket.send(packet);
     }
-
-    // -------------------------------------------------------------------------
-    // Compression
 
     private static byte[] compress(byte[] input) {
         Deflater deflater = new Deflater(Deflater.BEST_SPEED);

@@ -71,7 +71,6 @@ public final class ItemEnergyCosts {
 
     private ItemEnergyCosts() {}
 
-    // -------------------------------------------------------------------------
     // Public API
 
     public static OptionalInt getCost(ItemLike item) {
@@ -83,7 +82,6 @@ public final class ItemEnergyCosts {
         return stack.isEmpty() ? OptionalInt.empty() : getCost(stack.getItem());
     }
 
-    // -------------------------------------------------------------------------
     // Raw datapack entries (populated by EnergyCostReloadListener)
 
     sealed interface RawEntry permits ItemEntry, TagEntry {}
@@ -96,7 +94,6 @@ public final class ItemEnergyCosts {
         rawEntries = entries;
     }
 
-    // -------------------------------------------------------------------------
     // Computation
 
     public static synchronized void compute(MinecraftServer server) {
@@ -182,7 +179,6 @@ public final class ItemEnergyCosts {
         return entries;
     }
 
-    // -------------------------------------------------------------------------
     // Modpack config (config/temporalindustries-common.toml, see EnergyCostConfig)
 
     private record UserConfig(List<RawEntry> entries, int defaultBlockCost) {}
@@ -274,7 +270,6 @@ public final class ItemEnergyCosts {
         return found ? OptionalInt.of(best) : OptionalInt.empty();
     }
 
-    // -------------------------------------------------------------------------
     // Cache (per-world, invalidated whenever the recipe set or base costs change)
 
     private static Path cacheFile(MinecraftServer server) {

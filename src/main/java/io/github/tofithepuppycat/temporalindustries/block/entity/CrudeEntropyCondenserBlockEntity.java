@@ -168,9 +168,6 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
         return drained;
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);

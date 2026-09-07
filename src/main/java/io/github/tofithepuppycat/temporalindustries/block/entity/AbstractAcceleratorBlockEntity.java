@@ -89,9 +89,6 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
         syncToClients();
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -113,9 +110,6 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // -------------------------------------------------------------------------
-    // Container (single input slot)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.get(INPUT_SLOT).isEmpty(); }

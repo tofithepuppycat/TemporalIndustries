@@ -51,9 +51,6 @@ public class UdpSession {
     public int getTotalFragments() { return totalFragments; }
     @Nullable public InetSocketAddress getClientAddr() { return clientAddr; }
 
-    // -------------------------------------------------------------------------
-    // Server-side helpers
-
     /** Returns the raw bytes for a single outbound fragment. */
     public byte[] buildFragment(int fragIndex) {
         if (payload == null) throw new IllegalStateException("Not a send session");
@@ -79,9 +76,6 @@ public class UdpSession {
     public long payloadLength() {
         return payload == null ? 0 : payload.length;
     }
-
-    // -------------------------------------------------------------------------
-    // Client-side helpers
 
     /** Stores an inbound fragment. Returns true if this was the last one needed. */
     public boolean receiveFragment(int fragIndex, byte[] data) {

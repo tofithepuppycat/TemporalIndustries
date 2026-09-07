@@ -284,9 +284,6 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         return JumpResult.SUCCESS;
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -308,9 +305,6 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // -------------------------------------------------------------------------
-    // NBT
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {

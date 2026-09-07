@@ -47,9 +47,6 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         return List.of(getChunkPos());
     }
 
-    // -------------------------------------------------------------------------
-    // Lifecycle
-
     @Override
     public void onLoad() {
         super.onLoad();
@@ -90,9 +87,6 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         if (level.isClientSide) return;
         be.commonTick(level);
     }
-
-    // -------------------------------------------------------------------------
-    // Timeline access (delegates to TemporalWorldData)
 
     /**
      * Returns all commits relevant to this machine's chunk (commits touching it, plus its own
@@ -158,9 +152,6 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         ChunkPos chunkPos = getChunkPos();
         return List.of(new ChunkTimelineSnapshot(chunkPos, getChunkCommits(chunkPos), getChunkLocalParents(chunkPos), getChunkHeadId(chunkPos)));
     }
-
-    // -------------------------------------------------------------------------
-    // MenuProvider
 
     @Override
     public Component getDisplayName() {

@@ -118,9 +118,6 @@ public class SchrodingerGeneratorBlockEntity extends BlockEntity implements Entr
         syncToClients();
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);

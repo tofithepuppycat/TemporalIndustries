@@ -54,9 +54,6 @@ public class TemporalTimeline {
     /** chunkPos.toLong() -> the commit that chunk's live world currently reflects. */
     private final Map<Long, Long> chunkHeadId = new HashMap<>();
 
-    // -------------------------------------------------------------------------
-    // Mutation
-
     /** Forgets chunkPos's entire recorded history — every commit that touched it, its local-parent
      * links, and its head — without touching the live world. Commits that also touch OTHER chunks
      * (a shared DELTA, say) are left registered globally; only this chunk's own reference to them is
@@ -183,9 +180,6 @@ public class TemporalTimeline {
         chunkHeadId.put(chunkKey, commitId);
     }
 
-    // -------------------------------------------------------------------------
-    // Queries
-
     /** Every commit relevant to chunkPos — commits touching it plus its own branch markers — in creation order. */
     public List<TemporalCommit> getCommitsForChunk(ChunkPos chunkPos) {
         List<Long> ids = chunkIndex.getOrDefault(chunkPos.toLong(), Collections.emptyList());
@@ -252,7 +246,6 @@ public class TemporalTimeline {
         return TemporalCommit.ancestryChain(chunkCommits, localParents, headId).size();
     }
 
-    // -------------------------------------------------------------------------
     // Manual save-point diffing (Portable ChronoMarker — see PortableChronoMarkerItem)
 
     /** chunkPos's nearest SNAPSHOT ancestor (inclusive) and every DELTA between it and the head, in
@@ -346,9 +339,6 @@ public class TemporalTimeline {
 
         return changes.isEmpty() ? null : new ChunkDelta(dimension, chunkPos, changes);
     }
-
-    // -------------------------------------------------------------------------
-    // World application
 
     /** The block/block-entity/entity state chunkPos would have at targetGameTime, transitioning
      * from fromCommitId — built by undoing the live lineage past its fork with the target lineage,
@@ -550,9 +540,6 @@ public class TemporalTimeline {
         }
         return total;
     }
-
-    // -------------------------------------------------------------------------
-    // Serialization
 
     public CompoundTag toTag() {
         CompoundTag tag = new CompoundTag();

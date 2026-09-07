@@ -269,9 +269,6 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -294,7 +291,6 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    // -------------------------------------------------------------------------
     // Container (input/output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
