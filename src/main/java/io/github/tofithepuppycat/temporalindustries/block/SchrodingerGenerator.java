@@ -24,13 +24,9 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Early-game generator block: undirected, its only state is whether a mob is currently trapped
- * inside (see {@link SchrodingerGeneratorBlockEntity}), which also drives a faint glow. Filled by
- * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem#interactLivingEntity}
- * before placement; emptied by an empty-handed right-click or by breaking the block, either of which
- * releases the mob back into the world rather than deleting it.
- */
+/** Early-game generator block whose only state is whether a mob is trapped inside (see
+ * {@link SchrodingerGeneratorBlockEntity}). Emptying it via right-click or breaking releases the
+ * mob back into the world rather than deleting it. */
 @SuppressWarnings("null")
 public class SchrodingerGenerator extends BaseEntityBlock {
     public static final BooleanProperty OCCUPIED = BlockStateProperties.OCCUPIED;

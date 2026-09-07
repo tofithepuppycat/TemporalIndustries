@@ -32,10 +32,8 @@ import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /** GUI for the Chronosphere block: the same timeline graph view as the Chronovault (via
- * {@link TimelineGraphWidget}), reading/jumping the home chunk's history exactly like a
- * Chronovault — except Jump moves every chunk this Chronosphere has claimed, not just the one shown.
- * The 11x11 claim map lives behind a square bookmark tab on the panel's side and opens as an
- * overlay, rather than occupying the main view. */
+ * {@link TimelineGraphWidget}), except Jump moves every chunk this Chronosphere has claimed. The
+ * claim map lives behind a bookmark tab on the panel's side and opens as an overlay. */
 @SuppressWarnings("null")
 public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu> {
     private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -50,15 +48,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     private static final int IMAGE_WIDTH = 256;
     private static final int IMAGE_HEIGHT = 256;
-    /** base.png's actual panel artwork sits inset this many pixels on every side within the
-     * 256x256 canvas — every layout constant below is measured from the artwork's edge (via
-     * {@link #panelX()}/{@link #panelY()}), not from leftPos/topPos directly, and CONTENT_SIZE
-     * (not imageWidth) is the usable width/height for centering and right-edge anchoring. */
+    /** base.png's artwork sits inset this many pixels within the 256x256 canvas; layout constants
+     * below are measured from the artwork's edge via {@link #panelX()}/{@link #panelY()}. */
     private static final int CONTENT_MARGIN = 16;
     private static final int CONTENT_SIZE = IMAGE_WIDTH - 2 * CONTENT_MARGIN;
 
-    // base.png is a light panel, so text/UI accents are tuned for a light background rather than
-    // the dark theme the rest of the mod's placeholder GUIs still use.
+    // base.png is a light panel, so text/UI accents are tuned for a light background.
     private static final int TEXT_PRIMARY = 0xFF2B2B2B;
     private static final int TEXT_SECONDARY = 0xFF5A5A5A;
     private static final int TEXT_MUTED = 0xFF7A7A7A;
@@ -66,13 +61,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int GRAPH_X_OFFSET = 8;
     private static final int GRAPH_Y_OFFSET = 18;
     private static final int GRAPH_WIDTH = CONTENT_SIZE - 2 * GRAPH_X_OFFSET;
-    /** Below the graph: a small gap, the two preview-time labels, another gap, then the button
-     * row — see PREVIEW_CURRENT_Y_OFFSET/PREVIEW_DIFF_Y_OFFSET/BUTTON_ROW_Y_OFFSET below, all of
-     * which this height is sized to leave room for within CONTENT_SIZE. */
+    /** Sized to leave room below for the preview-time labels and button row within CONTENT_SIZE. */
     private static final int GRAPH_HEIGHT = 154;
 
-    // Right edge stays anchored where it always was; only the left edge moved in, so the bar
-    // reads shorter without shifting away from the panel's right side.
     private static final int ENERGY_BAR_X_OFFSET = 160;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
     private static final int ENERGY_BAR_WIDTH = 57;
@@ -92,15 +83,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int ACTION_BUTTON_GAP = 6;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
-    /** How often the map overlay re-fetches terrain thumbnails while open, so it doesn't go stale
-     * for a player who leaves it open and keeps building nearby. */
+    /** How often the map overlay re-fetches terrain thumbnails while open. */
     private static final int MAP_SYNC_INTERVAL_TICKS = 100;
 
-    // Bookmark/auto-track/settings tabs: a vertical stack mostly overlapping the panel's right
-    // edge, protruding outward, like a vanilla recipe-book tab attached to a crafting GUI — see
-    // IconTabRenderer for the layered sprite, and render()'s z-order note for why they're drawn
-    // BEFORE the panel background in the non-overlay case (so the panel's edge paints over the
-    // small overlap sliver, tucking the tab in rather than stacking it visibly on top).
+    // Bookmark/auto-track/settings tabs: a vertical stack overlapping the panel's right edge,
+    // like a vanilla recipe-book tab. Drawn BEFORE the panel background so its edge tucks them in.
     private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
     private static final int TAB_OVERLAP = 5;
     private static final int BOOKMARK_Y_OFFSET = 40;
@@ -111,16 +98,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
 
-    /** 15px cells rather than the grid's 32px default: at MAX_RADIUS=5 the map is 11 cells across,
-     * and only this size leaves the title above and the three footer lines below room inside
-     * CONTENT_SIZE. */
+    /** 15px cells rather than the grid's 32px default, to fit the title and footer lines inside CONTENT_SIZE. */
     private static final int MAP_CELL_SIZE = 15;
     private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(
             ChronosphereBlockEntity.MAX_RADIUS, ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
     private static final int TOTAL_CLAIMABLE = countClaimableCells();
 
-    // The map overlay's grid (165px tall at MAX_RADIUS=5) eats most of CONTENT_SIZE's 224px, so
-    // its title/grid/footer are packed tighter than the settings overlay's equivalents.
     private static final int MAP_TITLE_Y_OFFSET = 6;
     private static final int MAP_GRID_Y_OFFSET = 18;
     private static final int MAP_FOOTER_GAP = 4;
@@ -138,8 +121,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int ticksSinceMapSync = 0;
     private boolean mapOverlayOpen = false;
     private boolean settingsOverlayOpen = false;
-    /** Whether the settings overlay is showing the "are you sure" step rather than the plain
-     * Delete All History button — reset whenever the overlay itself closes. */
+    /** Whether the settings overlay is showing the "are you sure" step; reset when the overlay closes. */
     private boolean deleteHistoryConfirmPending = false;
 
     private int bookmarkX;
@@ -173,9 +155,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return count;
     }
 
-    /** The visible top-left corner of base.png's artwork — every layout offset in this screen is
-     * measured from here, not from leftPos/topPos, which are the outer edge of the 16px-inset
-     * canvas the artwork sits within. */
+    /** The visible top-left corner of base.png's artwork; layout offsets are measured from here. */
     private int panelX() {
         return leftPos + CONTENT_MARGIN;
     }
@@ -212,11 +192,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
     }
 
-    /** Requests the shared "All" view's commit graph — every claimed chunk's history merged
-     * together (see {@link ChronosphereBlockEntity#getChunkCommits}). forceFull bypasses the
-     * "nothing changed since lastKnownHeadCommitId" skip on the server, which matters right after
-     * opening the screen: a stale cached head id could otherwise coincidentally match the current
-     * one and cause the server to (wrongly) skip replying with its actual data. */
+    /** Requests the shared "All" view's commit graph. forceFull bypasses the server's
+     * "nothing changed" skip, needed right after opening since a stale cached head id could
+     * otherwise coincidentally match and cause the server to wrongly skip replying. */
     private void requestTimelineView(boolean forceFull) {
         long lastKnownHead = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getHeadCommitId();
         long lastKnownPreviewVersion = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getPreviewVersion();
@@ -256,8 +234,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         TimelineProjectionManager.toggleShowChanges();
     }
 
-    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
-     * Button widgets (consistent with the claim map overlay's own click handling). */
+    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than Button widgets. */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
         int buttonY = panelY() + 130;
 
@@ -318,9 +295,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         }
     }
 
-    /** Show Changes / Jump: small icon buttons (menu_icon_base_small.png + their own icon) in
-     * place of vanilla Buttons — Show Changes tints on while active, Jump dims while there's
-     * nothing selected to jump to. */
+    /** Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while nothing is selected. */
     private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
         int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
@@ -371,8 +346,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
     }
 
-    /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
-     * order (below the midpoint) and dark purple toward chaos (above it). */
+    /** Bidirectional order/chaos balance bar: fills from the center tick outward. */
     private void renderEntropyBar(GuiGraphics guiGraphics) {
         int barX = panelX() + ENTROPY_BAR_X_OFFSET;
         int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
@@ -407,7 +381,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         IconTabRenderer.renderBackground(guiGraphics, bookmarkX, bookmarkY, tint);
 
-        // Placeholder icon: a little 3x3 grid glyph, echoing the claim map it opens.
+        // Placeholder icon: a 3x3 grid glyph, echoing the claim map it opens.
         int glyphColor = mapOverlayOpen ? 0xFFF0FAFF : TEXT_PRIMARY;
         int cell = 5;
         int gap = 2;
@@ -435,7 +409,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         IconTabRenderer.renderBackground(guiGraphics, autoTrackX, autoTrackY, tint);
 
-        // Placeholder icon: a small filled "record" dot, echoing a recording indicator.
+        // Placeholder icon: a filled "record" dot.
         int glyphColor = enabled ? 0xFFFFEDED : TEXT_PRIMARY;
         int dotSize = 10;
         int dotX = autoTrackX + (TAB_ROW_SIZE - dotSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
@@ -511,9 +485,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return mouseX >= x && mouseX <= x + width && mouseY >= y && mouseY <= y + height;
     }
 
-    // GuiGraphics#drawCenteredString/#drawWordWrap always draw with a drop shadow and have no
-    // no-shadow overload; against this light panel the shadow reads as ghosting rather than
-    // contrast, so these draw centered/wrapped text without one instead.
+    // No no-shadow overload exists on GuiGraphics#drawCenteredString/#drawWordWrap; against this
+    // light panel the shadow reads as ghosting, so these draw text without one.
     private void drawCenteredNoShadow(GuiGraphics guiGraphics, Component text, int centerX, int y, int color) {
         guiGraphics.drawString(font, text, centerX - font.width(text) / 2, y, color, false);
     }
@@ -552,11 +525,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
         });
 
-        // menu.getBlockEntity() is the CLIENT's copy of the block entity; toggleChunk() only calls
-        // setChanged() (not the block-update sync AbstractTimelineMachineBlockEntity's other
-        // mutators trigger), so its additionalChunks set never actually reaches the client —
-        // getChunkCount() would always read 1 here. ChronosphereClientState's synced selection is
-        // the only client-accurate source.
+        // menu.getBlockEntity() is the client's stale copy (toggleChunk() only calls setChanged(),
+        // not a synced mutator), so ChronosphereClientState is the only client-accurate source.
         int claimedCount = ChronosphereClientState.getSelectedCount();
         int footerY = gridY + MAP_GRID.gridPixels() + MAP_FOOTER_GAP;
         drawCenteredNoShadow(guiGraphics, Component.literal(
@@ -585,10 +555,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-        // Tabs are always drawn BEFORE the panel background, so the panel's opaque texture paints
-        // over their small edge overlap and tucks them in — the same trick a vanilla recipe-book
-        // tab uses to look attached to, rather than stacked on top of, its GUI. This holds
-        // regardless of whether a modal overlay is open, so their z-order never shifts.
+        // Tabs are drawn BEFORE the panel background so its opaque texture tucks in their overlap.
         renderTabs(guiGraphics, mouseX, mouseY);
 
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
@@ -695,8 +662,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                     }
                 }
             }
-            // The overlay is modal: swallow every click on the panel while it's open so nothing
-            // underneath (the graph, the buttons) reacts to it.
+            // Modal: swallow clicks so nothing underneath reacts to them.
             return true;
         }
 
@@ -704,7 +670,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             if (button == 0) {
                 handleSettingsOverlayClick(mouseX, mouseY);
             }
-            // Modal, same as the claim map overlay above.
             return true;
         }
 
@@ -757,8 +722,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
     }
 
-    /** Formats an absolute game time as "Day {day} | {HH:MM}". Day 1 starts at game time 0; a
-     * Minecraft day is 24000 ticks, and tick 0 within a day is 06:00. */
+    /** Formats an absolute game time as "Day {day} | {HH:MM}"; tick 0 within a day is 06:00. */
     private static String formatGameDayTime(long gameTime) {
         long day = Math.floorDiv(gameTime, 24000L) + 1L;
         long dayTicks = Math.floorMod(gameTime, 24000L);

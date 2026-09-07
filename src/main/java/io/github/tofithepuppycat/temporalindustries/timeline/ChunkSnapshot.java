@@ -21,30 +21,19 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A full-chunk baseline: every block in the chunk, not just what's changed since some earlier
- * point (contrast {@link BlockChangeDelta}, which is deliberately sparse). Backs
- * {@link TemporalCommit.Type#SNAPSHOT} commits, which exist so {@link TemporalCommit#ancestryChain}
- * never has to walk further back than the nearest one — without a baseline to stop at, a chunk's
- * history walk (and the client's identical copy of that walk, for the ghost preview) grows without
- * bound for the life of the world.
+ * A full-chunk baseline: every block in the chunk, not just what changed (contrast
+ * {@link BlockChangeDelta}). Backs {@link TemporalCommit.Type#SNAPSHOT} commits so a history walk
+ * never has to go back further than the nearest one.
  *
- * <p>Sixteen-cube sections are the natural unit of sparseness here — a section that's uniformly
- * stone, air, or bedrock (the overwhelming majority of any real chunk) collapses to a single
- * stored state instead of 4096 individual ones, the same win a sparse octree gets from a uniform
- * octant. Sections that aren't uniform (the thin, block-heterogeneous band a player actually builds
- * in) fall back to a palette + run-length encoding: real terrain is strongly Y/Z-layered, so a
- * scan in y-major, then z, then x order tends to produce long runs even where individual blocks
- * differ across a section.
+ * <p>Each 16-cube section that's uniform (stone/air/bedrock) collapses to a single stored state;
+ * non-uniform sections fall back to a palette + run-length encoding, scanned y-major/z/x to
+ * maximize run length against typically Y/Z-layered terrain.
  */
 public final class ChunkSnapshot {
     private static final int SECTION_VOLUME = 16 * 16 * 16;
 
-    /** Bottom-up (y, then z, then x) — the same traversal order {@link SnapshotSection} uses to
-     * capture a chunk. Shared with {@link TemporalTimeline#applyChunkAtTime} so a delta-based
-     * rollback restores blocks in a deterministic, support-before-dependent order instead of
-     * whatever order a HashMap happens to iterate in — a plain HashMap order let gravity blocks
-     * (sand/gravel) and neighbor-reactive blocks (attached torches, redstone) reach the world in
-     * arbitrary order mid-restore. */
+    /** Bottom-up (y, then z, then x) order; used so rollback restores blocks deterministically
+     * (support before dependent) instead of in arbitrary HashMap iteration order. */
     public static final Comparator<BlockPos> BOTTOM_UP_ORDER =
             Comparator.<BlockPos>comparingInt(pos -> pos.getY())
                     .thenComparingInt(pos -> pos.getZ())
@@ -67,27 +56,21 @@ public final class ChunkSnapshot {
     public int sectionCount() { return sections.size(); }
     public int minSectionY() { return minSectionY; }
 
-    /** Whether section sectionIndex is a single uniform state in both this snapshot and other's —
-     * lets a whole 4096-position section be recognized as identical in O(1), without either side
-     * expanding into a position map first. Used by {@link TemporalTimeline#diffChunkAgainstHead}'s
-     * section-scoped fast path: the overwhelming majority of any real chunk (everything below the
-     * surface, everything above the build limit) is exactly this case. */
+    /** Whether section sectionIndex is the same single uniform state in both this snapshot and
+     * other's, letting a whole section be recognized as identical in O(1). */
     public boolean sectionTriviallyEquals(ChunkSnapshot other, int sectionIndex) {
         SnapshotSection a = sections.get(sectionIndex);
         SnapshotSection b = other.sections.get(sectionIndex);
         return a.uniform && b.uniform && a.uniformState.equals(b.uniformState);
     }
 
-    /** Collects just section sectionIndex's positions — the same output {@link #toBlockStateMap()}
-     * would produce for that section's Y-range, without expanding every other section too. */
+    /** Collects just section sectionIndex's positions, without expanding every other section. */
     public void collectSectionInto(int sectionIndex, Map<BlockPos, BlockState> out) {
         sections.get(sectionIndex).collectInto(chunkPos, minSectionY + sectionIndex, out);
     }
 
-    /** Every block position this baseline covers, expanded from its section encoding — used to
-     * seed a rollback's desired state when the chain being resolved has no shared history with the
-     * live chain to diff deltas against (see TemporalTimeline#resolveDesiredState). Read-only: unlike
-     * {@link #applyTo}, this never touches the world. */
+    /** Every block position this baseline covers, expanded from its section encoding. Read-only;
+     * unlike {@link #applyTo}, never touches the world. */
     public Map<BlockPos, BlockState> toBlockStateMap() {
         Map<BlockPos, BlockState> map = new HashMap<>();
         for (int i = 0; i < sections.size(); i++) {
@@ -96,8 +79,7 @@ public final class ChunkSnapshot {
         return map;
     }
 
-    /** This baseline's captured block entity NBT, keyed by position — the read-only counterpart to
-     * {@link #toBlockStateMap()} for {@link #applyTo}'s block entity restoration. */
+    /** This baseline's captured block entity NBT, keyed by position. */
     public Map<BlockPos, CompoundTag> getBlockEntityTags() {
         return blockEntities;
     }
@@ -119,8 +101,7 @@ public final class ChunkSnapshot {
         return new ChunkSnapshot(chunkPos, level.getMinSection(), sections, blockEntities);
     }
 
-    // NBT — server-only; never sent over the network (clients already have the real blocks
-    // synced through normal chunk data, so there's nothing for them to do with a full baseline).
+    // NBT — server-only; never sent over the network.
 
     public CompoundTag toTag() {
         CompoundTag tag = new CompoundTag();
@@ -165,8 +146,7 @@ public final class ChunkSnapshot {
         return new ChunkSnapshot(chunkPos, minSectionY, sections, blockEntities);
     }
 
-    // One 16x16x16 section: either a single uniform state (the common case for a real chunk —
-    // deep stone, sky air, bedrock), or a palette + run-length encoding of all 4096 positions.
+    // One 16x16x16 section: either a single uniform state, or a palette + run-length encoding.
 
     private static final class SnapshotSection {
         private final boolean uniform;
@@ -205,9 +185,8 @@ public final class ChunkSnapshot {
             int currentIndex = -1;
             int currentRunLength = 0;
 
-            // y-major, then z, then x: a section is usually far more uniform within one Y-layer
-            // (a slab of the same stone/ore/etc.) than across the vertical stack a player has
-            // actually dug through or built on, so this order maximises run length in practice.
+            // y-major, then z, then x: sections are usually more uniform within one Y-layer than
+            // across the vertical stack, maximizing run length.
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
@@ -243,9 +222,8 @@ public final class ChunkSnapshot {
             return new SnapshotSection(palette, indices, lengths);
         }
 
-        /** Writes this section's captured state into a map, keyed by absolute position — explicit
-         * about air rather than skipping it, so a caller can tell "this position should be cleared"
-         * from "this position isn't covered". */
+        /** Writes this section's captured state into a map, keyed by absolute position; explicit
+         * about air rather than skipping it. */
         void collectInto(ChunkPos chunkPos, int sectionY, Map<BlockPos, BlockState> out) {
             int baseX = chunkPos.getMinBlockX();
             int baseZ = chunkPos.getMinBlockZ();

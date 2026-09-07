@@ -24,10 +24,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * The single-block-tier time machine: no chunk tracking, no branching timeline (see
- * TemporalTimeline) — just one marker on the block its front face points at. Sneak-right-click
- * sets the marker to that block's current state; a plain right-click restores it, paying an
- * energy cost drawn from {@link io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts}.
+ * Single-block-tier time machine: marks the state of the block its front face points at.
+ * Sneak-right-click sets the marker; a plain right-click restores it for an energy cost.
  */
 @SuppressWarnings("null")
 public class Chronodial extends BaseEntityBlock {

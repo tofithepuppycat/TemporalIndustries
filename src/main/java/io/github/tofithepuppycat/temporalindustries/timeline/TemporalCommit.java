@@ -13,22 +13,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A single point in the timeline. SNAPSHOT commits store a full baseline state;
- * DELTA commits store only what changed since the previous commit — the same two types a
- * Portable ChronoMarker's manual save point produces (see PortableChronoMarkerItem), so a
- * player-triggered save is indistinguishable from an automatically tracked one for jump/rollback
- * purposes. A DELTA/SNAPSHOT produced that way is flagged playerMarked so the graph can point out
- * where a player actually clicked "save", without needing a separate zero-diff commit for it.
- * Commits form a singly-linked chain via parentId (-1 for the root).
+ * A single point in the timeline. SNAPSHOT commits store a full baseline state; DELTA commits
+ * store only what changed since the previous commit. Both types can also come from a player's
+ * Portable ChronoMarker save, flagged via playerMarked. Commits form a singly-linked chain via
+ * parentId (-1 for the root).
  */
 public final class TemporalCommit {
     public enum Type { SNAPSHOT, DELTA, BRANCH }
 
-    /** Sentinel meaning "no specific commit preferred — resolve purely by gameTime", for the
-     * preferredCommitId/targetCommitId parameters threaded through {@link TemporalTimeline#branch},
-     * {@link TemporalTimeline#applyChunkAtTime}, {@link TemporalTimeline#computeJumpCost}, and
-     * {@link io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider#jump(long, long)}.
-     * Distinct from the unrelated -1 used elsewhere as a root/parent or lookup-miss marker. */
+    /** Sentinel meaning "no specific commit preferred — resolve purely by gameTime". */
     public static final long NO_PREFERRED_COMMIT = -1L;
 
     private final long id;
@@ -36,16 +29,13 @@ public final class TemporalCommit {
     private final Type type;
     private final long gameTime;
     private final List<ChunkDelta> chunkDeltas;
-    /** Only meaningful for Type.SNAPSHOT: a full per-chunk baseline (see {@link ChunkSnapshot}) for
-     * every chunk this commit baselines. Never sent over the network — clients already see the
-     * real blocks through normal chunk sync, so there's nothing for them to do with the raw grid. */
+    /** Only meaningful for Type.SNAPSHOT: a full per-chunk baseline for every chunk this commit
+     * baselines. Never sent over the network. */
     private final List<ChunkSnapshot> chunkSnapshots;
-    /** Only meaningful for Type.BRANCH: the packed ChunkPos (see {@link net.minecraft.world.level.ChunkPos#toLong})
-     * this marker was checked out for. */
+    /** Only meaningful for Type.BRANCH: the packed ChunkPos this marker was checked out for. */
     private final long branchChunkPos;
-    /** Whether this DELTA/SNAPSHOT was produced by a player's Portable ChronoMarker save rather
-     * than automatic tracking — flags the commit for the graph's special mark icon instead of
-     * needing a separate zero-diff commit to point it out. Never true for BRANCH. */
+    /** Whether a player's Portable ChronoMarker save produced this DELTA/SNAPSHOT, rather than
+     * automatic tracking. Never true for BRANCH. */
     private final boolean playerMarked;
 
     private TemporalCommit(long id, long parentId, Type type, long gameTime, List<ChunkDelta> chunkDeltas,
@@ -64,21 +54,13 @@ public final class TemporalCommit {
         return new TemporalCommit(id, parentId, Type.DELTA, gameTime, chunkDeltas, Collections.emptyList(), 0L, playerMarked);
     }
 
-    /**
-     * A full-baseline commit: {@link TemporalCommit#ancestryChain} stops here rather than walking
-     * any further back, so a chunk's history-walk cost stays bounded by however recently it was
-     * last snapshotted instead of growing for the life of the world.
-     */
+    /** A full-baseline commit; {@link #ancestryChain} stops here instead of walking further back. */
     public static TemporalCommit snapshot(long id, long parentId, long gameTime, List<ChunkSnapshot> chunkSnapshots, boolean playerMarked) {
         return new TemporalCommit(id, parentId, Type.SNAPSHOT, gameTime, Collections.emptyList(), chunkSnapshots, 0L, playerMarked);
     }
 
-    /**
-     * A zero-diff marker commit created whenever a Time Machine checks out a point in time.
-     * Scoped to branchChunkPos: it only records a fork in that one chunk's own history, so
-     * subsequent deltas touching that chunk attach here instead of continuing past it, without
-     * affecting any other chunk's timeline.
-     */
+    /** A zero-diff marker commit created whenever a Time Machine checks out a point in time,
+     * scoped to branchChunkPos so only that chunk's history forks here. */
     public static TemporalCommit branch(long id, long parentId, long gameTime, long branchChunkPos) {
         return new TemporalCommit(id, parentId, Type.BRANCH, gameTime, Collections.emptyList(), Collections.emptyList(), branchChunkPos, false);
     }
@@ -92,8 +74,7 @@ public final class TemporalCommit {
     public List<ChunkSnapshot> getChunkSnapshots() { return chunkSnapshots; }
     /** Only meaningful when getType() == Type.BRANCH. */
     public long getBranchChunkPos() { return branchChunkPos; }
-    /** Whether a player's Portable ChronoMarker produced this commit rather than automatic
-     * tracking — always false for Type.BRANCH. */
+    /** Whether a player's Portable ChronoMarker produced this commit; always false for Type.BRANCH. */
     public boolean isPlayerMarked() { return playerMarked; }
 
     public int getTotalChangeCount() {
@@ -102,10 +83,7 @@ public final class TemporalCommit {
         return count;
     }
 
-    /**
-     * Deterministic 7-hex-digit label derived from this commit's identity, styled after a
-     * git short hash. Not cryptographic — just a stable, distinct-looking tag for GUI display.
-     */
+    /** Deterministic 7-hex-digit label derived from this commit's identity, styled after a git short hash. */
     public String getShortHash() {
         long h = id * 0x9E3779B97F4A7C15L;
         h ^= Long.rotateLeft(parentId * 0xC2B2AE3D27D4EB4FL + 1L, 17);
@@ -184,13 +162,12 @@ public final class TemporalCommit {
         return new TemporalCommit(id, parentId, type, gameTime, chunks, Collections.emptyList(), branchChunkPos, playerMarked);
     }
 
-    // Shared chunk-scoped graph traversal — used identically by the server (TemporalTimeline,
-    // to actually resolve/apply a rollback) and the client (TimelineProjectionManager, to preview
-    // one) so the two can never compute a different result for the same chunk-scoped commit list.
+    // Shared chunk-scoped graph traversal, used identically by the server (to resolve/apply a
+    // rollback) and the client (to preview one).
 
-    /** The commit in candidates whose gameTime is nearest targetGameTime, or -1 if candidates is
-     * empty. On an exact tie, prefers the LATER candidate (by list position), since a branch marker
-     * shares its exact gameTime with the commit it forked from and always appears after it. */
+    /** The commit in candidates whose gameTime is nearest targetGameTime, or -1 if empty. On an
+     * exact tie, prefers the later candidate, since a branch marker shares its parent's gameTime
+     * and always appears after it. */
     public static long resolveNearest(List<TemporalCommit> candidates, long targetGameTime) {
         long bestId = -1L;
         long bestDist = Long.MAX_VALUE;
@@ -205,13 +182,8 @@ public final class TemporalCommit {
     }
 
     /** Reconstructs commitId's ancestry within a chunk (root-most first, commitId last) by
-     * following localParentById links (each chunk-relevant commit id -> the id it locally forked
-     * from, -1/absent = root). Recorded explicitly at commit time rather than inferred from list
-     * order (see {@link TemporalTimeline}). Stops at the nearest SNAPSHOT ancestor rather than
-     * always walking to the true root — a snapshot is a full baseline (see {@link ChunkSnapshot}),
-     * so nothing before it can affect a diff computed from this chain, and without this bound the
-     * walk (done identically by both the server and the client's ghost-preview copy of this method)
-     * would grow for the entire life of the world. */
+     * following localParentById links. Stops at the nearest SNAPSHOT ancestor rather than the true
+     * root, since a snapshot is a full baseline and nothing before it affects the diff. */
     public static List<TemporalCommit> ancestryChain(List<TemporalCommit> chunkCommits, Map<Long, Long> localParentById, long commitId) {
         Map<Long, TemporalCommit> byId = new HashMap<>();
         for (TemporalCommit c : chunkCommits) byId.put(c.getId(), c);

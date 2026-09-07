@@ -21,14 +21,11 @@ import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 
 /**
  * Renders and drives a machine's commit graph — node layout, pan/zoom, click-to-select, hover
- * tooltip — reading from {@link TimelineProjectionManager}. Shared by every screen that shows
- * "the same timeline view as the Chronovault" ({@code ChronovaultScreen}, {@code ChronosphereScreen}),
- * so the graph looks and behaves identically everywhere it appears; only the surrounding chrome
- * (energy bar, buttons, labels) is screen-specific.
+ * tooltip — reading from {@link TimelineProjectionManager}. Shared by ChronovaultScreen and
+ * ChronosphereScreen so the graph behaves identically everywhere it appears.
  *
- * <p>Callers own the on-screen rectangle the graph draws into (graphX/Y/Width/Height) and pass it
- * into every render/interaction call — the widget itself holds no layout position, only the pan
- * pan/zoom/selection state for whichever machine is currently active.
+ * <p>Callers own the on-screen rectangle the graph draws into and pass it into every
+ * render/interaction call; the widget itself holds only pan/zoom/selection state.
  */
 @SuppressWarnings("null")
 public final class TimelineGraphWidget {
@@ -37,18 +34,15 @@ public final class TimelineGraphWidget {
 
     private static final int COLUMN_SPACING = 26;
     private static final int ROW_SPACING = 32;
-    /** Game ticks per column of horizontal spacing — nodes are placed by actual elapsed time
-     * rather than by position in the commit list. */
+    /** Game ticks per column; nodes are placed by elapsed time, not position in the commit list. */
     private static final double TICKS_PER_COLUMN = 80.0D;
-    /** Maximum horizontal spacing in pixels */
+    /** Maximum horizontal spacing in pixels. */
     private static final double MAX_COLUMN_OFFSET = 12.0D;
-    /** Minimum column gap enforced between chronologically consecutive commits, so two commits
-     * only ticks apart in gameTime still get visibly separate nodes instead of overlapping. */
+    /** Minimum column gap between consecutive commits, so ones only ticks apart don't overlap. */
     private static final double MIN_COLUMN_GAP = 0.4D;
     private static final int BRANCH_X_OFFSET = 6;
 
-    // Whichever commit this chunk's live world currently reflects is ringed by a static green
-    // halo, distinguishing it from the selected node's white highlight without any blinking.
+    // The commit this chunk's live world currently reflects is ringed by a static green halo.
     private static final int HEAD_HALO_RGB = 0xFF33FF33;
     private static final int HEAD_HALO_MARGIN = 2;
 
@@ -83,11 +77,8 @@ public final class TimelineGraphWidget {
     /** commitId -> GREEK_NAMES index of its lineage. Rebuilt each render() call. */
     private final Map<Long, Integer> timelineIndexById = new HashMap<>();
 
-    // Layout (row/column/label/fork-offset assignment) only actually needs recomputing when
-    // TimelineProjectionManager's commit list reference changes — which, since the server skips
-    // replying when nothing changed, is normally just once a second at most — rather than on every
-    // render() call (60/sec). cachedLayoutCommits is the identity of the list this layout was last
-    // computed from; a mismatch (including the initial null) triggers a rebuild.
+    // Layout only needs recomputing when the commit list reference changes, not on every render()
+    // call. cachedLayoutCommits is the list identity layout was last computed from.
     private List<TemporalCommit> cachedLayoutCommits = null;
     private Map<Long, TemporalCommit> byId = new HashMap<>();
     private Map<Long, Integer> rowById = new HashMap<>();
@@ -204,14 +195,13 @@ public final class TimelineGraphWidget {
                 }
 
                 if (isBranch) {
-                    // Branch points render as a hollow ring so a fork is visually distinct from a plain commit.
+                    // Branch points render as a hollow ring, distinct from a plain commit.
                     int outer = r + 1;
                     int inner = Math.max(1, r - 1);
                     guiGraphics.fill(pointX - outer, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
                     guiGraphics.fill(pointX - inner, pointY - inner, pointX + inner + 1, pointY + inner + 1, 0xFF000000);
                 } else if (commit.isPlayerMarked()) {
-                    // Player-marked commits render as a diamond, distinct from an automatic commit's square —
-                    // enlarged relative to a plain node so a player-triggered save stands out on the graph.
+                    // Player-marked commits render as an enlarged diamond, distinct from an automatic square.
                     drawDiamond(guiGraphics, pointX, pointY, shapeRadius, color);
                 } else {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
@@ -221,17 +211,14 @@ public final class TimelineGraphWidget {
             }
         }
 
-        // Redraw the selected node's highlight on top, in case a sibling drawn later in
-        // chronological order (e.g. a branch marker sharing its parent's gameTime, or a fork nudged
-        // only slightly right by BRANCH_X_OFFSET) ended up overlapping and painting over it.
+        // Redraw the selected node's highlight on top, in case a later-drawn sibling overlapped it.
         long selectedCommitId = TimelineProjectionManager.getSelectedCommitId();
         for (RenderedCommit rc : renderedCommits) {
             if (rc.commit.getId() != selectedCommitId) {
                 continue;
             }
             int selectedColor = 0xFFFFFFFF;
-            // Drawn larger than its normal size too, on top of the recolor, so the selection is
-            // obvious even when its color happens to be close to a neighboring lane's.
+            // Drawn larger too, so the selection is obvious even near a similar lane color.
             int selectedRadius = selectedRadius(rc.hitRadius);
             if (rc.commit.getId() == headCommitId) {
                 drawHeadHalo(guiGraphics, rc.x, rc.y, selectedRadius);
@@ -267,8 +254,7 @@ public final class TimelineGraphWidget {
 
     private void computeLayout(List<TemporalCommit> commits, Map<Long, Long> localParentById) {
         // Assign each commit a lane (row): the first child continues its parent's lane, additional
-        // children fork into new lanes. localParentById is this chunk's own fork history, distinct
-        // from a commit's dimension-wide getParentId().
+        // children fork into new lanes.
         byId = new HashMap<>();
         rowById = new HashMap<>();
         columnById = new HashMap<>();
@@ -276,9 +262,7 @@ public final class TimelineGraphWidget {
         forkOffsetById = new HashMap<>();
         Map<Long, Integer> childCountByParent = new HashMap<>();
         timelineIndexById.clear();
-        // Branch labels ("Beta Timeline", etc.) are only shown once that lineage actually has a
-        // node of its own — a bare checkout that never got followed by a commit shouldn't clutter
-        // the graph with a name for a branch nothing was ever recorded on.
+        // Branch labels are only shown once that lineage has a node of its own.
         Set<Long> pendingBranchLabelIds = new HashSet<>();
 
         long baseGameTime = commits.get(0).getGameTime();
@@ -306,8 +290,7 @@ public final class TimelineGraphWidget {
                 labelById.put(commit.getId(), GREEK_NAMES[timelineIndex % GREEK_NAMES.length] + " Timeline");
                 pendingBranchLabelIds.add(commit.getId());
             }
-            // A non-branch commit checked out onto this branch point means the branch is no longer
-            // an empty fork, so its label can stay.
+            // A non-branch commit checked out onto this branch point means the label can stay.
             if (!isRoot && !isBranch) {
                 pendingBranchLabelIds.remove(localParentId);
             }
@@ -320,28 +303,20 @@ public final class TimelineGraphWidget {
                 int parentRow = rowById.getOrDefault(localParentId, 0);
                 int childIndex = childCountByParent.getOrDefault(localParentId, 0);
                 childCountByParent.put(localParentId, childIndex + 1);
-                // Row 0 is reserved for the trunk, so the first checkout off it always gets a new
-                // row; re-checking out an existing branch reuses its row instead of forking again.
+                // Row 0 is reserved for the trunk; re-checking out an existing branch reuses its row.
                 boolean forksRow = childIndex != 0 || (isBranch && parentRow == 0);
                 row = forksRow ? nextRow++ : parentRow;
                 int parentOffset = forkOffsetById.getOrDefault(localParentId, 0);
                 forkOffsetById.put(commit.getId(), forksRow ? parentOffset + BRANCH_X_OFFSET : parentOffset);
             }
             rowById.put(commit.getId(), row);
-            // Saturating rather than linear or hard-clamped so a lineage that's gone stale for a
-            // long real-time gap doesn't strand its next node far off in the distance: matches
-            // roughly linear spacing for small gaps (slope at 0 is 1/TICKS_PER_COLUMN) but eases
-            // toward MAX_COLUMN_OFFSET for large ones WITHOUT ever truly flattening out — a hard
-            // clamp would stack every commit past the cap on the exact same column.
+            // Saturating rather than linear so a lineage stale for a long real-time gap doesn't
+            // strand its next node far off; eases toward MAX_COLUMN_OFFSET without ever flattening.
             double elapsedTicks = commit.getGameTime() - baseGameTime;
             double distanceOffset = MAX_COLUMN_OFFSET * elapsedTicks
                     / (elapsedTicks + MAX_COLUMN_OFFSET * TICKS_PER_COLUMN);
-            // The minimum gap is enforced against this commit's own local parent rather than
-            // whichever commit happens to precede it in (registration-order) commits — a branch
-            // marker's gameTime is the historical point it was checked out at, not "now" it was
-            // created, so it can easily be earlier than other commits already ahead of it in that
-            // list. Comparing to its own parent keeps it pinned near that point in time (as
-            // requested) instead of getting dragged rightward to match unrelated later history.
+            // Enforced against this commit's own local parent, not registration-order predecessor,
+            // since a branch marker's gameTime can be earlier than commits already ahead of it.
             double column = distanceOffset;
             if (!isRoot) {
                 double parentColumn = columnById.get(localParentId);
@@ -361,29 +336,23 @@ public final class TimelineGraphWidget {
         return Math.max(1, (int) Math.round(2 * zoom));
     }
 
-    /** Manual save-point diamonds render larger than a plain node's radius so a player-triggered
-     * save reads clearly against the automatic squares around it. */
+    /** Manual save-point diamonds render larger than a plain node so they stand out against automatic squares. */
     private static int markerRadius(int nodeRadius) {
         return nodeRadius + Math.max(1, nodeRadius / 2) + 1;
     }
 
-    /** Grows a node's normal on-screen radius for the selection redraw, so the selected node reads
-     * clearly even when its (white) color ends up close to a neighboring lane's. */
+    /** Grows a node's radius for the selection redraw, so it reads clearly against neighboring lanes. */
     private static int selectedRadius(int baseRadius) {
         return baseRadius + Math.max(1, baseRadius / 2);
     }
 
-    /** Draws a static green square behind a node, centered on (pointX, pointY) and sized bigger
-     * than its shape, so a margin of it shows around every shape (square, diamond, ring) as a
-     * halo marking whichever commit the live world currently reflects. */
+    /** Draws a static green halo behind a node, marking the commit the live world currently reflects. */
     private static void drawHeadHalo(GuiGraphics guiGraphics, int pointX, int pointY, int shapeRadius) {
         int halo = shapeRadius + HEAD_HALO_MARGIN;
         guiGraphics.fill(pointX - halo, pointY - halo, pointX + halo + 1, pointY + halo + 1, HEAD_HALO_RGB);
     }
 
-    /** Draws a filled diamond (a plus-like rotated square) centered on (pointX, pointY), one
-     * shrinking horizontal span per row — same per-row-fill rasterization style as the ring/square
-     * shapes above, just diamond-shaped instead. */
+    /** Draws a filled diamond centered on (pointX, pointY), one shrinking horizontal span per row. */
     private static void drawDiamond(GuiGraphics guiGraphics, int pointX, int pointY, int r, int color) {
         for (int dy = -r; dy <= r; dy++) {
             int halfWidth = r - Math.abs(dy);
@@ -410,8 +379,7 @@ public final class TimelineGraphWidget {
         return graphY + (int) Math.round(row * ROW_SPACING * zoom + viewOffsetY);
     }
 
-    /** Draws a staircase line as one filled rectangle per row/column crossed, batched along the
-     * minority axis, instead of one fill call per pixel. */
+    /** Draws a staircase line as one filled rectangle per row/column crossed, instead of per pixel. */
     private static void drawLine(GuiGraphics guiGraphics, int x1, int y1, int x2, int y2, int color) {
         int dx = x2 - x1;
         int dy = y2 - y1;
@@ -454,8 +422,7 @@ public final class TimelineGraphWidget {
         }
     }
 
-    /** @return true if the click landed inside the graph rect (consumed either as a node
-     * selection or the start of a pan drag) — mirrors the graph area's isInGraphArea+onClick logic. */
+    /** @return true if the click landed inside the graph rect (consumed as a node selection or pan drag start). */
     public boolean mouseClicked(double mouseX, double mouseY, int graphX, int graphY, int graphWidth, int graphHeight) {
         if (!isInGraphArea(mouseX, mouseY, graphX, graphY, graphWidth, graphHeight)) {
             return false;
@@ -499,8 +466,7 @@ public final class TimelineGraphWidget {
             return true;
         }
 
-        // Keep whatever graph point is under the cursor fixed on screen while zooming, instead of
-        // zooming around the graph's origin.
+        // Keep the graph point under the cursor fixed on screen while zooming.
         double originX = graphX + 12;
         double originY = graphY;
         double unitX = (mouseX - originX - viewOffsetX) / (COLUMN_SPACING * oldZoom);
@@ -524,8 +490,7 @@ public final class TimelineGraphWidget {
         return null;
     }
 
-    /** Full hover tooltip for whichever node is under the cursor, or empty if none. Identical
-     * across every screen that embeds this widget, so the graph reads the same everywhere. */
+    /** Full hover tooltip for whichever node is under the cursor, or empty if none. */
     public List<FormattedCharSequence> getTooltipAt(int mouseX, int mouseY) {
         RenderedCommit hovered = getCommitAt(mouseX, mouseY);
         if (hovered == null) return List.of();
@@ -553,8 +518,7 @@ public final class TimelineGraphWidget {
         return tooltip.stream().map(Component::getVisualOrderText).toList();
     }
 
-    /** Formats an absolute game time as "Day {day} | {HH:MM}". Day 1 starts at game time 0; a
-     * Minecraft day is 24000 ticks, and tick 0 within a day is 06:00. */
+    /** Formats an absolute game time as "Day {day} | {HH:MM}"; tick 0 within a day is 06:00. */
     private static String formatGameDayTime(long gameTime) {
         long day = Math.floorDiv(gameTime, 24000L) + 1L;
         long dayTicks = Math.floorMod(gameTime, 24000L);

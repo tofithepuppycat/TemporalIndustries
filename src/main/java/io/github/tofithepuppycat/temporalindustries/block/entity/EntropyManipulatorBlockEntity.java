@@ -218,10 +218,8 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
                 ? new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY)
                 : new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
 
-        // Chains pair a chaos recipe and an order recipe on the same input item (e.g. cobblestone
-        // ferments to gravel via chaos, or reverts to stone via order), so matches() alone (which
-        // only tests the item) is ambiguous between them. Resolve the ambiguity here by picking
-        // whichever candidate the manipulator actually has the entropy fluid to run.
+        // A chaos and order recipe can share the same input item, making matches() alone ambiguous;
+        // resolve by picking whichever candidate the manipulator actually has the entropy fluid to run.
         return recipeManager.getAllRecipesFor(recipeType).stream()
                 .map(RecipeHolder::value)
                 .filter(recipe -> recipe.matches(recipeInput, level))
@@ -237,8 +235,7 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     private boolean canOutput(EntropyManipulatorRecipe recipe) {
         ItemStack current = items.get(OUTPUT_SLOT);
         if (current.isEmpty()) return true;
-        // A tag-result recipe rolls a random item on completion, which can't be predicted ahead of
-        // time to check it'll stack with what's already there, so only let it start into an empty slot.
+        // A tag-result recipe rolls a random item on completion, so only let it start into an empty slot.
         if (recipe.isTagResult()) return false;
         Item output = recipe.getResultItem(level.registryAccess()).getItem();
         return current.getItem() == output && current.getCount() < current.getMaxStackSize();
@@ -290,8 +287,6 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // Container (input/output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.get(INPUT_SLOT).isEmpty() && items.get(OUTPUT_SLOT).isEmpty(); }

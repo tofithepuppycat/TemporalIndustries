@@ -10,10 +10,8 @@ import java.util.Map;
 
 /**
  * One chunk's commit graph, bundled with its ChunkPos so a client can resolve that chunk's own
- * ghost-preview diff independently of whichever chunk {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget}
- * happens to be displaying. A Time Machine only ever has one of these (its own chunk); a
- * Chronosphere has one per currently claimed chunk, since jumping moves all of them together —
- * see {@link io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider#getPreviewChunkSnapshots()}.
+ * ghost-preview diff independently of the chunk currently displayed. A Time Machine has one of
+ * these; a Chronosphere has one per claimed chunk, since jumping moves them together.
  */
 public record ChunkTimelineSnapshot(ChunkPos chunkPos, List<TemporalCommit> commits,
                                     Map<Long, Long> localParents, long headId) {

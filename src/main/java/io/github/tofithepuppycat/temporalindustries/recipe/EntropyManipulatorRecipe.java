@@ -30,13 +30,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * A single step of the Entropy Manipulator's transmutation chains: either an item ({@code
- * input_item}) or a fluid ({@code input_fluid} + {@code fluid_amount}) consumed alongside
- * {@code entropy_cost} mB of liquid Order/Chaos over {@code process_ticks} to produce either a
- * fixed {@code result} item or, for a chaotic "any dust"-style output, one random item drawn from
- * {@code result_tag} (count {@code result_count}) each time the recipe completes -- see {@link
- * #rollResult}. Exactly one of input_item/input_fluid, and exactly one of result/result_tag, must
- * be present in the JSON.
+ * A single step of the Entropy Manipulator's transmutation chains: consumes an item or fluid input
+ * plus Order/Chaos entropy over time to produce either a fixed result item or a random draw from a
+ * result tag. Exactly one of input_item/input_fluid, and exactly one of result/result_tag, must be
+ * present in the JSON.
  */
 public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe.Input> {
     private final EntropyType entropyType;

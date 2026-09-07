@@ -17,8 +17,7 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /** Container menu for the Entropy Manipulator GUI: an input/output slot pair plus both entropy
- * tanks' fill/capacity, the liquid material tank's fill/capacity/fluid, and processing progress,
- * packed into {@link ContainerData} the same way as {@link EntropyCondenserMenu}. */
+ * tanks' fill/capacity, the liquid material tank's fill/capacity/fluid, and processing progress. */
 @SuppressWarnings("null")
 public class EntropyManipulatorMenu extends AbstractContainerMenu {
     private static final int INPUT_SLOT_X = 55;

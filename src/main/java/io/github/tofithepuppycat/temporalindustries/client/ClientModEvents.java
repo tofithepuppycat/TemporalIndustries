@@ -85,11 +85,8 @@ public class ClientModEvents {
                 EntropyGlassesOverlay.INSTANCE);
     }
 
-    /** Drops the timeline/map client caches on logout — without this, a BlockPos from the world
-     * just left could coincidentally match a machine's position in the next world joined, and its
-     * stale commit data would render a ghost preview (see TimelineProjectionManager#clearAll)
-     * that has nothing to do with the new world. Also fires when creating a new singleplayer
-     * world, which should equally reset this. */
+    /** Drops the timeline/map client caches on logout, so stale data from the previous world
+     * can't coincidentally match a machine position in the next one joined. */
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         TimelineProjectionManager.clearAll();

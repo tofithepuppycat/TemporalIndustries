@@ -31,15 +31,10 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Block entity for the Chronodial, the single-block-tier time machine: no continuous change
- * tracking or branching (see TemporalTimeline) — just one manually-set marker on the block it
- * faces, which can later be restored. Deliberately self-contained; unlike the Time Machine it
- * never touches TemporalWorldData/TemporalTimeline.
- *
- * <p>Restoring a marker is always a jump into the past (the marker can only predate the restore),
- * so unlike Chronovault/Chronosphere it always adds a large flat amount of entropy rather than
- * shifting either direction — and refuses the jump outright rather than overflowing the chaos
- * tank. Entropy here has no passive drift, and moves only via jumps or fluid piped into its tanks.
+ * Block entity for the Chronodial: a single manually-set marker on the block it faces, which can
+ * later be restored. Self-contained; unlike the Time Machine it never touches TemporalWorldData.
+ * Restoring is always a jump into the past, so it always adds a flat amount of entropy rather
+ * than shifting either direction, and refuses outright rather than overflowing the chaos tank.
  */
 @SuppressWarnings("null")
 public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoProvider {
@@ -134,8 +129,7 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     };
     private final MachineFluidHandler fluidHandler = new MachineFluidHandler();
 
-    /** Named (rather than anonymous) so jumpToMarker() can reach consumeInternal() directly,
-     * bypassing the maxExtract cap that only throttles external cables/pipes. */
+    /** Named so jumpToMarker() can reach consumeInternal() directly, bypassing the maxExtract cap. */
     private final class MachineEnergyStorage extends EnergyStorage {
         MachineEnergyStorage() {
             super(ENERGY_CAPACITY, ENERGY_TRANSFER, ENERGY_TRANSFER);
@@ -249,9 +243,8 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         syncToClients();
     }
 
-    /** Restores the target block to its marked state, paying the jump's energy cost first (scaled
-     * by {@link #jumpCostMultiplier()}) and refusing outright if restoring would overflow the
-     * chaos tank, rather than clamping and restoring anyway. */
+    /** Restores the target block to its marked state, paying the jump's energy cost first and
+     * refusing outright if restoring would overflow the chaos tank. */
     public JumpResult jumpToMarker() {
         if (level == null || level.isClientSide || markerState == null) return JumpResult.NO_MARKER;
 

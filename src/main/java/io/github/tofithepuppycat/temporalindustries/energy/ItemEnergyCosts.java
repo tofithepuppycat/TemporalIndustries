@@ -41,26 +41,11 @@ import java.util.Map;
 import java.util.OptionalInt;
 
 /**
- * Holds the resolved energy cost of every known item and is responsible for computing it.
- *
- * <p>Three layers feed the final table, each able to override the previous:
- * <ol>
- *     <li>Base costs, defined in datapacks (see {@link EnergyCostReloadListener}) either per item
- *     or per item tag (so e.g. a single "#c:ingots" entry covers every ingot, vanilla or modded).</li>
- *     <li>The modpack config at {@code config/temporalindustries-common.toml} (see
- *     {@link EnergyCostConfig}), for modpack developers to add or override costs without touching
- *     a datapack.</li>
- *     <li>Recipe-derived costs: any item without a base cost that has a recipe whose ingredients are
- *     all already priced gets a cost equal to the summed ingredient cost divided by the result count.
- *     This repeats in passes so costs cascade through crafting chains, which is what lets modded
- *     items built from known-cost materials get a cost automatically.</li>
- *     <li>Finally, any block item still without a cost (no base entry, no resolvable recipe) falls
- *     back to a flat default so every block ends up priced. The default itself is configurable via
- *     {@code default_block_cost} in the modpack config.</li>
- * </ol>
- * The result is expensive to compute once (every recipe is scanned, possibly in several passes) but
- * cheap to reuse, so it's cached to disk per-world and only recomputed when the recipe set or base
- * costs actually change.
+ * Holds the resolved energy cost of every known item and computes it by layering: datapack base
+ * costs (per item or tag), modpack config overrides, recipe-derived costs cascading through
+ * crafting chains for anything still unpriced, and finally a flat default for any remaining block
+ * item. The result is expensive to compute (every recipe scanned, possibly in several passes) so
+ * it's cached to disk per-world and only recomputed when the recipe set or base costs change.
  */
 public final class ItemEnergyCosts {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -127,9 +112,8 @@ public final class ItemEnergyCosts {
         return costs;
     }
 
-    /** Prices any block item still without a cost after base costs and recipe propagation, so every
-     * block ends up priced even if it has no known ingredients (e.g. a naturally generated block with
-     * no crafting recipe). Returns how many items were priced this way. */
+    /** Prices any block item still without a cost after base costs and recipe propagation.
+     * @return how many items were priced this way. */
     private static int applyDefaultBlockCost(Map<Item, Integer> costs, int defaultBlockCost) {
         int defaulted = 0;
         for (Item item : BuiltInRegistries.ITEM) {
@@ -141,8 +125,8 @@ public final class ItemEnergyCosts {
         return defaulted;
     }
 
-    /** Applies tags first (broad strokes for whole item families), then explicit items, so within
-     * a single source an explicit item always wins over a tag-derived default. */
+    /** Applies tags first, then explicit items, so an explicit item always wins over a
+     * tag-derived default within a single source. */
     private static void applyEntries(Map<Item, Integer> costs, List<RawEntry> entries) {
         for (RawEntry entry : entries) {
             if (entry instanceof TagEntry tagEntry) {
@@ -191,8 +175,7 @@ public final class ItemEnergyCosts {
         return new UserConfig(entries, config.defaultBlockCost.get());
     }
 
-    /** Parses "id=cost" config lines (see EnergyCostConfig) into raw entries, logging and skipping
-     * anything malformed rather than failing the whole config. */
+    /** Parses "id=cost" config lines into raw entries, logging and skipping anything malformed. */
     private static void parseCostEntries(List<? extends String> rawLines, boolean isItem, List<RawEntry> out) {
         for (String line : rawLines) {
             int eq = line.indexOf('=');
@@ -215,8 +198,8 @@ public final class ItemEnergyCosts {
         }
     }
 
-    /** Iteratively assigns a cost to any priceable item whose recipe ingredients are already priced,
-     * until a full pass makes no further progress. Returns how many items were priced this way. */
+    /** Iteratively assigns a cost to any priceable item whose recipe ingredients are already
+     * priced, until a full pass makes no further progress. @return how many items were priced. */
     private static int propagateThroughRecipes(MinecraftServer server, Map<Item, Integer> costs) {
         HolderLookup.Provider registries = server.registryAccess();
         List<RecipeHolder<?>> recipes = server.getRecipeManager().getRecipes().stream()

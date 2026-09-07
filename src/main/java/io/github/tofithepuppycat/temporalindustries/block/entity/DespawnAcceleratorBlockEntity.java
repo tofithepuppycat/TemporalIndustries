@@ -13,9 +13,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Order variant of {@link DecayAcceleratorBlockEntity} (IDEAS.md "Despawn Accelerator"): accepts
- * ANY item/block, not just compostables, and destroys it for a flat ORDER payout. Meant to balance
- * the Order economy, which otherwise leans on running Entropy Manipulator recipes backward.
+ * Order variant of {@link DecayAcceleratorBlockEntity}: accepts any item/block, not just
+ * compostables, and destroys it for a flat ORDER payout.
  */
 public class DespawnAcceleratorBlockEntity extends AbstractAcceleratorBlockEntity {
     private static final int ORDER_PER_ITEM = 1;

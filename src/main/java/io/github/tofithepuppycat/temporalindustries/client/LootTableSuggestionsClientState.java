@@ -4,10 +4,7 @@ import net.minecraft.resources.ResourceLocation;
 
 import java.util.List;
 
-/** Client-side cache of every loot table id known to the server (see
- * io.github.tofithepuppycat.temporalindustries.network.LootTableSuggestionsSyncPacket), for
- * io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen's search-bar
- * autocomplete. */
+/** Client-side cache of every loot table id known to the server, for LootGeneratorScreen's search-bar autocomplete. */
 public final class LootTableSuggestionsClientState {
     private static List<ResourceLocation> lootTables = List.of();
 

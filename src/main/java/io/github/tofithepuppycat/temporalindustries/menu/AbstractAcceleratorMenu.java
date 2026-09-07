@@ -16,8 +16,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Shared menu skeleton for the Decay/Despawn Accelerator GUIs: one input slot (filtered by
- * subclass), a synced progress value, and the player inventory - same layout math as
- * {@link io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu}.
+ * subclass), a synced progress value, and the player inventory.
  */
 @SuppressWarnings("null")
 public abstract class AbstractAcceleratorMenu extends AbstractContainerMenu {

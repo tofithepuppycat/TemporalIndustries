@@ -12,11 +12,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 
-/**
- * Draws {@link EntropyOrbEntity} the same way vanilla draws an xp orb (a small billboarded quad,
- * reusing vanilla's experience_orb.png), but tinted by the orb's {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyType}
- * color instead of the xp rainbow shimmer.
- */
+/** Draws {@link EntropyOrbEntity} like a vanilla xp orb (billboarded quad, same texture), but
+ * tinted by the orb's entropy type instead of the xp rainbow shimmer. */
 public class EntropyOrbRenderer extends EntityRenderer<EntropyOrbEntity> {
     private static final ResourceLocation TEXTURE = ResourceLocation.withDefaultNamespace("textures/entity/experience_orb.png");
     private static final RenderType RENDER_TYPE = RenderType.itemEntityTranslucentCull(TEXTURE);

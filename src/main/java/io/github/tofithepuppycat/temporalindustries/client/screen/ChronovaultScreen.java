@@ -38,23 +38,18 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int ICON_CONFIG_SIZE = 26;
     private static final int TEXTURE_WIDTH = 256;
     private static final int TEXTURE_HEIGHT = 256;
-    /** base.png's actual panel artwork sits inset this many pixels on every side within the
-     * 256x256 canvas — every layout constant below is measured from the artwork's edge (via
-     * {@link #panelX()}/{@link #panelY()}), not from leftPos/topPos directly, and CONTENT_SIZE
-     * (not imageWidth) is the usable width/height for centering and right-edge anchoring. */
+    /** base.png's artwork sits inset this many pixels within the 256x256 canvas; layout constants
+     * below are measured from the artwork's edge via {@link #panelX()}/{@link #panelY()}. */
     private static final int CONTENT_MARGIN = 16;
     private static final int CONTENT_SIZE = TEXTURE_WIDTH - 2 * CONTENT_MARGIN;
 
-    // base.png is a light panel, so text/UI accents are tuned for a light background — matches
-    // ChronosphereScreen's palette.
+    // base.png is a light panel, so text/UI accents are tuned for a light background.
     private static final int TEXT_PRIMARY = 0xFF2B2B2B;
     private static final int TEXT_SECONDARY = 0xFF5A5A5A;
     private static final int COLOR_BORDER = 0xFF000000;
 
-    // Auto-track/settings tabs: a vertical stack mostly overlapping the panel's right edge,
-    // protruding outward — mirrors ChronosphereScreen's (including drawing them BEFORE the panel
-    // background in render() so the panel's edge tucks them in) minus its bookmark/claim map tab,
-    // since a Chronovault only ever has its own one chunk, never a claimed range.
+    // Auto-track/settings tabs: a vertical stack overlapping the panel's right edge, drawn BEFORE
+    // the panel background in render() so its edge tucks them in.
     private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
     private static final int TAB_OVERLAP = 5;
     private static final int AUTO_TRACK_Y_OFFSET = 40;
@@ -67,13 +62,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int GRAPH_X_OFFSET = 8;
     private static final int GRAPH_Y_OFFSET = 18;
     private static final int GRAPH_WIDTH = CONTENT_SIZE - 2 * GRAPH_X_OFFSET;
-    /** Below the graph: a small gap, the two preview-time labels, another gap, then the button
-     * row — see PREVIEW_CURRENT_Y_OFFSET/PREVIEW_DIFF_Y_OFFSET/BUTTON_ROW_Y_OFFSET below, all of
-     * which this height is sized to leave room for within CONTENT_SIZE. */
+    /** Sized to leave room below for the preview-time labels and button row within CONTENT_SIZE. */
     private static final int GRAPH_HEIGHT = 154;
 
-    // Right edge stays anchored where it always was; only the left edge moved in, so the bar
-    // reads shorter without shifting away from the panel's right side — matches ChronosphereScreen.
     private static final int ENERGY_BAR_X_OFFSET = 160;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
     private static final int ENERGY_BAR_WIDTH = 57;
@@ -98,8 +89,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     private int ticksSinceSync = 0;
     private boolean settingsOverlayOpen = false;
-    /** Whether the settings overlay is showing the "are you sure" step rather than the plain
-     * Delete All History button — reset whenever the overlay itself closes. */
+    /** Whether the settings overlay is showing the "are you sure" step; reset when the overlay closes. */
     private boolean deleteHistoryConfirmPending = false;
 
     private int autoTrackX;
@@ -118,9 +108,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         inventoryLabelY = imageHeight + 100; // Push off-screen to hide inventory
     }
 
-    /** The visible top-left corner of base.png's artwork — every layout offset in this screen is
-     * measured from here, not from leftPos/topPos, which are the outer edge of the 16px-inset
-     * canvas the artwork sits within. */
+    /** The visible top-left corner of base.png's artwork; layout offsets are measured from here. */
     private int panelX() {
         return leftPos + CONTENT_MARGIN;
     }
@@ -146,8 +134,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
-        // Force a full response regardless of whatever TimelineProjectionManager still has
-        // cached from a previously viewed machine (Long.MIN_VALUE can never equal a real head id).
+        // Force a full response regardless of any cache from a previously viewed machine.
         PacketDistributor.sendToServer(
                 new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE, Long.MIN_VALUE));
     }
@@ -163,10 +150,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         super.containerTick();
         TimelineProjectionManager.setCurrentGameTime(getCurrentGameTime());
 
-        // Periodically re-fetch commits so new ones show up while the GUI is open. The server
-        // skips the (potentially large, ever-growing) full commit list reply entirely when the
-        // chunk's head hasn't moved since our last known value, so this is cheap on the common
-        // case of nothing having changed in the last second.
+        // Periodically re-fetch commits; the server skips the full reply when the head hasn't moved.
         ticksSinceSync++;
         if (ticksSinceSync >= SYNC_INTERVAL_TICKS) {
             ticksSinceSync = 0;
@@ -181,8 +165,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         TimelineProjectionManager.toggleShowChanges();
     }
 
-    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
-     * Button widgets (consistent with ChronosphereScreen's identical settings overlay). */
+    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than Button widgets. */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
         int buttonY = panelY() + 130;
 
@@ -256,9 +239,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Show Changes / Jump: small icon buttons (menu_icon_base_small.png + their own icon) in
-     * place of vanilla Buttons — Show Changes tints on while active, Jump dims while there's
-     * nothing selected to jump to. */
+    /** Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while nothing is selected. */
     private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
         int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
@@ -287,8 +268,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         return mouseX >= barX && mouseX <= barX + ENERGY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENERGY_BAR_HEIGHT;
     }
 
-    /** Bidirectional order↔chaos balance bar: fills from the center tick outward, white toward
-     * order (below the midpoint) and dark purple toward chaos (above it). */
+    /** Bidirectional order/chaos balance bar: fills from the center tick outward. */
     private void renderEntropyBar(GuiGraphics guiGraphics) {
         int barX = panelX() + ENTROPY_BAR_X_OFFSET;
         int barY = panelY() + ENTROPY_BAR_Y_OFFSET;
@@ -324,8 +304,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         IconTabRenderer.renderBackground(guiGraphics, autoTrackX, autoTrackY, tint);
 
-        // Placeholder icon: a small filled "record" dot, echoing a recording indicator — same as
-        // ChronosphereScreen's auto-track tab.
+        // Placeholder icon: a filled "record" dot.
         int glyphColor = enabled ? 0xFFFFEDED : TEXT_PRIMARY;
         int dotSize = 10;
         int dotX = autoTrackX + (TAB_ROW_SIZE - dotSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
@@ -428,9 +407,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
-        // Tabs are always drawn BEFORE the panel background, so the panel's opaque texture paints
-        // over their small edge overlap and tucks them in, same as a vanilla recipe-book tab —
-        // regardless of whether the settings overlay is open, so its z-order never shifts.
+        // Tabs are drawn BEFORE the panel background so its opaque texture tucks in their overlap.
         renderTabs(guiGraphics, mouseX, mouseY);
 
         // Skip super.render() to avoid rendering inventory slots
@@ -495,8 +472,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             if (button == 0) {
                 handleSettingsOverlayClick(mouseX, mouseY);
             }
-            // Modal: swallow every click on the panel while it's open so nothing underneath
-            // (the graph, the buttons) reacts to it.
+            // Modal: swallow clicks so nothing underneath reacts to them.
             return true;
         }
 
@@ -548,9 +524,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        // Skip super.renderLabels() to avoid rendering inventory slot labels.
-        // Our render() override skips AbstractContainerScreen's leftPos/topPos translate,
-        // so coordinates here must be absolute (unlike vanilla renderLabels overrides).
+        // Coordinates here must be absolute, since render() skips AbstractContainerScreen's translate.
         drawCenteredNoShadow(guiGraphics, Component.translatable("block.temporalindustries.chronovault"), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
 
         long now = TimelineProjectionManager.getCurrentGameTime();
@@ -566,8 +540,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Formats an absolute game time as "Day {day} | {HH:MM}". Day 1 starts at game time 0; a
-     * Minecraft day is 24000 ticks, and tick 0 within a day is 06:00. */
+    /** Formats an absolute game time as "Day {day} | {HH:MM}"; tick 0 within a day is 06:00. */
     private static String formatGameDayTime(long gameTime) {
         long day = Math.floorDiv(gameTime, 24000L) + 1L;
         long dayTicks = Math.floorMod(gameTime, 24000L);

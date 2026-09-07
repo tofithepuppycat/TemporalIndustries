@@ -7,10 +7,7 @@ import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
 
-/** Grants no defense, isn't wearable as vanilla armor - only in Curios' head slot, when Curios is
- * installed (see compat/curios/CuriosCompat) - and only lets the wearer see entropy info about the
- * block they're looking at (see EntropyGlassesOverlay client-side and EntropyInfoProvider on block
- * entities). */
+/** Curios headwear (no armor value) that lets the wearer see entropy info about the block they're looking at. */
 public class EntropyGlassesItem extends Item {
     public EntropyGlassesItem(Properties properties) {
         super(properties);

@@ -28,18 +28,14 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Trigger device for the player temporal anchor system. All checkpoint/world-change state lives
- * server-side in TemporalWorldData.PlayerTemporalState, keyed by player UUID. The stack itself only
- * holds the liquid order it's charged with - poured in by
- * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService}, caught
- * straight out of ORD orbs like a cell, or filled by any fluid handler through its item capability -
- * and its rewind mode, both as data components — right-clicking calibrates (or re-calibrates) the
- * player's checkpoint; dying with enough order banked spends it to rewind (see
- * {@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener#onPlayerDeath}).
+ * Trigger device for the player temporal anchor system. Checkpoint/world-change state lives
+ * server-side in TemporalWorldData.PlayerTemporalState, keyed by player UUID; the stack only holds
+ * its charged Order amount and rewind mode as data components. Right-clicking calibrates the
+ * player's checkpoint; dying with enough Order banked spends it to rewind.
  */
 @SuppressWarnings("null")
 public class TemporalAnchorItem extends Item implements EntropyReceptacle {
-    /** Anchor tank size, in mB of liquid Order - the same scale machine tanks and cells use. */
+    /** Anchor tank size, in mB of liquid Order. */
     public static final int MAX_ORDER_MB = 5_000;
     public static final int MODE_REWIND_ALL = 0;
     public static final int MODE_KEEP_INVENTORY = 1;
@@ -65,7 +61,7 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         stack.set(Registration.ANCHOR_MODE.get(), new BottleContents(Math.floorMod(mode, MODE_COUNT)));
     }
 
-    /** 500 mB of Order for a full rewind, 1,000 for the more convenient keep-inventory rewind. */
+    /** Order cost for a rewind: 500 mB full rewind, 1,000 mB keep-inventory rewind. */
     public static int costForMode(int mode) {
         return mode == MODE_KEEP_INVENTORY ? 1_000 : 500;
     }
@@ -111,9 +107,8 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         return drained;
     }
 
-    /** First Temporal Anchor stack (main inventory, offhand, or Curios charm slot) carrying enough
-     * order to pay for its own mode's cost, or null if none qualifies — the anchor that pays for a
-     * death rewind. */
+    /** First Temporal Anchor stack (inventory, offhand, or Curios slot) with enough Order to pay for
+     * its own mode's cost, or null if none qualifies. */
     @Nullable
     public static ItemStack findChargedAnchor(Player player) {
         for (ItemStack stack : player.getInventory().items) {

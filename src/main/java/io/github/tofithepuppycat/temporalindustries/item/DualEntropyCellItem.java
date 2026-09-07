@@ -16,14 +16,9 @@ import net.minecraft.world.item.context.UseOnContext;
 import java.util.List;
 
 /**
- * Holds liquid ORD (order) and CHS (chaos) condensed out of the
- * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity} orbs it catches, up
- * to {@link EntropyContents#CAPACITY} mB of each. A player only attracts and picks up entropy orbs
- * while holding an {@link EntropyReceptacle} that accepts the orb's type - see
- * {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity#isHoldingReceptacle}.
- * Right-clicking a machine pours a dose of either fluid into it (see {@link CellTransfer}); the two
- * fill levels are drawn as stacked bars over the item icon by
- * {@link io.github.tofithepuppycat.temporalindustries.client.EntropyContainerItemDecorator}.
+ * Holds liquid ORD (order) and CHS (chaos) condensed out of entropy orbs it catches, up to
+ * {@link EntropyContents#CAPACITY} mB of each. Right-clicking a machine pours a dose of either
+ * fluid into it (see {@link CellTransfer}).
  */
 @SuppressWarnings("null")
 public class DualEntropyCellItem extends Item implements EntropyReceptacle {

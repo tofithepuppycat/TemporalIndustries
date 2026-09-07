@@ -5,9 +5,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Points spaced along the 12 edges of an axis-aligned box, in absolute world coordinates - used to
- * draw a particle outline around a structure (a single missing frame position, or an entire formed
- * multiblock's bounding box) rather than a burst at its center. */
+/** Points spaced along the 12 edges of an axis-aligned box, in world coordinates, for drawing a particle outline around a structure. */
 public final class BoxEdgeParticles {
     private static final int[][] EDGES = {
             {0, 1}, {1, 5}, {5, 3}, {3, 0}, // bottom face
@@ -17,8 +15,7 @@ public final class BoxEdgeParticles {
 
     private BoxEdgeParticles() {}
 
-    /** @param spacing target distance between consecutive points along each edge, in blocks - edges
-     * are always given at least their two endpoints, even if shorter than one spacing. */
+    /** @param spacing target distance between consecutive points along each edge, in blocks. */
     public static List<Vector3f> outline(double minX, double minY, double minZ, double maxX, double maxY, double maxZ, double spacing) {
         float[][] corners = {
                 {(float) minX, (float) minY, (float) minZ}, {(float) maxX, (float) minY, (float) minZ},

@@ -4,12 +4,7 @@ import net.minecraft.world.item.ItemStack;
 
 /**
  * Implemented by items that store liquid Order/Chaos on the stack and can catch an
- * {@link EntropyOrbEntity} out of the world — the
- * {@link io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem} (both types), the
- * single-type Order/Chaos cells ({@link io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem})
- * and the {@link io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem} (order only).
- * All amounts are millibuckets of the matching fluid, so the same numbers flow straight into machine
- * tanks — see {@link EntropyFluids#MB_PER_UNIT} for the orb-unit conversion.
+ * {@link EntropyOrbEntity} out of the world. All amounts are millibuckets of the matching fluid.
  */
 public interface EntropyReceptacle {
     /** Whether a stack of this item will attract/accept liquid of the given type. */

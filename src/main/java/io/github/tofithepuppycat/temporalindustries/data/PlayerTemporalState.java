@@ -69,11 +69,10 @@ public class PlayerTemporalState {
     }
 
     /**
-     * Restores every tracked block to the state it had at the last checkpoint.
-     * Uses the earliest recorded change per position (the state before the player
-     * first touched it), then clears the change list.
+     * Restores every tracked block to its state at the last checkpoint, using the earliest
+     * recorded change per position, then clears the change list.
      *
-     * @return the number of distinct block positions reverted
+     * @return number of distinct block positions reverted
      */
     public int revertWorldChanges(MinecraftServer server) {
         Map<ResourceLocation, Map<BlockPos, BlockChangeDelta>> earliestByDim = new LinkedHashMap<>();

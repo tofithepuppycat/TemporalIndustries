@@ -38,9 +38,8 @@ import org.jetbrains.annotations.NotNull;
 import java.util.List;
 
 /**
- * Lower tier of {@link io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser}: instead
- * of catching orbs with FE, it slowly drains the liquid Order/Chaos out of whatever cell sits in its
- * single input slot into its own smaller tanks, a few mB per tick, with no power involved.
+ * Lower tier of {@link io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser}: drains
+ * liquid Order/Chaos out of a cell in its single input slot into its own smaller tanks, no power involved.
  */
 @SuppressWarnings("null")
 public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -189,9 +188,6 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // -------------------------------------------------------------------------
-    // Container (single cell slot; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty(); }

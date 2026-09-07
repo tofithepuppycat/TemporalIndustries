@@ -40,23 +40,16 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Central event hub. Replaces both TemporalAnchorEvents and the block-scanning
- * loop that used to live in ChronovaultBlockEntity.tick().
- *
- * Responsibilities:
- *   - Record player-caused block changes into PlayerTemporalState (anchor system)
- *   - Buffer block changes for tracked chunks into TemporalWorldData.pendingBlockDeltas
- *   - Flush pending deltas into TemporalCommits every FLUSH_INTERVAL_TICKS
- *   - Track entity spawns/deaths in tracked chunks
- *   - Intercept an armed player's death and rewind them via their Temporal Anchor, pre-empting
- *     the death screen entirely
+ * Central event hub: records player-caused block changes into PlayerTemporalState, buffers
+ * changes for tracked chunks and flushes them into timeline commits, tracks entity spawns/deaths
+ * in tracked chunks, and intercepts an armed player's death to rewind them via their Temporal
+ * Anchor before the death screen shows.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalChangeListener {
     private static final int FLUSH_INTERVAL_TICKS = 20;
     // Entities interacted with this tick, snapshotted just before the interaction runs so the
-    // effect (dyeing, shearing, taming, renaming, etc.) can be diffed once it's taken effect —
-    // there's no generic "entity data changed" event to hook, so this stands in for one.
+    // effect can be diffed afterward (there's no generic "entity data changed" event).
     private static final List<PendingEntityCheck> PENDING_ENTITY_CHECKS = new ArrayList<>();
 
     private record PendingEntityCheck(Entity entity, ResourceLocation dimension, ChunkPos chunkPos, CompoundTag before) {}
@@ -74,11 +67,8 @@ public final class TemporalChangeListener {
         ServerPlayer player = event.getPlayer() instanceof ServerPlayer sp ? sp : null;
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
 
-        // In creative mode, left-clicking destroys the block instantly server-side without ever
-        // going through PlayerInteractEvent.LeftClickBlock's cancellation (see onLeftClickGlue) —
-        // so a creative player selecting/unglueing a region would actually break the block they
-        // clicked. Cancelling here instead stops the destroy before it happens, so the glue/unglue
-        // gesture never costs a block.
+        // In creative mode, left-clicking destroys the block instantly without going through
+        // PlayerInteractEvent.LeftClickBlock's cancellation, so cancel here to stop the destroy.
         if (player != null && TemporalGlueItem.isHolding(player)) {
             event.setCanceled(true);
             return;
@@ -86,12 +76,10 @@ public final class TemporalChangeListener {
 
         if (!shouldRecord(level, data, pos, player)) return;
 
-        // saveWithFullMetadata() is a real cost (full BE NBT), so it's only paid once we already
-        // know this change is actually going to be recorded somewhere.
+        // Only paid once we already know this change will actually be recorded somewhere.
         BlockEntity be = level.getBlockEntity(pos);
         CompoundTag prevBETag = be != null ? be.saveWithFullMetadata(level.registryAccess()) : null;
-        // Vanilla's Level#destroyBlock leaves behind whatever fluid the broken block was carrying
-        // (fluidstate.createLegacyBlock()), not air — matters for anything submerged/waterlogged.
+        // Vanilla leaves behind whatever fluid the broken block was carrying, not air.
         BlockChangeDelta delta = new BlockChangeDelta(
                 pos, event.getState(), event.getState().getFluidState().createLegacyBlock(), prevBETag, null);
 
@@ -116,10 +104,8 @@ public final class TemporalChangeListener {
         handleBlockChange(level, data, pos, delta, player);
     }
 
-    /** Covers bulk block placement that isn't attributable to a single BlockEvent.EntityPlaceEvent,
-     * most notably a sapling growing into a tree (random tick or bonemeal) via a feature/structure
-     * placement — NeoForge fires one MultiPlaceEvent with a snapshot per placed block instead of one
-     * EntityPlaceEvent per block. */
+    /** Covers bulk block placement not attributable to a single EntityPlaceEvent (e.g. a sapling
+     * growing into a tree), where NeoForge fires one MultiPlaceEvent with a snapshot per block. */
     @SubscribeEvent
     public static void onBlockMultiPlace(BlockEvent.EntityMultiPlaceEvent event) {
         if (event.isCanceled()) return;
@@ -141,8 +127,8 @@ public final class TemporalChangeListener {
         }
     }
 
-    /** Whether this change is actually going to be recorded anywhere (tracked chunk, or an armed
-     * player's anchor) — checked before paying for full block-entity NBT serialization. */
+    /** Whether this change will be recorded anywhere (tracked chunk, or an armed player's
+     * anchor), checked before paying for full block-entity NBT serialization. */
     private static boolean shouldRecord(ServerLevel level, TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
         ResourceLocation dimension = level.dimension().location();
         if (data.isGlued(dimension, pos)) return false;
@@ -172,9 +158,8 @@ public final class TemporalChangeListener {
         }
     }
 
-    /** Left-clicking while holding Temporal Glue deletes every glued region along the player's sight
-     * line, instead of starting to break whatever block (if any) is under the crosshair — mirrors
-     * Create's glue removal gesture, but works by aim rather than requiring an exact block hit. */
+    /** Left-clicking while holding Temporal Glue deletes every glued region along the player's
+     * sight line instead of breaking whatever block is under the crosshair. */
     @SubscribeEvent
     public static void onLeftClickGlue(PlayerInteractEvent.LeftClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -185,8 +170,8 @@ public final class TemporalChangeListener {
         TemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
     }
 
-    /** Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on a
-     * block at all (e.g. a glued region floating in open air, or just out past the nearest block). */
+    /** Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on
+     * a block at all. */
     @SubscribeEvent
     public static void onLeftClickEmptyGlue(PlayerInteractEvent.LeftClickEmpty event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -236,9 +221,8 @@ public final class TemporalChangeListener {
                 new EntityDelta(entity.getUUID(), EntityDelta.Type.REMOVED, stateTag, null));
     }
 
-    /** Fires before the interaction runs (dyeing/shearing/taming/feeding/naming/etc.), so this
-     * just snapshots "before" state; the actual diff happens at the end of this same tick once
-     * the interaction (if not cancelled) has already applied its effect. */
+    /** Fires before the interaction runs, so this just snapshots "before" state; the diff happens
+     * at the end of the same tick once the interaction has applied its effect. */
     @SubscribeEvent
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
@@ -271,8 +255,8 @@ public final class TemporalChangeListener {
         PENDING_ENTITY_CHECKS.clear();
     }
 
-    // Player death (anchor rewind) — cancels the death outright rather than letting it happen and
-    // reverting on respawn, so the rewind pre-empts the death screen entirely.
+    // Player death (anchor rewind) — cancels the death outright so the rewind pre-empts the
+    // death screen entirely.
 
     @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onPlayerDeath(LivingDeathEvent event) {

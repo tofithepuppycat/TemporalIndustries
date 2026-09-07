@@ -12,12 +12,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
  * Keeps the in-world "Show Changes" ghost preview (see {@link TimelineProjectionRenderer}) fresh
- * even after the machine's own GUI has been closed. Without this, {@link TimelineProjectionManager}'s
- * cached commit graph/head/previewChunkSnapshots would freeze at whatever they were the moment the
- * screen last polled — ChronosphereScreen/ChronovaultScreen only send {@link TimelinePreviewRequestPacket}
- * from their own containerTick, which stops entirely once the screen closes — so background
- * auto-tracking or another player's edits would silently drift the ghost preview out of sync with
- * the actual live world until the player reopened the GUI just to refresh it.
+ * even after the machine's GUI has closed. Without this, {@link TimelineProjectionManager}'s
+ * cached state would freeze at whatever it was when the screen (which only polls from its own
+ * containerTick) last closed, letting background auto-tracking or other players' edits drift out
+ * of sync with the live world.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class TimelineProjectionPoller {

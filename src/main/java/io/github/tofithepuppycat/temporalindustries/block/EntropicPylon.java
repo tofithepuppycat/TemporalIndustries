@@ -24,19 +24,17 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
-/** Routes liquid Order/Chaos between blocks the player marked ahead of time by right-clicking with
- * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem} in hand - see
- * {@link EntropicPylonBlockEntity} for the actual transfer. Like {@link LootGenerator}, only runs
- * once completed by a single {@link MachineFrame} directly above it. */
+/** Routes liquid Order/Chaos between blocks marked via {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem};
+ * see {@link EntropicPylonBlockEntity} for the transfer logic. Only runs once completed by a
+ * {@link MachineFrame} directly above it. */
 @SuppressWarnings("null")
 public class EntropicPylon extends BaseEntityBlock {
-    // Drives whether the pylon is actually routing entropy - see EntropicPylonBlockEntity#checkStructure.
+    // Whether the pylon is actually routing entropy - see EntropicPylonBlockEntity#checkStructure.
     public static final BooleanProperty FORMED = BooleanProperty.create("formed");
 
     private static final MapCodec<EntropicPylon> CODEC = simpleCodec(EntropicPylon::new);
 
-    /** Which entropy type this pylon is restricted to, or {@code null} for the dual pylon - handed
-     * straight to {@link EntropicPylonBlockEntity} on construction. */
+    /** Entropy type this pylon is restricted to, or {@code null} for the dual pylon. */
     @Nullable
     private final EntropyType filter;
     private final Supplier<BlockEntityType<EntropicPylonBlockEntity>> blockEntityType;

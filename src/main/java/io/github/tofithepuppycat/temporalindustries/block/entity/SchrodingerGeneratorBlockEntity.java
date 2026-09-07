@@ -29,22 +29,16 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /**
- * Early-game passive entropy generator: while it holds a captured mob (see
- * {@link io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem}), it periodically
- * spawns a small {@link EntropyOrbEntity}, ORD or CHS with equal chance each time — the mob is both
- * alive and dead until observed. Landing on ORD also fires a pulse of FE into {@link #energyStorage},
- * as if collapsing the superposition into "alive" released a burst of energy. The mob itself is never
- * simulated — only its type and custom name are kept — and is respawned back into the world by
- * {@link #release()}, called either from an empty-handed right-click
- * ({@code SchrodingerGenerator.useWithoutItem}) or when the block is removed
- * ({@code SchrodingerGenerator.onRemove}), so breaking an occupied generator never silently deletes
- * the mob.
+ * Early-game passive entropy generator: while it holds a captured mob, it periodically spawns a
+ * small {@link EntropyOrbEntity}, ORD or CHS with equal chance. Landing on ORD also fires a pulse
+ * of FE into {@link #energyStorage}. The mob itself is never simulated, only its type and custom
+ * name are kept, and it's respawned by {@link #release()} so breaking an occupied generator never
+ * silently deletes it.
  */
 @SuppressWarnings("null")
 public class SchrodingerGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
-    // Interval halved and CHS_PER_INTERVAL halved to match, so the generator drops orbs twice as often
-    // without producing entropy any faster overall; entropyAccumulator carries the fractional
-    // remainder between checks since an orb can't be spawned with a value below 1.
+    // entropyAccumulator carries the fractional remainder between checks since an orb can't be
+    // spawned with a value below 1.
     private static final int CHS_INTERVAL_TICKS = 50;
     private static final double CHS_PER_INTERVAL = 0.5;
 

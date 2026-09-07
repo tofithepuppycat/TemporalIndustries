@@ -76,8 +76,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         renderProgress(guiGraphics);
     }
 
-    /** Tiles the fluid's still texture (from the block atlas) bottom-up over the filled portion of
-     * the tank, tinted with the entropy color — same technique as EntropyCondenserScreen. */
+    /** Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with the entropy color. */
     private void renderEntropyBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
         if (capacity <= 0 || amount <= 0) return;
         int filled = Math.max(1, Math.round((amount / (float) capacity) * BAR_HEIGHT));
@@ -102,8 +101,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         guiGraphics.disableScissor();
     }
 
-    /** Renders whatever fluid sits in the material liquid tank, tinted with its own natural color
-     * (unlike the entropy bars, which always use the fixed Order/Chaos tint). */
+    /** Renders the material liquid tank, tinted with the fluid's own natural color rather than a fixed entropy tint. */
     private void renderLiquidTank(GuiGraphics guiGraphics) {
         int amount = menu.getLiquidFluidAmount();
         int capacity = menu.getLiquidTankCapacity();
@@ -137,8 +135,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         guiGraphics.disableScissor();
     }
 
-    /** Draws the Chaos or Order progress bar icon over the gear, growing left-to-right with
-     * processing progress; which icon is used depends on the active recipe's entropy type. */
+    /** Draws the Chaos or Order progress bar icon over the gear, growing left-to-right with progress. */
     private void renderProgress(GuiGraphics guiGraphics) {
         int code = menu.getActiveTypeCode();
         if (code == 0) return;

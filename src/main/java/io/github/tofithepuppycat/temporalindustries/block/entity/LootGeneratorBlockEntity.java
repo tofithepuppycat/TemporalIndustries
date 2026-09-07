@@ -55,14 +55,11 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Spends liquid Chaos to roll a player-chosen loot table (vanilla or modded) into its own
- * chest-sized inventory, one item at a time on a tick-driven progress bar - a fixed cost to start
- * the roll, plus a further cost per item actually placed. See {@link EntropyManipulatorBlockEntity}
- * for the ticked-consumption idiom this mirrors. A luck slider (0-{@link #MAX_LUCK}) feeds into the
- * roll as the loot table's luck parameter for better results, at a Chaos surcharge on both costs.
- * A play/stop toggle ({@link #beginGeneration()}/{@link #stopGeneration()}) starts and halts
- * generation, and a single/repeat toggle ({@link #setRepeatMode}) picks whether one press produces
- * one roll or keeps rolling for as long as Chaos holds out.
+ * Spends liquid Chaos to roll a player-chosen loot table into its own chest-sized inventory, one
+ * item at a time on a tick-driven progress bar: a fixed cost to start the roll, plus a further
+ * cost per item placed. A luck slider (0-{@link #MAX_LUCK}) skews results at a Chaos surcharge. A
+ * play/stop toggle starts/halts generation, and a repeat toggle picks whether one press produces
+ * one roll or keeps rolling until Chaos runs out.
  */
 @SuppressWarnings("null")
 public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider, MachineFrameController {
@@ -71,9 +68,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     public static final int ITEM_COST = 50;
     public static final int PROCESS_TICKS = 40;
 
-    // Luck slider: 0 (default, no extra cost) up to MAX_LUCK, fed straight into the loot table roll
-    // as LootContextParams.LUCK so tables with quality-weighted pools/functions skew toward better
-    // results, at a Chaos surcharge that scales with how far the slider is pushed.
+    // Luck slider: 0 (default) up to MAX_LUCK, fed into the roll as LUCK, at a scaling Chaos surcharge.
     public static final int MAX_LUCK = 10;
     public static final int LUCK_ROLL_COST = 100;
     public static final int LUCK_ITEM_COST = 20;
@@ -90,8 +85,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         }
     };
 
-    // Implementing Container directly (not only IItemHandler) is what lets vanilla hoppers push/pull
-    // items here; inventory wraps this same backing list as an IItemHandler for modded item pipes.
+    // Implements Container directly so vanilla hoppers can push/pull; inventory wraps the same list for modded pipes.
     private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
@@ -99,18 +93,14 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     private ResourceLocation selectedLootTable;
     private boolean lastSelectionValid = false;
     private int luck = 0;
-    // Whether the GUI's play/stop icon shows "stop" - true from pressing play until either the
-    // player presses stop or (single-shot mode) the in-flight roll finishes placing everything.
+    // Whether the GUI's play/stop icon shows "stop".
     private boolean running = false;
-    // false: one full roll (which may itself contain several items) per press of play, then stops.
-    // true: presses play once and keeps starting a fresh roll every time the previous one finishes,
-    // until stopped or Chaos runs out - resuming on its own once the tank refills, same as the
-    // existing mid-roll pause behavior.
+    // false: one roll per press of play, then stops. true: keeps starting a fresh roll every time
+    // the previous one finishes, until stopped or Chaos runs out.
     private boolean repeatMode = false;
     private List<ItemStack> pendingRoll = new ArrayList<>();
-    // Sampled by re-rolling the table a handful of extra times when a roll starts, purely so the
-    // client can spin through icons of things this table could plausibly produce (see
-    // LootGeneratorScreen) - not itself consumed or placed anywhere.
+    // Sampled by re-rolling the table a few extra times when a roll starts, purely for the client's
+    // roll animation icons - not itself consumed or placed anywhere.
     private List<ItemStack> possibleItems = new ArrayList<>();
     private int progress = 0;
     private int maxProgress = PROCESS_TICKS;
@@ -194,9 +184,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Presses "play": no-ops if already running, otherwise marks the generator running and kicks
-     * off the first roll (which itself no-ops harmlessly if there isn't enough Chaos yet or the
-     * selection is invalid - {@link #processTick()} keeps retrying every tick while running). */
+    /** Presses "play": no-ops if already running, otherwise marks running and kicks off the first
+     * roll ({@link #processTick()} keeps retrying every tick if it can't start yet). */
     public void beginGeneration() {
         if (running) return;
         running = true;
@@ -205,8 +194,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         startRoll();
     }
 
-    /** Presses "stop": halts immediately, discarding any roll that hasn't finished placing its items
-     * yet (the Chaos already spent to start that roll is not refunded). */
+    /** Presses "stop": halts immediately, discarding any unfinished roll (its Chaos is not refunded). */
     public void stopGeneration() {
         if (!running && pendingRoll.isEmpty()) return;
         running = false;
@@ -220,8 +208,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return progress;
     }
 
-    /** Sampled items this table could plausibly produce, for the client's roll animation - not the
-     * actual queued results. */
+    /** Sampled items this table could plausibly produce, for the client's roll animation, not the actual queued results. */
     public List<ItemStack> getPossibleItems() {
         return possibleItems;
     }
@@ -240,9 +227,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame} block.
-     * Also re-points the block entity of any frame already present back at this controller, so
-     * right-clicking that frame block can forward the interaction here - see {@link MachineFrameBlockEntity}. */
+    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame}
+     * block. Also re-points any frame already present back at this controller. */
     public List<BlockPos> findMissing() {
         List<BlockPos> missing = new ArrayList<>();
         if (level == null) return missing;
@@ -256,9 +242,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return missing;
     }
 
-    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients if it changed -
-     * including pushing {@link LootGenerator#FORMED} into the actual block state so the front-face
-     * model swaps between its animated and frozen-last-frame textures. */
+    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients and pushing
+     * {@link LootGenerator#FORMED} into the block state if it changed. */
     public boolean checkStructure() {
         boolean wasFormed = formed;
         formed = findMissing().isEmpty();
@@ -279,9 +264,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** Pushes {@link MachineFrame#CONNECTED} to every present frame position, so the Fusion
-     * connected-textures casing only shows on frames confirmed part of *this* formed structure -
-     * rather than any frame block happening to sit next to one. */
+    /** Pushes {@link MachineFrame#CONNECTED} to every present frame position, so the connected
+     * texture only shows on frames confirmed part of this formed structure. */
     private void updateFrameConnectivity(boolean connected) {
         Direction facing = getBlockState().getValue(LootGenerator.FACING);
         for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition, facing)) {
@@ -289,9 +273,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         }
     }
 
-    /** ORD-colored (see {@link EntropyType#ORDER}) outline traced along the edges of the whole
-     * formed structure's bounding box - not just at the controller - fired once when the structure
-     * transitions from unformed to formed. */
+    /** Order-colored outline traced along the edges of the whole formed structure's bounding box,
+     * fired once when it transitions from unformed to formed. */
     private void spawnFormedParticles(ServerLevel serverLevel) {
         Direction facing = getBlockState().getValue(LootGenerator.FACING);
         List<BlockPos> positions = new ArrayList<>(LootGeneratorStructure.framePositions(worldPosition, facing));
@@ -340,9 +323,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return lines;
     }
 
-    /** Sets the selected loot table id (or clears it, if {@code id} is null) and re-validates it
-     * against the server's actually-registered loot tables, so a stale/typoed id is flagged rather
-     * than silently accepted. */
+    /** Sets the selected loot table id (or clears it) and re-validates against registered tables, so a typoed id is flagged. */
     public void setSelectedLootTable(@Nullable ResourceLocation id) {
         this.selectedLootTable = id;
         this.lastSelectionValid = id != null && resolvesToRealTable(id);
@@ -350,11 +331,9 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Drains {@link #ROLL_COST} (plus luck surcharge) and rolls the selected loot table, queuing the
+    /** Drains {@link #ROLL_COST} (plus luck surcharge) and rolls the selected loot table, queuing
      * results to be placed one at a time by {@link #processTick()}. No-ops if a roll is already in
-     * progress, the selection doesn't resolve to a real loot table, or there isn't enough Chaos to
-     * start one - called from {@link #beginGeneration()} and, in repeat mode, again by
-     * {@link #processTick()} every time the previous roll finishes. */
+     * progress, the selection is invalid, or there isn't enough Chaos to start one. */
     private void startRoll() {
         if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
 
@@ -382,8 +361,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     }
 
     /** Re-rolls {@code table} a few extra times and dedupes the results into a small pool of items
-     * this table could plausibly produce, so the client has something to spin through while a roll
-     * is in progress instead of just the one outcome that actually got queued. */
+     * this table could plausibly produce, for the client to spin through during a roll. */
     private static List<ItemStack> samplePossibleItems(LootTable table, LootParams params, List<ItemStack> firstRoll) {
         List<ItemStack> pool = new ArrayList<>();
         addDistinct(pool, firstRoll);
@@ -411,9 +389,8 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return isChestLootTable(id) && level instanceof ServerLevel serverLevel && resolveLootTable(serverLevel, id) != LootTable.EMPTY;
     }
 
-    /** Restricts selectable tables to the {@code chests/} folder (vanilla convention for
-     * dungeon/structure/village loot) so players can't roll a block's block-drop table - e.g.
-     * {@code minecraft:blocks/chest} - for infinite free blocks. */
+    /** Restricts selectable tables to the {@code chests/} folder, so players can't roll a block's
+     * block-drop table for infinite free blocks. */
     public static boolean isChestLootTable(ResourceLocation id) {
         return id.getPath().startsWith("chests/");
     }
@@ -443,8 +420,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
             }
             if (running) {
                 if (repeatMode) {
-                    // No-ops harmlessly (insufficient Chaos, invalid selection, ...) - just retried
-                    // again next tick, same as the mid-roll pause below.
+                    // No-ops harmlessly and retries again next tick if it can't start yet.
                     startRoll();
                 } else {
                     running = false;
@@ -455,8 +431,7 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
             return;
         }
 
-        // Paused (not aborted) when short on Chaos or inventory space - resumes on its own once
-        // either frees up, rather than dropping loot on the ground or losing the roll.
+        // Paused (not aborted) when short on Chaos or inventory space; resumes on its own once either frees up.
         int itemCost = getItemCost();
         if (chaosTank.getFluidAmount() < itemCost || !canPlace(pendingRoll.get(0))) {
             return;
@@ -520,9 +495,6 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // Container (27-slot chest inventory; see ChronoProjectorBlockEntity for why both this and
-    // IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() {

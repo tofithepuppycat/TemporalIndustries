@@ -30,18 +30,10 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Handheld area-protection tool, similar in spirit to Create's Super Glue: right-click one corner,
- * then another, to glue that cuboid region — every block inside is skipped when a delta would be
- * captured ({@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener#shouldRecord})
- * and when a rollback/jump would otherwise overwrite it ({@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline}'s
- * isGlued predicate param), so it sits outside the timeline entirely. Left-click while aiming at an
- * existing glued region (there can be several overlapping) to delete every region along your sight line.
- * Regions are stored in {@link TemporalWorldData}, not on the item — the item only ever holds a
- * pending first corner, in its {@link DataComponents#CUSTOM_DATA}, mirroring
- * {@link EchoRecordItem}'s per-stack storage. While held, both the pending corner and every known
- * glued region are drawn by {@link io.github.tofithepuppycat.temporalindustries.client.GlueSelectionRenderer}
- * — see {@link GlueRegionRequestPacket}/{@link GlueRegionSyncPacket} for how the client learns
- * which regions exist.
+ * Handheld area-protection tool: right-click one corner, then another, to glue that cuboid region,
+ * excluding it from timeline capture and rollback/jump overwrites entirely. Left-click while aiming
+ * at a glued region deletes every region along the sight line. Regions are stored in
+ * {@link TemporalWorldData}, not on the item; the item only holds a pending first corner.
  */
 @SuppressWarnings("null")
 public class TemporalGlueItem extends Item {
@@ -85,12 +77,8 @@ public class TemporalGlueItem extends Item {
         return InteractionResult.SUCCESS;
     }
 
-    /** Left-click-with-glue handler, called from TemporalChangeListener (which cancels the block
-     * break that would otherwise start, or the swing-at-air interaction) for every left click while
-     * holding Temporal Glue. Deletes every glued region whose bounding box lies anywhere along the
-     * player's line of sight out to their block reach — so aiming roughly at a glued section is
-     * enough, no need to land the click on an exact block inside it — or clears a pending first
-     * corner if nothing was hit and one is pending. */
+    /** Left-click-with-glue handler: deletes every glued region along the player's line of sight
+     * out to block reach, or clears a pending first corner if nothing was hit. */
     public static void deleteRegionsAlongSight(ServerLevel level, ServerPlayer player, ItemStack stack) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         Vec3 origin = player.getEyePosition();
@@ -111,15 +99,13 @@ public class TemporalGlueItem extends Item {
         }
     }
 
-    /** Whether player is holding Temporal Glue in either hand — used by TemporalChangeListener to
-     * stop creative-mode instant break from destroying the block a glue/unglue click targets. */
+    /** Whether player is holding Temporal Glue in either hand. */
     public static boolean isHolding(Player player) {
         return player.getMainHandItem().getItem() instanceof TemporalGlueItem
                 || player.getOffhandItem().getItem() instanceof TemporalGlueItem;
     }
 
-    /** Pushes the current region list to every player in level's dimension, so a glue/unglue is
-     * reflected in everyone's in-world preview immediately instead of waiting for their next poll. */
+    /** Pushes the current region list to every player in level's dimension immediately. */
     private static void broadcastRegions(ServerLevel level) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
@@ -136,8 +122,7 @@ public class TemporalGlueItem extends Item {
         PacketDistributor.sendToServer(GlueRegionRequestPacket.INSTANCE);
     }
 
-    /** The pending first corner stored on stack, if any — read by
-     * {@link io.github.tofithepuppycat.temporalindustries.client.GlueSelectionRenderer} to draw it. */
+    /** The pending first corner stored on stack, if any. */
     public static Optional<BlockPos> getPendingCorner(ItemStack stack) {
         CompoundTag data = readData(stack);
         if (!data.contains("Pos1X")) return Optional.empty();

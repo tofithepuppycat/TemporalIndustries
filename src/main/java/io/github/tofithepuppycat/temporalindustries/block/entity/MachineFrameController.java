@@ -8,10 +8,8 @@ import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.Nullable;
 
-/** Implemented by any multiblock controller block entity that a
- * {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame} satellite can be pointed
- * at, so the frame can forward clicks and item/fluid capability requests to whichever controller
- * currently owns it without needing to know about every multiblock type that exists. */
+/** Implemented by any multiblock controller block entity a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame}
+ * satellite can be pointed at, so the frame can forward clicks and capability requests to whichever controller owns it. */
 public interface MachineFrameController {
     @Nullable IItemHandler getItemHandler();
 

@@ -35,11 +35,9 @@ public class TimelineProjectionRenderer {
     private static final float BLINK_ALPHA_MAX = 0.85F;
     private static final long BLINK_PERIOD_MS = 900L;
 
-    /** Outer boundary of the previewed claim: a translucent wall standing on each chunk edge that
-     * has no other previewed chunk behind it. */
+    /** Outer boundary of the previewed claim: a translucent wall on each chunk edge with no other previewed chunk behind it. */
     private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
-    /** Walls are backdrop, not the subject — kept well under the block decals' own blink alpha so
-     * they read as an enclosure rather than competing with the changes inside them. */
+    /** Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject. */
     private static final float WALL_ALPHA_SCALE = 0.35F;
 
     @SubscribeEvent
@@ -84,7 +82,7 @@ public class TimelineProjectionRenderer {
                 default -> ADD_COLOR;
             };
             if (entry.getCurrentState().isAir()) {
-                // Nothing there to decal faces onto yet, so float a small cube in the middle instead.
+                // Nothing to decal faces onto yet, so float a small cube in the middle instead.
                 renderCenterCube(poseStack, quadBuffer, relX, relY, relZ, color[0], color[1], color[2], alpha);
             } else {
                 renderFaceMarkers(poseStack, quadBuffer, relX, relY, relZ, color[0], color[1], color[2], alpha);
@@ -95,15 +93,10 @@ public class TimelineProjectionRenderer {
     }
 
     /**
-     * Draws a wall along every chunk edge on the OUTER boundary of the previewed claim — an edge
-     * with no other previewed chunk on the far side of it. Interior edges (between two claimed
-     * chunks) are skipped, so a multi-chunk Chronosphere claim reads as one enclosure rather than
-     * a grid of boxes, and a single-chunk Time Machine still gets a plain box around its chunk.
-     * If a single claimed chunk's own tab is open (see
-     * {@link TimelineProjectionManager#getSelectedViewChunk()}), that chunk also gets a full box
-     * on every side, even the edges it shares with a neighboring claimed chunk — otherwise a
-     * chunk in the middle of the claim wouldn't be outlined at all despite being the one whose
-     * history the player is actually browsing.
+     * Draws a wall along every chunk edge on the OUTER boundary of the previewed claim, skipping
+     * interior edges so a multi-chunk claim reads as one enclosure. If a single claimed chunk's
+     * own tab is open (see {@link TimelineProjectionManager#getSelectedViewChunk()}), that chunk
+     * gets a full box on every side too, so it's outlined even in the middle of the claim.
      */
     private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer, Level level,
                                             double cameraX, double cameraY, double cameraZ, float alpha) {
@@ -118,8 +111,7 @@ public class TimelineProjectionRenderer {
 
         Matrix4f matrix = poseStack.last().pose();
         float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
-        // Anchored to the world's actual build height, not the camera, so the wall stays put
-        // as the player flies up or down instead of chasing them.
+        // Anchored to the world's build height, not the camera, so the wall stays put as the player flies.
         float yBottom = (float) (level.getMinBuildHeight() - cameraY);
         float yTop = (float) (level.getMaxBuildHeight() - cameraY);
 

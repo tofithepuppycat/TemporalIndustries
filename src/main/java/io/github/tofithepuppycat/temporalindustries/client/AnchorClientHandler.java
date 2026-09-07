@@ -13,13 +13,9 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import org.joml.Vector3f;
 
-/**
- * Client-side reaction to {@link io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket}
- * and {@link io.github.tofithepuppycat.temporalindustries.network.AnchorRewindEffectPacket}.
- * Only ever invoked from those packets' handle() callbacks, which only fire on the client - kept
- * in its own class (mirroring {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager})
- * so the packet classes themselves never need to reference client-only types.
- */
+/** Client-side reaction to {@link io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket}
+ * and {@link io.github.tofithepuppycat.temporalindustries.network.AnchorRewindEffectPacket}, kept
+ * separate so the packet classes don't need to reference client-only types. */
 public final class AnchorClientHandler {
     private static final Vector3f REWIND_PARTICLE_COLOR = new Vector3f(
             ((EntropyType.CHAOS.color() >> 16) & 0xFF) / 255.0F,

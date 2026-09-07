@@ -16,10 +16,9 @@ import net.minecraft.world.item.context.UseOnContext;
 import java.util.List;
 
 /**
- * Single-type liquid entropy storage - the Order Cell and Chaos Cell, both instances of this class
- * distinguished by {@link #type}. Holds up to {@link BottleContents#CAPACITY} mB of its own fluid,
- * half of what {@link DualEntropyCellItem} holds per type, and only attracts/accepts orbs of its own
- * type. Right-clicking a machine pours a dose into it - see {@link CellTransfer}.
+ * Single-type liquid entropy storage - the Order Cell and Chaos Cell, distinguished by
+ * {@link #type}. Holds up to {@link BottleContents#CAPACITY} mB of its own fluid and only
+ * attracts/accepts orbs of that type. Right-clicking a machine pours a dose into it.
  */
 @SuppressWarnings("null")
 public class EntropyCellItem extends Item implements EntropyReceptacle {

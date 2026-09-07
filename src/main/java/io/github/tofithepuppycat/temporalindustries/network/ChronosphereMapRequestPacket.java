@@ -61,8 +61,7 @@ public class ChronosphereMapRequestPacket implements CustomPacketPayload {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue;
                     ChunkPos pos = new ChunkPos(home.x + dx, home.z + dz);
-                    // Only sample chunks already loaded — this is a preview, not a reason to force
-                    // remote/unclaimed chunks to generate.
+                    // Only sample already-loaded chunks; don't force generation for a preview.
                     if (!sender.level().hasChunk(pos.x, pos.z)) continue;
                     thumbnails.put(pos.toLong(), ChronoMapSampler.sampleChunk(sender.serverLevel(), pos));
                 }

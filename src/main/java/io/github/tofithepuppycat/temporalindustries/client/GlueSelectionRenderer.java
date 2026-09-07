@@ -26,10 +26,9 @@ import org.joml.Matrix4f;
 import java.util.List;
 import java.util.Optional;
 
-/** Renders Temporal Glue's selections in-world while a Temporal Glue is held in either hand: a
- * translucent fill plus a thin outline for every known glued region (see
- * {@link GlueSelectionClientState}), and, once a starting corner has been selected, a live preview
- * box tracking the crosshair from that corner to whatever block is currently looked at. */
+/** Renders Temporal Glue's in-world selections while a Temporal Glue is held: a translucent
+ * outlined box for every known glued region, plus a live preview box from the pending corner
+ * to the crosshair. */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class GlueSelectionRenderer {
     private static final float[] FILL_COLOR = {0.55F, 0.85F, 1.0F};
