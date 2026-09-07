@@ -23,9 +23,8 @@ public class RollbackChunkPacket implements CustomPacketPayload {
 
     private final BlockPos machinePos;
     private final long targetGameTime;
-    /** The exact commit clicked in the timeline graph, or {@link TemporalCommit#NO_PREFERRED_COMMIT}
-     * when there isn't one (falls back to gameTime-only resolution). Disambiguates a jump target
-     * from any other commit sharing the same gameTime — see TimelineViewProvider#jump(long, long). */
+    /** The exact commit clicked, or {@link TemporalCommit#NO_PREFERRED_COMMIT} to fall back to
+     * gameTime-only resolution; disambiguates commits sharing the same gameTime. */
     private final long targetCommitId;
 
     public RollbackChunkPacket(BlockPos machinePos, long targetGameTime, long targetCommitId) {

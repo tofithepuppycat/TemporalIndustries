@@ -47,13 +47,10 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Block entity for the Chrono Loop Projector: holds one Chrono Record and, while it has a
- * saved recording and enough stored energy, endlessly replays it via {@link #getCachedRecording()}
- * / {@link #computePlaybackProgress}, consumed client-side by the ghost renderer.
- *
- * Playback position is derived from a synced {@code loopEpoch} (the game time at which loop-tick 0
- * happened) rather than a per-tick counter, so nothing needs to be re-synced every tick — only
- * when the loop starts, stops, or is paused/resumed for lack of energy.
+ * Block entity for the Chrono Loop Projector: holds one Chrono Record and, while it has a saved
+ * recording and enough stored energy, endlessly replays it, consumed client-side by the ghost
+ * renderer. Playback position derives from a synced {@code loopEpoch} rather than a per-tick
+ * counter, so nothing needs re-syncing except on start/stop/pause.
  */
 @SuppressWarnings("null")
 public class ChronoProjectorBlockEntity extends BlockEntity implements Container, EntropyInfoProvider {
@@ -81,21 +78,15 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     private final ProjectorEnergyStorage energyStorage = new ProjectorEnergyStorage();
 
-    /** Holds whatever the loop's BREAK actions harvest and whatever its PLACE actions consume.
-     * Implementing {@link Container} directly (rather than only exposing the NeoForge IItemHandler
-     * capability) is what lets vanilla hoppers actually push/pull items here — hoppers look for a
-     * Container, not a capability. {@link #inventory} wraps this same backing list as an
-     * IItemHandler for modded item pipes, so both interop paths share one source of truth. */
+    /** Holds whatever the loop's BREAK actions harvest and PLACE actions consume. Implements
+     * {@link Container} directly so vanilla hoppers can push/pull (they look for a Container, not
+     * a capability); {@link #inventory} wraps the same list as an IItemHandler for modded pipes. */
     private final NonNullList<ItemStack> items = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
-    /** ARGB tint for this projector's ghost render — see {@code ChronoGhostRenderer}. Right-clicking
-     * the projector with a dye recolors it (RGB only; the alpha is fixed so the ghost always stays
-     * translucent regardless of dye). Channels are lightened toward white before use: the render
-     * multiplies this straight onto the recording owner's actual skin texture (not a plain overlay
-     * like leather armor's), so a saturated tint reads mostly as the skin's own colors darkened
-     * rather than a clean dye color — lightening it keeps the hue recognizable while letting less
-     * of the skin's original coloring show through. */
+    /** ARGB tint for this projector's ghost render; recolorable via dye (RGB only, alpha fixed for
+     * translucency). Channels are lightened toward white before use since the render multiplies
+     * this directly onto the skin texture rather than overlaying it, which would otherwise mostly darken it. */
     private static final int GHOST_ALPHA = 150;
     public static final int DEFAULT_GHOST_COLOR = ghostTint(70, 235, 255);
 
@@ -114,8 +105,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     private boolean active = false;
     private long loopEpoch = 0L;
     private int pausedTick = 0;
-    /** Not persisted: on reload, playback simply resumes from wherever loopEpoch/gameTime puts it,
-     * re-running at most one tick's worth of actions it would otherwise have missed. */
+    /** Not persisted: on reload, playback resumes from wherever loopEpoch/gameTime puts it. */
     private int lastExecutedTick = -1;
 
     public ChronoProjectorBlockEntity(BlockPos pos, BlockState state) {
@@ -134,16 +124,12 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return ghostColor;
     }
 
-    /** Recolors this projector's ghost render from a dye's RGB, lightened the same way as
-     * {@link #DEFAULT_GHOST_COLOR} — see {@link #ghostTint(int, int, int)}. */
+    /** Recolors this projector's ghost render from a dye's RGB, lightened the same way as {@link #DEFAULT_GHOST_COLOR}. */
     public void setGhostTint(int rgb) {
         ghostColor = ghostTint(FastColor.ARGB32.red(rgb), FastColor.ARGB32.green(rgb), FastColor.ARGB32.blue(rgb));
         setChanged();
         syncToClients();
     }
-
-    // -------------------------------------------------------------------------
-    // Container (see the `items`/`inventory` field doc for why this exists alongside IItemHandler)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.stream().allMatch(ItemStack::isEmpty); }
@@ -162,10 +148,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     @Override public boolean stillValid(Player player) { return Container.stillValidBlockEntity(this, player); }
     @Override public void clearContent() { items.clear(); }
 
-    // -------------------------------------------------------------------------
-    // Client-side ghost renderer registry (see ChronoGhostRenderer) — guarded on isClientSide so
-    // the client-only renderer class is never touched, let alone loaded, on a dedicated server.
-
+    // Guarded on isClientSide so the client-only renderer class is never loaded on a dedicated server.
     @Override
     public void onLoad() {
         super.onLoad();
@@ -223,12 +206,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Action execution (break/place) — see ChronoActionRecorder for how these get recorded
-
-    /** Actions replay at the recording's own absolute coordinates (where the player actually broke/
-     * placed things), not relative to the projector — the projector is just the engine holding the
-     * recorder, energy and inventory; it may sit far from the plot it's replaying. */
+    /** Actions replay at the recording's own absolute coordinates, not relative to the projector,
+     * which may sit far from the plot it's replaying. */
     private void executeActions(ServerLevel level, ChronoRecording recording, int tick) {
         ResourceLocation recordingDimension = recording.getDimension();
         if (recordingDimension != null && !recordingDimension.equals(level.dimension().location())) {
@@ -239,9 +218,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         int anchorY = (int) Math.floor(recording.getStartY());
         int anchorZ = (int) Math.floor(recording.getStartZ());
 
-        // Sweeping-edge-style hits record one ATTACK action per struck entity in the same tick;
-        // tracking already-claimed targets here keeps a multi-hit swing from resolving two of
-        // those actions onto the same physical mob and leaving its neighbour untouched.
+        // Tracks already-claimed targets so a multi-hit swing can't resolve two ATTACK actions onto the same mob.
         Set<LivingEntity> alreadyHit = new HashSet<>();
 
         for (ChronoRecording.Action action : recording.actionsAt(tick)) {
@@ -258,10 +235,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** {@code toolId}, if recorded, is replayed as a phantom tool purely so blocks that gate their
-     * loot table on the harvesting tool ({@code requiresCorrectToolForDrops}) drop correctly —
-     * modded ores/machines commonly do this. It's a fresh, undamaged, unenchanted stack of that
-     * item and is never pulled from (or returned to) the projector's own inventory. */
+    /** {@code toolId}, if recorded, is replayed as a phantom tool so blocks that gate loot on the
+     * harvesting tool drop correctly. It's a fresh unenchanted stack, never pulled from inventory. */
     private void executeBreak(ServerLevel level, BlockPos pos, @Nullable ResourceLocation toolId) {
         BlockState state = level.getBlockState(pos);
         if (state.isAir()) return;
@@ -278,10 +253,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Reproduces the exact recorded BlockState (orientation, connections, ...) and block entity
-     * data, not just the item's default block — important for modded machines/pipes/oriented
-     * blocks where "some instance of this block" isn't good enough. Falls back to the block's
-     * default state for older recordings made before this was captured. */
+    /** Reproduces the exact recorded BlockState and block entity data, not just the item's default
+     * block. Falls back to the default state for older recordings made before this was captured. */
     private void executePlace(ServerLevel level, BlockPos pos, @Nullable ResourceLocation itemId,
                                @Nullable CompoundTag blockStateTag, @Nullable CompoundTag blockEntityTag) {
         if (itemId == null || !level.getBlockState(pos).isAir()) return;
@@ -298,11 +271,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         restoreBlockEntity(level, pos, blockEntityTag);
     }
 
-    /** Reproduces a right-click block transform recorded generically as a before/after state diff
-     * (axe-stripping, hoe-tilling, honeycomb-waxing, a modded machine applying a casing to itself,
-     * ...) — see ChronoActionRecorder. Unlike PLACE, nothing is consumed from the projector's own
-     * inventory: whatever item caused this was only ever incidental to the transform, not something
-     * the ghost needs to physically hold. */
+    /** Reproduces a right-click block transform recorded as a before/after state diff (axe-stripping,
+     * hoe-tilling, etc). Unlike PLACE, nothing is consumed from the projector's own inventory. */
     private void executeModify(ServerLevel level, BlockPos pos, @Nullable CompoundTag blockStateTag,
                                 @Nullable CompoundTag blockEntityTag) {
         if (blockStateTag == null || level.getBlockState(pos).isAir()) return;
@@ -328,9 +298,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     }
 
     /** Hands `count` of `itemId` from this projector's own inventory to whatever container sits at
-     * pos (furnace fuel/input, hopper, chest, ...). Silently does nothing if the projector doesn't
-     * have any of that item — per design, a missing ingredient just skips this cycle rather than
-     * stalling or erroring. */
+     * pos. Silently skips this cycle if the projector doesn't have any of that item. */
     private void executeInsert(ServerLevel level, BlockPos pos, @Nullable ResourceLocation itemId, int count) {
         if (itemId == null || count <= 0) return;
         IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
@@ -349,8 +317,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Takes up to `count` of `itemId` out of whatever container sits at pos (e.g. a furnace's
-     * finished output) and into this projector's own inventory. */
+    /** Takes up to `count` of `itemId` out of whatever container sits at pos into this projector's own inventory. */
     private void executeExtract(ServerLevel level, BlockPos pos, @Nullable ResourceLocation itemId, int count) {
         if (itemId == null || count <= 0) return;
         IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
@@ -372,14 +339,9 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Reproduces a recorded melee hit by directly reapplying its final recorded damage, rather than
-     * tracking the original target's identity — it may no longer exist, or be a different instance,
-     * by the time the loop replays. Instead this looks for the nearest living entity of the recorded
-     * type near the recorded position, same as PLACE/MODIFY re-anchor to a position rather than an
-     * object. Uses a damage type that bypasses armor since the recorded amount is already the final
-     * post-reduction damage — applying armor again would double it up. Silently does nothing if no
-     * matching entity is nearby, per the same "missing target just skips this cycle" design as
-     * executeInsert/executeExtract. */
+    /** Reproduces a recorded melee hit by reapplying its final recorded damage to the nearest
+     * living entity of the recorded type near the recorded position, since the original target may
+     * no longer exist. Bypasses armor since the recorded amount is already post-reduction damage. */
     private void executeAttack(ServerLevel level, BlockPos pos, @Nullable ResourceLocation targetEntityTypeId,
                                 boolean targetBaby, float damage, Set<LivingEntity> alreadyHit) {
         if (targetEntityTypeId == null || damage <= 0F) return;
@@ -399,8 +361,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         target.hurt(source, damage);
     }
 
-    /** Removes up to `max` of `item` from the internal inventory, returning how many were actually
-     * removed. */
+    /** Removes up to `max` of `item` from the internal inventory, returning how many were actually removed. */
     private int extractUpToMatching(Item item, int max) {
         int remaining = max;
         for (int slot = 0; slot < inventory.getSlots() && remaining > 0; slot++) {
@@ -411,9 +372,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
         return max - remaining;
     }
-
-    // -------------------------------------------------------------------------
-    // Insert / remove (jukebox-style interaction, see EchoProjector)
 
     public ItemStack getStoredRecorder() {
         return recorderStack;
@@ -439,9 +397,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Playback query (used by the client-side ghost renderer)
-
     @Nullable
     public ChronoRecording getCachedRecording() {
         return cachedRecording;
@@ -451,10 +406,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return active;
     }
 
-    /** Whether the loop is currently running or paused (out of energy), and — while it holds a
-     * saved recording — that recording's average and peak per-tick energy cost, so a player can
-     * tell at a glance whether their power supply can actually sustain it. Stored/max energy
-     * itself isn't duplicated here since the Entropy Glasses overlay doesn't render that either. */
+    /** Whether the loop is running or paused (out of energy), plus the recording's average and
+     * peak per-tick energy cost so a player can judge whether their power supply can sustain it. */
     @Override
     public List<Component> getEntropyTooltip() {
         if (cachedRecording == null) {
@@ -472,8 +425,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         );
     }
 
-    /** Fractional position within the loop ([0, frameCount)) at gameTime + partialTick, or a
-     * negative number if there's nothing to play back right now. */
+    /** Fractional position within the loop at gameTime + partialTick, or negative if nothing to play back. */
     public double computePlaybackProgress(long gameTime, float partialTick) {
         if (!active || cachedRecording == null) return -1.0;
         int frameCount = cachedRecording.frameCount();

@@ -5,8 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.world.level.block.BaseEntityBlock;
 
-/** Single-liquid variant of {@link EntropicPylon} that only routes Chaos - see
- * {@link io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity#acceptsFluid}. */
+/** Single-liquid variant of {@link EntropicPylon} that only routes Chaos. */
 public class ChaosPylon extends EntropicPylon {
     private static final MapCodec<ChaosPylon> CODEC = simpleCodec(ChaosPylon::new);
 

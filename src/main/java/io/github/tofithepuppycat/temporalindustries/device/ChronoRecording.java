@@ -18,34 +18,20 @@ import java.util.UUID;
 
 /**
  * Read-only view of a finished Echo Record recording, parsed once from the item's
- * {@link DataComponents#CUSTOM_DATA} tag (see EchoRecordItem) and reused by the Echo
- * Projector for playback instead of re-reading NBT every tick/frame.
- *
- * Frame positions are stored relative to the position the recording started at, so playback
- * can re-anchor the path to wherever the projector happens to be. Actions (block break/place)
- * are keyed by the same tick indices as frames and anchored the same way, but as whole-block
- * integer offsets rather than continuous ones.
+ * {@link DataComponents#CUSTOM_DATA} tag and reused by the Echo Projector for playback instead
+ * of re-reading NBT every tick/frame. Frame positions and actions are stored relative to the
+ * recording's start position so playback can re-anchor the path anywhere.
  */
 public final class ChronoRecording {
 
     public record Frame(float x, float y, float z, float yaw, float pitch, boolean crouching) {}
 
     /**
-     * INSERT/EXTRACT cover any container-capable block (furnace, chest, hopper, brewing stand,
-     * ...): the player handing something to it or taking something out of it via its GUI, detected
-     * as an inventory diff across the open/close of that container's menu (see ChronoActionRecorder) —
-     * not tied to any particular slot, just "this item, this many, went in/came out".
-     * <p>
-     * MODIFY covers right-clicking a block with an item that changes ITS state in place without
-     * placing a new block or opening a container — axe-stripping logs, hoe-tilling dirt,
-     * shovel-pathing, honeycomb-waxing, applying a Create casing to a shaft, and anything similar
-     * from any mod. Detected generically as a before/after blockstate diff (see ChronoActionRecorder)
-     * rather than special-cased per interaction, so it isn't limited to vanilla tool abilities.
-     * <p>
-     * ATTACK covers the player melee-damaging a living, non-player entity. The exact final damage
-     * dealt (post armor/enchantments/criticals) is recorded and reapplied directly on replay rather
-     * than recomputed, matching how PLACE/MODIFY reapply their recorded end state instead of
-     * recomputing it.
+     * INSERT/EXTRACT: items handed to or taken from a container-capable block, detected as an
+     * inventory diff across a container GUI open/close. MODIFY: a right-click that changes a
+     * block's state in place (stripping, tilling, waxing, etc.) without placing a new block,
+     * detected generically as a before/after blockstate diff. ATTACK: the player melee-damaging
+     * a living entity, recording the final post-reduction damage for direct reapplication on replay.
      */
     public enum ActionType { BREAK, PLACE, INSERT, EXTRACT, MODIFY, ATTACK }
 
@@ -54,10 +40,8 @@ public final class ChronoRecording {
     public static final int ENERGY_PER_TICK = 15;
 
     /** Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
-     * {@link #ENERGY_PER_TICK} — see {@link #averageEnergyPerTick()}. ATTACK is priced highest since
-     * it's the only action type that harms mobs rather than just moving blocks/items around. Lives
-     * here rather than on the projector so recordings can report their own cost (e.g. in a tooltip)
-     * without needing a live projector instance. */
+     * {@link #ENERGY_PER_TICK}. ATTACK is priced highest since it's the only action type that harms
+     * mobs. Lives here so recordings can report their own cost without a live projector instance. */
     public static int actionEnergyCost(ActionType type) {
         return switch (type) {
             case ATTACK -> 45;
@@ -66,27 +50,19 @@ public final class ChronoRecording {
         };
     }
 
-    /** Hard ceiling on what any single tick can cost, regardless of how many actions land on it —
-     * without this, a tick recording something like a sweeping-edge swing through a whole mob farm
-     * could demand hundreds of FE in one instant and stall the loop indefinitely even with a
-     * healthy average power supply. See {@link #energyCostAt(int)}. */
+    /** Hard ceiling on what any single tick can cost, so a burst of many actions on one tick
+     * (e.g. a sweeping-edge hit on a mob farm) can't stall the loop indefinitely. */
     public static final int MAX_ENERGY_PER_TICK = 500;
 
     /**
-     * {@code item} is the block placed (PLACE) or the item transferred (INSERT/EXTRACT); the item
-     * held during the interaction (MODIFY, informational only — never consumed on replay); null for
-     * BREAK. {@code count} is only meaningful for INSERT/EXTRACT (always 1 for PLACE/MODIFY).
-     * {@code blockState}/{@code blockEntity} (PLACE and MODIFY) are the exact resulting state and,
-     * if any, block entity data — not just the block's default state — so oriented/configured
-     * modded blocks (machines, pipes, ...) reproduce faithfully rather than just "some instance of
-     * this block". {@code tool} (BREAK only) is the item the player was holding when they broke the
-     * block, replayed as a phantom tool purely so the drop calculation respects "requires correct
-     * tool" blocks — it's never pulled from the projector's inventory. {@code targetEntityType},
-     * {@code targetBaby} and {@code damage} (ATTACK only) are the entity type attacked, whether that
-     * entity was a baby, and the exact final damage dealt to it; replay looks for the nearest living
-     * entity of that type (and baby/adult state) near the recorded position rather than tracking the
-     * original entity's identity, since it may not even be the same instance by the time the loop
-     * replays.
+     * {@code item}: block placed (PLACE) or item transferred (INSERT/EXTRACT); null for BREAK.
+     * {@code count}: only meaningful for INSERT/EXTRACT. {@code blockState}/{@code blockEntity}
+     * (PLACE/MODIFY): the exact resulting state and block entity data, so configured modded blocks
+     * reproduce faithfully. {@code tool} (BREAK only): a phantom tool used only so the drop
+     * calculation respects "requires correct tool" blocks, never pulled from the projector's
+     * inventory. {@code targetEntityType}/{@code targetBaby}/{@code damage} (ATTACK only): replay
+     * looks for the nearest matching living entity near the recorded position rather than tracking
+     * the original entity's identity, since it may no longer exist.
      */
     public record Action(int dx, int dy, int dz, ActionType type, @Nullable ResourceLocation item, int count,
                           @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity, @Nullable ResourceLocation tool,
@@ -169,9 +145,7 @@ public final class ChronoRecording {
 
     /** What the Chrono Loop Projector actually charges for replaying loop-tick {@code tick}:
      * {@link #ENERGY_PER_TICK} plus that tick's recorded actions, clamped to
-     * {@link #MAX_ENERGY_PER_TICK}. The single source of truth for per-tick cost, used both by
-     * {@code ChronoProjectorBlockEntity.tick} to charge energy and by {@link #averageEnergyPerTick()}
-     * to report it, so the two can never drift apart. */
+     * {@link #MAX_ENERGY_PER_TICK}. */
     public int energyCostAt(int tick) {
         int actionsCost = 0;
         for (Action action : actionsAt(tick)) {
@@ -180,10 +154,8 @@ public final class ChronoRecording {
         return Math.min(ENERGY_PER_TICK + actionsCost, MAX_ENERGY_PER_TICK);
     }
 
-    /** This recording's total per-tick cost (see {@link #energyCostAt(int)}) spread evenly across
-     * the loop's length — i.e. what the Chrono Loop Projector spends per tick on average while
-     * replaying it, matching how {@code ChronoProjectorBlockEntity.tick} actually charges energy
-     * tick-by-tick (a burst of several actions on one tick, then none for a while). */
+    /** This recording's total per-tick cost spread evenly across the loop's length, i.e. what the
+     * Chrono Loop Projector spends per tick on average while replaying it. */
     public double averageEnergyPerTick() {
         if (frames.isEmpty()) return 0.0;
 
@@ -196,10 +168,8 @@ public final class ChronoRecording {
         return (double) total / frames.size();
     }
 
-    /** The single most expensive tick in this recording (see {@link #energyCostAt(int)}) — e.g. the
-     * tick a sweeping-edge swing hit a crowd of mobs. Already clamped to
-     * {@link #MAX_ENERGY_PER_TICK}, so this is also the most the projector will ever demand in one
-     * instant while replaying it. */
+    /** The single most expensive tick in this recording, already clamped to
+     * {@link #MAX_ENERGY_PER_TICK} — the most the projector will ever demand in one instant. */
     public int peakEnergyPerTick() {
         int peak = ENERGY_PER_TICK;
         for (int tick : actionsByTick.keySet()) {

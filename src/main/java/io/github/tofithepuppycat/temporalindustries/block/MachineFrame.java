@@ -24,15 +24,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 
 /** Generic structural filler block used to complete multiblock machines, starting with the
- * {@link LootGenerator}. Carries no behavior of its own beyond forwarding clicks to whatever
- * controller its {@link MachineFrameBlockEntity} currently points at - machines scan for its
- * presence at the expected structure positions. */
+ * {@link LootGenerator}. Forwards clicks to whatever controller its {@link MachineFrameBlockEntity}
+ * currently points at. */
 public class MachineFrame extends BaseEntityBlock {
-    // Drives which model/texture is used - the Fusion connected-textures casing while this frame is
-    // confirmed part of a formed multiblock, or a plain non-connecting texture while it isn't, so a
-    // stray/broken frame never visually blends into a structure it isn't actually completing. Kept
-    // up to date by the controller re-scanning its structure - see
-    // LootGeneratorBlockEntity#checkStructure.
+    // Whether this frame is confirmed part of a formed multiblock (drives connected-texture rendering).
     public static final BooleanProperty CONNECTED = BooleanProperty.create("connected");
 
     private static final MapCodec<MachineFrame> CODEC = simpleCodec(MachineFrame::new);
@@ -52,9 +47,8 @@ public class MachineFrame extends BaseEntityBlock {
         builder.add(CONNECTED);
     }
 
-    /** Pushes whether {@code pos} should render as part of a formed multiblock, no-oping if it's
-     * already showing that state or isn't actually a MachineFrame (e.g. the position turned out to
-     * be missing). */
+    /** Sets whether {@code pos} should render as part of a formed multiblock; no-ops if already set
+     * or not actually a MachineFrame. */
     public static void setConnected(Level level, BlockPos pos, boolean connected) {
         BlockState state = level.getBlockState(pos);
         if (state.is(Registration.MACHINE_FRAME_BLOCK.get()) && state.getValue(CONNECTED) != connected) {
@@ -63,10 +57,7 @@ public class MachineFrame extends BaseEntityBlock {
     }
 
     /** Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from {@code player}'s inventory to fill
-     * as many of {@code missing} positions as they can currently afford - shared by every
-     * frame-completed controller (see {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator#interact}
-     * and {@link io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity#onFrameInteract}),
-     * so none of them have to duplicate the inventory scan. */
+     * as many of {@code missing} positions as they can afford. Shared by every frame-completed controller. */
     public static void fillFromInventory(Level level, List<BlockPos> missing, ServerPlayer player) {
         for (BlockPos pos : missing) {
             if (!takeOneMachineFrame(player)) return;

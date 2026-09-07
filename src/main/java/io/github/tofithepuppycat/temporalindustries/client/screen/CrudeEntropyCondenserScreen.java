@@ -16,8 +16,7 @@ import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtension
 import net.neoforged.neoforge.fluids.FluidType;
 import org.jetbrains.annotations.NotNull;
 
-/** Minimal placeholder GUI, same "no dedicated art" approach as {@link EntropyCondenserScreen}: the
- * cell input slot, two fluid tank bars, and the player inventory. */
+/** Minimal placeholder GUI: the cell input slot, two fluid tank bars, and the player inventory. */
 @SuppressWarnings("null")
 public class CrudeEntropyCondenserScreen extends AbstractContainerScreen<CrudeEntropyCondenserMenu> {
     private static final int IMAGE_WIDTH = 176;
@@ -53,8 +52,7 @@ public class CrudeEntropyCondenserScreen extends AbstractContainerScreen<CrudeEn
                 menu.getChaosFluidAmount(), menu.getTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 
-    /** Tiles the fluid's still texture (from the block atlas) bottom-up over the filled portion of
-     * the tank, tinted with the entropy color — same approach as EntropyCondenserScreen. */
+    /** Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with the entropy color. */
     private void renderFluidBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
         guiGraphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xFF000000);
         if (capacity <= 0 || amount <= 0) return;

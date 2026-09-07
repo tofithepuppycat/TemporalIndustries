@@ -20,8 +20,7 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
 /** Textured GUI for the Entropy Condenser: an FE energy bar, two vertical entropy tank bars
- * (Order/Chaos), a Cell input slot, a button cycling the absorb range, and the player inventory —
- * same layout/rendering technique as {@link EntropyManipulatorScreen}. */
+ * (Order/Chaos), a Cell input slot, a button cycling the absorb range, and the player inventory. */
 @SuppressWarnings("null")
 public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyCondenserMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -88,8 +87,7 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         renderRangeIcons(guiGraphics);
     }
 
-    /** Range-cycle and show/hide-range controls, drawn as menu_icon_base_small.png icon buttons near
-     * the panel's right edge rather than vanilla Buttons, matching the mod's inline-button look elsewhere. */
+    /** Range-cycle and show/hide-range controls, drawn as icon buttons rather than vanilla Buttons. */
     private void renderRangeIcons(GuiGraphics guiGraphics) {
         int rangeX = leftPos + RANGE_ICON_X;
         int showRangeX = leftPos + SHOW_RANGE_ICON_X;

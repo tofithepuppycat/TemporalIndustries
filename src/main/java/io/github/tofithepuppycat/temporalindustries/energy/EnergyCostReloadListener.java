@@ -15,17 +15,10 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * Reads {@code data/<namespace>/energy_costs/*.json} files, each shaped like:
- * <pre>{@code
- * {
- *   "items": { "minecraft:diamond": 500 },
- *   "tags":  { "c:ingots": 55, "#minecraft:logs": 6 }
- * }
- * }</pre>
- * Only the raw ids are parsed here (see {@link ItemEnergyCosts#parseEntries}); resolving tag
- * membership requires the tag registry to be fully loaded, which isn't guaranteed during a reload
- * listener's apply() phase, so that (and the recipe-based propagation, and the modpack config
- * override file) happens later in {@link ItemEnergyCosts#compute}.
+ * Reads {@code data/<namespace>/energy_costs/*.json} files (an "items" and a "tags" object mapping
+ * ids to cost). Only raw ids are parsed here; resolving tag membership requires the tag registry
+ * to be fully loaded, which isn't guaranteed during a reload listener's apply() phase, so that
+ * happens later in {@link ItemEnergyCosts#compute}.
  */
 public class EnergyCostReloadListener extends SimpleJsonResourceReloadListener {
     private static final Logger LOGGER = LogUtils.getLogger();

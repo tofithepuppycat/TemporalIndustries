@@ -20,9 +20,8 @@ import net.minecraft.world.level.material.Fluid;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * JEI category for {@link EntropyManipulatorRecipe}: an input slot (item or, for fluid recipes,
- * the input fluid) feeding an arrow into the output item, plus an entropy slot below showing the
- * Order/Chaos fluid and amount the recipe consumes and the processing time as text.
+ * JEI category for {@link EntropyManipulatorRecipe}: an input slot feeding into an output item,
+ * plus an entropy slot showing the Order/Chaos amount consumed and the processing time.
  */
 public class EntropyManipulatorRecipeCategory implements IRecipeCategory<RecipeHolder<EntropyManipulatorRecipe>> {
     private static final int WIDTH = 130;

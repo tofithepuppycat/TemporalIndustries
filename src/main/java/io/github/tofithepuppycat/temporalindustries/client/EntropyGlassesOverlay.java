@@ -25,11 +25,8 @@ import net.neoforged.fml.ModList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Draws the block the player is looking at's entropy info to the right of the crosshair, on a
- * vanilla tooltip-style background, while Entropy Glasses are worn -- Curios' head slot is the only
- * way to wear them (see CuriosCompat). Sneaking also draws the equipped cells' Order/Chaos fill
- * levels to the left of the crosshair (see CuriosCellCompat). See EntropyInfoProvider for which
- * block entities report info. */
+/** Draws the looked-at block's entropy info to the right of the crosshair while Entropy Glasses
+ * are worn. Sneaking also draws the equipped cells' Order/Chaos fill levels to the left. */
 public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
@@ -110,8 +107,7 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         return ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player);
     }
 
-    /** Panel of the cells equipped in Curios' "cell" slots' Order/Chaos fill levels, drawn to the
-     * left of the crosshair (mirroring {@link #renderBlockInfo}) while the player is sneaking. */
+    /** Panel of equipped cells' Order/Chaos fill levels, drawn left of the crosshair while sneaking. */
     private static void renderCellStatus(GuiGraphics guiGraphics, Font font, Player player) {
         if (!ModList.get().isLoaded("curios")) return;
 

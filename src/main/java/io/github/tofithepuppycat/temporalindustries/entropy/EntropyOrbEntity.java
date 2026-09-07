@@ -26,11 +26,10 @@ import net.neoforged.fml.ModList;
 import java.util.function.Predicate;
 
 /**
- * ORD/CHS orb, modeled on vanilla {@link net.minecraft.world.entity.ExperienceOrb}: it floats, bobs,
- * merges with nearby orbs of the same {@link EntropyType} and gets picked up on touch. Unlike an xp
- * orb it is only attracted towards (and only picked up by) a player currently holding an
- * {@link EntropyReceptacle} that {@link EntropyReceptacle#accepts} this orb's type in either hand —
- * see {@link #isHoldingReceptacle}.
+ * ORD/CHS orb, modeled on vanilla {@link net.minecraft.world.entity.ExperienceOrb}: floats, bobs,
+ * merges with nearby orbs of the same {@link EntropyType}, and gets picked up on touch. Unlike an
+ * xp orb, it's only attracted to (and picked up by) a player holding a matching
+ * {@link EntropyReceptacle} in hand.
  */
 public class EntropyOrbEntity extends Entity {
     private static final int LIFETIME = 6000;

@@ -42,14 +42,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * The multi-chunk-tier time machine: like {@link Chronovault}, its home chunk can't overlap
- * another machine's tracked chunk (see canSurvive), but it can go on to additionally claim up to
- * an 11x11 area of chunks around itself (see {@link ChronosphereBlockEntity}), all moved together by
- * one jump and paid from one shared energy pool.
- *
- * <p>Purely visual: FACING tracks which way the model's animated front panel (see the block model's
- * "north" texture) points, exactly like a furnace — it has no bearing on chunk claiming/jumping,
- * which is always centred on the block's own position regardless of orientation.
+ * Multi-chunk-tier time machine: can claim up to an 11x11 area of chunks around itself
+ * (see {@link ChronosphereBlockEntity}), all moved together by one jump from a shared energy pool.
+ * FACING is purely visual (like a furnace) and has no bearing on chunk claiming/jumping.
  */
 @SuppressWarnings("null")
 public class Chronosphere extends BaseEntityBlock {
@@ -104,10 +99,7 @@ public class Chronosphere extends BaseEntityBlock {
     }
 
     /** Right-clicking with a Portable Chrono Marker copies this Chronosphere's claimed chunk
-     * configuration onto the marker (as offsets from the Chronosphere's home chunk) instead of
-     * opening the menu — a quick way to give the marker the same shape as an already-claimed
-     * Chronosphere, matching {@link io.github.tofithepuppycat.temporalindustries.network.ChronoMarkerSaveSelectionPacket}'s
-     * own save logic. Any other item falls through to the normal open-menu interaction. */
+     * layout onto the marker (as offsets from the home chunk) instead of opening the menu. */
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState state, @NotNull Level level,
                                                @NotNull BlockPos pos, @NotNull Player player,

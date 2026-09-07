@@ -25,11 +25,10 @@ import net.neoforged.neoforge.event.level.block.CropGrowEvent;
 import java.util.Set;
 
 /**
- * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events, as opposed to the
- * machine-driven spawners in {@code block.entity} (Seebeck generator, Schrodinger Generator). ORDER:
- * obsidian/basalt/cobblestone generation, crop growth, items despawning, passive/neutral mob death,
- * furnace "simplification" smelts (IDEAS.md). CHAOS: player death, splash/lingering potions, hostile
- * mob death.
+ * Spawns {@link EntropyOrbEntity}s for naturally-occurring order/chaos events (as opposed to the
+ * machine-driven spawners in {@code block.entity}): obsidian/cobblestone generation, crop growth,
+ * item despawn, and "simplification" smelts produce ORDER; player death, thrown potions, and
+ * hostile mob death produce CHAOS.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class EntropyEventListener {
@@ -45,8 +44,8 @@ public final class EntropyEventListener {
     private static final int HOSTILE_MOB_DEATH_CHAOS = 1;
     private static final int PASSIVE_MOB_DEATH_ORDER = 1;
 
-    /** Outputs of vanilla furnace recipes that "simplify" a material, per IDEAS.md - identified by
-     * the smelted result alone since each is unique to one vanilla smelting recipe. */
+    /** Outputs of vanilla furnace recipes that "simplify" a material, identified by the smelted
+     * result alone since each is unique to one vanilla smelting recipe. */
     private static final Set<Item> SIMPLIFICATION_RESULTS = Set.of(
             Items.STONE, Items.SMOOTH_STONE, Items.GLASS, Items.BRICK,
             Items.SMOOTH_SANDSTONE, Items.SMOOTH_RED_SANDSTONE, Items.SMOOTH_QUARTZ, Items.DEEPSLATE);

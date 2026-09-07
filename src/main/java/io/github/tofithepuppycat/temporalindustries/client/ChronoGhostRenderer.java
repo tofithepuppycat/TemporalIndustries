@@ -38,16 +38,9 @@ import java.util.concurrent.ConcurrentHashMap;
 
 /**
  * Draws a translucent "ghost" of whatever a Chrono Loop Projector is replaying, using the
- * recording owner's own skin (resolved the same way vanilla resolves any other player's skin —
- * instantly if they're online in this world, otherwise via the skin manager, which serves a
- * default skin immediately and swaps in the real one once it's fetched). Purely client-side and
- * purely visual: it never touches the server, it just reads the block entity's synced playback
- * state (see {@link ChronoProjectorBlockEntity#computePlaybackProgress}) and tint (see
- * {@link ChronoProjectorBlockEntity#getGhostColor()}, dyeable purple by default).
- *
- * The ghost isn't rendered through the normal player renderer; instead a plain {@link PlayerModel}
- * is drawn directly with a forced translucent render type so the tint/alpha apply reliably
- * regardless of skin.
+ * recording owner's resolved skin. Purely client-side and visual: it only reads the block entity's
+ * synced playback state and tint. A plain {@link PlayerModel} is drawn directly with a forced
+ * translucent render type (rather than the normal player renderer) so tint/alpha apply reliably.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class ChronoGhostRenderer {
@@ -57,8 +50,7 @@ public final class ChronoGhostRenderer {
     private static PlayerModel<LivingEntity> wideModel;
     private static PlayerModel<LivingEntity> slimModel;
 
-    /** One fake player per recording owner (not shared globally) so each ghost resolves and keeps
-     * its own skin rather than all ghosts collapsing onto whichever profile was created first. */
+    /** One fake player per recording owner so each ghost keeps its own resolved skin. */
     private static final Map<UUID, RemotePlayer> GHOSTS = new HashMap<>();
     @Nullable private static ClientLevel ghostsLevel;
 
@@ -168,10 +160,8 @@ public final class ChronoGhostRenderer {
         return type == PlayerSkin.Model.SLIM ? slimModel : wideModel;
     }
 
-    /** A player currently online in this world is used as-is (their AbstractClientPlayer already
-     * resolves its own skin); otherwise a fake player is built from the recording's stored
-     * owner id/name so {@link RemotePlayer#getSkin()} can resolve it the normal vanilla way
-     * (default immediately, swapped for the real skin once the skin manager fetches it). */
+    /** Builds a fake player from the recording's stored owner id/name so {@link RemotePlayer#getSkin()}
+     * can resolve it the normal vanilla way. */
     private static RemotePlayer fakeGhost(ClientLevel level, ChronoRecording recording) {
         if (ghostsLevel != level) {
             GHOSTS.clear();

@@ -100,8 +100,7 @@ public class EchoRecordItem extends Item {
     }
 
     /** Discards a saved-but-not-yet-inserted recording so the recorder can be reused. Only reachable
-     * via crouch right-click (see use()) so a normal right-click on a saved recorder never destroys
-     * it by accident. */
+     * via crouch right-click, so a normal right-click never destroys it by accident. */
     private void clearRecording(ItemStack stack, CompoundTag data, Player player, Level level) {
         data.putBoolean("Saved", false);
         data.put("Frames", new ListTag());
@@ -116,8 +115,7 @@ public class EchoRecordItem extends Item {
     public void inventoryTick(ItemStack stack, Level level, Entity entity, int slotId, boolean isSelected) {
         super.inventoryTick(stack, level, entity, slotId, isSelected);
         // Deliberately NOT gated on isSelected: recording must keep sampling movement even while
-        // the player is wielding a different tool to mine/place (see ChronoActionRecorder), as
-        // long as the Echo Record itself is still somewhere in their inventory.
+        // the player wields a different tool, as long as the item is still in their inventory.
         if (!(level instanceof ServerLevel serverLevel) || !(entity instanceof ServerPlayer player)) return;
 
         CompoundTag data = readData(stack);
@@ -151,9 +149,8 @@ public class EchoRecordItem extends Item {
     private static final DustParticleOptions START_MARKER_PARTICLE =
             new DustParticleOptions(new Vector3f(0.6F, 0.1F, 0.95F), 1.3F);
 
-    /** Marks wherever the current recording started with particles at ground level, for as long
-     * as it's actively being recorded — a visual reminder of where to return to so the loop closes
-     * cleanly, in the same dimension it was recorded in. */
+    /** Marks the current recording's start point with particles while it's actively recording, as
+     * a visual reminder of where to return to so the loop closes cleanly. */
     private void spawnStartMarker(CompoundTag data, ServerLevel serverLevel) {
         if (serverLevel.getGameTime() % 10 != 0) return;
 
@@ -185,8 +182,7 @@ public class EchoRecordItem extends Item {
         }
     }
 
-    /** Whether stack is an Echo Record actively recording (used by ChronoActionRecorder to find
-     * which, if any, of a player's items should capture a block break/place they just performed). */
+    /** Whether stack is an Echo Record actively recording. */
     public static boolean isRecording(ItemStack stack) {
         return stack.getItem() instanceof EchoRecordItem && readData(stack).getBoolean("Recording");
     }

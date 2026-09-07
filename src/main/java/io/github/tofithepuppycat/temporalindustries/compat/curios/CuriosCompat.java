@@ -14,22 +14,15 @@ import top.theillusivec4.curios.api.type.inventory.ICurioStacksHandler;
 import top.theillusivec4.curios.api.type.inventory.IDynamicStackHandler;
 
 /**
- * Isolates every reference to Curios' (optional, compileOnly) API in one class, so that class is
- * the only thing whose loading/verification would fail if Curios isn't installed. Callers must
- * only reach this class from behind a {@code ModList.get().isLoaded("curios")} check (see
- * EntropyGlassesOverlay) -- the JVM resolves a class's referenced types lazily, so as long as that
- * check short-circuits first, this class and the Curios types it names are never touched.
+ * Isolates all references to Curios' (optional, compileOnly) API so only this class fails to
+ * load if Curios isn't installed. Callers must only reach it from behind a
+ * {@code ModList.get().isLoaded("curios")} check.
  */
 public final class CuriosCompat {
     private CuriosCompat() {}
 
-    /** Lets Curios accept the Entropy Glasses in its "head" slot (an external slot other mods
-     * provide - opportunistically tagged via data/curios/tags/item/head.json) and the Temporal
-     * Anchor in Curios' own built-in "charm" slot (tagged via data/curios/tags/item/charm.json,
-     * granted to the player via data/temporalindustries/curios/entities/player.json — unlike the
-     * "cell" slot in {@link CuriosCellCompat}, "charm" is a slot type Curios already defines, so
-     * we don't declare our own slot type for it) — neither item is vanilla armor, so without this
-     * Curios has no way to know they're wearable curios at all. */
+    /** Registers the Entropy Glasses ("head" slot) and Temporal Anchor ("charm" slot) as
+     * curios, since neither is vanilla armor and Curios has no other way to know they're wearable. */
     public static void registerCapabilities(RegisterCapabilitiesEvent event) {
         event.registerItem(CuriosCapability.ITEM, (stack, ctx) -> (ICurio) () -> stack,
                 Registration.ENTROPY_GLASSES_ITEM.get(), Registration.TEMPORAL_ANCHOR_ITEM.get());
@@ -41,10 +34,7 @@ public final class CuriosCompat {
                 .orElse(false);
     }
 
-    /** Temporal Anchor equipped in a Curios charm slot, or null - so calibration payment
-     * ({@link io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem#findChargedAnchor})
-     * and passive order charging ({@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService})
-     * see it the same as one carried in the main inventory or offhand. */
+    /** Temporal Anchor equipped in a Curios charm slot, or null. */
     @Nullable
     public static ItemStack findEquippedTemporalAnchor(Player player) {
         return CuriosApi.getCuriosInventory(player)
@@ -53,11 +43,9 @@ public final class CuriosCompat {
                 .orElse(null);
     }
 
-    /** Snapshot of every curio slot's contents, for {@link
+    /** Snapshot of every curio slot's contents, used by {@link
      * io.github.tofithepuppycat.temporalindustries.device.PlayerSnapshot} to restore on a Temporal
-     * Anchor rewind — without this, a second anchor equipped in a curio slot after calibration
-     * would survive a "Rewind All" untouched, letting a player duplicate Temporal Anchors instead
-     * of losing them like the rest of their inventory does. */
+     * Anchor rewind (otherwise an equipped anchor would survive "Rewind All" and duplicate). */
     @Nullable
     public static ListTag saveCurios(Player player) {
         return CuriosApi.getCuriosInventory(player)
@@ -65,11 +53,8 @@ public final class CuriosCompat {
                 .orElse(null);
     }
 
-    /** Curios' own {@code loadInventory} only ever fills slots that are currently empty — a slot
-     * still holding a curio from after the checkpoint has its item shoved back into the player's
-     * main inventory as an "invalid stack" *without* removing it from the curio slot, and the
-     * snapshotted item for that slot is silently dropped. That duplicates whatever was equipped at
-     * death, so every slot is emptied first to force Curios to actually apply the snapshot. */
+    /** Empties every curio slot first, since Curios' {@code loadInventory} only fills empty slots
+     * and would otherwise silently drop the snapshot for any slot still occupied. */
     public static void loadCurios(Player player, ListTag data) {
         CuriosApi.getCuriosInventory(player).ifPresent(inventory -> {
             for (ICurioStacksHandler handler : inventory.getCurios().values()) {

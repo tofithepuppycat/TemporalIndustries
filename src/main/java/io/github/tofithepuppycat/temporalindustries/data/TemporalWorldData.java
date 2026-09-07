@@ -23,14 +23,9 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Central server-side store. Replaces TemporalAnchorSavedData.
- *
- * Holds:
- *   - Per-dimension TemporalTimeline (all commits for tracked chunks)
- *   - Per-player PlayerTemporalState (anchor checkpoints and recorded changes)
- *   - The set of currently tracked chunks (rebuilt from block entity onLoad() calls,
- *     not persisted — chunks re-register themselves on world load)
- *   - Transient pending deltas that accumulate between flush intervals
+ * Central server-side store: per-dimension timelines, per-player checkpoint state, tracked
+ * chunks, glued regions, and pending deltas awaiting flush. Tracked chunks are rebuilt from
+ * block entity onLoad() calls rather than persisted.
  */
 @SuppressWarnings("null")
 public class TemporalWorldData extends SavedData {
@@ -41,38 +36,24 @@ public class TemporalWorldData extends SavedData {
     private final Map<ResourceLocation, TemporalTimeline> timelines = new HashMap<>();
     private final Map<UUID, PlayerTemporalState> playerStates = new HashMap<>();
 
-    // dimension -> cuboid regions marked with Temporal Glue (see item.TemporalGlueItem). Glued
-    // blocks are never captured into a delta (TemporalChangeListener#shouldRecord) and are skipped
-    // when a rollback/jump would otherwise overwrite them (TemporalTimeline's isGlued predicate
-    // param), so they sit outside the timeline system entirely. Persisted like timelines.
+    // dimension -> cuboid regions marked with Temporal Glue. Glued blocks are never captured
+    // into a delta and are skipped by rollback/jump, so they sit outside the timeline system.
     private final Map<ResourceLocation, List<BoundingBox>> gluedRegions = new HashMap<>();
 
-    // Not persisted: bumped on every glue/unglue. Gluing never creates a timeline commit (see
-    // above), so nothing else changes a chunk's head id when a region is glued/unglued — the
-    // in-world "Show Changes" preview (TimelineProjectionManager) needs this as a separate cheap
-    // fingerprint to notice glue changes and re-fetch, otherwise it keeps ghosting blocks a jump
-    // would actually skip (or vice versa) until the player re-opens the GUI.
+    // Not persisted: bumped on every glue/unglue so the "Show Changes" preview can cheaply
+    // notice glue changes and re-fetch instead of ghosting stale blocks.
     private int glueVersion = 0;
 
-    // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> the set
-    // of owners currently claiming that chunk needs tracking (a ChronovaultBlockEntity/
-    // ChronosphereBlockEntity keyed by its own BlockPos, or a held Portable ChronoMarker keyed by
-    // the wielder's UUID). Owner-scoped rather than a plain boolean set so one owner letting go of
-    // a chunk (auto-tracking toggled off, claim released, machine broken) can never silently stop
-    // another owner's tracking of that same chunk out from under it — seen in practice as deltas
-    // still being recorded for a chunk right after its Chronosphere's auto-tracking was switched
-    // off, because a Portable ChronoMarker (or another machine) sharing that chunk was still
-    // tracking it. Keyed by dimension too: chunk (x, z) coordinates collide across dimensions, and
-    // a raw ChunkPos-only key would let an unrelated chunk in another dimension enable/disable
-    // tracking here by coincidence of coordinates.
+    // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> owners
+    // currently claiming that chunk needs tracking. Owner-scoped (not a plain boolean) so one
+    // owner releasing a chunk can't silently stop another owner's tracking of it.
     private final Map<ResourceLocation, Map<Long, Set<Object>>> trackedChunkOwners = new HashMap<>();
 
     // Transient pending deltas flushed by TemporalChangeListener on server tick.
     // Outer key: dimension. Inner key: chunkPos.toLong(). Value: latest merged delta per BlockPos.
     private final Map<ResourceLocation, Map<Long, Map<BlockPos, BlockChangeDelta>>> pendingBlockDeltas = new HashMap<>();
-    // Same dimension/chunk keying as pendingBlockDeltas, so entity spawns/deaths end up scoped to
-    // the chunk they happened in instead of bundled indiscriminately into every commit that
-    // dimension ever produces.
+    // Same dimension/chunk keying as pendingBlockDeltas, scoping entity spawns/deaths to the chunk
+    // they happened in.
     private final Map<ResourceLocation, Map<Long, List<EntityDelta>>> pendingEntityDeltas = new HashMap<>();
 
     // -------------------------------------------------------------------------
@@ -97,12 +78,9 @@ public class TemporalWorldData extends SavedData {
     // -------------------------------------------------------------------------
     // Chunk tracking
 
-    /** Registers owner as wanting chunkPos (in dimension) tracked. Idempotent per owner: calling
-     * this repeatedly for the same owner (e.g. every tick a Portable ChronoMarker refreshes its
-     * radius) never grows past one claim, so a single matching untrackChunk always fully releases it.
-     * Also guarantees chunkPos has a baseline snapshot to anchor its history walk (see
-     * {@link TemporalTimeline#ensureBaseline}) — centralized here so every owner gets this for free
-     * instead of each call site having to remember to pair the two calls itself. */
+    /** Registers owner as wanting chunkPos tracked. Idempotent per owner, so a single matching
+     * untrackChunk always fully releases it. Also ensures the chunk has a baseline snapshot
+     * ({@link TemporalTimeline#ensureBaseline}). */
     public void trackChunk(ResourceLocation dimension, ChunkPos pos, Object owner, ServerLevel level) {
         trackedChunkOwners.computeIfAbsent(dimension, d -> new HashMap<>())
                 .computeIfAbsent(pos.toLong(), c -> new HashSet<>())
@@ -124,9 +102,7 @@ public class TemporalWorldData extends SavedData {
         if (dimChunks.isEmpty()) trackedChunkOwners.remove(dimension);
     }
 
-    /** Releases every chunk owner currently claims, across every dimension — for a stateful owner
-     * (a held Portable ChronoMarker, keyed by player UUID) that needs to fully let go without
-     * tracking which chunks it last touched itself. */
+    /** Releases every chunk owner currently claims, across every dimension. */
     public void untrackAllForOwner(Object owner) {
         for (Map<Long, Set<Object>> dimChunks : trackedChunkOwners.values()) {
             dimChunks.values().removeIf(owners -> {
@@ -151,9 +127,8 @@ public class TemporalWorldData extends SavedData {
         setDirty();
     }
 
-    /** Removes every glued region whose bounding box the segment from origin to end passes through
-     * — used to unglue by aiming roughly at a region rather than needing to click an exact block
-     * inside it (see item.TemporalGlueItem#deleteRegionsAlongSight). @return how many were removed. */
+    /** Removes every glued region whose bounding box the segment from origin to end passes through.
+     * @return how many were removed. */
     public int removeGluedRegionsAlongRay(ResourceLocation dimension, Vec3 origin, Vec3 end) {
         List<BoundingBox> regions = gluedRegions.get(dimension);
         if (regions == null) return 0;
@@ -187,7 +162,7 @@ public class TemporalWorldData extends SavedData {
         return gluedRegions.getOrDefault(dimension, Collections.emptyList());
     }
 
-    /** Cheap fingerprint that changes on every glue/unglue, anywhere — see {@link #glueVersion}. */
+    /** Cheap fingerprint that changes on every glue/unglue, anywhere. */
     public int getGlueVersion() {
         return glueVersion;
     }
@@ -212,11 +187,9 @@ public class TemporalWorldData extends SavedData {
     // Pending delta buffering
 
     /**
-     * Records a block change for a tracked chunk. When the same position is
-     * changed multiple times within one flush interval the deltas are merged:
-     * the original previousState is preserved and only newState is updated.
-     * If the net effect is no change (same state AND same block-entity tag)
-     * the entry is removed.
+     * Records a block change for a tracked chunk, merging with any pending change at the same
+     * position (keeping the original previousState) and dropping the entry if the net effect is
+     * a no-op.
      */
     public void recordTrackedBlockChange(ResourceLocation dimension, ChunkPos chunkPos, BlockChangeDelta delta) {
         Map<BlockPos, BlockChangeDelta> chunkMap = pendingBlockDeltas
@@ -252,7 +225,6 @@ public class TemporalWorldData extends SavedData {
 
     /**
      * Flushes all pending deltas into commits on the relevant timelines.
-     * Called every FLUSH_INTERVAL_TICKS by TemporalChangeListener.
      *
      * @return true if any commits were created
      */

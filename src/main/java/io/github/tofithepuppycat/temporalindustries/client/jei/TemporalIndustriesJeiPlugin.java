@@ -29,24 +29,19 @@ import java.util.Set;
 import java.util.function.Supplier;
 
 /**
- * Discovered by JEI via the {@link JeiPlugin} annotation (NeoForge scans annotated classes at
- * mod-load time; nothing here runs, or even loads, when JEI isn't installed). Adds a "Show
- * recipes" click area over the Entropy Manipulator's progress bar (see
- * {@link EntropyManipulatorScreen#PROGRESS_X}) the same way Mekanism's machines do, so hovering
- * it shows the prompt and clicking opens the recipe category built by
- * {@link EntropyManipulatorRecipeCategory}.
+ * JEI plugin entry point, discovered via the {@link JeiPlugin} annotation; nothing here runs when
+ * JEI isn't installed. Adds a "Show recipes" click area over the Entropy Manipulator's progress bar.
  */
 @JeiPlugin
 public class TemporalIndustriesJeiPlugin implements IModPlugin {
     private static final ResourceLocation PLUGIN_UID = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "jei_plugin");
 
-    // Lazy (via createFromDeferredVanilla) since JEI can instantiate this plugin, running this
-    // field's initializer, before NeoForge's RegisterEvent has bound the DeferredHolder below --
-    // resolving it eagerly threw "Trying to access unbound value" on startup.
+    // Lazy since JEI can instantiate this plugin before NeoForge's RegisterEvent binds the
+    // DeferredHolder below; resolving eagerly threw "Trying to access unbound value" on startup.
     public static final Supplier<RecipeType<RecipeHolder<EntropyManipulatorRecipe>>> ENTROPY_MANIPULATOR_RECIPE_TYPE =
             RecipeType.createFromDeferredVanilla(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE);
 
-    /** Not backed by a real vanilla Recipe -- built at plugin-load time from the recipes above; see {@link #buildChains}. */
+    /** Not backed by a real vanilla Recipe; built at plugin-load time by {@link #buildChains}. */
     public static final RecipeType<EntropyManipulatorChain> ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE =
             RecipeType.create(TemporalIndustries.MODID, "entropy_manipulator_chain", EntropyManipulatorChain.class);
 
@@ -74,11 +69,8 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
     }
 
     /**
-     * Groups every non-fluid recipe into connected chains by shared item (e.g. stone/cobblestone/
-     * gravel/sand/redstone), each chain walked from a leaf end so items come out in a consistent
-     * left-to-right order. Every chain in the current data is a simple path (each item has at most
-     * one chaos-typed and one order-typed edge), so a leaf-to-leaf walk following unvisited
-     * neighbors is sufficient; it isn't a general graph solver.
+     * Groups non-fluid recipes into connected chains by shared item, walking each chain from a leaf
+     * end. Assumes every chain is a simple path (at most one chaos- and one order-typed edge per item).
      */
     private static List<EntropyManipulatorChain> buildChains(
             List<RecipeHolder<EntropyManipulatorRecipe>> recipes, net.minecraft.core.HolderLookup.Provider registries) {
@@ -98,8 +90,7 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
             if (matching.length == 0) continue;
 
             Item from = matching[0].getItem();
-            // A tag-result recipe rolls one of several possible outputs; use the same
-            // "first matching item" representative that tag-input edges already use above.
+            // Tag-result recipes roll one of several outputs; use the first matching item as representative.
             ItemStack resultStack = recipe.getResultItem(registries);
             if (resultStack.isEmpty()) continue;
             Item to = resultStack.getItem();

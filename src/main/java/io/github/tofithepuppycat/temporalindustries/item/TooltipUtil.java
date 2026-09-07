@@ -6,10 +6,8 @@ import net.minecraft.network.chat.Component;
 
 import java.util.List;
 
-/** Shared helper for gating flavor/how-to-use tooltip lines behind Shift, so item tooltips stay
- * short by default and only expand into the full description when the player asks for it. Status
- * lines (contents, charge, current mode, etc.) are functional and should stay outside this call,
- * always visible. */
+/** Gates flavor/how-to-use tooltip lines behind Shift so tooltips stay short by default. Functional
+ * status lines (contents, charge, mode) should stay outside this call, always visible. */
 public final class TooltipUtil {
     private TooltipUtil() {}
 

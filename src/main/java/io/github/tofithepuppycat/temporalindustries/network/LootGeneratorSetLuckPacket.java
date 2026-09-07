@@ -12,8 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: drag the Loot Generator's luck slider. The server clamps the value itself (see
- * {@link LootGeneratorBlockEntity#setLuck}) rather than trusting the client's slider position. */
+/** Client -> server: sets the Loot Generator's luck value; the server clamps it rather than trusting the client. */
 public class LootGeneratorSetLuckPacket implements CustomPacketPayload {
     public static final Type<LootGeneratorSetLuckPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_set_luck"));

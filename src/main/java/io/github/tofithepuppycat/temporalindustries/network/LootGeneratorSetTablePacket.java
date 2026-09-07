@@ -12,9 +12,8 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: set a Loot Generator's selected loot table id from the GUI's text field. The
- * server re-validates the id against its own registered loot tables (see
- * {@link LootGeneratorBlockEntity#setSelectedLootTable}) rather than trusting the client's input. */
+/** Client -> server: sets a Loot Generator's selected loot table id; the server re-validates it
+ * rather than trusting the client. */
 public class LootGeneratorSetTablePacket implements CustomPacketPayload {
     public static final Type<LootGeneratorSetTablePacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_set_table"));

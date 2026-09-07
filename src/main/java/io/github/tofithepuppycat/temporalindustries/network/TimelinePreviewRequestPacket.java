@@ -26,13 +26,10 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
 
     private final BlockPos machinePos;
     private final long lastKnownHeadCommitId;
-    /** The client's last-known previewVersion fingerprint (see {@link TimelinePreviewSyncPacket}) —
-     * covers everything the ghost preview (not just the displayed graph) depends on: every chunk in
-     * getPreviewChunkSnapshots(), plus glue state. lastKnownHeadCommitId alone can't catch either
-     * (see #handle below). */
+    /** The client's last-known preview fingerprint, covering everything the ghost preview depends
+     * on (all previewed chunks plus glue state) that headCommitId alone wouldn't catch. */
     private final long lastKnownPreviewVersion;
-    /** Which of TimelineViewProvider#getViewableChunks() to show, or null for the shared/default
-     * view (a Time Machine's own chunk; a Chronosphere's merged "All" view). */
+    /** Which viewable chunk to show, or null for the shared/default view. */
     @Nullable
     private final ChunkPos viewChunk;
 
@@ -67,13 +64,9 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         return new TimelinePreviewRequestPacket(machinePos, lastKnownHeadCommitId, lastKnownPreviewVersion, viewChunk);
     }
 
-    /** How close (in blocks) the sender must be to machinePos for a request to be honored. Not
-     * gated behind the machine's own container menu being open — the in-world "Show Changes" ghost
-     * preview (see {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionRenderer})
-     * is designed to keep refreshing while the player walks around away from the GUI (see {@link
-     * io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionPoller}), so a
-     * generous range covering a Chronosphere's full claim is used instead of a tight interaction
-     * range. */
+    /** Max distance (blocks) the sender may be from machinePos. Generous rather than a tight
+     * interaction range, since the ghost preview keeps refreshing while the player walks away
+     * from the GUI. */
     private static final double MAX_RANGE_BLOCKS = 256.0D;
 
     public static void handle(TimelinePreviewRequestPacket packet, IPayloadContext context) {
@@ -87,16 +80,9 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
 
             ChunkPos viewChunk = packet.viewChunk;
 
-            // The chunk's head id changes whenever any commit relevant to it is created (see
-            // TemporalTimeline#indexChunkTouch), so it's a cheap fingerprint for "has this
-            // machine's history changed since the client last saw it" — skipping the full commit
-            // list re-encode/re-decode (which only grows over a session) on every periodic poll
-            // when nothing actually happened avoids paying that cost once a second for nothing.
-            // On its own this only covers the displayed chunk, though: the ghost preview
-            // (previewChunkSnapshots) can cover other claimed chunks too — e.g. an auto-tracked
-            // Chronosphere chunk that isn't the one currently shown, or isn't shared across every
-            // claimed chunk yet — and it also depends on glue state, which never creates a commit
-            // at all. previewVersion below catches both; only skip the reply when neither changed.
+            // headCommitId is a cheap "has this chunk's history changed" fingerprint, avoiding a full
+            // commit-list re-encode on every poll. It only covers the displayed chunk though, so
+            // previewVersion also catches changes to other previewed chunks and glue state.
             long headCommitId = machine.getChunkHeadId(viewChunk);
             long previewVersion = computePreviewVersion(sender, machine);
             if (headCommitId == packet.lastKnownHeadCommitId && previewVersion == packet.lastKnownPreviewVersion) {
@@ -121,11 +107,8 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         });
     }
 
-    /** Combines every chunk the ghost preview covers' head id (cheap map lookups — see
-     * TemporalTimeline#getChunkHeadId — not the full commit-list copies getChunkCommits() does)
-     * with the world's glue-state version, so a change invisible to headCommitId alone (an
-     * unshared per-chunk commit, or a glue/unglue with no commit at all) still invalidates the
-     * client's cache. */
+    /** Combines every previewed chunk's head id with the world's glue-state version, so changes
+     * invisible to headCommitId alone still invalidate the client's cache. */
     private static long computePreviewVersion(ServerPlayer sender, TimelineViewProvider machine) {
         List<ChunkPos> previewChunks = machine.getViewableChunks();
         long combined = 0L;

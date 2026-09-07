@@ -17,7 +17,7 @@ import java.util.OptionalLong;
 
 /** Client-side view of the active Time Machine's chunk history: caches the last commit graph
  * fetched from the server, tracks the player's selected commit, and computes the block-diff
- * preview for {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionRenderer}. */
+ * preview for {@link TimelineProjectionRenderer}. */
 @SuppressWarnings("null")
 public final class TimelineProjectionManager {
     public enum ProjectionType { ADD, REMOVE, CHANGE }
@@ -49,28 +49,21 @@ public final class TimelineProjectionManager {
     private static Map<Long, Long> localParents = new HashMap<>();
     private static long headCommitId = -1L;
     private static long selectedCommitId = -1L;
-    /** commitId -> energy cost of jumping there from the chunk's current head, as last reported
-     * by the server (see ChronovaultBlockEntity#getChunkJumpCosts). */
+    /** commitId -> energy cost of jumping there from the chunk's current head, as last reported by the server. */
     private static Map<Long, Long> jumpCosts = new HashMap<>();
-    /** One commit-graph snapshot per chunk the ghost preview should cover — just the graph's own
-     * chunk for a Time Machine, but every claimed chunk for a Chronosphere (see
-     * TimelineViewProvider#getPreviewChunkSnapshots()), since a jump moves all of them together. */
+    /** One commit-graph snapshot per chunk the ghost preview should cover: the graph's own chunk
+     * for a Time Machine, every claimed chunk for a Chronosphere. */
     private static List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>();
-    /** Every glued region in the active machine's dimension, as of the last sync — positions inside
-     * these are excluded from the ghost preview below, since a jump skips them entirely (mirrors
-     * TemporalTimeline's isGlued predicate server-side). Synced directly rather than reusing
-     * GlueSelectionClientState, which only stays fresh while a Temporal Glue item is actually held. */
+    /** Every glued region in the active machine's dimension; positions inside these are excluded
+     * from the ghost preview since a jump skips them entirely. Synced directly rather than reusing
+     * GlueSelectionClientState, which only stays fresh while a Temporal Glue item is held. */
     private static List<BoundingBox> gluedRegions = new ArrayList<>();
-    /** Last-synced previewVersion fingerprint (see TimelinePreviewSyncPacket), echoed back on the
-     * next request so the server can skip replying when nothing preview-relevant changed. See
-     * TimelinePreviewRequestPacket#handle for what this covers beyond headCommitId. */
+    /** Last-synced previewVersion fingerprint, echoed back so the server can skip replying when nothing changed. */
     private static long previewVersion = Long.MIN_VALUE;
     /** Whether the in-world block-diff preview is toggled on via the "Show Changes" button. */
     private static boolean showChangesEnabled = false;
     /** null when browsing the shared "All" view; otherwise the single claimed chunk whose own tab
-     * is currently open (see ChronosphereScreen#selectedViewChunkKey), so the boundary renderer can
-     * outline that one chunk even when it sits inside a larger claim and wouldn't otherwise get
-     * walls on every side. */
+     * is open, so the boundary renderer can outline it even inside a larger claim. */
     private static ChunkPos selectedViewChunk = null;
 
     private TimelineProjectionManager() {}
@@ -79,9 +72,8 @@ public final class TimelineProjectionManager {
         activeMachinePos = machinePos;
     }
 
-    /** The machine the ghost preview is currently tracking, or null if none — used by {@link
-     * TimelineProjectionPoller} to keep polling for fresh data even after the machine's own GUI has
-     * closed, since {@link #hasActivePreview()} alone doesn't say which machine to ask. */
+    /** The machine the ghost preview is currently tracking, or null if none; used by
+     * {@link TimelineProjectionPoller} to keep polling after the machine's GUI has closed. */
     public static BlockPos getActiveMachinePos() {
         return activeMachinePos;
     }
@@ -92,10 +84,8 @@ public final class TimelineProjectionManager {
         }
     }
 
-    /** Unconditionally drops all client-side state, regardless of which machine (if any) is
-     * active. Used when the BlockPos itself stops being meaningful — e.g. leaving a world/server,
-     * where a stale activeMachinePos would otherwise keep matching the same coordinates in
-     * whatever world is joined next and project a ghost preview from data that no longer applies. */
+    /** Unconditionally drops all client-side state. Used when the BlockPos itself stops being
+     * meaningful, e.g. leaving a world, so a stale activeMachinePos can't match new coordinates. */
     public static void clearAll() {
         activeMachinePos = null;
         commits = new ArrayList<>();
@@ -110,8 +100,7 @@ public final class TimelineProjectionManager {
         selectedViewChunk = null;
     }
 
-    /** Tells the boundary renderer which single claimed chunk's own tab (if any) is currently
-     * open, so it can outline that chunk specifically. Pass null for the shared "All" view. */
+    /** Tells the boundary renderer which claimed chunk's own tab is open. Pass null for the shared "All" view. */
     public static void setSelectedViewChunk(ChunkPos chunk) {
         selectedViewChunk = chunk;
     }
@@ -166,8 +155,8 @@ public final class TimelineProjectionManager {
         return null;
     }
 
-    /** Selects exactly commitId, rather than re-deriving it from a game time (ambiguous for a
-     * branch marker, which shares its exact gameTime with the commit it forked from). */
+    /** Selects exactly commitId, rather than re-deriving it from game time (ambiguous for a
+     * branch marker, which shares its gameTime with the commit it forked from). */
     public static void setSelectedCommit(long commitId) {
         TemporalCommit commit = findCommit(commitId);
         if (commit == null) return;
@@ -176,14 +165,13 @@ public final class TimelineProjectionManager {
     }
 
     public static List<TemporalCommit> getCommits() { return commits; }
-    /** commitId -> the id it locally forked from within this chunk's history (see TemporalTimeline). */
+    /** commitId -> the id it locally forked from within this chunk's history. */
     public static Map<Long, Long> getLocalParents() { return localParents; }
     public static long getSelectedCommitId() { return selectedCommitId; }
-    /** The commit this chunk's live world currently reflects (as opposed to the browsing selection). */
+    /** The commit this chunk's live world currently reflects, as opposed to the browsing selection. */
     public static long getHeadCommitId() { return headCommitId; }
     public static long getPreviewVersion() { return previewVersion; }
-    /** Energy cost of jumping to commitId from the chunk's current head, or empty if unknown
-     * (e.g. stale client state right after switching machines). */
+    /** Energy cost of jumping to commitId from the chunk's current head, or empty if unknown. */
     public static OptionalLong getJumpCost(long commitId) {
         Long cost = jumpCosts.get(commitId);
         return cost == null ? OptionalLong.empty() : OptionalLong.of(cost);
@@ -197,10 +185,8 @@ public final class TimelineProjectionManager {
         selectedGameTime = clampSelected(selectedGameTime);
     }
 
-    /** Every chunk the active preview covers — the graph's own chunk for a Time Machine, every
-     * claimed chunk for a Chronosphere. Used to outline the claim's outer boundary in-world while
-     * "Show Changes" is on, so the player can see the extent a jump would actually touch even
-     * where no individual block happens to be changing. */
+    /** Every chunk the active preview covers, used to outline the claim's outer boundary in-world
+     * while "Show Changes" is on, even where no individual block happens to be changing. */
     public static List<ChunkPos> getPreviewChunks() {
         List<ChunkPos> chunks = new ArrayList<>(previewChunkSnapshots.size());
         for (ChunkTimelineSnapshot snapshot : previewChunkSnapshots) chunks.add(snapshot.chunkPos());
@@ -208,12 +194,9 @@ public final class TimelineProjectionManager {
     }
 
     /** Computes which blocks differ from their live world state at selectedGameTime, across every
-     * chunk in previewChunkSnapshots (not just whichever chunk the graph is displaying) — calls the
-     * same {@link TemporalTimeline#walkDeltas} the server's real jump
-     * ({@link io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline#applyChunkAtTime})
-     * uses, so the preview can't hand-drift out of sync with what Jump will actually do. Known gap:
-     * a jump that crosses a re-snapshot boundary (see walkDeltas's doc) needs a full chunk baseline
-     * the client never receives, so the preview under-reports changes in that case specifically. */
+     * chunk in previewChunkSnapshots, using the same {@link TemporalTimeline#walkDeltas} the
+     * server's real jump uses. Known gap: a jump crossing a re-snapshot boundary needs a full
+     * chunk baseline the client never receives, so the preview under-reports changes there. */
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 
@@ -224,12 +207,9 @@ public final class TimelineProjectionManager {
         return entries;
     }
 
-    /** Prefers the exact selected commit id when this chunk's own commit list contains it,
-     * falling back to gameTime-based resolution only for chunks that don't (e.g. a Chronosphere
-     * preview chunk the selected mark never touched). Mirrors why setSelectedCommit() stores an
-     * exact id in the first place: resolveNearest alone is ambiguous once a BRANCH marker shares
-     * the exact gameTime of the commit it forked from, which routinely happens right after jumping
-     * to one of two same-lineage marks and then selecting the other. */
+    /** Prefers the exact selected commit id when this chunk's commit list contains it, falling
+     * back to gameTime-based resolution only for chunks that don't. resolveNearest alone is
+     * ambiguous once a BRANCH marker shares the exact gameTime of the commit it forked from. */
     private static long resolveTargetCommit(List<TemporalCommit> chunkCommits) {
         for (TemporalCommit c : chunkCommits) {
             if (c.getId() == selectedCommitId) return selectedCommitId;
@@ -265,8 +245,8 @@ public final class TimelineProjectionManager {
         }
     }
 
-    /** Mirrors TemporalWorldData#isGlued server-side: true when pos sits inside any glued region
-     * synced for the active machine's dimension, meaning a jump would leave it untouched. */
+    /** True when pos sits inside any glued region synced for the active machine's dimension,
+     * meaning a jump would leave it untouched. Mirrors TemporalWorldData#isGlued server-side. */
     private static boolean isGlued(BlockPos pos) {
         for (BoundingBox region : gluedRegions) {
             if (region.isInside(pos)) return true;

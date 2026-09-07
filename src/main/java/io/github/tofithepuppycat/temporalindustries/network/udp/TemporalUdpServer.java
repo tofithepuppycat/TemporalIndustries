@@ -20,17 +20,9 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 
 /**
- * UDP server for bulk temporal data transfers.
- *
- * Lifecycle: started when the Minecraft server starts, stopped on server stop.
- * Listens on (Minecraft port + 1), default 25566.
- *
- * Usage: call TemporalUdpServer.send(playerUUID, payload) from any thread to
- * initiate an outbound bulk transfer. The payload should be pre-serialized and
- * will be ZLIB-compressed before fragmentation.
- *
- * The actual trigger device (global rollback) is not yet implemented; this class
- * provides the infrastructure for when it is.
+ * UDP server for bulk temporal data transfers. Starts/stops with the Minecraft server, listening on
+ * (Minecraft port + 1). Call {@link #send} from any thread to ZLIB-compress and fragment a payload
+ * out to a player. No current caller yet (global rollback trigger is unimplemented).
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalUdpServer {
@@ -88,11 +80,7 @@ public final class TemporalUdpServer {
         }
     }
 
-    /**
-     * Compresses and sends payload to the given player via UDP.
-     * The client must have already performed the handshake (i.e. opened the GUI that
-     * triggers a UDP handshake request) before this is called.
-     */
+    /** Compresses and sends payload to the given player; requires the client to have already handshaked. */
     public static void send(UUID playerUUID, byte[] rawPayload) {
         if (INSTANCE == null) return;
         INSTANCE.sendInternal(playerUUID, rawPayload);

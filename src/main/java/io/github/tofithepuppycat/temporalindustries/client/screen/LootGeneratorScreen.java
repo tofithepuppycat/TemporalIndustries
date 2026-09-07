@@ -31,11 +31,8 @@ import java.util.List;
 import java.util.Objects;
 
 /** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
- * state) with a vertical Chaos tank bar riding alongside it, a luck slider, a roll-progress bar,
- * and play/stop and single/repeat icon buttons right-aligned next to the cosmetic roll-preview
- * slot, stacked in that order in the header above the chest slots - see
- * {@code textures/gui/loot_generator.png} for the panel art (chest slots start at 8,68; player
- * inventory at 8,134; header controls at 8,8). */
+ * state) with a vertical Chaos tank bar alongside it, a luck slider, a roll-progress bar, and
+ * play/stop and single/repeat icon buttons next to the cosmetic roll-preview slot. */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -52,10 +49,8 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 216;
 
-    // Header starts below the machine title (drawn at y=6, ~9px tall) rather than right against it.
-    // Rows top to bottom: search field (with the vertical Chaos bar riding alongside it, right-
-    // flush against the panel edge at x=168), luck slider, progress bar, then the play/mode icons
-    // centered in the last row.
+    // Rows top to bottom: search field (with the Chaos bar alongside it), luck slider, progress
+    // bar, then the play/mode icons.
     private static final int FIELD_X = 8;
     private static final int FIELD_Y = 16;
     private static final int FIELD_HEIGHT = 12;
@@ -63,8 +58,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int CONTENT_WIDTH = 160;
 
     private static final int CHAOS_BAR_WIDTH = 10;
-    // Flush against the field's right edge (168, shared with the luck slider/progress bar below) -
-    // shortening the field to make room rather than floating the bar further out.
+    // Flush against the field's right edge, shortening the field to make room for the bar.
     private static final int CHAOS_BAR_X = FIELD_X + CONTENT_WIDTH - CHAOS_BAR_WIDTH;
     private static final int CHAOS_BAR_Y = FIELD_Y;
     private static final int FIELD_WIDTH = CHAOS_BAR_X - FIELD_X - 2;
@@ -79,14 +73,13 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int PROGRESS_BAR_WIDTH = FIELD_WIDTH;
     private static final int PROGRESS_BAR_HEIGHT = 6;
 
-    // Spans the field, luck slider and progress bar rows it rides alongside.
+    // Spans the field, luck slider, and progress bar rows.
     private static final int CHAOS_BAR_HEIGHT = PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT - CHAOS_BAR_Y;
 
     private static final int ICON_SIZE = IconButtonRenderer.SIZE;
     private static final int BUTTONS_Y = PROGRESS_BAR_Y + PROGRESS_BAR_HEIGHT + 3;
 
-    // Right-aligned on the buttons row, sitting directly beside the cosmetic roll-preview slot
-    // (rightmost) rather than centered in the row.
+    // Right-aligned on the buttons row, beside the cosmetic roll-preview slot.
     private static final int ROLL_ICON_SIZE = 16;
     private static final int ROLL_ICON_X = FIELD_X + CONTENT_WIDTH - ROLL_ICON_SIZE;
     private static final int ROLL_ICON_Y = BUTTONS_Y;
@@ -96,21 +89,17 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private static final int PLAY_ICON_X = MODE_ICON_X - ICON_SIZE - 2;
     private static final int PLAY_ICON_Y = BUTTONS_Y;
 
-    // Once progress is within this many ticks of maxProgress, the spin locks onto the item that's
-    // actually about to be placed instead of still cycling through the possible-items sample.
+    // Within this many ticks of maxProgress, the spin locks onto the item about to be placed.
     private static final int ROLL_LOCK_TICKS = 4;
-    // Cycle speed (client ticks per icon) slows down once past the halfway point, for a rough
-    // deceleration into the landed item rather than an abrupt stop.
+    // Cycle speed slows down past the halfway point, for a deceleration effect.
     private static final int ROLL_SPIN_TICKS_FAST = 3;
     private static final int ROLL_SPIN_TICKS_SLOW = 6;
 
-    // Total matches gathered for filtering/tab-cycling; only VISIBLE_SUGGESTIONS of these are shown
-    // on screen at once, the rest reachable by scrolling.
+    // Total matches gathered; only VISIBLE_SUGGESTIONS shown at once, rest reachable by scrolling.
     private static final int MAX_SUGGESTIONS = 50;
     private static final int VISIBLE_SUGGESTIONS = 4;
     private static final int SUGGESTION_ROW_HEIGHT = 10;
-    // Wider than the panel itself (which cuts loot table ids off awkwardly) - overhangs both edges
-    // symmetrically since there's nothing else drawn out there to clash with.
+    // Wider than the panel itself so loot table ids aren't cut off; overhangs both edges.
     private static final int SUGGESTIONS_WIDTH = 240;
 
     private EditBox lootTableField;
@@ -118,18 +107,15 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     private int lastSentLuck;
     private LuckSlider luckSlider;
 
-    // Tab-completion cycles through the matches for whatever text was in the field before the first
-    // Tab press in a run, rather than re-filtering against its own output on every subsequent press.
+    // Tab-completion cycles through matches for the text present before the first Tab press.
     private String tabCycleBase = null;
     private int tabCycleIndex = -1;
     private boolean applyingTabCompletion = false;
 
-    // Index of the first suggestion row currently drawn, when there are more matches than fit in
-    // the dropdown at once - see #renderSuggestions.
+    // First suggestion row currently drawn, when more matches exist than fit in the dropdown.
     private int suggestionScrollOffset = 0;
 
-    // Advances every client tick the screen is open, purely to drive the roll-animation's icon
-    // cycling - not synced, not persisted.
+    // Drives the roll-animation's icon cycling; not synced, not persisted.
     private int rollAnimTick = 0;
 
     public LootGeneratorScreen(LootGeneratorMenu menu, Inventory playerInventory, Component title) {
@@ -165,10 +151,8 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         PacketDistributor.sendToServer(LootTableSuggestionsRequestPacket.INSTANCE);
     }
 
-    // AbstractContainerScreen#mouseDragged is fully overridden for slot quick-crafting and never
-    // forwards to child widgets (ContainerEventHandler#mouseDragged, which vanilla Screen relies on
-    // for e.g. options sliders, is never called) - without this override, dragging the luck slider
-    // would only ever jump to the initial click position and ignore all subsequent movement.
+    // AbstractContainerScreen#mouseDragged never forwards to child widgets; without this override,
+    // dragging the luck slider would only jump to the initial click position.
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (getFocused() == luckSlider && isDragging()) {
@@ -181,20 +165,16 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
     protected void containerTick() {
         super.containerTick();
         rollAnimTick++;
-        // The client's container data starts at 0 until the server's first post-open broadcast
-        // lands, which can arrive after init() already built the slider from a stale read - keep it
-        // in sync with the real value except while the player has it focused (mid-drag or just
-        // clicked), so we don't fight their input.
+        // Keep the slider in sync with the server value except while the player has it focused,
+        // so we don't fight their input.
         if (luckSlider != null && !luckSlider.isFocused()) {
             luckSlider.syncFromServer(menu.getLuck());
         }
     }
 
-    /** Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}), fed into the loot
-     * roll as the vanilla loot-table luck parameter so quality-weighted pools/functions skew toward
-     * better results - at a Chaos surcharge that scales with the setting (see
-     * {@link LootGeneratorMenu#getRollCost()}/{@link LootGeneratorMenu#getItemCost()}). Only pushes a
-     * packet when the discrete luck level actually changes, not on every pixel of drag. */
+    /** Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}) fed into the loot
+     * roll's luck parameter, at a Chaos surcharge that scales with the setting. Only sends a packet
+     * when the discrete luck level actually changes. */
     private class LuckSlider extends AbstractSliderButton {
         LuckSlider(int x, int y, int width, int height, int initialLuck) {
             super(x, y, width, height, Component.empty(), initialLuck / (double) LootGeneratorBlockEntity.MAX_LUCK);
@@ -219,8 +199,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             PacketDistributor.sendToServer(new LootGeneratorSetLuckPacket(menu.getBlockPos(), luck));
         }
 
-        /** Pulls the slider's handle to match a value that arrived from the server (initial sync, or
-         * another client's change) without re-sending it back out via {@link #applyValue}. */
+        /** Pulls the slider's handle to match a server value without re-sending it via {@link #applyValue}. */
         void syncFromServer(int luck) {
             if (luck == lastSentLuck) return;
             lastSentLuck = luck;
@@ -263,9 +242,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         return result;
     }
 
-    /** Tab/Shift+Tab: cycles the field's text through the matches for the text that was present
-     * before cycling started, so repeated presses step through candidates instead of re-filtering
-     * against whatever the previous press just inserted. */
+    /** Tab/Shift+Tab: cycles the field's text through matches for the text present before cycling started. */
     private boolean tabComplete(boolean reverse) {
         if (tabCycleBase == null) tabCycleBase = lootTableField.getValue();
 
@@ -295,8 +272,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         PacketDistributor.sendToServer(new LootGeneratorSetTablePacket(menu.getBlockPos(), text));
     }
 
-    /** Play/stop icon: starts generation (single roll, or a self-continuing chain in repeat mode -
-     * see {@link LootGeneratorBlockEntity}) if idle, otherwise halts whatever's in flight. */
+    /** Play/stop icon: starts generation (single roll or repeating chain) if idle, otherwise halts it. */
     private void togglePlayStop() {
         if (menu.isRunning()) {
             PacketDistributor.sendToServer(new LootGeneratorStopPacket(menu.getBlockPos()));
@@ -306,27 +282,20 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** Single/repeat icon: just flips the mode for whenever generation is next started - doesn't
-     * itself start or stop anything. */
+    /** Single/repeat icon: flips the mode for the next generation; doesn't start or stop anything itself. */
     private void toggleRepeatMode() {
         PacketDistributor.sendToServer(new LootGeneratorToggleRepeatPacket(menu.getBlockPos()));
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        // EditBox#keyPressed only consumes special keys (backspace, arrows, ctrl-combos) - plain
-        // letters are inserted via charTyped instead, so it returns false for them. If we only acted
-        // on that return value, AbstractContainerScreen#keyPressed would still fall through to its
-        // own key-inventory close-check and hotbar-swap check on every ordinary letter, closing the
-        // screen the moment you type e.g. "e" (the default inventory key) or a digit. AnvilScreen's
-        // rename field avoids this the same way: swallow the whole keystroke whenever the field is
-        // actively focused (EditBox#canConsumeInput), not just when it reports having handled it.
+        // EditBox#keyPressed returns false for plain letters; without swallowing them via
+        // canConsumeInput, AbstractContainerScreen would close the screen on keys like "e".
         if (lootTableField.isFocused() && (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER)) {
             sendTableUpdateIfChanged();
             return true;
         }
-        // Tab would otherwise move widget focus (Screen#keyPressed's changeFocus handling) - claim
-        // it here first so it autocompletes the loot table id instead.
+        // Tab would otherwise move widget focus; claim it here to autocomplete the loot table id instead.
         if (lootTableField.isFocused() && keyCode == GLFW.GLFW_KEY_TAB) {
             tabComplete((modifiers & GLFW.GLFW_MOD_SHIFT) != 0);
             return true;
@@ -353,9 +322,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         renderRollAnimation(guiGraphics);
     }
 
-    /** Play/stop and single/repeat icon buttons, drawn as menu_icon_base_small.png icon buttons
-     * rather than vanilla Buttons, matching the mod's inline-button look elsewhere (see
-     * EntropyCondenserScreen's range controls). */
+    /** Play/stop and single/repeat icon buttons, drawn as icon buttons rather than vanilla Buttons. */
     private void renderControlIcons(GuiGraphics guiGraphics) {
         int playX = leftPos + PLAY_ICON_X;
         int modeX = leftPos + MODE_ICON_X;
@@ -390,10 +357,8 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         guiGraphics.fill(x + 1, y + 1, x + 1 + filled, y + PROGRESS_BAR_HEIGHT - 1, 0xFF55FF55);
     }
 
-    /** While a roll is in progress, spins the icon through the possible-items sample rolled
-     * server-side, slowing down past the halfway mark and locking onto the item that's actually
-     * about to be placed for the last {@link #ROLL_LOCK_TICKS} ticks - a slot-machine "deciding the
-     * loot" effect that resolves right as the progress bar fills. */
+    /** While a roll is in progress, spins the icon through the possible-items sample, slowing down
+     * past the halfway mark and locking onto the actual item for the last {@link #ROLL_LOCK_TICKS} ticks. */
     private void renderRollAnimation(GuiGraphics guiGraphics) {
         ItemStack display = currentRollDisplayStack();
         if (display.isEmpty()) return;
@@ -403,8 +368,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         guiGraphics.renderItem(display, x, y);
     }
 
-    /** Empty if no roll is in progress; otherwise whichever stack the animation should show this
-     * frame (spinning sample item, or the real upcoming item once landed). */
+    /** Empty if no roll is in progress; otherwise the stack the animation should show this frame. */
     private ItemStack currentRollDisplayStack() {
         ItemStack next = menu.getNextRollItem();
         if (next.isEmpty()) return ItemStack.EMPTY;
@@ -431,10 +395,8 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
-        // The suggestions dropdown always covers the luck slider's row when shown (see
-        // renderSuggestions), and relying on flush()+fill() to paint over the slider's already-queued
-        // "Luck: x/y" text is unreliable across render-type batches - just skip drawing the slider
-        // for this frame instead of fighting the draw order.
+        // The suggestions dropdown covers the luck slider's row when shown; skip drawing the
+        // slider rather than fighting draw order to paint over its queued text.
         boolean suggestionsShown = lootTableField.isFocused() && !matchingSuggestions(lootTableField.getValue()).isEmpty();
         luckSlider.visible = !suggestionsShown;
 
@@ -465,8 +427,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** The real item's tooltip once the spin has landed on it; a "still deciding" placeholder while
-     * it's still cycling through the sample, so the tooltip doesn't spoil the result early. */
+    /** The real item's tooltip once landed; a "still deciding" placeholder while still cycling. */
     private void renderRollIconTooltip(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         ItemStack next = menu.getNextRollItem();
         if (next.isEmpty()) return;
@@ -481,17 +442,13 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** Clamps {@link #suggestionScrollOffset} so the window of {@link #VISIBLE_SUGGESTIONS} rows it
-     * defines always stays within {@code matchCount} (called whenever the match list or the scroll
-     * offset itself may have changed). */
+    /** Clamps {@link #suggestionScrollOffset} so its window of {@link #VISIBLE_SUGGESTIONS} rows stays within {@code matchCount}. */
     private void clampSuggestionScroll(int matchCount) {
         int maxOffset = Math.max(0, matchCount - VISIBLE_SUGGESTIONS);
         suggestionScrollOffset = Math.max(0, Math.min(suggestionScrollOffset, maxOffset));
     }
 
-    /** Dropdown of matching loot table ids under the search field, drawn on top of everything else
-     * while the field is focused and holds partial text (hidden once the text already exactly
-     * matches a table, or once tab-cycling has landed on one - see {@link #matchingSuggestions}).
+    /** Dropdown of matching loot table ids under the search field while it holds partial text.
      * Centered under the field/panel, and scrollable when there are more matches than fit. */
     private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (!lootTableField.isFocused()) return;
@@ -504,9 +461,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         int visibleCount = Math.min(VISIBLE_SUGGESTIONS, matches.size());
         int height = visibleCount * SUGGESTION_ROW_HEIGHT;
 
-        // Flush any text already queued by earlier widgets (e.g. the luck slider's label) before
-        // drawing our opaque background, otherwise that queued text flushes after our fill and
-        // shows through it instead of being covered.
+        // Flush text queued by earlier widgets first, or it would show through our opaque background.
         guiGraphics.flush();
         guiGraphics.fill(x, y, x + SUGGESTIONS_WIDTH, y + height, 0xF0000000);
 
@@ -557,8 +512,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
                     return true;
                 }
             }
-            // Clicking anywhere outside the field (slots, buttons, empty panel) unfocuses it -
-            // otherwise, once focused, there was no way to click away from it.
+            // Clicking outside the field unfocuses it; otherwise there'd be no way to click away.
             if (!lootTableField.isMouseOver(mouseX, mouseY)) {
                 lootTableField.setFocused(false);
             }

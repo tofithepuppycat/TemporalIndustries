@@ -6,12 +6,9 @@ import net.minecraft.core.Direction;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Defines the 3(wide) x 2(tall) x 2(deep) frame shape required around a {@link LootGenerator}
- * controller for it to be formed. Offsets are authored for a controller facing {@link Direction#NORTH}
- * - the controller occupies the center of the front row at relative (0,0,0), with the frame's depth
- * extending south (away from its front face) - and are rotated to match the controller's actual
- * {@link LootGenerator#FACING} so the recognized shape lines up with the front face the block model
- * actually renders. */
+/** Defines the 3x2x2 frame shape required around a {@link LootGenerator} controller for it to be
+ * formed. Offsets are authored for a controller facing {@link Direction#NORTH} and rotated to
+ * match the controller's actual {@link LootGenerator#FACING}. */
 public final class LootGeneratorStructure {
     private static final List<BlockPos> FRAME_OFFSETS = buildFrameOffsets();
 
@@ -30,8 +27,7 @@ public final class LootGeneratorStructure {
         return List.copyOf(offsets);
     }
 
-    /** The 11 frame positions, in world space, for a controller placed at {@code controllerPos} and
-     * facing {@code facing}, matching the same y-axis rotation the blockstate applies to the model. */
+    /** The 11 frame positions in world space for a controller at {@code controllerPos} facing {@code facing}. */
     public static List<BlockPos> framePositions(BlockPos controllerPos, Direction facing) {
         List<BlockPos> positions = new ArrayList<>(FRAME_OFFSETS.size());
         for (BlockPos offset : FRAME_OFFSETS) {
@@ -40,9 +36,7 @@ public final class LootGeneratorStructure {
         return positions;
     }
 
-    /** Rotates a (x,z) offset authored for {@link Direction#NORTH} around the y-axis to match the
-     * given facing, using the same clockwise-from-above convention as the blockstate's "y" rotation
-     * (north=0, east=90, south=180, west=270). Leaves the vertical (y) component untouched. */
+    /** Rotates an (x,z) offset authored for {@link Direction#NORTH} around the y-axis to match facing. */
     private static BlockPos rotate(BlockPos offset, Direction facing) {
         int x = offset.getX();
         int z = offset.getZ();

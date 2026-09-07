@@ -34,11 +34,9 @@ import static io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerato
 
 /**
  * Passive FE generator: reads the neighbors to the left and right of the block (relative to
- * {@link net.minecraft.world.level.block.state.properties.DirectionProperty} {@link
- * io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator#FACING}) as a hot source (left)
- * and a cold source (right). While both are present it credits FE every tick, scaled by the
- * {@link #TEMPERATURES} gap between the two sources (per IDEAS.md's "Generates electricity based on
- * the temperature difference"), and periodically emits ORD/CHS orbs whose count scales the same way.
+ * FACING) as a hot source and a cold source. While both are present it credits FE every tick,
+ * scaled by the {@link #TEMPERATURES} gap between them, and periodically emits ORD/CHS orbs
+ * whose count scales the same way.
  */
 @SuppressWarnings("null")
 public class SeebeckGeneratorBlockEntity extends BlockEntity {
@@ -73,9 +71,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
     private static final int MIN_GEN_RATE_FE_PER_TICK = 4;
     private static final int MAX_GEN_RATE_FE_PER_TICK = 40;
 
-    // Orbs are emitted four times as often as before, with the per-emission amount scaled down to
-    // match, so total ORD/CHS output per minute is unchanged. entropyAccumulator carries the
-    // fractional remainder between emissions since an orb needs a whole value of at least 1.
+    // entropyAccumulator carries the fractional remainder between emissions since an orb needs a whole value of at least 1.
     private static final int ENTROPY_INTERVAL_TICKS = 50;
     private static final double MIN_ENTROPY_PER_INTERVAL = 0.25;
     private static final double MAX_ENTROPY_PER_INTERVAL = 1.0;
@@ -140,12 +136,8 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
         }
     }
 
-    /**
-     * Fluid source blocks (lava, water) have no collision, so an orb spawned at their center can only
-     * escape if there's open space directly above; when the source is embedded in terrain that space
-     * may not exist, leaving the orb stuck bobbing inside the fluid forever. Spawning above the block
-     * instead lets the existing solid-block escape logic ({@code moveTowardsClosestSpace}) handle it.
-     */
+    /** Fluid sources have no collision, so an orb spawned at their center can get stuck bobbing
+     * inside if embedded in terrain; spawning above the block avoids that. */
     private static double orbSpawnY(BlockPos pos, BlockState state) {
         return pos.getY() + (state.getFluidState().isEmpty() ? 0.5 : 1.05);
     }

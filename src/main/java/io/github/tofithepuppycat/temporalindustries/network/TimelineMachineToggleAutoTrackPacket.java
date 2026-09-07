@@ -12,9 +12,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: flip a timeline machine's auto-tracking flag (see the GUI's auto-track tab).
- * Shared by the Chronosphere and Chronovault screens — see TimelineMachineDeleteHistoryPacket for
- * why this can operate through the common TimelineViewMenu/AbstractTimelineMachineBlockEntity types. */
+/** Client -> server: flips a timeline machine's auto-tracking flag. Shared by the Chronosphere
+ * and Chronovault screens. */
 public class TimelineMachineToggleAutoTrackPacket implements CustomPacketPayload {
     public static final Type<TimelineMachineToggleAutoTrackPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_toggle_auto_track"));

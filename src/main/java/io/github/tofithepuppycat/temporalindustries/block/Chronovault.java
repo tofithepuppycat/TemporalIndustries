@@ -60,13 +60,8 @@ public class Chronovault extends BaseEntityBlock {
         return RenderShape.MODEL;
     }
 
-    /**
-     * A chunk's timeline is only meaningful relative to a single Chronovault's own rollback
-     * history (see TemporalTimeline) — a second machine tracking the same chunk would silently
-     * fight over which one's checkouts actually apply to it. Refusing to place (or survive) here
-     * keeps that 1:1 relationship intact, the same way vanilla blocks refuse to place where they
-     * can't structurally stand.
-     */
+    /** Refuses to survive on a chunk already tracked by another machine, since a chunk's
+     * timeline is only meaningful relative to a single Chronovault. */
     @Override
     public boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader level, @NotNull BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {

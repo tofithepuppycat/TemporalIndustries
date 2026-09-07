@@ -20,14 +20,10 @@ import java.util.List;
 import java.util.Set;
 
 /** Client -> server: confirm the Portable Chrono Marker's area-select map, saving the player's
- * chosen chunk offsets onto the marker item itself (see {@link
- * io.github.tofithepuppycat.temporalindustries.client.screen.ChronoMarkerMapScreen}) as its custom
- * shape (see {@link PortableChronoMarkerItem#saveOffsets}). This never marks anything by itself —
- * only a plain right-click with the saved shape does that (see {@link PortableChronoMarkerItem#use}).
- * Offsets are relative to wherever the marker is next used, not the anchor the map screen opened at,
- * so a saved shape is reusable anywhere. Re-validated against {@link
- * PortableChronoMarkerItem#MAP_SHAPE}/{@link PortableChronoMarkerItem#MAP_RADIUS_CHUNKS} — nothing
- * beyond "here are some chunk offsets" is trusted from the client. */
+ * chosen chunk offsets onto the marker item as its custom shape. Never marks anything itself — only
+ * a plain right-click does that. Offsets are relative to wherever the marker is next used, so a
+ * saved shape is reusable anywhere. Re-validated server-side; nothing from the client is trusted
+ * beyond "here are some chunk offsets". */
 public class ChronoMarkerSaveSelectionPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerSaveSelectionPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_save_selection"));
@@ -82,9 +78,7 @@ public class ChronoMarkerSaveSelectionPacket implements CustomPacketPayload {
         });
     }
 
-    /** Whichever hand currently holds the Portable Chrono Marker — the map screen doesn't track
-     * which hand opened it, so the save applies to whatever the sender is holding it in now (main
-     * hand preferred, matching how the item itself is normally used). Null if neither hand does. */
+    /** Whichever hand currently holds the Portable Chrono Marker (main hand preferred), or null if neither does. */
     private static ItemStack holdingMarker(ServerPlayer sender) {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack = sender.getItemInHand(hand);

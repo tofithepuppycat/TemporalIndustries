@@ -21,10 +21,8 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
 
 /** Renders an Entropy Condenser's absorb-range perimeter in-world while
- * {@link EntropyCondenserRangeClientState} points at it (toggled from its GUI's "Show Range"
- * button, and left showing after the GUI closes), using the same
- * {@link EntropyCondenserBlockEntity#absorbArea} the server uses to catch orbs, so the box always
- * matches what actually gets absorbed. */
+ * {@link EntropyCondenserRangeClientState} points at it, using the same
+ * {@link EntropyCondenserBlockEntity#absorbArea} the server uses to catch orbs. */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class EntropyCondenserRangeRenderer {
     private static final float[] FILL_COLOR = {0.55F, 1.0F, 0.65F};

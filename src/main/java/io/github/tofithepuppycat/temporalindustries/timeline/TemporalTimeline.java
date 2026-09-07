@@ -21,45 +21,33 @@ import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 
 /**
- * Per-dimension tree of TemporalCommits, linked by parentId.
+ * Per-dimension tree of TemporalCommits, linked by parentId. DELTA commits bundle everything
+ * changed in one flush interval and form the dimension-wide trunk; SNAPSHOT is an on-demand full
+ * baseline also on the trunk; BRANCH is a zero-diff fork marker scoped to one chunk.
  *
- * <ul>
- *   <li>DELTA: what changed in one flush interval, bundling every chunk touched. Forms the
- *       dimension-wide trunk ({@code headId}); ordinary gameplay never forks it.
- *   <li>SNAPSHOT: on-demand full baseline of all tracked chunks; also attaches to the trunk.
- *   <li>BRANCH: zero-diff fork marker for checking out a point in time on ONE chunk (see
- *       {@link TemporalCommit#getBranchChunkPos()}); never affects any other chunk's timeline.
- * </ul>
- *
- * Each chunk's own lineage is tracked separately from creation order via {@code chunkLocalParent}
- * (chunk-scoped parent per commit) and {@code chunkHeadId} (what that chunk's live world currently
- * reflects) — like {@code git checkout}: landing on a childless point just moves the head there
- * for free, while checking out a point with existing history forks a new branch (see branch()).
- *
- * Rollback for a chunk, from its current head to target T: walk chunkLocalParent links from both
- * to find their common-prefix fork point, undo the head chain past it, then replay T's chain past it.
+ * <p>Each chunk's lineage is tracked separately via {@code chunkLocalParent} (chunk-scoped parent
+ * per commit) and {@code chunkHeadId} (what the live world currently reflects), like
+ * {@code git checkout}: landing on a childless point just moves the head; checking out a point
+ * with existing history forks a new branch. Rollback walks both chains to their common-prefix
+ * fork point, undoes the head chain past it, then replays the target chain past it.
  */
 public class TemporalTimeline {
     private long nextId = 1;
-    /** Head of the dimension-wide trunk (DELTA/SNAPSHOT only); bookkeeping only, rollback
+    /** Head of the dimension-wide trunk (DELTA/SNAPSHOT only); bookkeeping only, since rollback
      * correctness is resolved per chunk. BRANCH commits never move this. */
     private long headId = -1L;
     private final LinkedList<TemporalCommit> commits = new LinkedList<>();
     private final Map<Long, TemporalCommit> byId = new HashMap<>();
     /** chunkPos.toLong() -> commit IDs relevant to that chunk, in creation order. */
     private final Map<Long, List<Long>> chunkIndex = new HashMap<>();
-    /** chunkPos.toLong() -> (commitId -> the id it locally forked from within that chunk's
-     * history, or -1 for a root). Recorded explicitly at commit time. */
+    /** chunkPos.toLong() -> (commitId -> the id it locally forked from, or -1 for a root). */
     private final Map<Long, Map<Long, Long>> chunkLocalParent = new HashMap<>();
     /** chunkPos.toLong() -> the commit that chunk's live world currently reflects. */
     private final Map<Long, Long> chunkHeadId = new HashMap<>();
 
-    /** Forgets chunkPos's entire recorded history — every commit that touched it, its local-parent
-     * links, and its head — without touching the live world. Commits that also touch OTHER chunks
-     * (a shared DELTA, say) are left registered globally; only this chunk's own reference to them is
-     * dropped, same as if it had never been tracked. Callers that want history to resume afterward
-     * still need to give the chunk a fresh baseline (see {@code ensureBaseline}), since without one
-     * it has no anchor to walk from. */
+    /** Forgets chunkPos's entire recorded history without touching the live world. Commits shared
+     * with other chunks stay registered globally; only this chunk's reference is dropped. Callers
+     * needing history to resume must give the chunk a fresh baseline afterward. */
     public void clearChunkHistory(ChunkPos chunkPos) {
         long chunkKey = chunkPos.toLong();
         chunkIndex.remove(chunkKey);
@@ -71,8 +59,7 @@ public class TemporalTimeline {
         return addDelta(gameTime, chunkDeltas, false);
     }
 
-    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than
-     * automatic tracking — flags the commit for the graph's special mark icon. */
+    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than automatic tracking */
     public TemporalCommit addDelta(long gameTime, List<ChunkDelta> chunkDeltas, boolean playerMarked) {
         TemporalCommit commit = TemporalCommit.delta(nextId++, headId, gameTime, chunkDeltas, playerMarked);
         registerCommit(commit);
@@ -83,25 +70,18 @@ public class TemporalTimeline {
         return addSnapshot(gameTime, chunkSnapshots, false);
     }
 
-    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than
-     * automatic tracking — flags the commit for the graph's special mark icon. */
+    /** @param playerMarked whether this came from a Portable ChronoMarker save rather than automatic tracking */
     public TemporalCommit addSnapshot(long gameTime, List<ChunkSnapshot> chunkSnapshots, boolean playerMarked) {
         TemporalCommit commit = TemporalCommit.snapshot(nextId++, headId, gameTime, chunkSnapshots, playerMarked);
         registerCommit(commit);
         return commit;
     }
 
-    /** How many commits chunkPos's head is past its nearest snapshot ancestor (inclusive of the
-     * snapshot itself) needs to reach before a fresh {@link ChunkSnapshot} baseline is due — shared
-     * by the periodic auto-tracking re-snapshot check ({@code AbstractTimelineMachineBlockEntity})
-     * and a Portable ChronoMarker's manual save point (see {@code PortableChronoMarkerItem}), so a
-     * player-triggered save re-baselines under exactly the same rule an automatic one would. */
+    /** Commits-since-snapshot threshold before a fresh {@link ChunkSnapshot} baseline is due;
+     * shared by auto-tracking and manual Portable ChronoMarker saves. */
     public static final int SNAPSHOT_COMMIT_THRESHOLD = 50;
 
-    /** Ensures chunkPos has at least one commit to anchor its history walk — called centrally from
-     * {@link io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData#trackChunk} so every
-     * owner (Time Machine, Chronosphere, Portable ChronoMarker) gets this guarantee for free instead
-     * of each having to remember to pair trackChunk with a baseline call itself.
+    /** Ensures chunkPos has at least one commit to anchor its history walk.
      * @return true if a baseline snapshot was actually created (chunk had no commits yet) */
     public boolean ensureBaseline(ChunkPos chunkPos, ServerLevel level) {
         if (!getCommitsForChunk(chunkPos).isEmpty()) return false;
@@ -109,17 +89,13 @@ public class TemporalTimeline {
         return true;
     }
 
-    /** Checks out targetGameTime for chunkPos, preferring preferredCommitId as the exact checkout
-     * target over resolveNearest's gameTime-only match when it's actually one of chunkPos's own
-     * commits (pass {@link TemporalCommit#NO_PREFERRED_COMMIT} to always resolve by gameTime alone).
-     * A branch marker always shares its exact gameTime with the commit it forked from (see
-     * TemporalCommit#resolveNearest's tie-break), so re-deriving the target from gameTime alone
-     * can't distinguish between two different branches' commits at the same tick — the caller
-     * hands back the literal id of whichever node was actually selected to disambiguate.
+    /** Checks out targetGameTime for chunkPos, preferring preferredCommitId as the exact target
+     * over gameTime-only resolution when it's one of chunkPos's own commits (pass
+     * {@link TemporalCommit#NO_PREFERRED_COMMIT} to always resolve by gameTime alone).
      *
      * <p>No-op if this chunk has no history yet, or its head is already at the resolved point.
-     * Landing on a childless point just moves the chunk's head there (no new commit); otherwise
-     * forks a zero-diff marker commit scoped to this chunk. */
+     * Landing on a childless point just moves the chunk's head there; otherwise forks a zero-diff
+     * marker commit scoped to this chunk. */
     @Nullable
     public TemporalCommit branch(ChunkPos chunkPos, long targetGameTime, long preferredCommitId) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
@@ -141,9 +117,8 @@ public class TemporalTimeline {
         return marker;
     }
 
-    /** targetGameTime resolved to a specific commit for chunkPos — preferredCommitId directly, if
-     * it's actually one of chunkPos's own commits, letting an exact node selection bypass
-     * resolveNearest's gameTime-only tie-break; otherwise the nearest match by gameTime, as before. */
+    /** targetGameTime resolved to a specific commit for chunkPos — preferredCommitId directly if
+     * it's one of chunkPos's own commits, otherwise the nearest match by gameTime. */
     private long resolveTarget(List<TemporalCommit> chunkCommits, long targetGameTime, long preferredCommitId) {
         if (preferredCommitId != TemporalCommit.NO_PREFERRED_COMMIT) {
             for (TemporalCommit c : chunkCommits) {
@@ -180,7 +155,7 @@ public class TemporalTimeline {
         chunkHeadId.put(chunkKey, commitId);
     }
 
-    /** Every commit relevant to chunkPos — commits touching it plus its own branch markers — in creation order. */
+    /** Every commit relevant to chunkPos, in creation order. */
     public List<TemporalCommit> getCommitsForChunk(ChunkPos chunkPos) {
         List<Long> ids = chunkIndex.getOrDefault(chunkPos.toLong(), Collections.emptyList());
         List<TemporalCommit> result = new ArrayList<>(ids.size());
@@ -191,7 +166,7 @@ public class TemporalTimeline {
         return result;
     }
 
-    /** commitId → the id it locally forked from within chunkPos's own history (see class doc). */
+    /** commitId → the id it locally forked from within chunkPos's own history. */
     public Map<Long, Long> getLocalParentsForChunk(ChunkPos chunkPos) {
         return Collections.unmodifiableMap(chunkLocalParent.getOrDefault(chunkPos.toLong(), Collections.emptyMap()));
     }
@@ -219,11 +194,8 @@ public class TemporalTimeline {
         return commits.isEmpty() ? -1L : commits.getLast().getId();
     }
 
-    /**
-     * The commit chunkPos's live world state currently reflects, or -1 if this chunk has no
-     * history yet. Callers that are about to call branch() (which can move this) must capture it
-     * first: see applyChunkAtTime's fromCommitId parameter.
-     */
+    /** The commit chunkPos's live world state currently reflects, or -1 if no history yet.
+     * Callers about to call branch() (which can move this) must capture it first. */
     public long getChunkHeadId(ChunkPos chunkPos) {
         long chunkKey = chunkPos.toLong();
         Long head = chunkHeadId.get(chunkKey);
@@ -234,10 +206,8 @@ public class TemporalTimeline {
 
     public boolean isEmpty() { return commits.isEmpty(); }
 
-    /** How many commits chunkPos's head is past its nearest snapshot ancestor (inclusive of the
-     * snapshot itself) — reuses ancestryChain's own bounded walk, so this stays cheap regardless
-     * of how deep the chunk's full history actually is. Used to decide when a fresh
-     * {@link ChunkSnapshot} is due (see the block entities' periodic re-snapshot check). */
+    /** How many commits chunkPos's head is past its nearest snapshot ancestor; used to decide
+     * when a fresh {@link ChunkSnapshot} is due. */
     public int getCommitsSinceSnapshot(ChunkPos chunkPos) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
         if (chunkCommits.isEmpty()) return 0;
@@ -246,14 +216,11 @@ public class TemporalTimeline {
         return TemporalCommit.ancestryChain(chunkCommits, localParents, headId).size();
     }
 
-    // Manual save-point diffing (Portable ChronoMarker — see PortableChronoMarkerItem)
+    // Manual save-point diffing (Portable ChronoMarker)
 
     /** chunkPos's nearest SNAPSHOT ancestor (inclusive) and every DELTA between it and the head, in
-     * chain order — the raw materials {@link #diffChunkAgainstHead} needs, without actually
-     * replaying them into a full per-position map (see that method's doc for why). Returns an empty
-     * chain if chunkPos has no history, or its earliest reachable commit isn't a SNAPSHOT (a
-     * defensive case that shouldn't occur once {@link #ensureBaseline} has run — every chunk's very
-     * first commit always is one). */
+     * chain order. Returns an empty chain if chunkPos has no history, or its earliest reachable
+     * commit isn't a SNAPSHOT (shouldn't occur once {@link #ensureBaseline} has run). */
     private List<TemporalCommit> headChainSinceSnapshot(ChunkPos chunkPos) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
         if (chunkCommits.isEmpty()) return List.of();
@@ -267,18 +234,12 @@ public class TemporalTimeline {
 
     /**
      * A {@link TemporalCommit.Type#DELTA}-ready diff of current (a just-captured full baseline)
-     * against chunkPos's materialized head — lets a Portable ChronoMarker's manual save point
-     * produce ordinary per-block deltas purely from two captures, without needing continuous
-     * background tracking of every chunk the player ever walks through (contrast Time
-     * Machine/Chronosphere auto-tracking, which records deltas as changes happen).
+     * against chunkPos's materialized head, letting a Portable ChronoMarker save produce ordinary
+     * per-block deltas from two captures without continuous background tracking.
      *
-     * <p>Section by section (see {@link ChunkSnapshot#sectionTriviallyEquals}) rather than
-     * expanding the baseline and current snapshots into full ~24-section, ~98k-position maps
-     * up front: a section neither the baseline-vs-current comparison nor any recorded delta
-     * touches — the common case for anything below the surface or above the build limit — never
-     * gets expanded at all. A claimed area's worth of untouched wilderness chunks used to mean a
-     * multi-hundred-thousand-entry HashMap build on every single mark; this keeps that work
-     * proportional to how much of the chunk has actually changed instead.
+     * <p>Compares section by section ({@link ChunkSnapshot#sectionTriviallyEquals}) rather than
+     * expanding both snapshots into full position maps up front, so untouched sections (the common
+     * case below the surface or above the build limit) never get expanded at all.
      * @return null if nothing actually changed since the head */
     @Nullable
     public ChunkDelta diffChunkAgainstHead(ResourceLocation dimension, ChunkSnapshot current) {
@@ -292,10 +253,8 @@ public class TemporalTimeline {
         }
         if (baseline == null) return null;
 
-        // Sparse overlay of every DELTA recorded on top of the baseline (latest write wins, same
-        // as the old full-materialization walk) — proportional to however many positions were ever
-        // actually changed, not the size of the chunk, so this costs nothing extra regardless of
-        // how large current/baseline are.
+        // Sparse overlay of every DELTA recorded on top of the baseline (latest write wins),
+        // proportional to positions actually changed rather than chunk size.
         Map<BlockPos, BlockState> overlayStates = new HashMap<>();
         Map<BlockPos, CompoundTag> overlayBeTags = new HashMap<>();
         Set<Integer> touchedSections = new HashSet<>();
@@ -342,19 +301,14 @@ public class TemporalTimeline {
 
     /** The block/block-entity/entity state chunkPos would have at targetGameTime, transitioning
      * from fromCommitId — built by undoing the live lineage past its fork with the target lineage,
-     * then replaying the target lineage past that same fork. Read-only: computing this touches
-     * nothing in the world. */
+     * then replaying the target lineage past that fork. Read-only; touches nothing in the world. */
     private record DesiredState(Map<BlockPos, BlockState> states, Map<BlockPos, CompoundTag> blockEntityTags,
                                  Map<UUID, CompoundTag> entityTags) {}
 
     /** Result of walking chunkPos's commit graph from fromCommitId to targetCommitId over ordinary
-     * DELTA/BRANCH commits only — the common-prefix/undo/replay algorithm both the server's real
-     * jump (via {@link #resolveDesiredState}) and the client's ghost-preview projection
-     * ({@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager})
-     * need, extracted here as a static, world-independent function so the two can never hand-drift
-     * apart. commonPrefixLen and targetChain are exposed for the server's disjoint-lineage/SNAPSHOT
-     * fallback below, which needs a {@link ChunkSnapshot}'s full baseline (server-only data, never
-     * sent to the client — see that class's doc) that this walk alone can't produce. */
+     * DELTA/BRANCH commits — a static, world-independent function shared by the server's real jump
+     * and the client's ghost-preview projection so the two can't drift apart. commonPrefixLen and
+     * targetChain are exposed for the server's disjoint-lineage/SNAPSHOT fallback below. */
     public record DeltaWalkResult(Map<BlockPos, BlockState> states, Map<BlockPos, CompoundTag> blockEntityTags,
                                    Map<UUID, CompoundTag> entityTags, int commonPrefixLen,
                                    List<TemporalCommit> targetChain) {}
@@ -426,15 +380,10 @@ public class TemporalTimeline {
         Map<BlockPos, BlockState> desiredStates = new HashMap<>(walk.states());
         Map<BlockPos, CompoundTag> desiredBETags = new HashMap<>(walk.blockEntityTags());
 
-        // If the target lineage shares no history with the live one, its chain starts fresh from
-        // its own nearest SNAPSHOT ancestor (see TemporalCommit#ancestryChain) — a full baseline
-        // whose block grid must be applied directly, since a SNAPSHOT itself carries no ChunkDelta
-        // for the undo/replay walk above to see. Without this, jumping onto a disjoint lineage (e.g.
-        // back to the trunk after a re-snapshot happened while branched off it) applies nothing at
-        // all for everything the snapshot baselined, leaving the world stuck on the live branch.
-        // Server-only: a ChunkSnapshot's full block grid is never sent to the client (see its class
-        // doc), so the client's identical walkDeltas() call can't and doesn't attempt this — its
-        // ghost preview is a known-incomplete approximation across a re-snapshot boundary.
+        // If the target lineage shares no history with the live one, its chain starts fresh from its
+        // own nearest SNAPSHOT ancestor — a full baseline that must be applied directly since a
+        // SNAPSHOT carries no ChunkDelta for the undo/replay walk above to see. Server-only: the
+        // client's ghost preview can't do this and is a known-incomplete approximation here.
         List<TemporalCommit> targetChain = walk.targetChain();
         if (walk.commonPrefixLen() == 0 && !targetChain.isEmpty() && targetChain.get(0).getType() == TemporalCommit.Type.SNAPSHOT) {
             for (ChunkSnapshot snapshot : targetChain.get(0).getChunkSnapshots()) {
@@ -447,13 +396,9 @@ public class TemporalTimeline {
         return new DesiredState(desiredStates, desiredBETags, walk.entityTags());
     }
 
-    /** Applies the world state for chunkPos at targetGameTime, transitioning from fromCommitId — the
-     * commit this chunk's live world currently reflects (callers must capture this via
-     * getChunkHeadId(chunkPos) before calling branch() for the same checkout) — resolving the target
-     * the same preferredCommitId-aware way as {@link #branch(ChunkPos, long, long)} (pass the same
-     * preferredCommitId to both calls for one checkout so they can never disagree on which commit
-     * the target actually is), and never overwriting a position isGlued reports true for (see
-     * item.TemporalGlueItem), leaving it exactly as the live world has it. */
+    /** Applies the world state for chunkPos at targetGameTime, transitioning from fromCommitId (the
+     * commit the live world currently reflects — capture via getChunkHeadId before calling branch()
+     * for the same checkout). Never overwrites a position isGlued reports true for. */
     public void applyChunkAtTime(ChunkPos chunkPos, long targetGameTime, long fromCommitId, ServerLevel level,
                                   long preferredCommitId, Predicate<BlockPos> isGlued) {
         DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
@@ -476,17 +421,11 @@ public class TemporalTimeline {
 
     /** Writes desired's resolved block states (and block-entity tags) into the live world.
      *
-     * <p>Positions are visited bottom-up ({@link ChunkSnapshot#BOTTOM_UP_ORDER}) in two passes
-     * instead of one raw, arbitrarily-ordered pass: the first pass writes every changed block with
-     * {@code UPDATE_KNOWN_SHAPE} set, which skips the recursive neighbor-shape/destroy cascade
-     * ({@code Level#setBlock} normally runs synchronously on every single write) and skips neighbor
-     * -changed notifications — so an about-to-be-restored support block (a wall under a torch, sand
-     * under sand) can never desync or get destroyed by a transient, mid-restore configuration that
-     * never actually existed. Only once every position in this chunk already holds its final state
-     * does the second pass fire the normal neighbor-shape and neighbor-changed updates, so gravity
-     * blocks, redstone, and attachment checks all evaluate against the real final result instead of
-     * an arbitrary partial one. This mirrors how vanilla's structure-template placement avoids the
-     * same cascade hazard. */
+     * <p>Two passes, bottom-up ({@link ChunkSnapshot#BOTTOM_UP_ORDER}): the first writes every
+     * changed block with {@code UPDATE_KNOWN_SHAPE}, skipping neighbor-shape/destroy cascades so a
+     * support block about to be restored can't desync against a transient mid-restore state. The
+     * second pass then fires normal neighbor updates once the chunk's final state is fully in
+     * place, mirroring how vanilla structure-template placement avoids the same hazard. */
     private void applyBlockStates(DesiredState desired, ServerLevel level, Predicate<BlockPos> isGlued) {
         List<BlockPos> positions = new ArrayList<>(desired.states().keySet());
         positions.removeIf(isGlued);
@@ -522,11 +461,8 @@ public class TemporalTimeline {
     }
 
     /** The energy cost of jumping chunkPos to targetGameTime from fromCommitId: costFn summed over
-     * every block position whose state would actually change (positions the target state already
-     * matches cost nothing). Read-only — same fromCommitId-capture rule as applyChunkAtTime.
-     * Resolves the target the same preferredCommitId-aware way as {@link #branch(ChunkPos, long, long)},
-     * and never charges for a glued position (see {@link #applyChunkAtTime(ChunkPos, long, long, ServerLevel, long, Predicate)}),
-     * since a jump will never actually touch it. */
+     * every block position whose state would actually change. Read-only; never charges for a
+     * glued position, since a jump will never touch it. */
     public long computeJumpCost(ChunkPos chunkPos, long targetGameTime, long fromCommitId, Level level,
                                  ToLongFunction<BlockState> costFn, long preferredCommitId, Predicate<BlockPos> isGlued) {
         DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
@@ -548,8 +484,7 @@ public class TemporalTimeline {
         for (TemporalCommit commit : commits) commitList.add(commit.toTag());
         tag.put("Commits", commitList);
 
-        // Persisted explicitly rather than re-derived by replaying Commits, since a free checkout
-        // can't be reconstructed from creation order alone.
+        // Persisted explicitly, since a free checkout can't be reconstructed from creation order alone.
         ListTag headList = new ListTag();
         for (Map.Entry<Long, Long> entry : chunkHeadId.entrySet()) {
             CompoundTag headTag = new CompoundTag();

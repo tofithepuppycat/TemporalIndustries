@@ -18,10 +18,9 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/** Container menu for the Loot Generator GUI: Chaos tank fill/capacity and roll progress packed
- * into {@link ContainerData} the same way as {@link io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu},
- * plus a 27-slot chest-sized inventory. The selected loot table id and its validity flag are read
- * straight off the block entity instead, since strings don't fit in {@code ContainerData}'s int slots. */
+/** Container menu for the Loot Generator GUI: Chaos tank fill/capacity, roll progress, and a
+ * 27-slot inventory. The selected loot table id and validity flag are read straight off the block
+ * entity, since strings don't fit in {@code ContainerData}'s int slots. */
 @SuppressWarnings("null")
 public class LootGeneratorMenu extends AbstractContainerMenu {
     private static final int SLOT_COUNT = 27;
@@ -134,9 +133,7 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
         return blockEntity.isSelectionValid();
     }
 
-    /** Items this table could plausibly produce, sampled server-side when the current roll started -
-     * used by {@link io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen}
-     * to spin through icons while the roll is in progress. */
+    /** Items this table could plausibly produce, sampled server-side when the current roll started. */
     public List<ItemStack> getPossibleItems() {
         return blockEntity.getPossibleItems();
     }

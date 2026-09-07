@@ -1,13 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.chronomap;
 
-/**
- * Shared chunk-area math: which (dx, dz) chunk offsets from an anchor chunk fall within a given
- * radius, under either a circular or a square {@link Shape}. Used by the Chronosphere's claim bounds
- * (square), the Portable Chrono Marker's area select (circle), the shared chunk-selection map grid
- * (see {@link io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid}), and
- * the chunk-thumbnail request handlers' server-side sampling/bounds checks, so the claimable shape,
- * the drawn/clickable grid, and the terrain actually sampled always agree.
- */
+/** Shared chunk-area math: which (dx, dz) chunk offsets from an anchor chunk fall within a given
+ * radius, under either a circular or square {@link Shape}. Keeps claim bounds, the selection grid,
+ * and terrain sampling all agreeing on the same shape. */
 public final class ChunkArea {
     private ChunkArea() {}
 
