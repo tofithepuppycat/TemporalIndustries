@@ -130,9 +130,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         syncToClients();
     }
 
-    // -------------------------------------------------------------------------
-    // Structure
-
     private BlockPos framePos() {
         return worldPosition.above();
     }
@@ -209,9 +206,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
             serverLevel.sendParticles(MISSING_FRAME_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Tick / transfer
 
     public static void tick(Level level, BlockPos pos, BlockState state, EntropicPylonBlockEntity be) {
         if (level.isClientSide) return;
@@ -344,7 +338,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return new Vector3f(pos.getX() + 0.5F, pos.getY() + 0.5F, pos.getZ() + 0.5F);
     }
 
-    // -------------------------------------------------------------------------
     // MachineFrameController - the pylon isn't itself an item/fluid container, only a router, so a
     // frame sitting on top of it exposes nothing to pipes/hoppers; a click just reports status.
 
@@ -378,9 +371,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
                 inputs.size(), outputs.size(), formedComponent), true);
         return InteractionResult.CONSUME;
     }
-
-    // -------------------------------------------------------------------------
-    // Sync
 
     private void syncToClients() {
         if (level != null && !level.isClientSide) {

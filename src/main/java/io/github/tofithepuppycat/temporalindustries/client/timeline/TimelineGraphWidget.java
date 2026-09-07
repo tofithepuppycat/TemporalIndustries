@@ -454,9 +454,6 @@ public final class TimelineGraphWidget {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Interaction
-
     /** @return true if the click landed inside the graph rect (consumed either as a node
      * selection or the start of a pan drag) — mirrors the graph area's isInGraphArea+onClick logic. */
     public boolean mouseClicked(double mouseX, double mouseY, int graphX, int graphY, int graphWidth, int graphHeight) {

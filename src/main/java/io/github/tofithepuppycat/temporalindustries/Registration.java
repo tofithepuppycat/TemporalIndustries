@@ -283,8 +283,6 @@ public class Registration {
                 .block(CHAOS_FLUID_BLOCK).bucket(CHAOS_BUCKET_ITEM);
     }
 
-    // --- Entropy Condenser ---
-
     public static final DeferredBlock<EntropyCondenser> ENTROPY_CONDENSER_BLOCK = BLOCKS.register("entropy_condenser",
             () -> new EntropyCondenser(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 

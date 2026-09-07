@@ -52,9 +52,6 @@ public final class TemporalUdpClient {
         INSTANCE = new TemporalUdpClient();
     }
 
-    // -------------------------------------------------------------------------
-    // Public API
-
     /**
      * Connects to the server's UDP endpoint. Should be called after the player
      * connects and the server communicates its UDP port via TCP.
@@ -73,9 +70,6 @@ public final class TemporalUdpClient {
     public static void setPayloadHandler(Consumer<byte[]> handler) {
         payloadHandler = handler;
     }
-
-    // -------------------------------------------------------------------------
-    // Internal
 
     private void connectInternal(String serverHost, int udpPort) {
         disconnectInternal();
@@ -110,9 +104,6 @@ public final class TemporalUdpClient {
         byte[] frame = UdpFrame.buildHandshakeReq(playerId);
         socket.send(new DatagramPacket(frame, frame.length, serverAddr));
     }
-
-    // -------------------------------------------------------------------------
-    // Receive loop
 
     private void receiveLoop() {
         byte[] buf = new byte[RECEIVE_BUFFER];
@@ -155,7 +146,6 @@ public final class TemporalUdpClient {
                 UdpSession session = inboundSessions.get(sessionId);
                 if (session == null) return;
 
-                // Send per-fragment ACK
                 byte[] ack = UdpFrame.buildAck(sessionId, fragIndex);
                 socket.send(new DatagramPacket(ack, ack.length, serverAddr));
 
@@ -186,9 +176,6 @@ public final class TemporalUdpClient {
             Minecraft.getInstance().execute(() -> handler.accept(decompressed));
         }
     }
-
-    // -------------------------------------------------------------------------
-    // Decompression
 
     private static byte[] decompress(byte[] compressed) {
         try {
