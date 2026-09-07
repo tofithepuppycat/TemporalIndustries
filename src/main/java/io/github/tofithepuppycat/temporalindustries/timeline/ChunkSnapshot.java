@@ -102,9 +102,6 @@ public final class ChunkSnapshot {
         return blockEntities;
     }
 
-    // -------------------------------------------------------------------------
-    // Capture
-
     public static ChunkSnapshot capture(ServerLevel level, ChunkPos chunkPos) {
         LevelChunk chunk = level.getChunk(chunkPos.x, chunkPos.z);
         LevelChunkSection[] chunkSections = chunk.getSections();
@@ -122,7 +119,6 @@ public final class ChunkSnapshot {
         return new ChunkSnapshot(chunkPos, level.getMinSection(), sections, blockEntities);
     }
 
-    // -------------------------------------------------------------------------
     // NBT — server-only; never sent over the network (clients already have the real blocks
     // synced through normal chunk data, so there's nothing for them to do with a full baseline).
 
@@ -169,7 +165,6 @@ public final class ChunkSnapshot {
         return new ChunkSnapshot(chunkPos, minSectionY, sections, blockEntities);
     }
 
-    // -------------------------------------------------------------------------
     // One 16x16x16 section: either a single uniform state (the common case for a real chunk —
     // deep stone, sky air, bedrock), or a palette + run-length encoding of all 4096 positions.
 

@@ -402,9 +402,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         energyStorage.consumeInternal(Math.min(feThisTick, energyStorage.getEnergyStored()));
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -554,9 +551,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     protected static long costOf(BlockState state) {
         return ItemEnergyCosts.getCost(state.getBlock()).orElse(0);
     }
-
-    // -------------------------------------------------------------------------
-    // Accessors for menus / packets
 
     @Override
     public long getPlacedGameTime()   { return placedGameTime; }

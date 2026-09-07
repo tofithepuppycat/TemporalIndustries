@@ -32,9 +32,6 @@ public final class UdpFrame {
 
     private UdpFrame() {}
 
-    // -------------------------------------------------------------------------
-    // Builders
-
     public static byte[] buildHandshakeReq(java.util.UUID playerUUID) {
         ByteBuffer buf = ByteBuffer.allocate(17).order(ByteOrder.BIG_ENDIAN);
         buf.put(TYPE_HANDSHAKE_REQ);
@@ -95,9 +92,6 @@ public final class UdpFrame {
         return buf.array();
     }
 
-    // -------------------------------------------------------------------------
-    // Readers
-
     public static byte frameType(byte[] data) {
         return data[0];
     }
@@ -106,7 +100,6 @@ public final class UdpFrame {
         return ByteBuffer.wrap(data, 1, data.length - 1).order(ByteOrder.BIG_ENDIAN);
     }
 
-    // CRC-32 over raw bytes (java.util.zip.CRC32)
     public static int crc32(byte[] data) {
         java.util.zip.CRC32 crc = new java.util.zip.CRC32();
         crc.update(data);

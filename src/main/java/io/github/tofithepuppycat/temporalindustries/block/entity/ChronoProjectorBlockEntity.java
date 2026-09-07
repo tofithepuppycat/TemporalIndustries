@@ -182,9 +182,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Tick
-
     public static void tick(Level level, BlockPos pos, BlockState state, ChronoProjectorBlockEntity be) {
         if (level.isClientSide) return;
 
@@ -488,9 +485,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return mod;
     }
 
-    // -------------------------------------------------------------------------
-    // Sync
-
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -512,9 +506,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // -------------------------------------------------------------------------
-    // NBT
 
     @Override
     protected void saveAdditional(CompoundTag tag, HolderLookup.Provider registries) {
