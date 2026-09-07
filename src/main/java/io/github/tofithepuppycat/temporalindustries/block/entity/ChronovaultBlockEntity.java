@@ -26,10 +26,8 @@ import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 
-/** Block entity for the Chronovault: holds per-machine energy/time state and reads/writes
- * the shared {@link TemporalTimeline} for its chunk. See {@link AbstractTimelineMachineBlockEntity}
- * for the logic shared with {@link ChronosphereBlockEntity} — a Chronovault is just a Chronosphere
- * whose jumps only ever move its own single chunk. */
+/** Block entity for the Chronovault: holds per-machine energy/time state and reads/writes the
+ * shared {@link TemporalTimeline} for its own single chunk. */
 public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     private static final int ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000;
@@ -61,7 +59,7 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
                 TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
                 ensureSnapshotted(worldData, timeline, serverLevel, chunkPos);
 
-                // Restore placedGameTime from the timeline if this is a reload
+                // Restore placedGameTime from the timeline on reload.
                 if (placedGameTime == UNSET_TIME) {
                     long earliest = timeline.getEarliestGameTimeForChunk(chunkPos);
                     if (earliest != -1L) {
@@ -88,11 +86,7 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         be.commonTick(level);
     }
 
-    /**
-     * Returns all commits relevant to this machine's chunk (commits touching it, plus its own
-     * branch markers), in chronological order. Used by the sync packet to send timeline data
-     * to the client. This machine only ever has one chunk, so chunkPos is ignored.
-     */
+    /** All commits relevant to this machine's chunk, in chronological order. chunkPos is ignored (one chunk only). */
     @Override
     public List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
         if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
@@ -102,11 +96,7 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         return timeline.getCommitsForChunk(getChunkPos());
     }
 
-    /**
-     * Returns commitId -> the id it locally forked from within this machine's chunk (see
-     * TemporalTimeline's class doc). Sent alongside getChunkCommits() so the client can lay out
-     * the timeline graph using this chunk's real branch topology instead of guessing from order.
-     */
+    /** commitId -> the id it locally forked from, so the client can lay out the graph by real branch topology. */
     @Override
     public Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos) {
         if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
@@ -116,8 +106,7 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         return timeline.getLocalParentsForChunk(getChunkPos());
     }
 
-    /** The commit this machine's chunk's live world currently reflects. Not always the last entry
-     * in getChunkCommits() — see {@link TemporalTimeline#branch}. */
+    /** The commit this machine's chunk's live world currently reflects; not always the last entry in getChunkCommits(). */
     @Override
     public long getChunkHeadId(@Nullable ChunkPos chunkPos) {
         if (level == null || level.isClientSide || level.getServer() == null) return -1L;

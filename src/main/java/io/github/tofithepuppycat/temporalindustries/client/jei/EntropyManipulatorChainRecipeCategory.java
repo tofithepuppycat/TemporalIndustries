@@ -15,14 +15,11 @@ import net.minecraft.network.chat.Component;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * JEI category for {@link EntropyManipulatorChain}: a whole transmutation chain laid out as a
- * horizontal row of item slots, with the chaos/order recipe cost connecting each adjacent pair
- * drawn as colored text above (forward) and below (backward) the gap between them. Supplements
- * {@link EntropyManipulatorRecipeCategory}, which still handles single-step "how do I make/use
- * this item" lookups; this category exists purely to visualize the full path at once.
+ * JEI category for {@link EntropyManipulatorChain}: a transmutation chain laid out as a horizontal
+ * row of item slots, with the chaos/order cost of each step drawn above/below the gap between them.
  */
 public class EntropyManipulatorChainRecipeCategory implements IRecipeCategory<EntropyManipulatorChain> {
-    /** Longest chain currently defined (netherrack->magma_block->obsidian->crying_obsidian->nether_star, etc). */
+    /** Longest chain currently defined. */
     private static final int MAX_ITEMS = 5;
     private static final int SLOT_SIZE = 18;
     private static final int SLOT_GAP = 4;

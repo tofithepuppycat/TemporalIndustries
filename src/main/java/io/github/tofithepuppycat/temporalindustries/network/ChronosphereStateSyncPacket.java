@@ -15,9 +15,8 @@ import java.util.List;
 import java.util.Set;
 
 /** Server -> client: a Chronosphere's current claimed/blocked chunk sets, for
- * {@link ChronosphereClientState}. Jump-cost preview is handled separately by the reused
- * Time Machine timeline packets (see TimelinePreviewSyncPacket), since the graph already shows a
- * cost per node. */
+ * {@link ChronosphereClientState}. Jump-cost preview is handled separately by the reused Time
+ * Machine timeline packets. */
 public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     public static final Type<ChronosphereStateSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_state_sync"));
@@ -29,8 +28,7 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final List<Long> selectedChunkKeys;
     private final List<Long> blockedChunkKeys;
     private final boolean autoTrackingEnabled;
-    /** How many of selectedChunkKeys are currently tracked (recording deltas) — see
-     * ChronosphereStateRequestPacket#sendStateSync. */
+    /** How many of selectedChunkKeys are currently tracked (recording deltas). */
     private final int trackedCount;
 
     public ChronosphereStateSyncPacket(BlockPos machinePos, List<Long> selectedChunkKeys,

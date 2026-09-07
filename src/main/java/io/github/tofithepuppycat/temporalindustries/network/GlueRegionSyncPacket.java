@@ -12,9 +12,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Server -> client: the full glued-region list for one dimension, for {@link GlueSelectionClientState}
- * — sent in reply to a {@link GlueRegionRequestPacket}, and immediately after any glue/unglue so
- * everyone currently in that dimension sees the change right away. */
+/** Server -> client: the full glued-region list for one dimension, sent in reply to a request
+ * or immediately after any glue/unglue change. */
 public class GlueRegionSyncPacket implements CustomPacketPayload {
     public static final Type<GlueRegionSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "glue_region_sync"));

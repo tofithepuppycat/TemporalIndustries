@@ -7,14 +7,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Renders and hit-tests a grid of chunk cells centred on an anchor chunk — the chunk selection map
- * originally built for the Chronosphere's claim overlay ({@link
- * io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}), extracted so the
- * Portable Chrono Marker's own area-select screen can present the exact same grid, colors-aside.
- * Purely layout/rendering/hit-testing; callers own what each cell actually means (claimed, blocked,
- * selected, terrain thumbnail, ...) via {@link CellPainter}.
- */
+/** Renders and hit-tests a grid of chunk cells centred on an anchor chunk, shared by the
+ * Chronosphere's claim overlay and the Portable Chrono Marker's area-select screen. Purely
+ * layout/rendering/hit-testing; callers own what each cell means via {@link CellPainter}. */
 public final class ChunkSelectionGrid {
     public static final int DEFAULT_CELL_SIZE = 32;
     public static final int CELL_GAP = 0;
@@ -52,10 +47,8 @@ public final class ChunkSelectionGrid {
         return shape.contains(radius, dx, dz);
     }
 
-    /** Draws every in-radius cell tinted/textured per {@code painter} — either a flat status color,
-     * or (once a terrain thumbnail is available) that terrain tinted translucently by status. Cells
-     * sit flush against each other with no border/gap, so once every cell has its terrain thumbnail
-     * the grid reads as one continuous map instead of a mosaic of separate tiles. */
+    /** Draws every in-radius cell tinted/textured per {@code painter}: a flat status color, or a
+     * terrain thumbnail tinted translucently by status once available. */
     public void render(GuiGraphics guiGraphics, int gridX, int gridY, ChunkPos anchor, CellPainter painter) {
         for (int row = 0; row < gridSize; row++) {
             for (int col = 0; col < gridSize; col++) {

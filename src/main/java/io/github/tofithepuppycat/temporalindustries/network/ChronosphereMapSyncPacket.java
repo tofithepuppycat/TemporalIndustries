@@ -35,8 +35,7 @@ public class ChronosphereMapSyncPacket implements CustomPacketPayload {
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereMapSyncPacket packet) {
         buf.writeBlockPos(packet.machinePos);
 
-        // Thumbnails are cheap to compute but not cheap to send raw (up to 121 chunks x 256 bytes
-        // each): deflate the same way TimelinePreviewSyncPacket does for its commit payload.
+        // Thumbnails are cheap to compute but not cheap to send raw (up to 121 chunks x 256 bytes each): deflate.
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.buffer());
         body.writeVarInt(packet.thumbnails.size());
         for (Map.Entry<Long, byte[]> entry : packet.thumbnails.entrySet()) {

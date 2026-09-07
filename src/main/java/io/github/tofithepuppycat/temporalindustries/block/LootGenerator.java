@@ -39,9 +39,7 @@ import java.util.List;
 @SuppressWarnings("null")
 public class LootGenerator extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    // Drives which front-face model is used: the animated texture while the surrounding
-    // MachineFrame multiblock is formed, or a static last-frame texture while it isn't - see
-    // LootGeneratorBlockEntity#checkStructure.
+    // Whether the surrounding MachineFrame multiblock is formed - see LootGeneratorBlockEntity#checkStructure.
     public static final BooleanProperty FORMED = BooleanProperty.create("formed");
 
     private static final MapCodec<LootGenerator> CODEC = simpleCodec(LootGenerator::new);
@@ -103,11 +101,8 @@ public class LootGenerator extends BaseEntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /** Opens the loot generator's GUI if its frame is already formed, otherwise auto-fills what it can
-     * from the player's inventory (without opening the GUI that same click, so completing the frame
-     * doesn't immediately throw the player into the menu) or highlights what's still missing. Shared
-     * by both a direct click on the controller and a click on one of its {@link MachineFrame}
-     * satellites forwarding here via its stored controller position. */
+    /** Opens the GUI if the frame is formed, otherwise auto-fills from the player's inventory or
+     * highlights what's missing. Shared by direct clicks and forwarded clicks from a {@link MachineFrame} satellite. */
     public static InteractionResult interact(Level level, BlockPos pos, LootGeneratorBlockEntity be, ServerPlayer serverPlayer) {
         if (be.checkStructure()) {
             serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));

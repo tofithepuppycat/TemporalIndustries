@@ -32,38 +32,22 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * Watches for a recording player's own block breaks/places and container item transfers, and
- * appends them to whichever of their Echo Records (see {@link EchoRecordItem}) is
- * currently recording — regardless of which item is actually in hand, since
- * {@link EchoRecordItem#inventoryTick} keeps sampling movement even while a pickaxe/hoe/etc.
- * is wielded.
- *
- * PLACE is captured via {@link BlockEvent.EntityPlaceEvent} rather than the right-click itself,
- * because only after placement do we know the block's actual resulting state (orientation,
- * connections, ...) and any block entity data it ended up with — the right-click is only used to
- * remember which item caused the placement (EntityPlaceEvent doesn't say).
- *
- * Container transfers (e.g. feeding a furnace, taking its output) aren't exposed as a per-slot
- * event by vanilla/NeoForge, so they're inferred: whichever container-capable block the player
- * last right-clicked is remembered, then the player's own inventory is snapshotted on
- * {@link PlayerContainerEvent.Open} and diffed against itself on {@link PlayerContainerEvent.Close}.
- * Items that vanished from the player's inventory during that GUI session were handed to the
- * container (INSERT); items that appeared were taken from it (EXTRACT).
- *
- * Ticks are keyed against the recording's own StartGameTime rather than its frame list size, so
- * ordering relative to inventoryTick within the same server tick doesn't matter.
+ * Watches a recording player's block breaks/places and container item transfers, appending them
+ * to whichever Echo Record ({@link EchoRecordItem}) is currently recording, regardless of what's
+ * in hand. PLACE is captured after the block actually lands (so its real resulting state and
+ * block entity data are known), while the preceding right-click is only used to remember which
+ * item caused it. Container transfers are inferred by diffing the player's inventory across a
+ * container GUI open/close, since there's no per-slot transfer event.
  */
 public final class ChronoActionRecorder {
     /** Mirrors EchoRecordItem's own cap so an action can never reference a tick beyond what
      * the recording could possibly retain. */
     private static final int MAX_FRAMES = 20 * 60;
 
-    /** player UUID -> the container-capable block they most recently right-clicked, consumed by
-     * the very next container-open on that player (see class doc). */
+    /** player UUID -> the container-capable block they most recently right-clicked. */
     private static final Map<UUID, BlockPos> PENDING_CONTAINER_POS = new HashMap<>();
 
-    /** player UUID -> the BlockItem stack they most recently right-clicked with, consumed by the
-     * very next EntityPlaceEvent for that player (see class doc). */
+    /** player UUID -> the BlockItem stack they most recently right-clicked with. */
     private static final Map<UUID, ItemStack> PENDING_PLACE_ITEM = new HashMap<>();
 
     private record OpenSession(BlockPos pos, long tick, Map<Item, Integer> inventorySnapshot) {}
@@ -75,7 +59,7 @@ public final class ChronoActionRecorder {
                                     @Nullable ResourceLocation item) {}
 
     /** player UUID -> the block state right before their most recent right-click, checked for a
-     * change at the end of the same server tick (see class doc / onServerTick). */
+     * change at the end of the same server tick. */
     private static final Map<UUID, ModifyCandidate> PENDING_MODIFY = new HashMap<>();
 
     private ChronoActionRecorder() {}
@@ -111,10 +95,8 @@ public final class ChronoActionRecorder {
 
     /**
      * Once per server tick, checks every block a recording player right-clicked that tick for
-     * whether its state actually changed — catching axe-stripping, hoe-tilling, honeycomb-waxing,
-     * and arbitrary modded right-click transforms (e.g. applying a Create casing to a shaft)
-     * generically, without needing a dedicated event for each one. A no-op right-click (nothing
-     * there worth recording) just falls out of the map unrecorded.
+     * whether its state actually changed, catching axe-stripping, hoe-tilling, and arbitrary
+     * modded right-click transforms generically without a dedicated event for each.
      */
     public static void onServerTick(ServerTickEvent.Post event) {
         if (PENDING_MODIFY.isEmpty()) return;
@@ -143,8 +125,8 @@ public final class ChronoActionRecorder {
         }
     }
 
-    /** Fires once the block a right-click BlockItem caused has actually been placed — this is where
-     * we learn its real resulting BlockState and any block entity data, see class doc. */
+    /** Fires once the block a right-click BlockItem caused has actually been placed, so its real
+     * resulting BlockState and any block entity data are known. */
     public static void onEntityPlace(BlockEvent.EntityPlaceEvent event) {
         if (!(event.getEntity() instanceof ServerPlayer player) || !(event.getLevel() instanceof ServerLevel level)) {
             return;
@@ -167,22 +149,10 @@ public final class ChronoActionRecorder {
     }
 
     /**
-     * Records the player melee-damaging a living entity, keyed off the final post-reduction damage
-     * (armor, enchantments, criticals all already applied) rather than the raw hit, so replay can
-     * just reapply that same number instead of recreating the whole combat calculation — see
-     * {@link ChronoRecording.ActionType#ATTACK}.
-     * <p>
-     * Only direct melee hits count ({@code getDirectEntity() == player}); projectiles and other
-     * indirect damage aren't attributed to an "attack" here. Players are excluded as targets so a
-     * replaying loop can never be used to automate PvP against someone who wasn't there when it was
-     * recorded.
-     * <p>
-     * The held item is whatever's in the main hand, vanilla or modded, with no allow-list — any
-     * melee weapon or tool that deals damage records the same way. A Sweeping Edge (or modded
-     * equivalent) swing that damages several entities fires this event once per entity hit, each
-     * producing its own ATTACK action at the same tick with that entity's own recorded position —
-     * see {@code ChronoProjectorBlockEntity#executeActions} for how replay keeps those from
-     * colliding onto a single target.
+     * Records the player melee-damaging a living, non-player entity, keyed off the final
+     * post-reduction damage so replay can just reapply that number instead of recomputing combat.
+     * Only direct melee hits count; players are excluded as targets so a replaying loop can't be
+     * used to automate PvP against someone who wasn't there when it was recorded.
      */
     public static void onLivingDamage(LivingDamageEvent.Post event) {
         if (!(event.getSource().getDirectEntity() instanceof ServerPlayer player)) return;

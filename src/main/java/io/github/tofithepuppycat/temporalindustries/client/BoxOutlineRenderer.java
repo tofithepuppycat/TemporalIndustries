@@ -3,13 +3,10 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix4f;
 
-/** Shared debug-quad box/outline drawing for in-world overlay renderers (see
- * {@link GlueSelectionRenderer} and {@code EntropyCondenserRangeRenderer}): a translucent fill plus a
- * thin edged outline for a camera-relative axis-aligned region, drawn onto {@link RenderType#debugQuads()}. */
+/** Shared debug-quad box/outline drawing for in-world overlay renderers: a translucent fill plus a
+ * thin edged outline for a camera-relative axis-aligned region. */
 public final class BoxOutlineRenderer {
-    /** Grows every rendered box outward by this much on every axis, so its faces never sit exactly
-     * on the same plane as a real block face — that exact coincidence causes z-fighting against
-     * world geometry at the region's boundary. */
+    /** Grows every rendered box outward by this much on every axis to avoid z-fighting with block faces. */
     public static final float SURFACE_OUTSET = 0.004F;
 
     private BoxOutlineRenderer() {}
@@ -32,10 +29,7 @@ public final class BoxOutlineRenderer {
                 outlineColor[0], outlineColor[1], outlineColor[2], outlineAlpha);
     }
 
-    /** Draws a box's 12 edges as thin boxes rather than GL lines, so they have real thickness
-     * regardless of view distance/GL line-width support. Each edge varies along exactly one axis
-     * (boxes here are always axis-aligned); the other two axes get inflated by thickness/2 on both
-     * sides to give it a square cross-section. */
+    /** Draws a box's 12 edges as thin boxes (rather than GL lines) so they have real thickness. */
     private static void outline(Matrix4f matrix, VertexConsumer buffer, float minX, float minY, float minZ,
                                  float maxX, float maxY, float maxZ, float thickness,
                                  float r, float g, float b, float a) {

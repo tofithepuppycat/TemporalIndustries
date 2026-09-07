@@ -45,13 +45,10 @@ import java.util.List;
 import static io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser.FACING;
 
 /**
- * Instantly absorbs (powered by FE) any {@link EntropyOrbEntity} orb inside a configurable cuboid
- * range that starts at the block's front face and extends outward, and condenses its value into
- * liquid Order/Chaos fluid across two internal tanks, per IDEAS.md's Entropy Condenser. Also has a
- * single input slot that slowly drains an Order/Chaos Cell into the same tanks, the same unpowered
- * way {@link CrudeEntropyCondenserBlockEntity} works, for topping tanks off by hand, and an output
- * slot that slowly fills any {@link io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle}
- * placed in it back out of the tanks.
+ * Instantly absorbs (powered by FE) any {@link EntropyOrbEntity} inside a configurable cuboid
+ * range extending outward from the block's front face, condensing its value into liquid
+ * Order/Chaos across two internal tanks. Also has an input slot that drains a cell into the tanks
+ * unpowered, and an output slot that fills a receptacle back out of the tanks.
  */
 @SuppressWarnings("null")
 public class EntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -83,8 +80,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
             return v;
         }
 
-        /** {@link #extractEnergy} is capped at 0 (external capability is receive-only), so
-         * condensing needs its own path to spend stored FE that isn't clamped by that cap. */
+        /** Condensing needs its own path to spend stored FE, since extractEnergy is capped at 0 (receive-only). */
         boolean consumeInternal(int amount, boolean simulate) {
             if (energy < amount) return false;
             if (!simulate) {
@@ -209,10 +205,8 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         be.fillOutput();
     }
 
-    /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face
-     * (per {@code facing}) and extending outward — not centered on the block itself. Public so the
-     * client can render its perimeter (see EntropyCondenserRangeRenderer) from the same geometry
-     * the server uses to catch orbs. */
+    /** The absorb cuboid: rangeXrangeXrange, starting flush against the block's front face and
+     * extending outward. Public so the client can render its perimeter using the same geometry. */
     public static AABB absorbArea(BlockPos pos, Direction facing, int range) {
         double cx = pos.getX() + 0.5;
         double cy = pos.getY() + 0.5;
@@ -266,8 +260,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         syncToClients();
     }
 
-    // Cell slot draining (unpowered; see CrudeEntropyCondenserBlockEntity for the same logic)
-
     private void drainCell() {
         ItemStack stack = items.get(CELL_SLOT);
         if (!(stack.getItem() instanceof EntropyReceptacle receptacle)) return;
@@ -282,8 +274,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         syncToClients();
     }
 
-    /** Moves up to {@link #CELL_DRAIN_PER_TICK} mB of {@code type} out of the cell and into its tank,
-     * capped by both the cell's contents and the tank's remaining space. Returns how much moved. */
+    /** Moves up to {@link #CELL_DRAIN_PER_TICK} mB of {@code type} from the cell into its tank. Returns how much moved. */
     private int drainInto(EntropyReceptacle receptacle, ItemStack stack, EntropyType type) {
         FluidTank tank = type == EntropyType.ORDER ? orderTank : chaosTank;
         int spaceInTank = tank.getCapacity() - tank.getFluidAmount();
@@ -296,8 +287,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         tank.fill(EntropyFluids.stack(type, drained), IFluidHandler.FluidAction.EXECUTE);
         return drained;
     }
-
-    // Output slot filling (unpowered; reverse of the cell slot draining above)
 
     /** Tries to push Order then Chaos out of the tanks into whatever {@link EntropyReceptacle} sits
      * in {@link #OUTPUT_SLOT}, up to {@link #OUTPUT_FILL_PER_TICK} of each per tick. */
@@ -313,8 +302,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
         syncToClients();
     }
 
-    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} mB from {@code tank} into whatever the receptacle
-     * accepts. Returns how much was actually accepted. */
+    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} mB from {@code tank} into the receptacle. Returns how much was accepted. */
     private int fillFrom(FluidTank tank, EntropyType type, ItemStack stack, EntropyReceptacle receptacle) {
         int available = Math.min(OUTPUT_FILL_PER_TICK, tank.getFluidAmount());
         if (available <= 0) return 0;
@@ -347,8 +335,6 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     public Packet<ClientGamePacketListener> getUpdatePacket() {
         return ClientboundBlockEntityDataPacket.create(this);
     }
-
-    // Container (cell input + output slots; see ChronoProjectorBlockEntity for why both this and IItemHandler exist)
 
     @Override public int getContainerSize() { return items.size(); }
     @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty() && items.get(OUTPUT_SLOT).isEmpty(); }

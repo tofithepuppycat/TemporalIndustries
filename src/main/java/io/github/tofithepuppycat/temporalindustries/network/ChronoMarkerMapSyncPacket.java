@@ -13,10 +13,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server -> client: terrain thumbnails for the Portable Chrono Marker's area-select map — see
- * {@link ChronoMarkerMapRequestPacket}. Mirrors {@link ChronosphereMapSyncPacket}'s wire format
- * (deflated payload, same reasoning) but keyed by a generic anchor chunk key rather than a
- * machine's BlockPos. */
+/** Server -> client: terrain thumbnails for the Portable Chrono Marker's area-select map, keyed by
+ * a generic anchor chunk key rather than a machine's BlockPos. Payload is deflated on the wire. */
 public class ChronoMarkerMapSyncPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerMapSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_map_sync"));
@@ -35,8 +33,7 @@ public class ChronoMarkerMapSyncPacket implements CustomPacketPayload {
     public static void encode(RegistryFriendlyByteBuf buf, ChronoMarkerMapSyncPacket packet) {
         buf.writeLong(packet.anchorKey);
 
-        // Thumbnails are cheap to compute but not cheap to send raw: deflate the same way
-        // ChronosphereMapSyncPacket does for its own thumbnail payload.
+        // Thumbnails are cheap to compute but not cheap to send raw: deflate the payload.
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.buffer());
         body.writeVarInt(packet.thumbnails.size());
         for (Map.Entry<Long, byte[]> entry : packet.thumbnails.entrySet()) {

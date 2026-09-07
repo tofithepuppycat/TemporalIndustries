@@ -27,8 +27,7 @@ public final class ChronosphereClientState {
         }
     }
 
-    /** Unconditionally drops all client-side state — see {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager#clearAll()}
-     * for why this needs to happen on world/server disconnect rather than only per-machine. */
+    /** Unconditionally drops all client-side state; called on world/server disconnect. */
     public static void clearAll() {
         activeMachinePos = null;
         selectedChunks = new HashSet<>();
@@ -62,14 +61,13 @@ public final class ChronosphereClientState {
         return selectedChunks.size();
     }
 
-    /** Every claimed chunk's packed key, as last synced from the server — used to build the
-     * Chronosphere GUI's per-chunk timeline tabs. */
+    /** Every claimed chunk's packed key, used to build the Chronosphere GUI's per-chunk timeline tabs. */
     public static Set<Long> getSelectedChunks() {
         return selectedChunks;
     }
 
-    /** How many of the claimed chunks are currently tracked (recording deltas) — may be less than
-     * getSelectedCount() when auto-tracking is off. */
+    /** How many claimed chunks are currently tracked; may be less than getSelectedCount() when
+     * auto-tracking is off. */
     public static int getTrackedCount() {
         return trackedCount;
     }

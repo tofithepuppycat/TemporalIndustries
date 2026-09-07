@@ -40,23 +40,19 @@ import java.util.function.Predicate;
 
 /**
  * Shared logic between {@link ChronovaultBlockEntity} (one tracked chunk) and
- * {@link ChronosphereBlockEntity} (up to 25, sharing one energy pool) — the two differ only in how
- * many chunks a jump touches ({@link #getAllChunks()}) and in their energy pool size; everything
- * else (energy storage plumbing, the placed/selected game time clamp, periodic re-snapshotting,
- * jump/checkout, and the NBT for all of the above) was previously duplicated line-for-line across
- * both block entities, so every fix to one had to be repeated by hand in the other.
+ * {@link ChronosphereBlockEntity} (up to 25, sharing one energy pool). Subclasses only differ in
+ * how many chunks a jump touches ({@link #getAllChunks()}) and energy pool size; everything else
+ * (energy storage, game time clamping, re-snapshotting, jump/checkout, NBT) lives here.
  */
 @SuppressWarnings("null")
 public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         implements net.minecraft.world.MenuProvider, TimelineViewProvider, EntropyInfoProvider {
     protected static final long UNSET_TIME = -1L;
 
-    /** Entropy is a balance between ORD (0, order) and CHS ({@link #ENTROPY_MAX}, chaos), starting
-     * centered, physically backed by two FluidTanks whose contents always sum to ENTROPY_MAX (1 mB
-     * = 1 entropy unit — see orderTank/chaosTank). Per IDEAS.md, a machine drifts toward chaos while
-     * its selected view sits away from the present and settles back toward balance once it's caught
-     * up. Away-from-balance entropy raises jump FE cost and autotracking's per-tick FE drain, and a
-     * successful jump itself shifts the bar: past adds chaos, future adds order. */
+    /** Entropy is a balance between order (0) and chaos ({@link #ENTROPY_MAX}), backed by two
+     * FluidTanks whose contents always sum to ENTROPY_MAX. It drifts toward chaos while the
+     * selected view sits away from the present, raising jump cost and autotrack drain; a jump
+     * into the past adds chaos, into the future adds order. */
     public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
     private static final int ENTROPY_DRIFT_INTERVAL_TICKS = 20; // 1 second
@@ -68,10 +64,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
-    /** Whether this machine is currently recording DELTA commits for the chunks getAllChunks()
-     * returns. Subclasses pick their own default: off for a Chronosphere (an idle claim shouldn't
-     * silently accumulate history until the player opts in), on for a Chronovault (it only ever
-     * has its own placed chunk, so there's no idle-claim concern). */
+    /** Whether this machine is recording DELTA commits for getAllChunks(). Defaults off for a
+     * Chronosphere, on for a Chronovault. */
     protected boolean autoTrackingEnabled = false;
 
     private final class MachineFluidHandler implements IFluidHandler {
@@ -89,9 +83,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             return tank == 0 ? orderTank.isFluidValid(stack) : chaosTank.isFluidValid(stack);
         }
 
-        /** Filling one tank always displaces the same amount out of the other, so
-         * orderTank+chaosTank stays fixed at ENTROPY_MAX — the pair is a balance register, not two
-         * independent resource pools. */
+        /** Filling one tank displaces the same amount from the other, keeping orderTank+chaosTank fixed at ENTROPY_MAX. */
         @Override public int fill(FluidStack resource, FluidAction action) {
             if (orderTank.isFluidValid(resource)) {
                 int accepted = Math.min(resource.getAmount(), chaosTank.getFluidAmount());
@@ -108,8 +100,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             return 0;
         }
 
-        /** Draining one tank grows the other by the same amount, for the same fixed-sum reason as
-         * {@link #fill}. */
+        /** Draining one tank grows the other by the same amount, same fixed-sum invariant as {@link #fill}. */
         @Override public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
             if (!orderTank.getFluid().isEmpty() && orderTank.getFluid().getFluid().isSame(resource.getFluid())) {
                 return drainOrder(resource.getAmount(), action);
@@ -155,8 +146,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     };
     private final MachineFluidHandler fluidHandler = new MachineFluidHandler();
 
-    /** Named (rather than anonymous) so a jump's own cost can be deducted directly, bypassing the
-     * maxExtract cap that only throttles external cables/pipes pulling power out through the capability. */
+    /** Named so a jump's own cost can be deducted directly, bypassing the maxExtract cap that only throttles external capability access. */
     private final class MachineEnergyStorage extends EnergyStorage {
         MachineEnergyStorage(int capacity, int transfer) {
             super(capacity, transfer, transfer);
@@ -228,8 +218,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return data;
     }
 
-    /** The logical order/chaos balance scalar — 0 is pure order, {@link #ENTROPY_MAX} pure chaos.
-     * Always equal to the chaos tank's fill, since orderTank+chaosTank is held fixed at ENTROPY_MAX. */
+    /** Order/chaos balance scalar: 0 is pure order, {@link #ENTROPY_MAX} pure chaos. */
     public int getEntropy() { return chaosTank.getFluidAmount(); }
 
     public IFluidHandler getFluidHandler() { return fluidHandler; }
@@ -245,8 +234,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override public int getEntropyBalance() { return getEntropy(); }
     @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
 
-    /** Mirrors {@link #driftEntropy}'s direction (drift is server-only, but placed/selected game
-     * time and entropy are synced, so the client can recompute the same target without ticking). */
+    /** Mirrors {@link #driftEntropy}'s direction so the client can recompute the target without ticking. */
     @Override
     public float getEntropyRatePerSecond() {
         if (level == null) return 0f;
@@ -256,10 +244,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return Integer.signum(target - entropy) * ENTROPY_DRIFT_STEP / 100f;
     }
 
-    /** Transfers up to |delta| units from order to chaos (delta > 0) or chaos to order (delta < 0),
-     * clamped so neither tank leaves [0, ENTROPY_MAX]. Every entropy mutation (drift, jump, fluid
-     * I/O) funnels through here or {@link MachineFluidHandler} so the orderTank+chaosTank==ENTROPY_MAX
-     * invariant is enforced in one place. */
+    /** Transfers up to |delta| units from order to chaos (delta > 0) or vice versa, clamped to [0, ENTROPY_MAX]. */
     private void shiftEntropyToward(int delta) {
         if (delta == 0) return;
         int current = getEntropy();
@@ -276,23 +261,20 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         syncToClients();
     }
 
-    /** Jump FE cost multiplier: 1x when balanced, rising to 1+{@link #ENTROPY_COST_SCALE} at either
-     * extreme — symmetric, so neither pure-order nor pure-chaos is favored for jump cost. */
+    /** Jump FE cost multiplier: 1x when balanced, rising to 1+{@link #ENTROPY_COST_SCALE} at either extreme. */
     private double jumpCostMultiplier() {
         double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
         return 1.0 + ENTROPY_COST_SCALE * distance;
     }
 
-    /** Every chunk a jump on this machine moves together — one for a Time Machine, up to 25 for a
-     * Chronosphere. Home/primary chunk first. */
+    /** Every chunk a jump on this machine moves together, home/primary chunk first. */
     public abstract List<ChunkPos> getAllChunks();
 
     public boolean isAutoTrackingEnabled() {
         return autoTrackingEnabled;
     }
 
-    /** Flips auto-tracking, immediately (un)tracking every chunk getAllChunks() returns so
-     * recording starts/stops right away rather than waiting for the next onLoad(). */
+    /** Flips auto-tracking, immediately (un)tracking every chunk getAllChunks() returns. */
     public void setAutoTrackingEnabled(boolean enabled) {
         if (enabled == autoTrackingEnabled) return;
         autoTrackingEnabled = enabled;
@@ -312,19 +294,15 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         syncToClients();
     }
 
-    /** A chunk with no commits yet (freshly claimed/placed, or claimed-but-never-touched across a
-     * restart) gets a full baseline instead of waiting for its first delta — see ChunkSnapshot's
-     * class doc for why ancestryChain needs one of these to exist. */
+    /** A chunk with no commits yet gets a full baseline instead of waiting for its first delta. */
     protected static void ensureSnapshotted(TemporalWorldData worldData, TemporalTimeline timeline, ServerLevel serverLevel, ChunkPos chunkPos) {
         if (!timeline.getCommitsForChunk(chunkPos).isEmpty()) return;
         timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
         worldData.setDirty();
     }
 
-    /** Wipes every chunk getAllChunks() returns of its recorded history and re-baselines each from
-     * its current live state, without changing a single block — the world stays exactly as it is,
-     * there's just nothing left to jump back to until new history accumulates from here. Also
-     * resets placed/selected game time to now, same as if the machine had just been placed. */
+    /** Wipes recorded history for every chunk getAllChunks() returns and re-baselines from current
+     * live state (no blocks change). Also resets placed/selected game time to now. */
     public void deleteAllHistory() {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
 
@@ -343,18 +321,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         syncToClients();
     }
 
-    // -------------------------------------------------------------------------
-    // Tick — normally just first-placement initialisation, no block scanning; the one deliberate
-    // exception is the rare re-snapshot check below, which trades a bounded once-a-minute full
-    // chunk read (per claimed chunk) for keeping every other history walk cheap for the rest of
-    // that minute.
-
     private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
 
     /** Clamps placed/selected game time and, once a minute, re-snapshots any claimed chunk whose
-     * history has drifted far enough from its last baseline — called from each subclass's static
-     * {@code tick} entrypoint (kept per-subclass only because BlockEntityTicker needs a concrete
-     * type to bind to at registration). */
+     * history has drifted far enough from its last baseline. Called from each subclass's static tick entrypoint. */
     protected final void commonTick(Level level) {
         if (placedGameTime == UNSET_TIME) {
             placedGameTime = level.getGameTime();
@@ -381,8 +351,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
     }
 
-    /** Ticks entropy one step toward chaos while the selected view is behind the present, or one
-     * step back toward balance once it's caught up — see the ENTROPY_MAX field javadoc. */
+    /** Ticks entropy one step toward chaos while the selected view is behind the present, or back toward balance once caught up. */
     private void driftEntropy(long now) {
         int target = selectedGameTime < now ? ENTROPY_MAX : ENTROPY_BALANCED;
         int entropy = getEntropy();
@@ -392,10 +361,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         shiftEntropyToward(step);
     }
 
-    /** Constant per-tick FE drain while auto-tracking is on, scaled by how far entropy sits from
-     * balance — charged every tick, not just on the drift interval. Skips (rather than disabling
-     * tracking) when energy is insufficient, so a starved machine keeps recording history instead of
-     * silently losing it. */
+    /** Per-tick FE drain while auto-tracking is on, scaled by distance from entropy balance. Skips
+     * (rather than disabling tracking) when energy is insufficient, so history keeps recording. */
     private void drainAutoTrackingEnergy() {
         double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
         int feThisTick = (int) Math.round(AUTOTRACK_BASE_FE_PER_TICK + AUTOTRACK_ENTROPY_SCALE * distance);
@@ -424,10 +391,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    /** Skips chunks the world isn't currently tracking (auto-tracking off, for a Chronosphere; or
-     * a Time Machine that hasn't finished its first onLoad() yet) so this timer can't manufacture a
-     * commit on its own — untracked chunks must only accumulate history the player explicitly
-     * recorded. */
+    /** Skips chunks the world isn't currently tracking, so this timer can't manufacture a commit
+     * on its own; untracked chunks only accumulate history the player explicitly recorded. */
     private void maybeResnapshot(ServerLevel serverLevel) {
         MinecraftServer server = serverLevel.getServer();
         if (server == null) return;
@@ -443,10 +408,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Jump / rollback — shared by every TimelineViewProvider implementation, since a Time Machine
-    // is just a Chronosphere whose getAllChunks() always returns a single chunk.
-
     @Override
     public JumpResult jump(long targetGameTime, long targetCommitId) {
         if (level == null || level.isClientSide) return JumpResult.SUCCESS;
@@ -458,8 +419,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         setSelectedGameTime(targetGameTime, TemporalCommit.NO_PREFERRED_COMMIT, applyToWorld);
     }
 
-    /** Same as {@link #setSelectedGameTime(long, boolean)}, but see {@link #jump(long, long)} for
-     * what targetCommitId is for. */
+    /** Same as {@link #setSelectedGameTime(long, boolean)}, with an explicit target commit id. */
     public JumpResult setSelectedGameTime(long targetGameTime, long targetCommitId, boolean applyToWorld) {
         if (level == null || level.isClientSide) return JumpResult.SUCCESS;
 
@@ -475,9 +435,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return result;
     }
 
-    /** Read-only total cost of jumping every chunk getAllChunks() returns to targetGameTime from
-     * its current head, including the current entropy-based multiplier — kept in sync with
-     * {@link #applyTimelineView} so a previewed cost never diverges from what's actually charged. */
+    /** Read-only total cost of jumping every chunk to targetGameTime, including the entropy
+     * multiplier; kept in sync with {@link #applyTimelineView} so previews never diverge. */
     public long computeTotalJumpCost(long targetGameTime, long targetCommitId) {
         if (level == null || level.getServer() == null) return 0L;
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
@@ -494,13 +453,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return Math.round(total * jumpCostMultiplier());
     }
 
-    /** Checks out targetGameTime for every chunk getAllChunks() returns and applies it to the live
-     * world, paying the combined jump cost (scaled by {@link #jumpCostMultiplier()}) from the energy
-     * pool first. Does nothing but return INSUFFICIENT_ENERGY (and play a denial sound) if there
-     * isn't enough energy stored — callers with a player to notify (see RollbackChunkPacket) turn
-     * that into a chat message. On success, shifts entropy toward chaos for a jump into the past
-     * (targetGameTime before what was previously selected) or toward order for a jump into the
-     * future. */
+    /** Checks out targetGameTime for every chunk and applies it to the live world, paying the
+     * combined jump cost from the energy pool first; returns INSUFFICIENT_ENERGY without acting if
+     * underfunded. On success, shifts entropy toward chaos for a jump into the past, order for the future. */
     public JumpResult applyTimelineView(long targetGameTime, long targetCommitId, long previousSelectedGameTime) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
 
@@ -509,16 +464,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         TemporalTimeline timeline = worldData.getTimeline(dimension);
         if (timeline == null) return JumpResult.SUCCESS;
 
-        // Block changes since the last periodic flush (TemporalChangeListener, every 20 ticks) sit
-        // uncommitted in TemporalWorldData's pending-delta buffer, invisible to the commit graph a
-        // rollback walks. Without flushing first, a block placed moments ago could be skipped
-        // entirely by the jump below instead of being undone.
+        // Flush pending deltas first, or a block placed moments ago could be skipped by the jump below.
         worldData.flushPendingDeltas(level.getGameTime());
 
         List<ChunkPos> chunks = getAllChunks();
         Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
 
-        // Capture every chunk's head before branch() can move any of them.
+        // Capture every chunk's head before branch() moves any of them.
         long[] previousHeads = new long[chunks.size()];
         long totalCost = 0L;
         for (int i = 0; i < chunks.size(); i++) {
@@ -557,10 +509,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     public long getSelectedGameTime() { return selectedGameTime; }
 
-    // -------------------------------------------------------------------------
-    // NBT — only energy + per-machine time values; the timeline itself lives in TemporalWorldData.
-    // Subclasses call super then add their own fields (Chronosphere: auto-tracking + claimed chunks).
-
+    // NBT: only energy + per-machine time values; the timeline itself lives in TemporalWorldData.
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
@@ -583,14 +532,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
             chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
         } else if (tag.contains("Entropy")) {
-            // Pre-rework save: entropy was a plain 0-1000 int. Rescale x10 into the new 0-10000
-            // tanks instead of resetting an existing world's machines back to 50/50.
+            // Pre-rework save: entropy was a plain 0-1000 int. Rescale x10 into the new 0-10000 tanks.
             int legacyChaos = (int) Math.clamp(tag.getInt("Entropy") * 10L, 0L, (long) ENTROPY_MAX);
             orderTank.setFluid(new FluidStack(Registration.ORDER_FLUID.get(), ENTROPY_MAX - legacyChaos));
             chaosTank.setFluid(new FluidStack(Registration.CHAOS_FLUID.get(), legacyChaos));
         }
-        // Absent (pre-existing save from before this tag existed) leaves the subclass constructor's
-        // default in place, so old Chronospheres stay off and old Chronovaults stay always-on.
+        // Absent means a pre-existing save; leave subclass constructor's default in place.
         if (tag.contains("AutoTrackingEnabled")) autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
     }
 }

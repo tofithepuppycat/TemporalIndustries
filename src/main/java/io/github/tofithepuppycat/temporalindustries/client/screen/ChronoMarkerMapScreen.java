@@ -23,18 +23,12 @@ import java.util.List;
 import java.util.Set;
 
 /**
- * Standalone (non-container) screen for the Portable Chrono Marker's sneak-right-click area select:
- * the same {@link ChunkSelectionGrid} the Chronosphere's claim overlay uses, letting the player pick
- * exactly which chunks around them make up the marker's custom shape. Opened directly via
- * {@link #open}, not through a container menu, since there's no block/BlockEntity backing this
- * item's action.
+ * Standalone (non-container) screen for the Portable Chrono Marker's sneak-right-click area select,
+ * using {@link ChunkSelectionGrid} to let the player pick which chunks form the marker's shape.
+ * Opened directly via {@link #open} since there's no block/BlockEntity backing this item's action.
  *
- * <p>This screen only ever saves a selection onto the item (see {@link PortableChronoMarkerItem#saveOffsets}) —
- * it never marks by itself. Only a plain right-click with the marker actually records a save point,
- * using whatever shape was last saved here (or the fixed default square, if nothing has been saved
- * yet). Selection lives entirely client-side until "Save" is pressed — unlike the Chronosphere's
- * claim map, there's no persistent server-side claim that other players/screens need to stay in sync
- * with, so nothing is sent to the server until the player confirms (see {@link ChronoMarkerSaveSelectionPacket}).
+ * <p>Only saves a selection onto the item; a plain right-click with the marker is what actually
+ * records a save point. Selection stays client-side until "Save" is pressed.
  */
 @SuppressWarnings("null")
 public class ChronoMarkerMapScreen extends Screen {
@@ -50,23 +44,19 @@ public class ChronoMarkerMapScreen extends Screen {
     private static final int COLOR_SELECTED = 0xFF3D9BE0;
     private static final int COLOR_AVAILABLE = 0xFFAFAFAF;
 
-    /** How often the map re-fetches terrain thumbnails while open, matching the Chronosphere claim
-     * map's own refresh interval. */
+    /** How often the map re-fetches terrain thumbnails while open. */
     private static final int MAP_SYNC_INTERVAL_TICKS = 100;
     private static final int BUTTON_WIDTH = 76;
     private static final int BUTTON_HEIGHT = 20;
     private static final int BUTTON_GAP = 3;
 
-    /** 15px cells rather than the grid's 32px default: at MAP_RADIUS_CHUNKS=5 (matching the
-     * Chronosphere's own claim radius) the map is 11 cells across, and only this size keeps the
-     * grid inside the 256px panel alongside the title and footer/buttons below it. */
+    /** 15px cells rather than the grid's 32px default, so the grid fits inside the 256px panel. */
     private static final int GRID_CELL_SIZE = 15;
     private static final ChunkSelectionGrid GRID = new ChunkSelectionGrid(PortableChronoMarkerItem.MAP_RADIUS_CHUNKS,
             PortableChronoMarkerItem.MAP_SHAPE, GRID_CELL_SIZE);
 
     private final ChunkPos anchor;
-    /** Chunk keys currently chosen for marking — always contains the anchor chunk, which can't be
-     * deselected (mirrors the Chronosphere claim map's home chunk). */
+    /** Chunk keys currently chosen for marking; always contains the anchor chunk, which can't be deselected. */
     private final Set<Long> selected = new LinkedHashSet<>();
 
     private int leftPos;
@@ -132,11 +122,8 @@ public class ChronoMarkerMapScreen extends Screen {
         return false;
     }
 
-    /** The base {@link Screen#renderBackground} applies the vanilla world-blur post-process behind
-     * the GUI (see {@code Screen#renderBlurredBackground}); {@link net.minecraft.client.gui.screens.inventory.AbstractContainerScreen}
-     * (what ChronosphereScreen extends) overrides this to skip that entirely and just dim the world,
-     * which is why its claim map never looks blurred. This screen isn't a container, so it has to
-     * opt out the same way explicitly to match. */
+    /** Skips the vanilla world-blur post-process, just dimming the world instead, to match
+     * {@link net.minecraft.client.gui.screens.inventory.AbstractContainerScreen}'s behavior. */
     @Override
     public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(guiGraphics);

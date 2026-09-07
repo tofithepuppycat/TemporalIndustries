@@ -103,8 +103,8 @@ import net.neoforged.neoforge.registries.NeoForgeRegistries;
 @SuppressWarnings("null")
 public class Registration {
 
-    // "Echo"-prefixed items get a dark cyan name; "Chrono"-prefixed items reuse vanilla EPIC (light purple).
-    // See META-INF/enumextensions.json - the -1 is a placeholder for Rarity's id param, which FML fills in with the ordinal.
+    // "Echo"-prefixed items get a dark cyan name; "Chrono"-prefixed items reuse vanilla EPIC.
+    // -1 is a placeholder for Rarity's id param; FML fills it in with the ordinal (see enumextensions.json).
     public static final EnumProxy<Rarity> ECHO_RARITY = new EnumProxy<>(Rarity.class, -1, MODID + ":echo", ChatFormatting.DARK_AQUA);
 
     public static final DeferredRegister.Blocks BLOCKS = DeferredRegister.createBlocks(MODID);
@@ -122,9 +122,8 @@ public class Registration {
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
     public static final DeferredRegister<ParticleType<?>> PARTICLE_TYPES = DeferredRegister.create(Registries.PARTICLE_TYPE, MODID);
 
-    /** Static, colorable spark used for the entropic pylon's transfer bolt - see
-     * {@link io.github.tofithepuppycat.temporalindustries.client.TransmitSparkParticle} for why this
-     * needed its own type rather than reusing vanilla's {@code ENTITY_EFFECT} (which drifts upward). */
+    /** Static, colorable spark for the entropic pylon's transfer bolt; needs its own type since
+     * vanilla's {@code ENTITY_EFFECT} drifts upward. */
     public static final DeferredHolder<ParticleType<?>, ParticleType<ColorParticleOption>> TRANSMIT_SPARK =
             PARTICLE_TYPES.register("transmit_spark", () -> new ParticleType<ColorParticleOption>(false) {
                 @Override
@@ -167,8 +166,8 @@ public class Registration {
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
 
-    // --- Entropy Glasses: no defense, lets the wearer see EntropyInfoProvider block entities' state.
-    // Not wearable as vanilla armor - only in Curios' head slot (see compat/curios/CuriosCompat). ---
+    // Entropy Glasses: lets the wearer see EntropyInfoProvider block entities' state; no defense,
+    // worn only in Curios' head slot rather than as vanilla armor.
 
     public static final DeferredItem<Item> ENTROPY_GLASSES_ITEM = ITEMS.register("entropy_glasses",
             () -> new EntropyGlassesItem(new Item.Properties().stacksTo(1)));
@@ -194,9 +193,8 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> BOTTLE_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "bottle_contents", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
-    // --- Temporal Anchor order tank/mode, a cell's selected transfer step, and Temporal Glue's
-    // sub-durability charge progress ---
-    // all reuse BottleContents (a plain persistent+networked int wrapper) rather than adding new records.
+    // Temporal Anchor's order tank/mode, a cell's transfer step, and Temporal Glue's charge progress
+    // all reuse BottleContents (a plain persistent+networked int wrapper) rather than new records.
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_ORDER = DATA_COMPONENTS.registerComponentType(
             "anchor_order", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
@@ -403,11 +401,8 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ENTROPIC_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropic_pylon",
             () -> BlockEntityType.Builder.of(EntropicPylonBlockEntity::new, ENTROPIC_PYLON_BLOCK.get()).build(null));
 
-    // Assigned as a side effect of CHAOS_PYLON_BLOCK_ENTITY/ORDER_PYLON_BLOCK_ENTITY's own registration
-    // below - the factory lambda passed to BlockEntityType.Builder.of needs the type it's building for,
-    // but referencing the DeferredHolder field being initialized from within its own initializer is a
-    // compile error, so a plain mutable field stands in; it's populated before any block entity is
-    // actually constructed in-game.
+    // Stand-in for the DeferredHolder below: the builder lambda needs its own type, but referencing
+    // the field being initialized from within its own initializer is a compile error.
     private static BlockEntityType<EntropicPylonBlockEntity> chaosPylonBlockEntityType;
     private static BlockEntityType<EntropicPylonBlockEntity> orderPylonBlockEntityType;
 
