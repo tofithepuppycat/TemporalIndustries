@@ -21,14 +21,8 @@ import java.util.function.Consumer;
 import java.util.zip.Inflater;
 
 /**
- * UDP client for receiving bulk temporal data from the server.
- *
- * The server UDP port is communicated via the normal Minecraft TCP channel
- * (a future ServerUdpInfoPacket S2C packet). Once connected, the client sends
- * a HANDSHAKE_REQ so the server knows its address, then listens for DATA_FRAGs.
- *
- * On full reassembly, the inflated payload is handed to a registered handler
- * (e.g., the global rollback applicator).
+ * UDP client for receiving bulk temporal data from the server. Sends a HANDSHAKE_REQ once connected,
+ * listens for DATA_FRAGs, and hands the reassembled/inflated payload to a registered handler.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class TemporalUdpClient {
@@ -52,10 +46,7 @@ public final class TemporalUdpClient {
         INSTANCE = new TemporalUdpClient();
     }
 
-    /**
-     * Connects to the server's UDP endpoint. Should be called after the player
-     * connects and the server communicates its UDP port via TCP.
-     */
+    /** Connects to the server's UDP endpoint; call after the server communicates its UDP port via TCP. */
     public static void connect(String serverHost, int udpPort) {
         if (INSTANCE == null) return;
         INSTANCE.connectInternal(serverHost, udpPort);

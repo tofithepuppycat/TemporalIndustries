@@ -26,9 +26,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Shared skeleton for the Decay/Despawn Accelerator generators: a single input slot, a tick-driven
- * progress counter, and on completion the item is consumed and one {@link EntropyOrbEntity} is
- * spawned. Subclasses just decide whether a stack may be accepted and how much entropy it's worth.
+ * Shared skeleton for the Decay/Despawn Accelerator generators: single input slot, tick-driven
+ * progress counter, consumes the item and spawns one {@link EntropyOrbEntity} on completion.
  */
 @SuppressWarnings("null")
 public abstract class AbstractAcceleratorBlockEntity extends BlockEntity implements Container, MenuProvider {

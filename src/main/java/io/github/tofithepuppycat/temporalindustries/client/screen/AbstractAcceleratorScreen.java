@@ -8,9 +8,8 @@ import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Shared "no dedicated art" placeholder GUI for the Decay/Despawn Accelerator screens, same flat-fill
- * approach as {@link CrudeEntropyCondenserScreen}: an input slot and a progress bar tinted by the
- * generator's entropy color, filled proportionally as the current item cooks down.
+ * Shared flat-fill placeholder GUI for the Decay/Despawn Accelerator screens: an input slot and a
+ * progress bar tinted by the entropy color, filled proportionally as the item cooks down.
  */
 @SuppressWarnings("null")
 public abstract class AbstractAcceleratorScreen<T extends AbstractAcceleratorMenu> extends AbstractContainerScreen<T> {

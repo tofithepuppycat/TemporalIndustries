@@ -8,17 +8,11 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.material.MapColor;
 
 /**
- * Samples a chunk's surface into a small grid of packed vanilla map-color bytes (same
- * {@code (colorId << 2) | brightness} encoding {@link MapColor#getPackedId} produces, so the
- * client can decode with {@link MapColor#getColorFromPackedId}) — used to paint an actual terrain
- * thumbnail behind the Chronosphere's chunk-claim map instead of a flat colored square.
- *
- * <p>This is a simplified, GUI-scaled port of {@code MapItem#update}'s column-sampling loop
- * (full-resolution, one sample per block, no scale/multiset averaging — a claim-map cell doesn't
- * need vanilla's zoomed-out multi-chunk-per-pixel averaging) rather than routing through the real
- * {@link net.minecraft.world.level.saveddata.maps.MapItemSavedData}/{@code MapRenderer} pipeline,
- * which is built around a player physically holding a numbered map item and isn't practical to
- * stand up for a transient GUI overlay covering up to 121 chunks at once.
+ * Samples a chunk's surface into a small grid of packed vanilla map-color bytes (the same encoding
+ * {@link MapColor#getPackedId} produces), used to paint a terrain thumbnail behind the
+ * Chronosphere's chunk-claim map. A simplified, full-resolution port of {@code MapItem#update}'s
+ * column-sampling loop rather than the real map-item rendering pipeline, which assumes a player is
+ * physically holding a numbered map.
  */
 public final class ChronoMapSampler {
     public static final int SIZE = 16;
@@ -32,8 +26,7 @@ public final class ChronoMapSampler {
         int baseZ = chunkPos.getMinBlockZ();
         int minY = level.getMinBuildHeight();
 
-        // Previous row's surface height per column, for the same "brighter going up, darker going
-        // down" banding vanilla maps use, compared against this row.
+        // Previous row's surface height per column, for the same brighter-up/darker-down banding vanilla maps use.
         int[] prevRowHeight = new int[SIZE];
         boolean[] havePrevRow = new boolean[SIZE];
 

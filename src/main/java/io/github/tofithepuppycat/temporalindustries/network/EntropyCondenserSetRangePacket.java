@@ -12,8 +12,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: set an Entropy Condenser's absorb range (see the GUI's range control), clamped
- * to {@link EntropyCondenserBlockEntity#MIN_RANGE}..{@link EntropyCondenserBlockEntity#MAX_RANGE}. */
+/** Client -> server: sets an Entropy Condenser's absorb range. */
 public class EntropyCondenserSetRangePacket implements CustomPacketPayload {
     public static final Type<EntropyCondenserSetRangePacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_condenser_set_range"));

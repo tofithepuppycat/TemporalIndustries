@@ -4,32 +4,24 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.resources.ResourceLocation;
 
-/** Shared layered rendering for the small square tabs the Chronosphere/Chronovault GUIs hang off
- * their panel's right edge (settings, auto-track, ...): a menu_base_right.png backing,
- * menu_icon_base.png centered on top of that as the icon's own backdrop, then the tab's specific
- * icon drawn on top of that. */
+/** Shared layered rendering for the small square tabs hanging off a panel's right edge: a
+ * menu_base_right.png backing, menu_icon_base.png centered on top, then the tab's icon. */
 public final class IconTabRenderer {
-    /** Backing for the tabs, which all hang off the panel's right edge (bookmark, auto-track,
-     * settings) — the "right" variant faces its rounded corner outward on that side. */
+    /** Backing for the tabs; the "right" variant faces its rounded corner outward. */
     private static final ResourceLocation MENU_BASE_RIGHT_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/menu_base_right.png");
     private static final ResourceLocation MENU_ICON_BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/menu_icon_base.png");
 
-    /** Native resolution of menu_base_right.png — tabs are drawn 1:1 at this size so the sprite's
-     * rounded corners don't pick up scaling artifacts. */
+    /** Native resolution of menu_base_right.png; drawn 1:1 to avoid scaling artifacts on the rounded corners. */
     public static final int SIZE = 32;
     private static final int ICON_BASE_SIZE = 22;
-    /** menu_icon_base.png's own art (and, since it's meant to sit centered inside that backdrop,
-     * every icon — including the bookmark/auto-track placeholder glyphs — drawn on top of it) sits
-     * left of center within its square, so nudge all of it right to actually land centered on the
-     * tab. Public so callers positioning their own placeholder glyphs can apply the same nudge. */
+    /** menu_icon_base.png's art sits left of center, so nudge it (and icons on top of it) right to center on the tab. */
     public static final int ICON_X_NUDGE = 2;
 
     private IconTabRenderer() {}
 
-    /** Draws the menu_base_right -> menu_icon_base layers, plus an optional tint (e.g. for
-     * selected/hovered state) washed over the whole tab. Callers draw their own icon on top after. */
+    /** Draws the menu_base_right -> menu_icon_base layers, plus an optional tint for selected/hovered state. */
     public static void renderBackground(GuiGraphics guiGraphics, int x, int y, int tint) {
         blitNative(guiGraphics, MENU_BASE_RIGHT_TEXTURE, x, y, SIZE);
 
@@ -47,8 +39,8 @@ public final class IconTabRenderer {
         blitNative(guiGraphics, icon, x + offset + ICON_X_NUDGE, y + offset, iconSize);
     }
 
-    /** Blits a square texture 1:1 at its own native resolution — the 6-arg blit overload assumes a
-     * 256x256 atlas when normalizing UVs, which would sample only a sliver of these small sprites. */
+    /** Blits at native resolution; the 6-arg blit overload assumes a 256x256 atlas and would
+     * undersample these small sprites. */
     private static void blitNative(GuiGraphics guiGraphics, ResourceLocation texture, int x, int y, int size) {
         guiGraphics.blit(texture, x, y, size, size, 0.0F, 0.0F, size, size, size, size);
     }

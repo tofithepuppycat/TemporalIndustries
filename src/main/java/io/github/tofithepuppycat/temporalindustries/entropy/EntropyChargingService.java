@@ -16,11 +16,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Passively trickles liquid ORD out of any Order Cell / Dual Entropy Cell carried in a player's main
- * inventory, offhand, or Cell curio slot into chargeable items carried the same way - currently
- * Temporal Glue (restores durability) and the Temporal Anchor (fills its order tank). Ticked once
- * per {@link #CHARGE_INTERVAL_TICKS} from {@link io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener}'s
- * existing flush loop. All amounts are mB, like everywhere else downstream of an orb.
+ * Passively trickles liquid ORD out of any Order Cell / Dual Entropy Cell carried by a player into
+ * chargeable items carried the same way (Temporal Glue durability, Temporal Anchor order tank).
+ * Ticked once per {@link #CHARGE_INTERVAL_TICKS}.
  */
 public final class EntropyChargingService {
     public static final int CHARGE_INTERVAL_TICKS = 20;

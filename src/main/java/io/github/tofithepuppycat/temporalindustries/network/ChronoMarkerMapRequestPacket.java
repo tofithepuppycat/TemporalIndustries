@@ -15,11 +15,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Client -> server: request terrain thumbnails for the Portable Chrono Marker's area-select map —
- * sent once when the map screen opens and periodically while it stays open, mirroring {@link
- * ChronosphereMapRequestPacket} but keyed by an arbitrary anchor chunk (the player's position when
- * they opened the screen) rather than a machine's BlockPos, since the marker has no block/menu to
- * validate the request against. Trust is instead anchored to the sender's own current position. */
+/** Client -> server: request terrain thumbnails for the Portable Chrono Marker's area-select map,
+ * keyed by an arbitrary anchor chunk (the player's position when they opened the screen) since the
+ * marker has no block/menu to validate against; trust is anchored to the sender's current position. */
 public class ChronoMarkerMapRequestPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerMapRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_map_request"));
@@ -27,9 +25,7 @@ public class ChronoMarkerMapRequestPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ChronoMarkerMapRequestPacket> STREAM_CODEC =
             StreamCodec.of(ChronoMarkerMapRequestPacket::encode, ChronoMarkerMapRequestPacket::decode);
 
-    /** Slack (in chunks) allowed between the anchor the client claims and the sender's actual
-     * current chunk, so a player who walks a little after opening the screen doesn't just get
-     * silently ignored, while still bounding how far a modified client could probe. */
+    /** Slack (in chunks) allowed between the claimed anchor and the sender's actual chunk. */
     private static final int ANCHOR_SLACK_CHUNKS = 4;
 
     private final long anchorKey;
@@ -63,8 +59,7 @@ public class ChronoMarkerMapRequestPacket implements CustomPacketPayload {
                 for (int dz = -radius; dz <= radius; dz++) {
                     if (!PortableChronoMarkerItem.MAP_SHAPE.contains(radius, dx, dz)) continue;
                     ChunkPos pos = new ChunkPos(anchor.x + dx, anchor.z + dz);
-                    // Only sample chunks already loaded — this is a preview, not a reason to force
-                    // remote/unclaimed chunks to generate.
+                    // Only sample already-loaded chunks; don't force generation for a preview.
                     if (!sender.level().hasChunk(pos.x, pos.z)) continue;
                     thumbnails.put(pos.toLong(), ChronoMapSampler.sampleChunk(sender.serverLevel(), pos));
                 }

@@ -38,16 +38,11 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     private final long selectedCommitId;
     /** commitId -> energy cost of jumping there from the chunk's current head. */
     private final Map<Long, Long> jumpCosts;
-    /** One commit-graph snapshot per chunk the in-world ghost preview should cover — for a Time
-     * Machine just its own chunk (duplicating the fields above), for a Chronosphere every chunk
-     * it has claimed. See TimelineViewProvider#getPreviewChunkSnapshots(). */
+    /** One commit-graph snapshot per chunk the ghost preview covers. */
     private final List<ChunkTimelineSnapshot> previewChunkSnapshots;
-    /** Every glued region in the machine's dimension, as of this sync — a jump skips these
-     * positions entirely (see TemporalTimeline's isGlued predicate), so the ghost preview needs
-     * them too, independent of whatever GlueSelectionClientState has cached from a Temporal Glue
-     * item that may not even be held right now. */
+    /** Every glued region in the machine's dimension; a jump skips these positions. */
     private final List<BoundingBox> gluedRegions;
-    /** See {@link TimelinePreviewRequestPacket}'s lastKnownPreviewVersion field doc. */
+    /** Fingerprint matching {@link TimelinePreviewRequestPacket#lastKnownPreviewVersion}. */
     private final long previewVersion;
 
     public TimelinePreviewSyncPacket(BlockPos machinePos, long placedGameTime, long selectedGameTime,
@@ -75,10 +70,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         buf.writeLong(packet.selectedGameTime);
         buf.writeLong(packet.currentGameTime);
 
-        // Commits/parent map can carry an unbounded amount of block/entity delta NBT, so encode
-        // them into a scratch buffer and DEFLATE it rather than writing them raw — NBT is
-        // text-like and repetitive, so this compresses well and keeps the packet off the
-        // per-connection rate limit under a large timeline.
+        // Commits/parent map can carry unbounded block/entity delta NBT, so DEFLATE the body rather
+        // than writing it raw to keep large timelines off the per-connection rate limit.
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.buffer());
         body.writeVarInt(packet.commits.size());
         for (TemporalCommit commit : packet.commits) TemporalCommit.encode(commit, body);

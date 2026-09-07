@@ -14,9 +14,8 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Client -> server: request every currently-registered loot table id, for the Loot Generator
- * screen's search-bar autocomplete — sent once when the screen opens, since the client has no
- * access to the server's reloadable loot table registry otherwise. No payload. */
+/** Client -> server: requests every registered loot table id, for the Loot Generator screen's
+ * search-bar autocomplete. No payload. */
 public class LootTableSuggestionsRequestPacket implements CustomPacketPayload {
     public static final Type<LootTableSuggestionsRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_table_suggestions_request"));

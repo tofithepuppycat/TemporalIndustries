@@ -11,13 +11,10 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Remembers the controller position of whatever multiblock this frame block is currently part of,
- * so right-clicking the frame can forward the interaction to that controller (see
- * {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame}), and so item/fluid
- * capability requests against the frame can be forwarded to the controller too - letting pipes,
- * hoppers etc. insert/extract from any face of the multiblock, not just the controller block.
- * Kept up to date by the controller re-scanning its structure - see
- * {@link LootGeneratorBlockEntity#findMissing()}. */
+/** Remembers the controller position of whatever multiblock this frame is currently part of, so
+ * clicks and item/fluid capability requests against the frame forward to that controller, letting
+ * pipes/hoppers insert/extract from any face of the multiblock. Kept up to date by the controller
+ * re-scanning its structure. */
 public class MachineFrameBlockEntity extends BlockEntity {
     @Nullable
     private BlockPos controller;

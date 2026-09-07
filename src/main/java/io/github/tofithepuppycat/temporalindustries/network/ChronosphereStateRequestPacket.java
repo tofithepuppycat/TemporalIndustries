@@ -59,8 +59,8 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
         });
     }
 
-    /** Builds and sends a full state snapshot for machine to sender. Shared by the periodic poll
-     * and by ChronosphereToggleChunkPacket, which wants an immediate refresh after a click. */
+    /** Builds and sends a full state snapshot for machine to sender. Also used by
+     * ChronosphereToggleChunkPacket for an immediate refresh after a click. */
     public static void sendStateSync(ServerPlayer sender, ChronosphereBlockEntity machine, BlockPos machinePos) {
         Set<Long> selected = new HashSet<>();
         for (ChunkPos pos : machine.getAllChunks()) selected.add(pos.toLong());
@@ -81,10 +81,8 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
             }
         }
 
-        // How many of the claimed chunks are actually being tracked (recording deltas) right now —
-        // may be fewer than selected.size() if auto-tracking is off, and can differ from it even
-        // when auto-tracking is on if another owner (a held Portable ChronoMarker, another
-        // machine) also happens to be tracking one of these chunks.
+        // Claimed chunks actually being tracked right now; can be fewer than selected.size() if
+        // auto-tracking is off, or if another owner is tracking one of these chunks.
         int trackedCount = 0;
         for (long key : selected) {
             if (worldData.isTracked(dimension, new ChunkPos(key))) trackedCount++;

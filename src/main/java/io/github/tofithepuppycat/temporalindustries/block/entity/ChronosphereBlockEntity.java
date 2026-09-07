@@ -39,12 +39,9 @@ import java.util.Objects;
 import java.util.Set;
 
 /**
- * Block entity for the Chronosphere, the multi-chunk-tier time machine: the player claims up to an
- * 11x11 chunk area (centred on the block's own chunk, always included) from
- * {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}'s map, and
- * a single jump moves every claimed chunk to the same target time, paid from one shared energy pool
- * (unlike the Time Machine, which is one energy pool per chunk). See
- * {@link AbstractTimelineMachineBlockEntity} for the jump/energy/re-snapshot logic shared between them.
+ * Block entity for the Chronosphere: the player claims up to an 11x11 chunk area (centred on and
+ * always including the home chunk), and a single jump moves every claimed chunk to the same
+ * target time, paid from one shared energy pool.
  */
 public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
     /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. an 11x11 box. */
@@ -117,12 +114,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
      * (the Portable Chrono Marker's area-select map keeps the inscribed {@code CIRCLE} instead). */
     public static final ChunkArea.Shape CLAIM_SHAPE = ChunkArea.Shape.SQUARE;
 
-    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable box —
-     * shared with {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen}
-     * and {@link io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket}
-     * so the map's drawn shape, click hit-testing, and the server's actual rule always agree. Delegates
-     * to {@link ChunkArea}, the same radius math the Portable Chrono Marker's area-select map and its
-     * network handlers use. */
+    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable box; shared
+     * with the client screen and network handlers so shape, hit-testing, and server rule always agree. */
     public static boolean isWithinRadius(int dx, int dz) {
         return CLAIM_SHAPE.contains(MAX_RADIUS, dx, dz);
     }
@@ -173,15 +166,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Jump — computeTotalJumpCost/applyTimelineView/jump/setSelectedGameTime/deleteAllHistory all
-    // live in AbstractTimelineMachineBlockEntity, operating over getAllChunks() above.
-
-    // -------------------------------------------------------------------------
-    // TimelineViewProvider — chunkPos null means the shared "All" view (the GUI's default tab);
-    // otherwise one specific claimed chunk's own graph (home chunk included). jump() always moves
-    // every claimed chunk together regardless of which one is being displayed.
-
+    // chunkPos null means the shared "All" view (the GUI's default tab); otherwise one specific
+    // claimed chunk's own graph. jump() always moves every claimed chunk together regardless.
     @Override
     public List<ChunkPos> getViewableChunks() {
         return getAllChunks();
@@ -199,15 +185,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
     /**
      * The shared "All" view: only commits relevant to EVERY claimed chunk, in creation order.
-     *
-     * <p>Deliberately an intersection rather than a union. Each chunk keeps its own independent
-     * ancestry (see {@link TemporalTimeline}'s class doc), so unioning the claimed chunks' commit
-     * lists produces commits from lineages that have no local-parent link to each other — the
-     * graph layout then treats every one of them as a fresh root, stacking them all at row 0 with
-     * their own "… Timeline" labels drawn on top of each other. The commits every chunk shares are
-     * exactly the ones that describe the claim as a whole (a Chronosphere's jumps batch every
-     * claimed chunk into the same DELTA/SNAPSHOT commits), and they form a single connected chain
-     * that lays out cleanly. Per-chunk detail is still one tab click away.
+     * Deliberately an intersection rather than a union — unioning per-chunk commit lists would mix
+     * lineages with no local-parent link, causing the graph layout to stack them all as fresh roots.
      */
     private List<TemporalCommit> sharedCommits(TemporalTimeline timeline) {
         List<ChunkPos> chunks = getAllChunks();
@@ -232,10 +211,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         if (chunkPos != null) return timeline.getLocalParentsForChunk(chunkPos);
 
         // Shared view: re-link each shared commit to its nearest ancestor that is ALSO shared,
-        // rather than passing through the raw per-chunk links. A shared commit's immediate local
-        // parent is often a commit only some chunks have (so it isn't drawn here); left as-is that
-        // link would dangle, the layout would treat the commit as a root, and the shared chain
-        // would fragment back into the overlapping pile this view exists to avoid.
+        // since its raw local parent is often a commit only some chunks have.
         Set<Long> sharedIds = new HashSet<>();
         for (TemporalCommit commit : sharedCommits(timeline)) sharedIds.add(commit.getId());
 
@@ -247,9 +223,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return relinked;
     }
 
-    /** Walks commitId's local-parent chain upward until it reaches a commit in sharedIds, or -1 if
-     * it runs out. Guarded against a cycle in the (persisted) parent links so a corrupt save can't
-     * hang the server tick here. */
+    /** Walks commitId's local-parent chain upward until it reaches a commit in sharedIds, or -1.
+     * Guarded against a cycle in persisted parent links so a corrupt save can't hang the tick. */
     private static long nearestSharedAncestor(Map<Long, Long> rawParents, Set<Long> sharedIds, long commitId) {
         Set<Long> visited = new HashSet<>();
         long current = rawParents.getOrDefault(commitId, -1L);
@@ -268,16 +243,9 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         if (timeline == null) return -1L;
         if (chunkPos != null) return timeline.getChunkHeadId(chunkPos);
 
-        // The home chunk's actual head is frequently NOT itself shared by every claimed chunk (a
-        // delta/branch commit only touches the chunks it actually affects), and a head id the
-        // shared view never draws would leave its "live world is here" pulse invisible. Resolve by
-        // TIME rather than walking the home chunk's own local-parent chain for a shared ancestor —
-        // after a jump lands the home chunk on a fresh per-chunk branch marker, that marker has no
-        // shared ancestor of its own to walk to (each claimed chunk gets its own distinct marker, so
-        // the walk can run out and strand the pulse on whatever shared commit was drawn before the
-        // jump). Nearest-by-gameTime always finds the shared node that best represents where the
-        // live world actually is now, since a jump target's marker always carries the exact gameTime
-        // it was checked out to.
+        // The home chunk's head is frequently not itself shared by every claimed chunk, so the
+        // "live world is here" pulse must resolve by nearest gameTime instead of walking the
+        // home chunk's local-parent chain, which can dead-end on a fresh per-chunk branch marker.
         long homeHead = timeline.getChunkHeadId(getHomeChunkPos());
         TemporalCommit homeHeadCommit = timeline.getCommitById(homeHead);
         if (homeHeadCommit == null) return -1L;
@@ -287,14 +255,9 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     }
 
     /**
-     * Total cost is only priced for the currently selected node, not every node in the graph.
-     * computeTotalJumpCost() walks every claimed chunk's own ancestry chain, so pricing it for
-     * each of H commits costs O(H x claimedChunks x avgChunkHistory) — with 13 chunks claimed and
-     * history that only ever grows over a session, that quadratic blowup was enough to stall the
-     * server tick on every 20-tick GUI poll. One commit's worth of that same
-     * O(claimedChunks x avgChunkHistory) work, computed only on an actual selection change, costs
-     * the same as a real jump — which nobody has needed to bound. Un-selected nodes simply render
-     * without a jump-cost line (see TimelineGraphWidget's tooltip).
+     * Total cost is only priced for the currently selected node, not every node in the graph, since
+     * pricing every commit would be O(H x claimedChunks x avgChunkHistory) and stall the server tick
+     * on every GUI poll. Un-selected nodes simply render without a jump-cost line.
      */
     @Override
     public Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
@@ -309,8 +272,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return Collections.emptyMap();
     }
 
-    /** One snapshot per claimed chunk (not just whichever one tab is currently showing), so the
-     * in-world ghost preview covers everything a jump would actually touch. */
+    /** One snapshot per claimed chunk, so the in-world ghost preview covers everything a jump would touch. */
     @Override
     public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
         if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();

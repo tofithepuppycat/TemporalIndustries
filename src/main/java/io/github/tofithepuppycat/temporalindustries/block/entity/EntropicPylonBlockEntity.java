@@ -41,14 +41,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Transfers liquid Order/Chaos between marked blocks. Which blocks to pull from and push into is
- * decided entirely by {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem}
- * before this block even exists - the item records up to
- * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem#MAX_MARKS} input
- * positions (plain right-click) and output positions (shift right-click) on itself, and hands
- * whatever's still in range off to {@link #setMarks} the moment it's placed. Requires a single
- * {@link MachineFrame} directly above to actually run - see {@link #checkStructure()}, mirroring
- * the controller/frame idiom {@link LootGeneratorBlockEntity} established.
+ * Transfers liquid Order/Chaos between marked blocks. Input/output positions are recorded on
+ * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem} before placement and
+ * handed off via {@link #setMarks}. Requires a single {@link MachineFrame} directly above to run.
  */
 @SuppressWarnings("null")
 public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController {
@@ -59,8 +54,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    /** Spark texture rather than {@link #MISSING_FRAME_PARTICLE}/{@link #formedParticle}'s flat dust
-     * square, so the flow of fluid along a leg reads as distinct from the structure outlines. */
+    /** Spark texture so the flow of fluid along a leg reads as distinct from the structure outlines. */
     private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
     private static final ColorParticleOption CHAOS_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.CHAOS);
     /** Interior joints in the jagged transmit bolt, not counting its two fixed endpoints. */
@@ -92,9 +86,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private int ticksSinceStructureCheck = 0;
     private int outputCursor = 0;
 
-    /** Which entropy type this pylon is restricted to, or {@code null} for the original dual pylon,
-     * which routes whichever of Order/Chaos is actually present - see {@link #acceptsFluid} and
-     * {@link io.github.tofithepuppycat.temporalindustries.block.ChaosPylon}/{@link io.github.tofithepuppycat.temporalindustries.block.OrderPylon}. */
+    /** Which entropy type this pylon is restricted to, or {@code null} for the dual pylon that routes whichever is present. */
     @Nullable
     private final EntropyType filter;
     private final DustParticleOptions formedParticle;
@@ -121,8 +113,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return formed;
     }
 
-    /** Called once, right as {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem}
-     * places this block, with whatever marks from the item stack are still in range. */
+    /** Called once, right as the placing item hands off whatever marks are still in range. */
     public void setMarks(List<BlockPos> inputs, List<BlockPos> outputs) {
         this.inputs = new ArrayList<>(inputs);
         this.outputs = new ArrayList<>(outputs);
@@ -134,10 +125,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return worldPosition.above();
     }
 
-    /** The frame position above this pylon, if it still needs a {@link MachineFrame} block - empty
-     * once one's present, for {@link MachineFrame#fillFromInventory} to consume from the player's
-     * inventory just like {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator}'s
-     * larger structure does. */
+    /** The frame position above this pylon if it still needs a {@link MachineFrame} block; empty once one's present. */
     public List<BlockPos> findMissing() {
         if (level == null) return List.of();
         BlockPos framePos = framePos();
@@ -149,9 +137,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     }
 
     /** Re-checks for a {@link MachineFrame} directly above and updates {@link #formed}, syncing to
-     * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed - same
-     * idiom as {@link LootGeneratorBlockEntity#checkStructure()}, just for a single fixed position
-     * instead of a whole ring. */
+     * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed. */
     public boolean checkStructure() {
         if (level == null) return formed;
         boolean wasFormed = formed;
@@ -181,9 +167,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return formed;
     }
 
-    /** ORD-colored (see {@link EntropyType#ORDER}) outline traced along the edges of the pylon and
-     * its completing frame's bounding box, fired once when the structure transitions from unformed
-     * to formed - same idiom as {@link LootGeneratorBlockEntity#spawnFormedParticles}. */
+    /** Order-colored outline traced along the edges of the pylon and its completing frame's
+     * bounding box, fired once when the structure transitions from unformed to formed. */
     private void spawnFormedParticles(ServerLevel serverLevel, BlockPos framePos) {
         int minX = Math.min(worldPosition.getX(), framePos.getX());
         int minY = Math.min(worldPosition.getY(), framePos.getY());
@@ -197,8 +182,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Red outline traced along the edges of the still-missing frame position directly above -
-     * mirrors {@link io.github.tofithepuppycat.temporalindustries.block.LootGenerator#highlightMissing}. */
+    /** Red outline traced along the edges of the still-missing frame position directly above. */
     private void highlightMissing(ServerLevel serverLevel) {
         BlockPos pos = framePos();
         for (Vector3f point : BoxEdgeParticles.outline(pos.getX(), pos.getY(), pos.getZ(),
@@ -221,10 +205,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         transferOnce();
     }
 
-    /** One transfer attempt per marked input, against the next marked output in rotation - so with
-     * equal counts every input/output pair gets visited over time instead of always favoring the
-     * first output. Moves whatever fluid is actually present (Order or Chaos) - see
-     * {@link #transferAnyTank} for why this doesn't just call {@link FluidUtil#tryFluidTransfer}. */
+    /** One transfer attempt per marked input, against the next marked output in rotation, so every
+     * pair gets visited over time instead of always favoring the first output. */
     private void transferOnce() {
         for (BlockPos inPos : inputs) {
             IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
@@ -239,19 +221,14 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Tries every tank in {@code source} individually rather than {@link FluidUtil#tryFluidTransfer},
-     * which drains via the ambiguous {@code IFluidHandler#drain(int, FluidAction)} overload - dual-fluid
-     * handlers like {@link EntropyCondenserBlockEntity}'s resolve that call to whichever tank they check
-     * first (Order), so Chaos would never move and nothing offering only Order could ever fill a
-     * Chaos-only destination like {@link LootGeneratorBlockEntity}. Draining by explicit
-     * {@link FluidStack} instead lets each tank's actual contents get offered on their own. */
-    /** Whether {@code stack} is allowed to move through this pylon - {@code true} for anything on
-     * the original dual pylon ({@link #filter} is {@code null}), or only the matching entropy type
-     * on {@link io.github.tofithepuppycat.temporalindustries.block.ChaosPylon}/{@link io.github.tofithepuppycat.temporalindustries.block.OrderPylon}. */
+    /** Whether {@code stack} is allowed to move through this pylon: anything if {@link #filter} is
+     * {@code null} (dual pylon), otherwise only the matching entropy type. */
     private boolean acceptsFluid(FluidStack stack) {
         return filter == null || EntropyFluids.typeOf(stack.getFluid()) == filter;
     }
 
+    // Tries every tank in source individually (rather than FluidUtil.tryFluidTransfer, whose ambiguous
+    // drain overload would always resolve dual-fluid handlers to whichever tank they check first).
     private void transferAnyTank(IFluidHandler source, IFluidHandler dest, BlockPos inPos, BlockPos outPos) {
         for (int i = 0; i < source.getTanks(); i++) {
             FluidStack inTank = source.getFluidInTank(i);
@@ -277,14 +254,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** A jagged bolt from {@code from} to {@code to}, colored by {@code type} - drawn every tick a
-     * transfer actually moves fluid, so the flow direction (input into the pylon, or pylon out to an
-     * output) reads at a glance. Re-jittered fresh each call so the bolt flickers between different
-     * jagged shapes tick to tick, like real lightning, rather than sitting static. {@code from}/{@code to}
-     * are passed in already at the height they should render at - see {@link #transferAnyTank}, which
-     * uses {@link #framePos()} rather than {@link #worldPosition} for the pylon's own end of each leg,
-     * so the bolt meets the machine frame above the pylon without also lifting the input/output ends
-     * off their own blocks. */
+    /** A jagged bolt from {@code from} to {@code to}, colored by {@code type}, drawn every tick a
+     * transfer moves fluid so the flow direction reads at a glance. Re-jittered fresh each call so
+     * it flickers like real lightning rather than sitting static. */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
         ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
         Vector3f start = centerOf(from);
@@ -294,11 +266,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Builds a jagged path of points from {@code start} to {@code end}: {@link #LIGHTNING_SEGMENTS}
-     * straight sub-segments whose interior joints are each nudged by a random amount perpendicular to
-     * the line (up to {@link #LIGHTNING_JITTER} blocks), then densely resampled at
-     * {@link #LIGHTNING_PARTICLE_SPACING} so the zigzag reads as a continuous bolt rather than a few
-     * bent joints. */
+    /** Builds a jagged path from {@code start} to {@code end}: straight sub-segments with jittered
+     * interior joints, densely resampled so the zigzag reads as a continuous bolt. */
     private static List<Vector3f> lightningArc(Vector3f start, Vector3f end, RandomSource random) {
         Vector3f direction = new Vector3f(end).sub(start);
         if (direction.lengthSquared() < 1.0E-6F) return List.of(start);
@@ -338,9 +307,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return new Vector3f(pos.getX() + 0.5F, pos.getY() + 0.5F, pos.getZ() + 0.5F);
     }
 
-    // MachineFrameController - the pylon isn't itself an item/fluid container, only a router, so a
-    // frame sitting on top of it exposes nothing to pipes/hoppers; a click just reports status.
-
+    // The pylon isn't itself an item/fluid container, only a router; a click just reports status.
     @Override
     @Nullable
     public IItemHandler getItemHandler() {

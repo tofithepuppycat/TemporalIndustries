@@ -22,11 +22,8 @@ import net.minecraft.world.level.block.state.properties.DirectionProperty;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Passive FE generator: {@link #FACING} isn't just cosmetic here (unlike {@link Chronosphere}'s) —
- * it picks which horizontal neighbors {@link SeebeckGeneratorBlockEntity} reads as the hot source
- * (to the left) and cold source (to the right), per IDEAS.md's "hot block from left, cold from right".
- */
+/** Passive FE generator. {@link #FACING} picks which horizontal neighbors
+ * {@link SeebeckGeneratorBlockEntity} reads as the hot source (left) and cold source (right). */
 @SuppressWarnings("null")
 public class SeebeckGenerator extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
