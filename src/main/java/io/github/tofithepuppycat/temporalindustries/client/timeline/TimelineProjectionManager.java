@@ -11,9 +11,11 @@ import net.minecraft.world.level.levelgen.structure.BoundingBox;
 
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
+import java.util.Set;
 
 /** Client-side view of the active Time Machine's chunk history: caches the last commit graph
  * fetched from the server, tracks the player's selected commit, and computes the block-diff
@@ -162,6 +164,23 @@ public final class TimelineProjectionManager {
         if (commit == null) return;
         selectedCommitId = commitId;
         selectedGameTime = clampSelected(commit.getGameTime());
+    }
+
+    /** Whether the currently selected node is a BRANCH commit that can be safely deleted — i.e. the
+     * chunk's current head isn't itself, or a descendant of it, on the branch's forked-off lineage. */
+    public static boolean isSelectedBranchDeletable() {
+        TemporalCommit selected = findCommit(selectedCommitId);
+        if (selected == null || selected.getType() != TemporalCommit.Type.BRANCH) return false;
+
+        // Walk headCommitId's ancestry; if it passes through selectedCommitId, the branch is either
+        // the current head itself or an ancestor of it, meaning it's currently checked out.
+        long current = headCommitId;
+        Set<Long> visited = new HashSet<>();
+        while (current >= 0 && visited.add(current)) {
+            if (current == selectedCommitId) return false;
+            current = localParents.getOrDefault(current, -1L);
+        }
+        return true;
     }
 
     public static List<TemporalCommit> getCommits() { return commits; }

@@ -59,4 +59,10 @@ public interface TimelineViewProvider {
 
     /** Updates selectedGameTime, optionally applying it to the live world. */
     void setSelectedGameTime(long targetGameTime, boolean applyToWorld);
+
+    /** Deletes the given BRANCH commit and everything forked from it, scoped to whichever chunk it
+     * belongs to, provided that chunk's head doesn't currently sit inside it (i.e. it isn't the
+     * branch currently checked out). No-op if branchCommitId isn't a deletable branch.
+     * @return true if the branch was deleted */
+    boolean deleteBranch(long branchCommitId);
 }

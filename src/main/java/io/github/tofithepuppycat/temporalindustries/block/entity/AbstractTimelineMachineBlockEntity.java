@@ -321,6 +321,27 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         syncToClients();
     }
 
+    /** Deletes branchCommitId and everything forked from it, scoped to this machine's home chunk
+     * (its only chunk for a Chronovault; a Chronosphere's shared graph can only ever show a BRANCH
+     * commit belonging to its home chunk, since a branch marker is exclusive to the one chunk it
+     * was checked out for). No-op if the branch's chunk head sits inside it. */
+    @Override
+    public boolean deleteBranch(long branchCommitId) {
+        if (!(level instanceof ServerLevel) || level.getServer() == null) return false;
+
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
+        if (timeline == null) return false;
+
+        boolean deleted = timeline.deleteBranch(getAllChunks().get(0), branchCommitId);
+        if (deleted) {
+            worldData.setDirty();
+            setChanged();
+            syncToClients();
+        }
+        return deleted;
+    }
+
     private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
 
     /** Clamps placed/selected game time and, once a minute, re-snapshots any claimed chunk whose
