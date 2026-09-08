@@ -164,7 +164,7 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         String modeKey = getMode(stack) == MODE_KEEP_INVENTORY
                 ? "item.temporalindustries.temporal_anchor.mode_keep_inventory"
                 : "item.temporalindustries.temporal_anchor.mode_rewind_all";
-        tooltip.add(Component.translatable(modeKey).withStyle(ChatFormatting.YELLOW));
+        tooltip.add(EntropyDisplay.colorTokens(Component.translatable(modeKey).getString(), ChatFormatting.YELLOW));
 
         TooltipUtil.appendDescription(tooltip, "item.temporalindustries.temporal_anchor.tooltip");
     }

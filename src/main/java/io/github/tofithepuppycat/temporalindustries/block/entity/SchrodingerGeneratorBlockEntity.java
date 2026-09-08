@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -84,7 +85,7 @@ public class SchrodingerGeneratorBlockEntity extends BlockEntity implements Entr
     @Override
     public List<Component> getEntropyTooltip() {
         return List.of(isOccupied()
-                ? Component.translatable("overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating").withStyle(ChatFormatting.DARK_PURPLE)
+                ? EntropyDisplay.colorTokens(Component.translatable("overlay.temporalindustries.entropy_glasses.schrodinger_generator.generating").getString(), ChatFormatting.DARK_PURPLE)
                 : Component.translatable("overlay.temporalindustries.entropy_glasses.schrodinger_generator.empty").withStyle(ChatFormatting.GRAY));
     }
 
