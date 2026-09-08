@@ -145,7 +145,7 @@
 	"item.temporalindustries.chaos_pylon.cleared": "Cleared all marks",
 	"block.temporalindustries.order_pylon": "Order Pylon",
 	"block.temporalindustries.order_pylon.tooltip": "Routes liquid Order between blocks marked\nby right-clicking (input) or shift-right-clicking\n(output) with it in hand, up to 4 of each within\n11 blocks. Requires a Basic Machine Frame directly\nabove to function.",
-	"block.temporalindustries.order_pylon.status": "Order Pylon: %s input(s), %s output(s) - %s",
+	"block.temporalindustries.order_pylon.status": "%s input(s), %s output(s) - %s",
 	"block.temporalindustries.order_pylon.formed": "formed",
 	"block.temporalindustries.order_pylon.unformed": "unformed",
 	"item.temporalindustries.order_pylon.marked_input": "Marked input (%s/%s)",
@@ -173,7 +173,7 @@
 	"overlay.temporalindustries.entropy_glasses.loot_generator.stopped": "Stopped",
 	"overlay.temporalindustries.entropy_glasses.accelerator.progress": "Progress: %s/%s",
 	"overlay.temporalindustries.entropy_glasses.accelerator.idle": "Idle",
-	"overlay.temporalindustries.entropy_glasses.seebeck_generator.energy": "%s/%s FE",
+	"overlay.temporalindustries.entropy_glasses.seebeck_generator.temp_diff": "Temp diff: %s/%s",
 	"overlay.temporalindustries.entropy_glasses.seebeck_generator.generating": "Generating",
 	"overlay.temporalindustries.entropy_glasses.seebeck_generator.idle": "Missing hot/cold source"
 }
