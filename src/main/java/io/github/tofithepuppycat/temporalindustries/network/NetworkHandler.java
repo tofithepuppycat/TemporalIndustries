@@ -65,6 +65,11 @@ public class NetworkHandler {
                 TimelineMachineDeleteHistoryPacket::handle);
 
         registrar.playToServer(
+                TimelineMachineDeleteBranchPacket.TYPE,
+                TimelineMachineDeleteBranchPacket.STREAM_CODEC,
+                TimelineMachineDeleteBranchPacket::handle);
+
+        registrar.playToServer(
                 GlueRegionRequestPacket.TYPE,
                 GlueRegionRequestPacket.STREAM_CODEC,
                 GlueRegionRequestPacket::handle);
