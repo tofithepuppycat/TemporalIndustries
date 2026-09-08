@@ -212,7 +212,7 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         }
 
         long feCost = Math.round(ItemEnergyCosts.getCost(markerState.getBlock()).orElse(0) * jumpCostMultiplier());
-        lines.add(Component.translatable("block.temporalindustries.chronodial.glasses_fe_cost", feCost).withStyle(ChatFormatting.YELLOW));
+        lines.add(EntropyDisplay.colorTokens(Component.translatable("block.temporalindustries.chronodial.glasses_fe_cost", feCost).getString(), ChatFormatting.YELLOW));
         lines.add(Component.translatable("block.temporalindustries.chronodial.glasses_entropy_cost", EntropyDisplay.formatBalance(JUMP_ENTROPY_SHIFT))
                 .withStyle(ChatFormatting.LIGHT_PURPLE));
         return lines;

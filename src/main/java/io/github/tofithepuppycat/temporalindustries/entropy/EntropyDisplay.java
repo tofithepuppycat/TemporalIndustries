@@ -7,12 +7,21 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.network.chat.TextColor;
 
 import java.util.Locale;
+import java.util.Map;
 
 /** Formatting for the two entropy scales shown to players: liquid amounts in mB (cells, the anchor,
- * machine tanks) and the machine order/chaos balance. */
+ * machine tanks) and the machine order/chaos balance. Also the shared palette for tooltip text -
+ * other classes should reuse these colors rather than picking their own. */
 public final class EntropyDisplay {
-    private static final TextColor ORDER_UNIT_COLOR = TextColor.fromRgb(0xcfa0f3);
-    private static final TextColor CHAOS_UNIT_COLOR = TextColor.fromRgb(0x68f6ff);
+    public static final TextColor ORDER_COLOR = TextColor.fromRgb(0xcfa0f3);
+    public static final TextColor CHAOS_COLOR = TextColor.fromRgb(0x68f6ff);
+    public static final TextColor FE_COLOR = TextColor.fromRgb(0xffaa00);
+
+    private static final Map<String, TextColor> TOKEN_COLORS = Map.of(
+            "ORD", ORDER_COLOR,
+            "CHS", CHAOS_COLOR,
+            "FE", FE_COLOR
+    );
 
     private EntropyDisplay() {}
 
@@ -31,34 +40,52 @@ public final class EntropyDisplay {
 
     /** The colored "ORD" / "CHS" unit suffix, e.g. to append after a formatted amount. */
     public static MutableComponent unit(EntropyType type) {
-        TextColor color = type == EntropyType.ORDER ? ORDER_UNIT_COLOR : CHAOS_UNIT_COLOR;
+        TextColor color = type == EntropyType.ORDER ? ORDER_COLOR : CHAOS_COLOR;
         String text = type == EntropyType.ORDER ? " ORD" : " CHS";
         return Component.literal(text).setStyle(Style.EMPTY.withColor(color));
     }
 
-    /** Rebuilds {@code text} as a component, recoloring any "ORD" / "CHS" substrings with their
-     * entropy colors and everything else with {@code baseColor}. Embedding raw §-format codes
+    /** Rebuilds {@code text} as a component, recoloring any "ORD" / "CHS" / "FE" tokens with their
+     * shared colors and everything else with {@code baseColor}. Embedding raw §-format codes
      * directly in the lang file doesn't render correctly in every tooltip context, so callers
      * that mix these tokens into flavor text should route through this instead. */
     public static MutableComponent colorTokens(String text, ChatFormatting baseColor) {
         MutableComponent result = Component.empty();
         int i = 0;
         while (i < text.length()) {
-            int ordIdx = text.indexOf("ORD", i);
-            int chsIdx = text.indexOf("CHS", i);
-            int next = ordIdx == -1 ? chsIdx : (chsIdx == -1 ? ordIdx : Math.min(ordIdx, chsIdx));
-            if (next == -1) {
+            int matchIdx = -1;
+            String matchToken = null;
+            for (String token : TOKEN_COLORS.keySet()) {
+                int idx = nextWordBoundaryMatch(text, token, i);
+                if (idx != -1 && (matchIdx == -1 || idx < matchIdx)) {
+                    matchIdx = idx;
+                    matchToken = token;
+                }
+            }
+            if (matchIdx == -1) {
                 result.append(Component.literal(text.substring(i)).withStyle(baseColor));
                 break;
             }
-            if (next > i) {
-                result.append(Component.literal(text.substring(i, next)).withStyle(baseColor));
+            if (matchIdx > i) {
+                result.append(Component.literal(text.substring(i, matchIdx)).withStyle(baseColor));
             }
-            boolean isOrder = next == ordIdx;
-            TextColor color = isOrder ? ORDER_UNIT_COLOR : CHAOS_UNIT_COLOR;
-            result.append(Component.literal(isOrder ? "ORD" : "CHS").setStyle(Style.EMPTY.withColor(color)));
-            i = next + 3;
+            result.append(Component.literal(matchToken).setStyle(Style.EMPTY.withColor(TOKEN_COLORS.get(matchToken))));
+            i = matchIdx + matchToken.length();
         }
         return result;
+    }
+
+    /** Finds the next occurrence of {@code token} at or after {@code from} that isn't part of a
+     * larger word, so short tokens like "FE" don't match inside unrelated text. */
+    private static int nextWordBoundaryMatch(String text, String token, int from) {
+        int idx = text.indexOf(token, from);
+        while (idx != -1) {
+            boolean beforeOk = idx == 0 || !Character.isLetter(text.charAt(idx - 1));
+            int after = idx + token.length();
+            boolean afterOk = after >= text.length() || !Character.isLetter(text.charAt(after));
+            if (beforeOk && afterOk) return idx;
+            idx = text.indexOf(token, idx + 1);
+        }
+        return -1;
     }
 }

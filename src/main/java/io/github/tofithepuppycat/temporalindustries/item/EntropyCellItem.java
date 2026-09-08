@@ -5,8 +5,9 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.Style;
+import net.minecraft.network.chat.TextColor;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
@@ -85,8 +86,9 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
-        ChatFormatting color = type == EntropyType.ORDER ? ChatFormatting.WHITE : ChatFormatting.DARK_PURPLE;
-        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(BottleContents.CAPACITY)).withStyle(color)
+        TextColor color = type == EntropyType.ORDER ? EntropyDisplay.ORDER_COLOR : EntropyDisplay.CHAOS_COLOR;
+        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(BottleContents.CAPACITY))
+                .setStyle(Style.EMPTY.withColor(color))
                 .append(EntropyDisplay.unit(type)));
         CellTransfer.appendTooltip(stack, tooltip);
     }
