@@ -1,11 +1,14 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -25,12 +28,15 @@ import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
+import java.util.List;
+
 /**
  * Shared skeleton for the Decay/Despawn Accelerator generators: single input slot, tick-driven
  * progress counter, consumes the item and spawns one {@link EntropyOrbEntity} on completion.
  */
 @SuppressWarnings("null")
-public abstract class AbstractAcceleratorBlockEntity extends BlockEntity implements Container, MenuProvider {
+public abstract class AbstractAcceleratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
     public static final int INPUT_SLOT = 0;
     private static final int SLOT_COUNT = 1;
     public static final int PROCESS_TIME_TICKS = 100;
@@ -55,6 +61,18 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
 
     public int getProgress() {
         return progress;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        List<Component> lines = new ArrayList<>();
+        lines.add(getDisplayName().copy().withStyle(ChatFormatting.WHITE));
+        boolean processing = progress > 0;
+        lines.add((processing
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.accelerator.progress", progress, PROCESS_TIME_TICKS)
+                : Component.translatable("overlay.temporalindustries.entropy_glasses.accelerator.idle"))
+                .withStyle(processing ? ChatFormatting.YELLOW : ChatFormatting.GRAY));
+        return lines;
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, AbstractAcceleratorBlockEntity be) {

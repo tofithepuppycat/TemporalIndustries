@@ -2,14 +2,20 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.network.chat.Component;
+import net.minecraft.network.protocol.Packet;
+import net.minecraft.network.protocol.game.ClientGamePacketListener;
+import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.tags.TagKey;
@@ -22,9 +28,11 @@ import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
 import org.jetbrains.annotations.NotNull;
+import org.jetbrains.annotations.Nullable;
 import org.slf4j.Logger;
 import com.mojang.logging.LogUtils;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -39,7 +47,7 @@ import static io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerato
  * whose count scales the same way.
  */
 @SuppressWarnings("null")
-public class SeebeckGeneratorBlockEntity extends BlockEntity {
+public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
     public static final TagKey<Block> HOT_SOURCES = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(MODID, "seebeck_hot_sources"));
     public static final TagKey<Block> COLD_SOURCES = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(MODID, "seebeck_cold_sources"));
 
@@ -96,6 +104,8 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
 
     private final GeneratorEnergyStorage energyStorage = new GeneratorEnergyStorage();
     private double entropyAccumulator = 0.0;
+    /** Whether both a hot and cold source were present as of the last tick, purely for the Entropy Glasses overlay. */
+    private boolean active = false;
 
     public SeebeckGeneratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.SEEBECK_GENERATOR_BLOCK_ENTITY.get(), pos, state);
@@ -103,6 +113,20 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
 
     public IEnergyStorage getEnergyStorage() {
         return energyStorage;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.translatable("block.temporalindustries.seebeck_generator").withStyle(ChatFormatting.WHITE));
+        lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.energy",
+                        energyStorage.getEnergyStored(), energyStorage.getMaxEnergyStored())
+                .withStyle(ChatFormatting.YELLOW));
+        lines.add((active
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.generating")
+                : Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.idle"))
+                .withStyle(active ? ChatFormatting.GREEN : ChatFormatting.GRAY));
+        return lines;
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, SeebeckGeneratorBlockEntity be) {
@@ -119,12 +143,17 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
 
         boolean hot = (hotState.is(HOT_SOURCES) || extraHot.containsKey(hotState.getBlock())) && isActiveHot(hotState);
         boolean cold = coldState.is(COLD_SOURCES) || extraCold.containsKey(coldState.getBlock());
-
-        if (!(hot && cold)) return;
+        boolean wasActive = be.active;
+        be.active = hot && cold;
+        if (!be.active) {
+            if (wasActive) be.syncToClients();
+            return;
+        }
 
         double tempFactor = temperatureFactor(hotState.getBlock(), coldState.getBlock(), extraHot, extraCold);
         int genRate = (int) Math.round(MIN_GEN_RATE_FE_PER_TICK + (MAX_GEN_RATE_FE_PER_TICK - MIN_GEN_RATE_FE_PER_TICK) * tempFactor);
         be.energyStorage.produce(genRate);
+        be.syncToClients();
 
         if (level.getGameTime() % ENTROPY_INTERVAL_TICKS == 0) {
             be.entropyAccumulator += MIN_ENTROPY_PER_INTERVAL + (MAX_ENTROPY_PER_INTERVAL - MIN_ENTROPY_PER_INTERVAL) * tempFactor;
@@ -200,11 +229,34 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
         return result;
     }
 
+    private void syncToClients() {
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    @Override
+    public CompoundTag getUpdateTag(HolderLookup.Provider registries) {
+        return saveWithoutMetadata(registries);
+    }
+
+    @Override
+    public void handleUpdateTag(CompoundTag tag, HolderLookup.Provider registries) {
+        loadAdditional(tag, registries);
+    }
+
+    @Nullable
+    @Override
+    public Packet<ClientGamePacketListener> getUpdatePacket() {
+        return ClientboundBlockEntityDataPacket.create(this);
+    }
+
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putDouble("EntropyAccumulator", entropyAccumulator);
+        tag.putBoolean("Active", active);
     }
 
     @Override
@@ -212,5 +264,6 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity {
         super.loadAdditional(tag, registries);
         if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
         entropyAccumulator = tag.getDouble("EntropyAccumulator");
+        active = tag.getBoolean("Active");
     }
 }
