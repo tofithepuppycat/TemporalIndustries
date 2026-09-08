@@ -44,7 +44,7 @@ import java.util.List;
 /**
  * Transfers liquid Order/Chaos between marked blocks. Input/output positions are recorded on
  * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem} before placement and
- * handed off via {@link #setMarks}. Requires a single {@link MachineFrame} directly above to run.
+ * handed off via {@link #setMarks}. Requires a single {@link MachineFrame} directly below to run.
  */
 @SuppressWarnings("null")
 public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController, EntropyInfoProvider {
@@ -135,10 +135,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     }
 
     private BlockPos framePos() {
-        return worldPosition.above();
+        return worldPosition.below();
     }
 
-    /** The frame position above this pylon if it still needs a {@link MachineFrame} block; empty once one's present. */
+    /** The frame position below this pylon if it still needs a {@link MachineFrame} block; empty once one's present. */
     public List<BlockPos> findMissing() {
         if (level == null) return List.of();
         BlockPos framePos = framePos();
@@ -149,7 +149,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return level.getBlockState(framePos).is(Registration.MACHINE_FRAME_BLOCK.get()) ? List.of() : List.of(framePos);
     }
 
-    /** Re-checks for a {@link MachineFrame} directly above and updates {@link #formed}, syncing to
+    /** Re-checks for a {@link MachineFrame} directly below and updates {@link #formed}, syncing to
      * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed. */
     public boolean checkStructure() {
         if (level == null) return formed;
@@ -195,7 +195,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Red outline traced along the edges of the still-missing frame position directly above. */
+    /** Red outline traced along the edges of the still-missing frame position directly below. */
     private void highlightMissing(ServerLevel serverLevel) {
         BlockPos pos = framePos();
         for (Vector3f point : BoxEdgeParticles.outline(pos.getX(), pos.getY(), pos.getZ(),
