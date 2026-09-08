@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.entropy;
 
+import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.network.chat.Style;
@@ -33,5 +34,31 @@ public final class EntropyDisplay {
         TextColor color = type == EntropyType.ORDER ? ORDER_UNIT_COLOR : CHAOS_UNIT_COLOR;
         String text = type == EntropyType.ORDER ? " ORD" : " CHS";
         return Component.literal(text).setStyle(Style.EMPTY.withColor(color));
+    }
+
+    /** Rebuilds {@code text} as a component, recoloring any "ORD" / "CHS" substrings with their
+     * entropy colors and everything else with {@code baseColor}. Embedding raw §-format codes
+     * directly in the lang file doesn't render correctly in every tooltip context, so callers
+     * that mix these tokens into flavor text should route through this instead. */
+    public static MutableComponent colorTokens(String text, ChatFormatting baseColor) {
+        MutableComponent result = Component.empty();
+        int i = 0;
+        while (i < text.length()) {
+            int ordIdx = text.indexOf("ORD", i);
+            int chsIdx = text.indexOf("CHS", i);
+            int next = ordIdx == -1 ? chsIdx : (chsIdx == -1 ? ordIdx : Math.min(ordIdx, chsIdx));
+            if (next == -1) {
+                result.append(Component.literal(text.substring(i)).withStyle(baseColor));
+                break;
+            }
+            if (next > i) {
+                result.append(Component.literal(text.substring(i, next)).withStyle(baseColor));
+            }
+            boolean isOrder = next == ordIdx;
+            TextColor color = isOrder ? ORDER_UNIT_COLOR : CHAOS_UNIT_COLOR;
+            result.append(Component.literal(isOrder ? "ORD" : "CHS").setStyle(Style.EMPTY.withColor(color)));
+            i = next + 3;
+        }
+        return result;
     }
 }

@@ -14,6 +14,7 @@ import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorStopPac
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorToggleRepeatPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootGeneratorTriggerRollPacket;
 import io.github.tofithepuppycat.temporalindustries.network.LootTableSuggestionsRequestPacket;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.AbstractSliderButton;
 import net.minecraft.client.gui.components.EditBox;
@@ -422,8 +423,9 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             renderRollIconTooltip(guiGraphics, mouseX, mouseY);
         }
         if (isOver(mouseX, mouseY, leftPos + LUCK_SLIDER_X, topPos + LUCK_SLIDER_Y, LUCK_SLIDER_WIDTH, LUCK_SLIDER_HEIGHT)) {
-            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.loot_generator.luck_cost",
-                    menu.getRollCost(), menu.getItemCost()), mouseX, mouseY);
+            String luckCostText = Component.translatable("gui.temporalindustries.loot_generator.luck_cost",
+                    menu.getRollCost(), menu.getItemCost()).getString();
+            guiGraphics.renderTooltip(font, EntropyDisplay.colorTokens(luckCostText, ChatFormatting.WHITE), mouseX, mouseY);
         }
     }
 
