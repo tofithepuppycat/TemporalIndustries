@@ -106,6 +106,8 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
     private double entropyAccumulator = 0.0;
     /** Whether both a hot and cold source were present as of the last tick, purely for the Entropy Glasses overlay. */
     private boolean active = false;
+    /** Clamped [0, MAX_TEMP_DIFF] hot/cold temperature gap as of the last tick, purely for the Entropy Glasses overlay. */
+    private int tempDiff = 0;
 
     public SeebeckGeneratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.SEEBECK_GENERATOR_BLOCK_ENTITY.get(), pos, state);
@@ -119,8 +121,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
     public List<Component> getEntropyTooltip() {
         List<Component> lines = new ArrayList<>();
         lines.add(Component.translatable("block.temporalindustries.seebeck_generator").withStyle(ChatFormatting.WHITE));
-        lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.energy",
-                        energyStorage.getEnergyStored(), energyStorage.getMaxEnergyStored())
+        lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.temp_diff", tempDiff, MAX_TEMP_DIFF)
                 .withStyle(ChatFormatting.YELLOW));
         lines.add((active
                 ? Component.translatable("overlay.temporalindustries.entropy_glasses.seebeck_generator.generating")
@@ -144,13 +145,15 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         boolean hot = (hotState.is(HOT_SOURCES) || extraHot.containsKey(hotState.getBlock())) && isActiveHot(hotState);
         boolean cold = coldState.is(COLD_SOURCES) || extraCold.containsKey(coldState.getBlock());
         boolean wasActive = be.active;
+        int previousTempDiff = be.tempDiff;
         be.active = hot && cold;
+        be.tempDiff = clampedTempDiff(hotState.getBlock(), coldState.getBlock(), extraHot, extraCold);
         if (!be.active) {
-            if (wasActive) be.syncToClients();
+            if (wasActive || be.tempDiff != previousTempDiff) be.syncToClients();
             return;
         }
 
-        double tempFactor = temperatureFactor(hotState.getBlock(), coldState.getBlock(), extraHot, extraCold);
+        double tempFactor = (double) be.tempDiff / MAX_TEMP_DIFF;
         int genRate = (int) Math.round(MIN_GEN_RATE_FE_PER_TICK + (MAX_GEN_RATE_FE_PER_TICK - MIN_GEN_RATE_FE_PER_TICK) * tempFactor);
         be.energyStorage.produce(genRate);
         be.syncToClients();
@@ -180,11 +183,11 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         return true;
     }
 
-    /** Normalized (0-1) temperature gap between the hot and cold source, scaled against the widest possible pairing. */
-    private static double temperatureFactor(Block hot, Block cold, Map<Block, Integer> extraHot, Map<Block, Integer> extraCold) {
+    /** Temperature gap between the hot and cold source, clamped to [0, MAX_TEMP_DIFF]. */
+    private static int clampedTempDiff(Block hot, Block cold, Map<Block, Integer> extraHot, Map<Block, Integer> extraCold) {
         int hotTemp = TEMPERATURES.getOrDefault(hot, extraHot.getOrDefault(hot, 0));
         int coldTemp = TEMPERATURES.getOrDefault(cold, extraCold.getOrDefault(cold, 0));
-        return Math.clamp((double) (hotTemp - coldTemp) / MAX_TEMP_DIFF, 0.0, 1.0);
+        return Math.clamp(hotTemp - coldTemp, 0, MAX_TEMP_DIFF);
     }
 
     /** Config-defined hot sources beyond the {@link #HOT_SOURCES} tag, re-parsed only when the config list changes. */
@@ -257,6 +260,7 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putDouble("EntropyAccumulator", entropyAccumulator);
         tag.putBoolean("Active", active);
+        tag.putInt("TempDiff", tempDiff);
     }
 
     @Override
@@ -265,5 +269,6 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
         entropyAccumulator = tag.getDouble("EntropyAccumulator");
         active = tag.getBoolean("Active");
+        tempDiff = tag.getInt("TempDiff");
     }
 }
