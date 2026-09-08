@@ -4,6 +4,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
+
 import java.util.List;
 
 /** Gates flavor/how-to-use tooltip lines behind Shift so tooltips stay short by default. Functional
@@ -14,7 +16,8 @@ public final class TooltipUtil {
     public static void appendDescription(List<Component> tooltip, String... translationKeys) {
         if (Screen.hasShiftDown()) {
             for (String key : translationKeys) {
-                tooltip.add(Component.translatable(key).withStyle(ChatFormatting.GRAY));
+                String text = Component.translatable(key).getString();
+                tooltip.add(EntropyDisplay.colorTokens(text, ChatFormatting.GRAY));
             }
         } else {
             tooltip.add(Component.translatable("tooltip.temporalindustries.hold_shift")
