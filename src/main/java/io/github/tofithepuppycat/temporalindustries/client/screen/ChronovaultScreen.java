@@ -16,6 +16,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
@@ -35,6 +36,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final ResourceLocation ICON_CONFIG_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_config.png");
     private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_eye.png");
     private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_jump.png");
+    private static final ResourceLocation ICON_TRASHCAN_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_trashcan.png");
     private static final int ICON_CONFIG_SIZE = 26;
     private static final int TEXTURE_WIDTH = 256;
     private static final int TEXTURE_HEIGHT = 256;
@@ -100,6 +102,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private int showChangesY;
     private int jumpX;
     private int jumpY;
+    private int deleteBranchX;
+    private int deleteBranchY;
 
     public ChronovaultScreen(ChronovaultMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -121,11 +125,13 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     protected void init() {
         super.init();
 
-        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 2 + ACTION_BUTTON_GAP)) / 2;
+        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 3 + ACTION_BUTTON_GAP * 2)) / 2;
         showChangesX = groupX;
         jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        deleteBranchX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
+        deleteBranchY = showChangesY;
 
         autoTrackX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         autoTrackY = panelY() + AUTO_TRACK_Y_OFFSET;
@@ -200,6 +206,17 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
+    private void deleteSelectedBranch() {
+        if (!TimelineProjectionManager.isSelectedBranchDeletable()) {
+            return;
+        }
+        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), TimelineProjectionManager.getSelectedCommitId()));
+        TimelineProjectionManager.clearSelectedCommit();
+        // Deleting a branch doesn't move the chunk's head, so the server's "nothing changed" skip
+        // would otherwise suppress a reply; force a full resync to pick up the removed commits.
+        PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE, Long.MIN_VALUE));
+    }
+
     private static Component showChangesLabel(boolean enabled) {
         return Component.translatable(enabled
                 ? "gui.temporalindustries.chronovault.hide_changes"
@@ -250,6 +267,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         int jumpTint = !jumpActive ? 0x80000000 : (isMouseOverJumpButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
         IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
+
+        boolean deleteActive = TimelineProjectionManager.isSelectedBranchDeletable();
+        int deleteTint = !deleteActive ? 0x80000000 : (isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
+        IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
     }
 
     private boolean isMouseOverShowChangesButton(double mouseX, double mouseY) {
@@ -260,6 +282,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private boolean isMouseOverJumpButton(double mouseX, double mouseY) {
         return mouseX >= jumpX && mouseX <= jumpX + ACTION_BUTTON_SIZE
                 && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
+    }
+
+    private boolean isMouseOverDeleteBranchButton(double mouseX, double mouseY) {
+        return mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
+                && mouseY >= deleteBranchY && mouseY <= deleteBranchY + ACTION_BUTTON_SIZE;
     }
 
     private boolean isMouseOverEnergyBar(int mouseX, int mouseY) {
@@ -443,6 +470,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
+        } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
+            Component label = TimelineProjectionManager.isSelectedBranchDeletable()
+                    ? Component.translatable("gui.temporalindustries.chronovault.delete_branch")
+                    : Component.translatable("gui.temporalindustries.chronovault.delete_branch_in_use");
+            guiGraphics.renderTooltip(font, label, mouseX, mouseY);
         }
     }
 
@@ -483,6 +515,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         if (button == 0 && isMouseOverJumpButton(mouseX, mouseY)) {
             jumpAndClose();
+            return true;
+        }
+
+        if (button == 0 && isMouseOverDeleteBranchButton(mouseX, mouseY)) {
+            deleteSelectedBranch();
             return true;
         }
 

@@ -55,6 +55,45 @@ public class TemporalTimeline {
         chunkHeadId.remove(chunkKey);
     }
 
+    /** Deletes chunkPos's branchCommitId and everything forked from it within chunkPos's own local
+     * history, provided the chunk's current head doesn't sit inside that subtree — i.e. the branch
+     * being deleted isn't the one currently checked out. Only drops chunkPos's local references,
+     * same as {@link #clearChunkHistory}; commits shared with other chunks stay registered globally.
+     * @return true if the branch was deleted */
+    public boolean deleteBranch(ChunkPos chunkPos, long branchCommitId) {
+        TemporalCommit branch = byId.get(branchCommitId);
+        if (branch == null || branch.getType() != TemporalCommit.Type.BRANCH) return false;
+
+        long chunkKey = chunkPos.toLong();
+        Map<Long, Long> localParents = chunkLocalParent.get(chunkKey);
+        if (localParents == null || !localParents.containsKey(branchCommitId)) return false;
+
+        Set<Long> subtree = collectSubtree(localParents, branchCommitId);
+        if (subtree.contains(getChunkHeadId(chunkPos))) return false;
+
+        List<Long> ids = chunkIndex.get(chunkKey);
+        if (ids != null) ids.removeIf(subtree::contains);
+        localParents.keySet().removeAll(subtree);
+        return true;
+    }
+
+    /** rootId plus every commit transitively forked from it, per localParents' child links. */
+    private static Set<Long> collectSubtree(Map<Long, Long> localParents, long rootId) {
+        Map<Long, List<Long>> children = new HashMap<>();
+        for (Map.Entry<Long, Long> entry : localParents.entrySet()) {
+            children.computeIfAbsent(entry.getValue(), k -> new ArrayList<>()).add(entry.getKey());
+        }
+        Set<Long> result = new HashSet<>();
+        Deque<Long> stack = new ArrayDeque<>();
+        stack.push(rootId);
+        while (!stack.isEmpty()) {
+            long id = stack.pop();
+            if (!result.add(id)) continue;
+            for (long child : children.getOrDefault(id, List.of())) stack.push(child);
+        }
+        return result;
+    }
+
     public TemporalCommit addDelta(long gameTime, List<ChunkDelta> chunkDeltas) {
         return addDelta(gameTime, chunkDeltas, false);
     }
