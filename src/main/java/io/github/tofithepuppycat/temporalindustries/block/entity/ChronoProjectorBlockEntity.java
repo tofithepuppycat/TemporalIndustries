@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoRecording;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -420,8 +421,8 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
                                 ? "block.temporalindustries.echo_projector.glasses_active"
                                 : "block.temporalindustries.echo_projector.glasses_paused")
                         .withStyle(active ? ChatFormatting.GREEN : ChatFormatting.RED),
-                Component.translatable("block.temporalindustries.echo_projector.glasses_energy_rate",
-                        String.format("%.1f", cachedRecording.averageEnergyPerTick()), cachedRecording.peakEnergyPerTick())
+                EntropyDisplay.colorTokens(Component.translatable("block.temporalindustries.echo_projector.glasses_energy_rate",
+                        String.format("%.1f", cachedRecording.averageEnergyPerTick()), cachedRecording.peakEnergyPerTick()).getString(), ChatFormatting.GRAY)
         );
     }
 
