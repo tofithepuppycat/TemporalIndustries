@@ -52,6 +52,8 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     private long markerGameTime = UNSET_TIME;
     @Nullable private BlockState markerState;
     @Nullable private CompoundTag markerBlockEntityTag;
+    /** Edge-detects incoming redstone pulses; deliberately not persisted. */
+    private boolean powered;
 
     private final class MachineFluidHandler implements IFluidHandler {
         @Override public int getTanks() { return 2; }
@@ -223,6 +225,14 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
 
     public boolean hasMarker() {
         return markerGameTime != UNSET_TIME;
+    }
+
+    public boolean isPowered() {
+        return powered;
+    }
+
+    public void setPowered(boolean powered) {
+        this.powered = powered;
     }
 
     public long getMarkerGameTime() {

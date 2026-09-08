@@ -25,7 +25,7 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Single-block-tier time machine: marks the state of the block its front face points at.
- * Sneak-right-click sets the marker; a plain right-click restores it for an energy cost.
+ * Sneak-right-click sets the marker; a redstone pulse restores it for an energy cost.
  */
 @SuppressWarnings("null")
 public class Chronodial extends BaseEntityBlock {
@@ -69,30 +69,45 @@ public class Chronodial extends BaseEntityBlock {
             return InteractionResult.PASS;
         }
 
-        if (player.isShiftKeyDown()) {
-            chronodial.setMarker();
-            player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.marker_set"), true);
-            level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.2F);
-            return InteractionResult.CONSUME;
+        if (!player.isShiftKeyDown()) {
+            return InteractionResult.PASS;
         }
+
+        chronodial.setMarker();
+        player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.marker_set"), true);
+        level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.BLOCKS, 1.0F, 1.2F);
+        return InteractionResult.CONSUME;
+    }
+
+    @Override
+    protected void neighborChanged(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
+                                    @NotNull Block neighborBlock, @NotNull BlockPos neighborPos, boolean movedByPiston) {
+        super.neighborChanged(state, level, pos, neighborBlock, neighborPos, movedByPiston);
+        if (level.isClientSide) {
+            return;
+        }
+
+        if (!(level.getBlockEntity(pos) instanceof ChronodialBlockEntity chronodial)) {
+            return;
+        }
+
+        boolean powered = level.hasNeighborSignal(pos);
+        if (!powered) {
+            chronodial.setPowered(false);
+            return;
+        }
+        if (chronodial.isPowered()) {
+            return;
+        }
+        chronodial.setPowered(true);
 
         ChronodialBlockEntity.JumpResult result = chronodial.jumpToMarker();
         switch (result) {
             case SUCCESS -> level.playSound(null, pos, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
-            case ALREADY_AT_MARKER -> player.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronodial.already_at_marker"), true);
-            case NO_MARKER -> player.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronodial.no_marker"), true);
-            case INSUFFICIENT_ENERGY -> {
-                player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.insufficient_energy"), true);
-                level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
-            }
-            case ENTROPY_MAXED -> {
-                player.displayClientMessage(Component.translatable("block.temporalindustries.chronodial.entropy_maxed"), true);
-                level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
-            }
+            case ALREADY_AT_MARKER, NO_MARKER -> { }
+            case INSUFFICIENT_ENERGY, ENTROPY_MAXED ->
+                    level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
         }
-        return InteractionResult.CONSUME;
     }
 
     @Nullable
