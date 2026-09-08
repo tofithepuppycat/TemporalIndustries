@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.block.BoxEdgeParticles;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
@@ -46,7 +47,7 @@ import java.util.List;
  * handed off via {@link #setMarks}. Requires a single {@link MachineFrame} directly above to run.
  */
 @SuppressWarnings("null")
-public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController {
+public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController, EntropyInfoProvider {
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
     /** mB of whichever fluid is present, moved per input->output pair each tick. */
     private static final int TRANSFER_RATE_MB = 50;
@@ -111,6 +112,18 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
     public boolean isFormed() {
         return formed;
+    }
+
+    @Override
+    public List<Component> getEntropyTooltip() {
+        ResourceLocation key = BuiltInRegistries.BLOCK.getKey(getBlockState().getBlock());
+        String prefix = "block." + key.getNamespace() + "." + key.getPath();
+        Component formedComponent = formed
+                ? Component.translatable(prefix + ".formed").withStyle(ChatFormatting.GREEN)
+                : Component.translatable(prefix + ".unformed").withStyle(ChatFormatting.RED);
+        return List.of(
+                Component.translatable(prefix).withStyle(ChatFormatting.WHITE),
+                Component.translatable(prefix + ".status", inputs.size(), outputs.size(), formedComponent).withStyle(ChatFormatting.GRAY));
     }
 
     /** Called once, right as the placing item hands off whatever marks are still in range. */
