@@ -59,10 +59,10 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     public static final int PROGRESS_WIDTH = 34;
     public static final int PROGRESS_HEIGHT = 34;
 
-    /** Shown above the output slot only when the input has more than one matching recipe (e.g.
+    /** Shown below the output slot only when the input has more than one matching recipe (e.g.
      * Order+sand can yield glass, sandstone, or gravel); click it to cycle the chosen output. */
     private static final int RECIPE_SELECT_X = 116;
-    private static final int RECIPE_SELECT_Y = 16;
+    private static final int RECIPE_SELECT_Y = 53;
     private static final int RECIPE_SELECT_SIZE = 16;
 
     public EntropyManipulatorScreen(EntropyManipulatorMenu menu, Inventory playerInventory, Component title) {
@@ -88,7 +88,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         renderRecipeSelect(guiGraphics);
     }
 
-    /** Draws the currently-selected output item as a ghost icon above the output slot when the
+    /** Draws the currently-selected output item as a ghost icon below the output slot when the
      * input is ambiguous, so the player can see (and click to cycle) what will be produced. */
     private void renderRecipeSelect(GuiGraphics guiGraphics) {
         if (menu.getRecipeOptionCount() <= 1) return;
