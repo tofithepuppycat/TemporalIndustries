@@ -11,6 +11,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -21,6 +23,8 @@ import net.minecraft.world.MenuProvider;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
+import net.minecraft.core.registries.BuiltInRegistries;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.RecipeHolder;
@@ -36,7 +40,10 @@ import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.NotNull;
 
+import java.util.Comparator;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /**
  * Spends liquid Order or Chaos to transmute whatever sits in its input slot, or the fluid in its
@@ -129,6 +136,9 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     private int maxProgress = PROCESS_TICKS;
     @Nullable
     private EntropyType activeType = null;
+    /** Player's chosen output per input item, for inputs with more than one matching recipe
+     * (e.g. Order+sand could yield glass, sandstone, or gravel); cycled via the GUI. */
+    private final Map<Item, ResourceLocation> preferredRecipes = new HashMap<>();
 
     public EntropyManipulatorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.ENTROPY_MANIPULATOR_BLOCK_ENTITY.get(), pos, state);
@@ -207,25 +217,82 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         syncToClients();
     }
 
+    private EntropyManipulatorRecipe.Input currentInput() {
+        ItemStack input = items.get(INPUT_SLOT);
+        return !input.isEmpty()
+                ? new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY)
+                : new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
+    }
+
+    /** Every recipe whose input matches, sorted by id for a stable pick/cycle order. Several
+     * recipes can share an input and entropy type (e.g. Order+sand can yield glass, sandstone, or
+     * gravel), so this list may legitimately contain more than one entry. */
+    private List<RecipeHolder<EntropyManipulatorRecipe>> getMatchingRecipes(EntropyManipulatorRecipe.Input recipeInput) {
+        if (level == null) return List.of();
+        var recipeManager = level.getRecipeManager();
+        var recipeType = Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
+        return recipeManager.getAllRecipesFor(recipeType).stream()
+                .filter(holder -> holder.value().matches(recipeInput, level))
+                .sorted(Comparator.comparing(holder -> holder.id().toString()))
+                .toList();
+    }
+
+    /** Among ambiguous matches, prefers the player's saved choice for this input item, falling
+     * back to the first (stably ordered) candidate. */
+    @Nullable
+    private RecipeHolder<EntropyManipulatorRecipe> pickPreferred(List<RecipeHolder<EntropyManipulatorRecipe>> matches, ItemStack input) {
+        if (matches.isEmpty()) return null;
+        if (!input.isEmpty()) {
+            ResourceLocation preferred = preferredRecipes.get(input.getItem());
+            if (preferred != null) {
+                for (RecipeHolder<EntropyManipulatorRecipe> holder : matches) {
+                    if (holder.id().equals(preferred)) return holder;
+                }
+            }
+        }
+        return matches.get(0);
+    }
+
     @Nullable
     private EntropyManipulatorRecipe resolveActiveRecipe() {
         if (level == null) return null;
-        var recipeManager = level.getRecipeManager();
-        var recipeType = Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
+        EntropyManipulatorRecipe.Input recipeInput = currentInput();
+        List<RecipeHolder<EntropyManipulatorRecipe>> processable = getMatchingRecipes(recipeInput).stream()
+                .filter(holder -> canProcess(holder.value()))
+                .toList();
+        RecipeHolder<EntropyManipulatorRecipe> chosen = pickPreferred(processable, recipeInput.item());
+        return chosen == null ? null : chosen.value();
+    }
 
-        ItemStack input = items.get(INPUT_SLOT);
-        EntropyManipulatorRecipe.Input recipeInput = !input.isEmpty()
-                ? new EntropyManipulatorRecipe.Input(input, FluidStack.EMPTY)
-                : new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
+    /** How many recipes currently match the input slot/tank, regardless of whether entropy is
+     * available to run them; the GUI only offers cycling when this is more than one. */
+    public int getMatchingRecipeCount() {
+        return getMatchingRecipes(currentInput()).size();
+    }
 
-        // A chaos and order recipe can share the same input item, making matches() alone ambiguous;
-        // resolve by picking whichever candidate the manipulator actually has the entropy fluid to run.
-        return recipeManager.getAllRecipesFor(recipeType).stream()
-                .map(RecipeHolder::value)
-                .filter(recipe -> recipe.matches(recipeInput, level))
-                .filter(this::canProcess)
-                .findFirst()
-                .orElse(null);
+    /** The output item the manipulator will currently produce for the input, ignoring entropy
+     * availability, for GUI preview purposes. */
+    public ItemStack getSelectedRecipePreview(HolderLookup.Provider registries) {
+        EntropyManipulatorRecipe.Input recipeInput = currentInput();
+        RecipeHolder<EntropyManipulatorRecipe> chosen = pickPreferred(getMatchingRecipes(recipeInput), recipeInput.item());
+        return chosen == null ? ItemStack.EMPTY : chosen.value().getResultItem(registries);
+    }
+
+    /** Advances the player's chosen output for the current input item to the next matching recipe,
+     * wrapping around; a no-op if there's no ambiguity to resolve. */
+    public void cyclePreferredRecipe() {
+        EntropyManipulatorRecipe.Input recipeInput = currentInput();
+        ItemStack input = recipeInput.item();
+        if (input.isEmpty()) return;
+
+        List<RecipeHolder<EntropyManipulatorRecipe>> matches = getMatchingRecipes(recipeInput);
+        if (matches.size() < 2) return;
+
+        RecipeHolder<EntropyManipulatorRecipe> active = pickPreferred(matches, input);
+        int index = (matches.indexOf(active) + 1) % matches.size();
+        preferredRecipes.put(input.getItem(), matches.get(index).id());
+        setChanged();
+        syncToClients();
     }
 
     private boolean canProcess(EntropyManipulatorRecipe recipe) {
@@ -324,6 +391,15 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         tag.putInt("Progress", progress);
         if (activeType != null) tag.putString("ActiveType", activeType.name());
         ContainerHelper.saveAllItems(tag, items, registries);
+
+        ListTag preferredTag = new ListTag();
+        preferredRecipes.forEach((item, recipeId) -> {
+            CompoundTag entry = new CompoundTag();
+            entry.putString("Item", BuiltInRegistries.ITEM.getKey(item).toString());
+            entry.putString("Recipe", recipeId.toString());
+            preferredTag.add(entry);
+        });
+        tag.put("PreferredRecipes", preferredTag);
     }
 
     @Override
@@ -336,5 +412,14 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         activeType = tag.contains("ActiveType") ? EntropyType.valueOf(tag.getString("ActiveType")) : null;
         items.clear();
         ContainerHelper.loadAllItems(tag, items, registries);
+
+        preferredRecipes.clear();
+        if (tag.contains("PreferredRecipes")) {
+            for (Tag entryTag : tag.getList("PreferredRecipes", Tag.TAG_COMPOUND)) {
+                CompoundTag entry = (CompoundTag) entryTag;
+                Item item = BuiltInRegistries.ITEM.get(ResourceLocation.parse(entry.getString("Item")));
+                preferredRecipes.put(item, ResourceLocation.parse(entry.getString("Recipe")));
+            }
+        }
     }
 }

@@ -6,6 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipula
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
+import io.github.tofithepuppycat.temporalindustries.network.EntropyManipulatorCycleRecipePacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -15,10 +16,14 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.inventory.InventoryMenu;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.level.material.Fluid;
 import net.minecraft.world.level.material.Fluids;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidType;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
 /** Textured GUI for the Entropy Manipulator: two vertical entropy tank bars (Chaos/Order), a
@@ -54,6 +59,12 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     public static final int PROGRESS_WIDTH = 34;
     public static final int PROGRESS_HEIGHT = 34;
 
+    /** Shown above the output slot only when the input has more than one matching recipe (e.g.
+     * Order+sand can yield glass, sandstone, or gravel); click it to cycle the chosen output. */
+    private static final int RECIPE_SELECT_X = 116;
+    private static final int RECIPE_SELECT_Y = 16;
+    private static final int RECIPE_SELECT_SIZE = 16;
+
     public EntropyManipulatorScreen(EntropyManipulatorMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
@@ -74,6 +85,22 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
                 menu.getOrderFluidAmount(), menu.getEntropyTankCapacity(), Registration.ORDER_FLUID_TYPE.get(), EntropyType.ORDER.color());
 
         renderProgress(guiGraphics);
+        renderRecipeSelect(guiGraphics);
+    }
+
+    /** Draws the currently-selected output item as a ghost icon above the output slot when the
+     * input is ambiguous, so the player can see (and click to cycle) what will be produced. */
+    private void renderRecipeSelect(GuiGraphics guiGraphics) {
+        if (menu.getRecipeOptionCount() <= 1) return;
+        int itemId = menu.getSelectedRecipeOutputId();
+        if (itemId < 0) return;
+
+        Item item = BuiltInRegistries.ITEM.byId(itemId);
+        if (item == Items.AIR) return;
+
+        int x = leftPos + RECIPE_SELECT_X;
+        int y = topPos + RECIPE_SELECT_Y;
+        guiGraphics.renderItem(new ItemStack(item), x, y);
     }
 
     /** Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with the entropy color. */
@@ -173,7 +200,23 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
             guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getEntropyTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
         } else if (isOver(mouseX, mouseY, leftPos + LIQUID_X, topPos + LIQUID_Y, LIQUID_WIDTH, LIQUID_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.literal(menu.getLiquidFluidAmount() + "/" + menu.getLiquidTankCapacity() + " mB"), mouseX, mouseY);
+        } else if (menu.getRecipeOptionCount() > 1
+                && isOver(mouseX, mouseY, leftPos + RECIPE_SELECT_X, topPos + RECIPE_SELECT_Y, RECIPE_SELECT_SIZE, RECIPE_SELECT_SIZE)) {
+            int itemId = menu.getSelectedRecipeOutputId();
+            Item item = itemId < 0 ? Items.AIR : BuiltInRegistries.ITEM.byId(itemId);
+            guiGraphics.renderTooltip(font, Component.translatable(
+                    "gui.temporalindustries.entropy_manipulator.recipe_select", item.getDescription()), mouseX, mouseY);
         }
+    }
+
+    @Override
+    public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (button == 0 && menu.getRecipeOptionCount() > 1
+                && isOver((int) mouseX, (int) mouseY, leftPos + RECIPE_SELECT_X, topPos + RECIPE_SELECT_Y, RECIPE_SELECT_SIZE, RECIPE_SELECT_SIZE)) {
+            PacketDistributor.sendToServer(new EntropyManipulatorCycleRecipePacket(menu.getBlockPos()));
+            return true;
+        }
+        return super.mouseClicked(mouseX, mouseY, button);
     }
 
     private boolean isOver(int mouseX, int mouseY, int x, int y, int width, int height) {
