@@ -123,6 +123,7 @@
 	"block.temporalindustries.despawn_accelerator.tooltip": "Accelerates item despawning.\nYield: 1 ORD per item\nProcess Time: 5s",
 	"block.temporalindustries.entropy_manipulator": "Entropy Manipulator",
 	"block.temporalindustries.entropy_manipulator.tooltip": "Transmutes items into other items in a given entropy chain.",
+	"gui.temporalindustries.entropy_manipulator.recipe_select": "Producing: %s (click to cycle)",
 	"jei.temporalindustries.entropy_manipulator_chain": "Entropy Chain",
 	"block.temporalindustries.loot_generator": "Loot Generator",
 	"block.temporalindustries.loot_generator.tooltip": "Spends CHS to roll a chosen loot table\n(vanilla or modded) into its own chest-sized inventory.\nRequires a Machine Frame structure to function.",

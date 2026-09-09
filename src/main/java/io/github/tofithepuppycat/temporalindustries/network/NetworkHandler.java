@@ -148,5 +148,10 @@ public class NetworkHandler {
                 LootTableSuggestionsSyncPacket.TYPE,
                 LootTableSuggestionsSyncPacket.STREAM_CODEC,
                 LootTableSuggestionsSyncPacket::handle);
+
+        registrar.playToServer(
+                EntropyManipulatorCycleRecipePacket.TYPE,
+                EntropyManipulatorCycleRecipePacket.STREAM_CODEC,
+                EntropyManipulatorCycleRecipePacket::handle);
     }
 }
