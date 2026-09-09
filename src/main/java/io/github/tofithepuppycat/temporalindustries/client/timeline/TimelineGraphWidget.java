@@ -93,37 +93,25 @@ public final class TimelineGraphWidget {
     private double viewOffsetY = 0.0D;
     private double zoom = 1.0D;
 
-    /** Per-machine pan/zoom, kept across GUI close+reopen for this client session. */
-    private static final Map<BlockPos, ViewState> savedViewStates = new HashMap<>();
-
-    private record ViewState(double offsetX, double offsetY, double zoom) {}
-
     private BlockPos machinePos;
 
-    /** Call from the screen's init(): sets which machine's saved pan/zoom to restore. */
+    /** Call from the screen's init(): resets pan/zoom so the view recenters on the current node. */
     public void init(BlockPos machinePos) {
         this.machinePos = machinePos;
         viewInitialized = false;
         draggingView = false;
-
-        ViewState saved = savedViewStates.get(machinePos);
-        if (saved != null) {
-            viewOffsetX = saved.offsetX();
-            viewOffsetY = saved.offsetY();
-            zoom = saved.zoom();
-            viewInitialized = true;
-        } else {
-            viewOffsetX = 0.0D;
-            viewOffsetY = 0.0D;
-            zoom = 1.0D;
-        }
+        viewOffsetX = 0.0D;
+        viewOffsetY = 0.0D;
+        zoom = 1.0D;
     }
 
-    /** Call from the screen's onClose(): persists pan/zoom for next time this machine is opened. */
+    /** Call from the screen's onClose(): resets pan/zoom so reopening recenters on the current node. */
     public void onClose() {
-        if (machinePos != null) {
-            savedViewStates.put(machinePos, new ViewState(viewOffsetX, viewOffsetY, zoom));
-        }
+        viewInitialized = false;
+        draggingView = false;
+        viewOffsetX = 0.0D;
+        viewOffsetY = 0.0D;
+        zoom = 1.0D;
     }
 
     public void render(GuiGraphics guiGraphics, Font font, int graphX, int graphY, int graphWidth, int graphHeight) {
@@ -140,18 +128,18 @@ public final class TimelineGraphWidget {
             computeLayout(commits, localParentById);
         }
 
+        long headCommitId = TimelineProjectionManager.getHeadCommitId();
+
         if (!viewInitialized) {
-            TemporalCommit latest = commits.get(commits.size() - 1);
-            double lastColumn = columnById.get(latest.getId());
-            int lastRow = rowById.get(latest.getId());
-            viewOffsetX = (graphWidth - 24) - lastColumn * COLUMN_SPACING * zoom;
-            viewOffsetY = (graphHeight / 2.0D) - lastRow * ROW_SPACING * zoom;
+            TemporalCommit centerOn = byId.getOrDefault(headCommitId, commits.get(commits.size() - 1));
+            double centerColumn = columnById.get(centerOn.getId());
+            int centerRow = rowById.get(centerOn.getId());
+            viewOffsetX = (graphWidth / 2.0D) - centerColumn * COLUMN_SPACING * zoom;
+            viewOffsetY = (graphHeight / 2.0D) - centerRow * ROW_SPACING * zoom;
             viewInitialized = true;
         }
 
         guiGraphics.enableScissor(graphX, graphY, graphX + graphWidth, graphY + graphHeight);
-
-        long headCommitId = TimelineProjectionManager.getHeadCommitId();
 
         // Two passes so lines always render under labels.
         int r = nodeRadius();
