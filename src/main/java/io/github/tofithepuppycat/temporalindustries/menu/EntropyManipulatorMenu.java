@@ -38,7 +38,7 @@ public class EntropyManipulatorMenu extends AbstractContainerMenu {
     }
 
     public EntropyManipulatorMenu(int id, Inventory playerInventory, EntropyManipulatorBlockEntity blockEntity) {
-        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(9));
+        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(11));
     }
 
     public EntropyManipulatorMenu(int id, Inventory playerInventory, EntropyManipulatorBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -48,7 +48,7 @@ public class EntropyManipulatorMenu extends AbstractContainerMenu {
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 9);
+        checkContainerDataCount(data, 11);
         addDataSlots(data);
 
         addSlot(new Slot(blockEntity, EntropyManipulatorBlockEntity.INPUT_SLOT, INPUT_SLOT_X, INPUT_SLOT_Y));
@@ -89,6 +89,23 @@ public class EntropyManipulatorMenu extends AbstractContainerMenu {
         EntropyType activeType = blockEntity.getActiveType();
         data.set(7, activeType == null ? 0 : activeType.ordinal() + 1);
         data.set(8, blockEntity.getMaxProgress());
+
+        int optionCount = blockEntity.getMatchingRecipeCount();
+        data.set(9, optionCount);
+        ItemStack preview = optionCount > 1
+                ? blockEntity.getSelectedRecipePreview(blockEntity.getLevel().registryAccess())
+                : ItemStack.EMPTY;
+        data.set(10, preview.isEmpty() ? -1 : BuiltInRegistries.ITEM.getId(preview.getItem()));
+    }
+
+    /** Number of recipes currently matching the input; the GUI only shows the cycle icon above 1. */
+    public int getRecipeOptionCount() {
+        return data.get(9);
+    }
+
+    /** Registry id of the currently selected output item, or -1 if there's no ambiguity to preview. */
+    public int getSelectedRecipeOutputId() {
+        return data.get(10);
     }
 
     public int getChaosFluidAmount() {
