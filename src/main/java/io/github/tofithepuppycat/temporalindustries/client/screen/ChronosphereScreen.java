@@ -1,6 +1,8 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
 
@@ -126,6 +128,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private boolean settingsOverlayOpen = false;
     /** Whether the settings overlay is showing the "are you sure" step; reset when the overlay closes. */
     private boolean deleteHistoryConfirmPending = false;
+
+    /** Drag-to-select state for the claim map: the direction (claim/release) is fixed to whatever
+     * the first cell of the drag did, so dragging a chosen direction across a mixed selection
+     * doesn't flip cells back and forth. */
+    private boolean mapDragActive = false;
+    private boolean mapDragAdding = false;
+    private final Set<Long> mapDragTouchedChunks = new HashSet<>();
 
     private int bookmarkX;
     private int bookmarkY;
@@ -664,6 +673,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             mapOverlayOpen = !mapOverlayOpen;
             settingsOverlayOpen = false;
             deleteHistoryConfirmPending = false;
+            mapDragActive = false;
+            mapDragTouchedChunks.clear();
             if (mapOverlayOpen) {
                 ticksSinceMapSync = 0;
                 PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
@@ -689,10 +700,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 ChunkPos clicked = getGridCellAt(mouseX, mouseY);
                 if (clicked != null && !clicked.equals(new ChunkPos(menu.getBlockPos()))) {
                     long key = clicked.toLong();
-                    boolean add = !ChronosphereClientState.isSelected(key);
-                    if (!(add && ChronosphereClientState.isBlocked(key))) {
-                        PacketDistributor.sendToServer(new ChronosphereToggleChunkPacket(menu.getBlockPos(), key, add));
-                    }
+                    mapDragActive = true;
+                    mapDragAdding = !ChronosphereClientState.isSelected(key);
+                    mapDragTouchedChunks.clear();
+                    applyMapDragToggle(key);
                 }
             }
             // Modal: swallow clicks so nothing underneath reacts to them.
@@ -727,9 +738,26 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
+    /** Sends a toggle packet for {@code key} using the drag's fixed direction, once per cell per
+     * drag, skipping chunks blocked by another machine when claiming. */
+    private void applyMapDragToggle(long key) {
+        if (!mapDragTouchedChunks.add(key)) return;
+        if (mapDragAdding && ChronosphereClientState.isBlocked(key)) return;
+        PacketDistributor.sendToServer(new ChronosphereToggleChunkPacket(menu.getBlockPos(), key, mapDragAdding));
+    }
+
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
-        if (mapOverlayOpen || settingsOverlayOpen) {
+        if (mapOverlayOpen) {
+            if (button == 0 && mapDragActive) {
+                ChunkPos hovered = getGridCellAt(mouseX, mouseY);
+                if (hovered != null && !hovered.equals(new ChunkPos(menu.getBlockPos()))) {
+                    applyMapDragToggle(hovered.toLong());
+                }
+            }
+            return true;
+        }
+        if (settingsOverlayOpen) {
             return true;
         }
         if (graphWidget.mouseDragged(dragX, dragY)) {
@@ -741,6 +769,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (mapOverlayOpen) {
+            mapDragActive = false;
+            mapDragTouchedChunks.clear();
             return true;
         }
         if (button == 0 && graphWidget.mouseReleased()) {
