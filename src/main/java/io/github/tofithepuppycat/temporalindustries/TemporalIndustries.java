@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellComp
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
+import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftChunkListener;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.network.NetworkHandler;
@@ -48,5 +49,7 @@ public class TemporalIndustries
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onContainerClose);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onPlayerLoggedOut);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onServerTick);
+
+        NeoForge.EVENT_BUS.addListener(ChronoRiftChunkListener::onChunkLoad);
     }
 }
