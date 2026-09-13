@@ -27,9 +27,18 @@ public final class ChronoRiftChunkListener {
         }
 
         TemporalWorldData data = TemporalWorldData.get(riftLevel.getServer());
+        data.markChronoRiftChunkLoaded(event.getChunk().getPos());
         if (data.getChronoRiftActiveTime() == TemporalWorldData.NO_CHRONO_RIFT_SESSION) return;
 
         data.enqueueChronoRiftFill(event.getChunk().getPos());
+    }
+
+    public static void onChunkUnload(ChunkEvent.Unload event) {
+        if (!(event.getLevel() instanceof ServerLevel riftLevel) || riftLevel.dimension() != ChronoRiftDimension.LEVEL_KEY) {
+            return;
+        }
+
+        TemporalWorldData.get(riftLevel.getServer()).markChronoRiftChunkUnloaded(event.getChunk().getPos());
     }
 
     public static void onServerTick(ServerTickEvent.Post event) {

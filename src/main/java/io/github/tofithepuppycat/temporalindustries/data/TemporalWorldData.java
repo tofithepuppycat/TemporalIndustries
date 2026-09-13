@@ -70,6 +70,11 @@ public class TemporalWorldData extends SavedData {
     // synchronously from inside ChunkEvent.Load would re-enter the event and cascade outward
     // (observed as a server hang), so loads only enqueue here; a server-tick handler drains it.
     private final LinkedHashSet<Long> chronoRiftPendingFill = new LinkedHashSet<>();
+    // Chunks currently loaded in the rift dimension, maintained via ChunkEvent.Load/Unload. A chunk
+    // that stays loaded across an empty-rift session boundary never gets a fresh Load event, so it
+    // wouldn't otherwise notice its fill is stale for the new session's time; setChronoRiftActiveTime
+    // re-queues every entry here so already-loaded chunks still get corrected.
+    private final Set<Long> chronoRiftLoadedChunks = new HashSet<>();
 
     public long getChronoRiftActiveTime() {
         return chronoRiftActiveTime;
@@ -82,9 +87,19 @@ public class TemporalWorldData extends SavedData {
     }
 
     /** Opens (or re-confirms) the rift session at requestedTime. Only meaningful to call when the
-     * rift was just found empty by {@link #canEnterChronoRift}. */
+     * rift was just found empty by {@link #canEnterChronoRift}. Re-queues every chunk still loaded
+     * from a previous session so it gets corrected even though it won't fire a fresh Load event. */
     public void setChronoRiftActiveTime(long requestedTime) {
         chronoRiftActiveTime = requestedTime;
+        chronoRiftPendingFill.addAll(chronoRiftLoadedChunks);
+    }
+
+    public void markChronoRiftChunkLoaded(ChunkPos pos) {
+        chronoRiftLoadedChunks.add(pos.toLong());
+    }
+
+    public void markChronoRiftChunkUnloaded(ChunkPos pos) {
+        chronoRiftLoadedChunks.remove(pos.toLong());
     }
 
     @Nullable
