@@ -74,7 +74,9 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
      */
     private static List<EntropyManipulatorChain> buildChains(
             List<RecipeHolder<EntropyManipulatorRecipe>> recipes, net.minecraft.core.HolderLookup.Provider registries) {
-        record TypedCost(EntropyType type, int cost) {
+        // options: every stack this recipe could produce, already carrying its true count (result's
+        // own count for a fixed result, or result_count applied to each item in a tag result).
+        record TypedCost(EntropyType type, int cost, List<ItemStack> options) {
         }
 
         Map<Item, Map<Item, TypedCost>> directed = new LinkedHashMap<>();
@@ -90,13 +92,15 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
             if (matching.length == 0) continue;
 
             Item from = matching[0].getItem();
+            List<ItemStack> options = recipe.isTagResult()
+                    ? recipe.possibleResults(registries)
+                    : List.of(recipe.getResultItem(registries));
+            if (options.isEmpty() || options.get(0).isEmpty()) continue;
             // Tag-result recipes roll one of several outputs; use the first matching item as representative.
-            ItemStack resultStack = recipe.getResultItem(registries);
-            if (resultStack.isEmpty()) continue;
-            Item to = resultStack.getItem();
+            Item to = options.get(0).getItem();
             if (from == to) continue;
 
-            directed.computeIfAbsent(from, k -> new LinkedHashMap<>()).put(to, new TypedCost(recipe.entropyType(), recipe.entropyCost()));
+            directed.computeIfAbsent(from, k -> new LinkedHashMap<>()).put(to, new TypedCost(recipe.entropyType(), recipe.entropyCost(), options));
             undirected.computeIfAbsent(from, k -> new LinkedHashSet<>()).add(to);
             undirected.computeIfAbsent(to, k -> new LinkedHashSet<>()).add(from);
             if (!insertionOrder.contains(from)) insertionOrder.add(from);
@@ -127,7 +131,17 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
             }
             if (path.size() < 2) continue;
 
-            List<ItemStack> items = path.stream().map(Item::getDefaultInstance).toList();
+            List<EntropyManipulatorChain.Node> items = new ArrayList<>();
+            for (int i = 0; i < path.size(); i++) {
+                Item item = path.get(i);
+                // A node's display comes from whichever adjacent recipe actually produces it, so
+                // tag-based results and non-default counts show up correctly instead of a bare stack.
+                TypedCost producedFromLeft = i > 0 ? directed.getOrDefault(path.get(i - 1), Map.of()).get(item) : null;
+                TypedCost producedFromRight = i < path.size() - 1 ? directed.getOrDefault(path.get(i + 1), Map.of()).get(item) : null;
+                TypedCost produced = producedFromLeft != null ? producedFromLeft : producedFromRight;
+                items.add(new EntropyManipulatorChain.Node(produced != null ? produced.options() : List.of(item.getDefaultInstance())));
+            }
+
             List<EntropyManipulatorChain.Step> steps = new ArrayList<>();
             for (int i = 0; i < path.size() - 1; i++) {
                 Item a = path.get(i);

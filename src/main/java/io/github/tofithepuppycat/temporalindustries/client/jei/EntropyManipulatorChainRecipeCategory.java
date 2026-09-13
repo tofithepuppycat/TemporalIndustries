@@ -68,7 +68,7 @@ public class EntropyManipulatorChainRecipeCategory implements IRecipeCategory<En
             RecipeIngredientRole role = i == last ? RecipeIngredientRole.OUTPUT : RecipeIngredientRole.INPUT;
             builder.addSlot(role, i * STRIDE + 1, ITEM_Y + 1)
                     .setStandardSlotBackground()
-                    .addItemStack(chain.items().get(i));
+                    .addItemStacks(chain.items().get(i).options());
         }
     }
 
