@@ -163,5 +163,10 @@ public class NetworkHandler {
                 ChronoLensTravelPacket.TYPE,
                 ChronoLensTravelPacket.STREAM_CODEC,
                 ChronoLensTravelPacket::handle);
+
+        registrar.playToClient(
+                ChronoRiftChunkTrackedSyncPacket.TYPE,
+                ChronoRiftChunkTrackedSyncPacket.STREAM_CODEC,
+                ChronoRiftChunkTrackedSyncPacket::handle);
     }
 }

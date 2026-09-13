@@ -14,7 +14,6 @@ import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
-import io.github.tofithepuppycat.temporalindustries.block.TemporalGlitchBlock;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
@@ -344,14 +343,6 @@ public class Registration {
     public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
             () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
 
-    // Chrono Rift placeholder terrain, filled by ChronoRiftFiller where no tracked history exists.
-    public static final DeferredBlock<TemporalGlitchBlock> TEMPORAL_GLITCH_BLOCK = BLOCKS.register("temporal_glitch_block",
-            () -> new TemporalGlitchBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE)
-                    .strength(-1.0F, 3600000.0F).noLootTable().sound(SoundType.AMETHYST_CLUSTER)));
-
-    public static final DeferredItem<Item> TEMPORAL_GLITCH_BLOCK_ITEM = ITEMS.register("temporal_glitch_block",
-            () -> new DescribedBlockItem(TEMPORAL_GLITCH_BLOCK.get(), new Item.Properties()));
-
     // --- Entropic Pylon: routes liquid Order/Chaos between player-marked blocks ---
 
     public static final DeferredBlock<EntropicPylon> ENTROPIC_PYLON_BLOCK = BLOCKS.register("entropic_pylon",
@@ -473,7 +464,6 @@ public class Registration {
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
-                        output.accept(TEMPORAL_GLITCH_BLOCK_ITEM);
                         output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(CHAOS_PYLON_ITEM);
                         output.accept(ORDER_PYLON_ITEM);

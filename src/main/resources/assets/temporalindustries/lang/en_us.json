@@ -138,8 +138,6 @@
 	"block.temporalindustries.loot_generator.missing_frame": "Missing %s Machine Frame block(s)",
 	"block.temporalindustries.machine_frame": "Basic Machine Frame",
 	"block.temporalindustries.machine_frame.tooltip": "Structural block used in recipes and multiblock machines.",
-	"block.temporalindustries.temporal_glitch_block": "Temporal Glitch",
-	"block.temporalindustries.temporal_glitch_block.tooltip": "Placeholder terrain in the Chrono Rift where no tracked history exists.",
 	"block.temporalindustries.entropic_pylon": "Entropic Pylon",
 	"block.temporalindustries.entropic_pylon.tooltip": "Routes ORD/CHS between marked blocks.\nRight-click: mark input | Shift-right-click: mark output\nRange: 11 blocks\nMax Marks: 4 inputs, 4 outputs\nTransfer Rate: 50 mB/t\nRequires Basic Machine Frame above",
 	"block.temporalindustries.entropic_pylon.status": "Entropic Pylon: %s input(s), %s output(s) - %s",

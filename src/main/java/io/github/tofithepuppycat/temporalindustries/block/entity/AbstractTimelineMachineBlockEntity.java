@@ -35,6 +35,7 @@ import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.function.Predicate;
 
@@ -506,11 +507,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
         energyStorage.consumeInternal(totalCost);
 
+        // Deferred across every claimed chunk: settling one chunk right after it's written can reach
+        // into a sibling chunk this jump hasn't reached yet, which would still look like its old,
+        // unjumped state to that settle pass and can wrongly destroy blocks at the boundary between
+        // them (e.g. a crop next to a chunk edge). Settling only once everything is written avoids it.
+        List<BlockPos> deferredSettle = new ArrayList<>();
         for (int i = 0; i < chunks.size(); i++) {
             ChunkPos chunk = chunks.get(i);
             timeline.branch(chunk, targetGameTime, targetCommitId);
-            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued);
+            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued, deferredSettle);
         }
+        TemporalTimeline.settleBlocks(serverLevel, deferredSettle);
         worldData.setDirty();
 
         if (targetGameTime != previousSelectedGameTime) {
