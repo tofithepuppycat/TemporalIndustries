@@ -26,6 +26,29 @@ public class PlayerTemporalState {
     private final UUID playerId;
     @Nullable private PlayerSnapshot checkpoint;
     private final List<PlayerBlockChange> changes = new ArrayList<>();
+    @Nullable private ChronoRiftOrigin chronoRiftOrigin;
+
+    /** Where a player stood right before stepping into the Chrono Rift, so the Chronoscope's
+     * return trip can put them back without touching health/inventory/xp (unlike the heavier
+     * {@link PlayerSnapshot}, which a rift round-trip has no reason to rewind). */
+    public record ChronoRiftOrigin(ResourceLocation dimension, double x, double y, double z, float yRot, float xRot) {
+        public CompoundTag toTag() {
+            CompoundTag tag = new CompoundTag();
+            tag.putString("Dimension", dimension.toString());
+            tag.putDouble("X", x);
+            tag.putDouble("Y", y);
+            tag.putDouble("Z", z);
+            tag.putFloat("YRot", yRot);
+            tag.putFloat("XRot", xRot);
+            return tag;
+        }
+
+        public static ChronoRiftOrigin fromTag(CompoundTag tag) {
+            return new ChronoRiftOrigin(ResourceLocation.tryParse(tag.getString("Dimension")),
+                    tag.getDouble("X"), tag.getDouble("Y"), tag.getDouble("Z"),
+                    tag.getFloat("YRot"), tag.getFloat("XRot"));
+        }
+    }
 
     public record PlayerBlockChange(ResourceLocation dimension, BlockChangeDelta delta) {
         public CompoundTag toTag() {
@@ -61,6 +84,19 @@ public class PlayerTemporalState {
     public void clearCheckpoint() {
         checkpoint = null;
         changes.clear();
+    }
+
+    @Nullable
+    public ChronoRiftOrigin getChronoRiftOrigin() {
+        return chronoRiftOrigin;
+    }
+
+    public void setChronoRiftOrigin(ChronoRiftOrigin origin) {
+        this.chronoRiftOrigin = origin;
+    }
+
+    public void clearChronoRiftOrigin() {
+        this.chronoRiftOrigin = null;
     }
 
     public void recordChange(ResourceLocation dimension, BlockChangeDelta delta) {
@@ -115,6 +151,7 @@ public class PlayerTemporalState {
         ListTag changeList = new ListTag();
         for (PlayerBlockChange pbc : changes) changeList.add(pbc.toTag());
         tag.put("Changes", changeList);
+        if (chronoRiftOrigin != null) tag.put("ChronoRiftOrigin", chronoRiftOrigin.toTag());
         return tag;
     }
 
@@ -127,6 +164,9 @@ public class PlayerTemporalState {
         ListTag changeList = tag.getList("Changes", Tag.TAG_COMPOUND);
         for (int i = 0; i < changeList.size(); i++) {
             state.changes.add(PlayerBlockChange.fromTag(changeList.getCompound(i)));
+        }
+        if (tag.contains("ChronoRiftOrigin", Tag.TAG_COMPOUND)) {
+            state.chronoRiftOrigin = ChronoRiftOrigin.fromTag(tag.getCompound("ChronoRiftOrigin"));
         }
         return state;
     }

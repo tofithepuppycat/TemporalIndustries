@@ -233,6 +233,36 @@ public class TemporalTimeline {
         return commits.isEmpty() ? -1L : commits.getLast().getId();
     }
 
+    /** Every DELTA/SNAPSHOT commit in this dimension, in creation order — the dimension-wide trunk,
+     * as opposed to a single chunk's local history. BRANCH markers are chunk-scoped checkouts and
+     * are never part of it. Each trunk commit's own {@link TemporalCommit#getParentId()} already
+     * chains it to the previous trunk commit (see {@link #registerCommit}), so no separate
+     * local-parent bookkeeping is needed to render it as a graph. */
+    public List<TemporalCommit> getTrunkCommits() {
+        List<TemporalCommit> trunk = new ArrayList<>(commits.size());
+        for (TemporalCommit commit : commits) {
+            if (commit.getType() != TemporalCommit.Type.BRANCH) trunk.add(commit);
+        }
+        return trunk;
+    }
+
+    /** The id of chunkPos's own latest commit at or before targetGameTime, or -1 if none exists
+     * (either the chunk has no history at all, or its earliest commit is still later than
+     * targetGameTime). Ties broken toward the higher id (the most recently created). Unlike {@link
+     * TemporalCommit#resolveNearest}, this never resolves to a commit *after* targetGameTime. */
+    public long resolveFloorCommit(ChunkPos chunkPos, long targetGameTime) {
+        long bestId = -1L;
+        long bestGameTime = Long.MIN_VALUE;
+        for (TemporalCommit c : getCommitsForChunk(chunkPos)) {
+            if (c.getGameTime() > targetGameTime) continue;
+            if (c.getGameTime() > bestGameTime || (c.getGameTime() == bestGameTime && c.getId() > bestId)) {
+                bestGameTime = c.getGameTime();
+                bestId = c.getId();
+            }
+        }
+        return bestId;
+    }
+
     /** The commit chunkPos's live world state currently reflects, or -1 if no history yet.
      * Callers about to call branch() (which can move this) must capture it first. */
     public long getChunkHeadId(ChunkPos chunkPos) {

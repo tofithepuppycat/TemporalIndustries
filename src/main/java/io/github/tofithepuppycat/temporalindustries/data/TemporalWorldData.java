@@ -57,6 +57,41 @@ public class TemporalWorldData extends SavedData {
     private final Map<ResourceLocation, Map<Long, List<EntityDelta>>> pendingEntityDeltas = new HashMap<>();
 
     // -------------------------------------------------------------------------
+    // Chrono Rift session (not persisted: an empty rift always resets to "no active session")
+
+    /** Sentinel meaning no session is currently open (the rift is empty). */
+    public static final long NO_CHRONO_RIFT_SESSION = Long.MIN_VALUE;
+    private long chronoRiftActiveTime = NO_CHRONO_RIFT_SESSION;
+    // Global chunk key -> the gameTime it was last filled at, so a new session (different time)
+    // naturally invalidates stale chunks as players revisit them, with no bulk-reset step needed.
+    private final Map<Long, Long> chronoRiftFilledChunks = new HashMap<>();
+
+    public long getChronoRiftActiveTime() {
+        return chronoRiftActiveTime;
+    }
+
+    /** Whether requestedTime may enter the rift right now: freely if it's empty, otherwise only if
+     * it matches whatever moment is already open there. */
+    public boolean canEnterChronoRift(ServerLevel riftLevel, long requestedTime) {
+        return riftLevel.players().isEmpty() || requestedTime == chronoRiftActiveTime;
+    }
+
+    /** Opens (or re-confirms) the rift session at requestedTime. Only meaningful to call when the
+     * rift was just found empty by {@link #canEnterChronoRift}. */
+    public void setChronoRiftActiveTime(long requestedTime) {
+        chronoRiftActiveTime = requestedTime;
+    }
+
+    @Nullable
+    public Long getChronoRiftChunkFilledTime(ChunkPos pos) {
+        return chronoRiftFilledChunks.get(pos.toLong());
+    }
+
+    public void markChronoRiftChunkFilled(ChunkPos pos, long gameTime) {
+        chronoRiftFilledChunks.put(pos.toLong(), gameTime);
+    }
+
+    // -------------------------------------------------------------------------
     // Access
 
     public static TemporalWorldData get(MinecraftServer server) {
@@ -316,7 +351,7 @@ public class TemporalWorldData extends SavedData {
 
         ListTag playerList = new ListTag();
         for (PlayerTemporalState state : playerStates.values()) {
-            if (state.isArmed()) playerList.add(state.toTag());
+            if (state.isArmed() || state.getChronoRiftOrigin() != null) playerList.add(state.toTag());
         }
         tag.put("Players", playerList);
 
