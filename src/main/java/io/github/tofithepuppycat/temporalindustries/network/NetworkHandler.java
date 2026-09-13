@@ -153,5 +153,15 @@ public class NetworkHandler {
                 EntropyManipulatorCycleRecipePacket.TYPE,
                 EntropyManipulatorCycleRecipePacket.STREAM_CODEC,
                 EntropyManipulatorCycleRecipePacket::handle);
+
+        registrar.playToServer(
+                ChronoLensRequestPacket.TYPE,
+                ChronoLensRequestPacket.STREAM_CODEC,
+                ChronoLensRequestPacket::handle);
+
+        registrar.playToServer(
+                ChronoLensTravelPacket.TYPE,
+                ChronoLensTravelPacket.STREAM_CODEC,
+                ChronoLensTravelPacket::handle);
     }
 }

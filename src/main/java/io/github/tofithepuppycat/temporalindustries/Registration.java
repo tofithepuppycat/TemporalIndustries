@@ -14,6 +14,7 @@ import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
+import io.github.tofithepuppycat.temporalindustries.block.TemporalGlitchBlock;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
@@ -37,6 +38,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
@@ -165,6 +167,9 @@ public class Registration {
 
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
+
+    public static final DeferredItem<Item> CHRONOSCOPE_ITEM = ITEMS.register("chronoscope",
+            () -> new ChronoscopeItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
     // Entropy Glasses: lets the wearer see EntropyInfoProvider block entities' state; no defense,
     // worn only in Curios' head slot rather than as vanilla armor.
@@ -339,6 +344,14 @@ public class Registration {
     public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
             () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
 
+    // Chrono Rift placeholder terrain, filled by ChronoRiftFiller where no tracked history exists.
+    public static final DeferredBlock<TemporalGlitchBlock> TEMPORAL_GLITCH_BLOCK = BLOCKS.register("temporal_glitch_block",
+            () -> new TemporalGlitchBlock(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE)
+                    .strength(-1.0F, 3600000.0F).noLootTable().sound(SoundType.AMETHYST_CLUSTER)));
+
+    public static final DeferredItem<Item> TEMPORAL_GLITCH_BLOCK_ITEM = ITEMS.register("temporal_glitch_block",
+            () -> new DescribedBlockItem(TEMPORAL_GLITCH_BLOCK.get(), new Item.Properties()));
+
     // --- Entropic Pylon: routes liquid Order/Chaos between player-marked blocks ---
 
     public static final DeferredBlock<EntropicPylon> ENTROPIC_PYLON_BLOCK = BLOCKS.register("entropic_pylon",
@@ -460,6 +473,7 @@ public class Registration {
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
+                        output.accept(TEMPORAL_GLITCH_BLOCK_ITEM);
                         output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(CHAOS_PYLON_ITEM);
                         output.accept(ORDER_PYLON_ITEM);
@@ -467,6 +481,7 @@ public class Registration {
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
+                        output.accept(CHRONOSCOPE_ITEM);
                         output.accept(ENTROPY_GLASSES_ITEM);
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);
