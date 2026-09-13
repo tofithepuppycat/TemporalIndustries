@@ -12,6 +12,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.effect.MobEffectInstance;
+import net.minecraft.world.phys.Vec3;
 import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
@@ -100,6 +101,12 @@ public class PlayerSnapshot {
         }
 
         player.teleportTo(targetLevel, x, y, z, yRot, xRot);
+        // Same-dimension teleportTo just repositions the connection; it doesn't clear fall
+        // state, so a void plunge's accumulated fall distance/velocity would otherwise slam
+        // into the checkpoint ground as lethal fall damage on the next tick, killing the
+        // player a second time.
+        player.setDeltaMovement(Vec3.ZERO);
+        player.resetFallDistance();
         player.setHealth(health);
 
         player.getFoodData().setFoodLevel(foodLevel);
