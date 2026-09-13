@@ -51,5 +51,6 @@ public class TemporalIndustries
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onServerTick);
 
         NeoForge.EVENT_BUS.addListener(ChronoRiftChunkListener::onChunkLoad);
+        NeoForge.EVENT_BUS.addListener(ChronoRiftChunkListener::onServerTick);
     }
 }
