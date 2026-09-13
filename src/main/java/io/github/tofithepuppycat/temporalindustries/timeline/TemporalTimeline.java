@@ -446,13 +446,13 @@ public class TemporalTimeline {
         long targetCommitId = resolveTarget(chunkCommits, targetGameTime, preferredCommitId);
 
         DeltaWalkResult walk = walkDeltas(chunkCommits, localParents, chunkPos, fromCommitId, targetCommitId);
-        Map<BlockPos, BlockState> desiredStates = new HashMap<>(walk.states());
-        Map<BlockPos, CompoundTag> desiredBETags = new HashMap<>(walk.blockEntityTags());
+        Map<BlockPos, BlockState> desiredStates = new HashMap<>();
+        Map<BlockPos, CompoundTag> desiredBETags = new HashMap<>();
 
         // If the target lineage shares no history with the live one, its chain starts fresh from its
-        // own nearest SNAPSHOT ancestor — a full baseline that must be applied directly since a
-        // SNAPSHOT carries no ChunkDelta for the undo/replay walk above to see. Server-only: the
-        // client's ghost preview can't do this and is a known-incomplete approximation here.
+        // own nearest SNAPSHOT ancestor — a full baseline applied first since a SNAPSHOT carries no
+        // ChunkDelta for the undo/replay walk below to see. Server-only: the client's ghost preview
+        // can't do this and is a known-incomplete approximation here.
         List<TemporalCommit> targetChain = walk.targetChain();
         if (walk.commonPrefixLen() == 0 && !targetChain.isEmpty() && targetChain.get(0).getType() == TemporalCommit.Type.SNAPSHOT) {
             for (ChunkSnapshot snapshot : targetChain.get(0).getChunkSnapshots()) {
@@ -461,6 +461,11 @@ public class TemporalTimeline {
                 desiredBETags.putAll(snapshot.getBlockEntityTags());
             }
         }
+
+        // Deltas replayed past the shared/SNAPSHOT baseline must win over it for any position they
+        // touch, or every delta between the baseline and the target would be silently discarded.
+        desiredStates.putAll(walk.states());
+        desiredBETags.putAll(walk.blockEntityTags());
 
         return new DesiredState(desiredStates, desiredBETags, walk.entityTags());
     }
