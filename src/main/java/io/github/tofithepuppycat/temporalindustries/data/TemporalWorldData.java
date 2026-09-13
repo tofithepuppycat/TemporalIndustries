@@ -65,6 +65,11 @@ public class TemporalWorldData extends SavedData {
     // Global chunk key -> the gameTime it was last filled at, so a new session (different time)
     // naturally invalidates stale chunks as players revisit them, with no bulk-reset step needed.
     private final Map<Long, Long> chronoRiftFilledChunks = new HashMap<>();
+    // Chunks ChronoRiftChunkListener has seen load but not yet filled. Filling writes real blocks
+    // and runs neighbor-shape "settle" updates, which can force-load bordering chunks — doing that
+    // synchronously from inside ChunkEvent.Load would re-enter the event and cascade outward
+    // (observed as a server hang), so loads only enqueue here; a server-tick handler drains it.
+    private final LinkedHashSet<Long> chronoRiftPendingFill = new LinkedHashSet<>();
 
     public long getChronoRiftActiveTime() {
         return chronoRiftActiveTime;
@@ -89,6 +94,20 @@ public class TemporalWorldData extends SavedData {
 
     public void markChronoRiftChunkFilled(ChunkPos pos, long gameTime) {
         chronoRiftFilledChunks.put(pos.toLong(), gameTime);
+    }
+
+    public void enqueueChronoRiftFill(ChunkPos pos) {
+        chronoRiftPendingFill.add(pos.toLong());
+    }
+
+    /** Pops one pending chunk off the fill queue, or null if empty. */
+    @Nullable
+    public ChunkPos pollChronoRiftFill() {
+        Iterator<Long> it = chronoRiftPendingFill.iterator();
+        if (!it.hasNext()) return null;
+        long key = it.next();
+        it.remove();
+        return new ChunkPos(key);
     }
 
     // -------------------------------------------------------------------------
