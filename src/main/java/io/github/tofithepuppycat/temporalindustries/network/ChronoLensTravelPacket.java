@@ -5,6 +5,8 @@ import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftDimension;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChronoRiftFiller;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
+import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.codec.StreamCodec;
@@ -15,7 +17,13 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.Heightmap;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
+
+import java.util.ArrayList;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 
 /** Client -> server: the Chronoscope's "Travel" button, requesting entry into the Chrono Rift at
  * the selected moment. Refused if the rift already has occupants anchored to a different moment
@@ -73,18 +81,27 @@ public class ChronoLensTravelPacket implements CustomPacketPayload {
             data.setDirty();
 
             ChunkPos destChunk = new ChunkPos(sender.blockPosition());
+            Map<Long, Boolean> trackedSnapshot = new LinkedHashMap<>();
+            // Every chunk in the prefill radius is written before any of them is settled: settling a
+            // chunk fires neighbor-shape/destroy checks that can reach into a sibling chunk still in
+            // this same loop, and that sibling looks like unfilled void until its own turn comes up —
+            // wrongly destroying supported blocks (e.g. crops) right at the boundary between them.
+            List<BlockPos> deferredSettle = new ArrayList<>();
             for (int dx = -PREFILL_RADIUS_CHUNKS; dx <= PREFILL_RADIUS_CHUNKS; dx++) {
                 for (int dz = -PREFILL_RADIUS_CHUNKS; dz <= PREFILL_RADIUS_CHUNKS; dz++) {
                     ChunkPos pos = new ChunkPos(destChunk.x + dx, destChunk.z + dz);
                     riftLevel.getChunk(pos.x, pos.z); // force load/generate (pure void, cheap)
-                    ChronoRiftFiller.fillChunk(server, riftLevel, pos, packet.selectedGameTime);
+                    ChronoRiftFiller.fillChunk(server, riftLevel, pos, packet.selectedGameTime, deferredSettle);
+                    trackedSnapshot.put(pos.toLong(), data.isChronoRiftChunkTracked(pos));
                 }
             }
+            TemporalTimeline.settleBlocks(riftLevel, deferredSettle);
 
             int x = sender.getBlockX();
             int z = sender.getBlockZ();
             int y = riftLevel.getHeight(Heightmap.Types.MOTION_BLOCKING, x, z);
             sender.teleportTo(riftLevel, x + 0.5D, y + 1.0D, z + 0.5D, sender.getYRot(), sender.getXRot());
+            PacketDistributor.sendToPlayer(sender, new ChronoRiftChunkTrackedSyncPacket(trackedSnapshot));
         });
     }
 

@@ -75,6 +75,10 @@ public class TemporalWorldData extends SavedData {
     // wouldn't otherwise notice its fill is stale for the new session's time; setChronoRiftActiveTime
     // re-queues every entry here so already-loaded chunks still get corrected.
     private final Set<Long> chronoRiftLoadedChunks = new HashSet<>();
+    // Chunks that resolved to real reconstructed history the last time they were filled (as opposed
+    // to being left void for lack of any commit at the requested moment). Drives the client-side rift
+    // boundary shader and the server-side movement border in ChronoRiftBorderListener.
+    private final Set<Long> chronoRiftTrackedChunks = new HashSet<>();
 
     public long getChronoRiftActiveTime() {
         return chronoRiftActiveTime;
@@ -109,6 +113,15 @@ public class TemporalWorldData extends SavedData {
 
     public void markChronoRiftChunkFilled(ChunkPos pos, long gameTime) {
         chronoRiftFilledChunks.put(pos.toLong(), gameTime);
+    }
+
+    public boolean isChronoRiftChunkTracked(ChunkPos pos) {
+        return chronoRiftTrackedChunks.contains(pos.toLong());
+    }
+
+    public void markChronoRiftChunkTracked(ChunkPos pos, boolean tracked) {
+        if (tracked) chronoRiftTrackedChunks.add(pos.toLong());
+        else chronoRiftTrackedChunks.remove(pos.toLong());
     }
 
     public void enqueueChronoRiftFill(ChunkPos pos) {

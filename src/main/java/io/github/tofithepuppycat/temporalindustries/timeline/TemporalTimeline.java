@@ -470,8 +470,20 @@ public class TemporalTimeline {
      * for the same checkout). Never overwrites a position isGlued reports true for. */
     public void applyChunkAtTime(ChunkPos chunkPos, long targetGameTime, long fromCommitId, ServerLevel level,
                                   long preferredCommitId, Predicate<BlockPos> isGlued) {
+        applyChunkAtTime(chunkPos, targetGameTime, fromCommitId, level, preferredCommitId, isGlued, null);
+    }
+
+    /** Same as {@link #applyChunkAtTime(ChunkPos, long, long, ServerLevel, long, Predicate)}, but when
+     * deferredSettle is non-null the neighbor-shape/destroy settle pass is collected into it instead of
+     * running immediately, so a caller applying several chunks in one batch can settle them all only
+     * after every chunk in the batch has its final blocks in place — otherwise a support block right at
+     * the edge of a chunk that hasn't been written yet can appear missing to an already-settled
+     * neighbor's shape check. Callers must then pass the accumulated list to {@link
+     * #settleBlocks(ServerLevel, List)} once the whole batch is written. */
+    public void applyChunkAtTime(ChunkPos chunkPos, long targetGameTime, long fromCommitId, ServerLevel level,
+                                  long preferredCommitId, Predicate<BlockPos> isGlued, @Nullable List<BlockPos> deferredSettle) {
         DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
-        applyBlockStates(desired, level, isGlued);
+        applyBlockStates(desired, level, isGlued, deferredSettle);
 
         for (Map.Entry<UUID, CompoundTag> entry : desired.entityTags().entrySet()) {
             Entity existing = level.getEntity(entry.getKey());
@@ -494,8 +506,10 @@ public class TemporalTimeline {
      * changed block with {@code UPDATE_KNOWN_SHAPE}, skipping neighbor-shape/destroy cascades so a
      * support block about to be restored can't desync against a transient mid-restore state. The
      * second pass then fires normal neighbor updates once the chunk's final state is fully in
-     * place, mirroring how vanilla structure-template placement avoids the same hazard. */
-    private void applyBlockStates(DesiredState desired, ServerLevel level, Predicate<BlockPos> isGlued) {
+     * place, mirroring how vanilla structure-template placement avoids the same hazard — unless
+     * deferredSettle is non-null, in which case this chunk's changed positions are appended there
+     * instead, for the caller to settle once every chunk in its batch is written. */
+    private void applyBlockStates(DesiredState desired, ServerLevel level, Predicate<BlockPos> isGlued, @Nullable List<BlockPos> deferredSettle) {
         List<BlockPos> positions = new ArrayList<>(desired.states().keySet());
         positions.removeIf(isGlued);
         positions.sort(ChunkSnapshot.BOTTOM_UP_ORDER);
@@ -520,8 +534,18 @@ public class TemporalTimeline {
             }
         }
 
-        // Settle pass: now that this chunk's final configuration is fully in place, run the shape
-        // and neighbor-changed updates that were deliberately skipped above.
+        if (deferredSettle != null) {
+            deferredSettle.addAll(changed);
+        } else {
+            settleBlocks(level, changed);
+        }
+    }
+
+    /** Settle pass: now that every position's final configuration is in place, run the shape and
+     * neighbor-changed updates that {@link #applyBlockStates} deliberately skips during writing. Safe
+     * to call once over positions gathered from several chunks, so a batch apply never runs a chunk's
+     * settle pass while a sibling chunk in the same batch is still unwritten. */
+    public static void settleBlocks(ServerLevel level, List<BlockPos> changed) {
         for (BlockPos pos : changed) {
             BlockState state = level.getBlockState(pos);
             state.updateNeighbourShapes(level, pos, Block.UPDATE_CLIENTS);
