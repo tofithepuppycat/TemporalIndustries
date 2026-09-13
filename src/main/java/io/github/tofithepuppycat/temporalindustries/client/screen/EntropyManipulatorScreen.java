@@ -62,7 +62,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     /** Shown below the output slot only when the input has more than one matching recipe (e.g.
      * Order+sand can yield glass, sandstone, or gravel); click it to cycle the chosen output. */
     private static final int RECIPE_SELECT_X = 116;
-    private static final int RECIPE_SELECT_Y = 53;
+    private static final int RECIPE_SELECT_Y = 58;
     private static final int RECIPE_SELECT_SIZE = 16;
 
     public EntropyManipulatorScreen(EntropyManipulatorMenu menu, Inventory playerInventory, Component title) {
