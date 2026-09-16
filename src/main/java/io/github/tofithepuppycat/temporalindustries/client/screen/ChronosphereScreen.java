@@ -136,6 +136,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private boolean mapDragAdding = false;
     private final Set<Long> mapDragTouchedChunks = new HashSet<>();
 
+    /** Ctrl+drag alternative: rather than toggling cells as the cursor crosses them, the whole
+     * rectangle between the press point and the release point is applied at once on release. */
+    private boolean mapRectDragActive = false;
+    private int mapRectStartDx;
+    private int mapRectStartDz;
+    private int mapRectHoverDx;
+    private int mapRectHoverDz;
+    private static final int COLOR_RECT_PREVIEW = 0x803D9BE0;
+
     private int bookmarkX;
     private int bookmarkY;
     private int autoTrackX;
@@ -562,6 +571,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
         });
 
+        if (mapRectDragActive) {
+            MAP_GRID.renderRectHighlight(guiGraphics, gridX, gridY,
+                    mapRectStartDx, mapRectStartDz, mapRectHoverDx, mapRectHoverDz, COLOR_RECT_PREVIEW);
+        }
+
         // menu.getBlockEntity() is the client's stale copy (toggleChunk() only calls setChanged(),
         // not a synced mutator), so ChronosphereClientState is the only client-accurate source.
         int claimedCount = ChronosphereClientState.getSelectedCount();
@@ -675,6 +689,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             deleteHistoryConfirmPending = false;
             mapDragActive = false;
             mapDragTouchedChunks.clear();
+            mapRectDragActive = false;
             if (mapOverlayOpen) {
                 ticksSinceMapSync = 0;
                 PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
@@ -697,13 +712,24 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         if (mapOverlayOpen) {
             if (button == 0) {
-                ChunkPos clicked = getGridCellAt(mouseX, mouseY);
-                if (clicked != null && !clicked.equals(new ChunkPos(menu.getBlockPos()))) {
-                    long key = clicked.toLong();
-                    mapDragActive = true;
-                    mapDragAdding = !ChronosphereClientState.isSelected(key);
+                if (hasControlDown()) {
+                    int[] start = MAP_GRID.clampedOffsetAt(mouseX, mouseY, gridX, gridY);
+                    mapRectStartDx = mapRectHoverDx = start[0];
+                    mapRectStartDz = mapRectHoverDz = start[1];
+                    mapRectDragActive = true;
                     mapDragTouchedChunks.clear();
-                    applyMapDragToggle(key);
+                    ChunkPos home = new ChunkPos(menu.getBlockPos());
+                    long startKey = new ChunkPos(home.x + start[0], home.z + start[1]).toLong();
+                    mapDragAdding = !ChronosphereClientState.isSelected(startKey);
+                } else {
+                    ChunkPos clicked = getGridCellAt(mouseX, mouseY);
+                    if (clicked != null && !clicked.equals(new ChunkPos(menu.getBlockPos()))) {
+                        long key = clicked.toLong();
+                        mapDragActive = true;
+                        mapDragAdding = !ChronosphereClientState.isSelected(key);
+                        mapDragTouchedChunks.clear();
+                        applyMapDragToggle(key);
+                    }
                 }
             }
             // Modal: swallow clicks so nothing underneath reacts to them.
@@ -746,10 +772,31 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         PacketDistributor.sendToServer(new ChronosphereToggleChunkPacket(menu.getBlockPos(), key, mapDragAdding));
     }
 
+    /** Applies the rectangle between the press point and the release point, in the direction
+     * fixed by the starting cell, once mapRectDragActive drag ends. */
+    private void applyRectDrag() {
+        ChunkPos home = new ChunkPos(menu.getBlockPos());
+        int minDx = Math.min(mapRectStartDx, mapRectHoverDx);
+        int maxDx = Math.max(mapRectStartDx, mapRectHoverDx);
+        int minDz = Math.min(mapRectStartDz, mapRectHoverDz);
+        int maxDz = Math.max(mapRectStartDz, mapRectHoverDz);
+        for (int dx = minDx; dx <= maxDx; dx++) {
+            for (int dz = minDz; dz <= maxDz; dz++) {
+                if (dx == 0 && dz == 0) continue; // home chunk isn't toggleable
+                if (!MAP_GRID.isWithinRadius(dx, dz)) continue;
+                applyMapDragToggle(new ChunkPos(home.x + dx, home.z + dz).toLong());
+            }
+        }
+    }
+
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (mapOverlayOpen) {
-            if (button == 0 && mapDragActive) {
+            if (button == 0 && mapRectDragActive) {
+                int[] hover = MAP_GRID.clampedOffsetAt(mouseX, mouseY, gridX, gridY);
+                mapRectHoverDx = hover[0];
+                mapRectHoverDz = hover[1];
+            } else if (button == 0 && mapDragActive) {
                 ChunkPos hovered = getGridCellAt(mouseX, mouseY);
                 if (hovered != null && !hovered.equals(new ChunkPos(menu.getBlockPos()))) {
                     applyMapDragToggle(hovered.toLong());
@@ -769,6 +816,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public boolean mouseReleased(double mouseX, double mouseY, int button) {
         if (mapOverlayOpen) {
+            if (mapRectDragActive) {
+                applyRectDrag();
+                mapRectDragActive = false;
+            }
             mapDragActive = false;
             mapDragTouchedChunks.clear();
             return true;

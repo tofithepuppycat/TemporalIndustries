@@ -91,6 +91,32 @@ public final class ChunkSelectionGrid {
         return new ChunkPos(anchor.x + dx, anchor.z + dz);
     }
 
+    /** Like {@link #cellAt}, but clamps to the grid's bounds instead of returning null when the
+     * cursor strays outside it (e.g. mid drag) or lands off-shape. Returned as a {dx, dz} offset
+     * from the anchor rather than a {@link ChunkPos} since off-shape offsets have no valid chunk. */
+    public int[] clampedOffsetAt(double mouseX, double mouseY, int gridX, int gridY) {
+        double clampedX = Math.min(Math.max(mouseX, gridX), gridX + gridPixels - 1);
+        double clampedY = Math.min(Math.max(mouseY, gridY), gridY + gridPixels - 1);
+        int col = (int) ((clampedX - gridX) / cellSize);
+        int row = (int) ((clampedY - gridY) / cellSize);
+        col = Math.min(Math.max(col, 0), gridSize - 1);
+        row = Math.min(Math.max(row, 0), gridSize - 1);
+        return new int[] { col - radius, row - radius };
+    }
+
+    /** Fills the rectangle of cells spanning (dx1, dz1) to (dx2, dz2), inclusive, in either order. */
+    public void renderRectHighlight(GuiGraphics guiGraphics, int gridX, int gridY, int dx1, int dz1, int dx2, int dz2, int color) {
+        int minCol = Math.min(dx1, dx2) + radius;
+        int maxCol = Math.max(dx1, dx2) + radius;
+        int minRow = Math.min(dz1, dz2) + radius;
+        int maxRow = Math.max(dz1, dz2) + radius;
+        int x1 = gridX + minCol * cellSize;
+        int y1 = gridY + minRow * cellSize;
+        int x2 = gridX + (maxCol + 1) * cellSize;
+        int y2 = gridY + (maxRow + 1) * cellSize;
+        guiGraphics.fill(x1, y1, x2, y2, color);
+    }
+
     public interface CellPainter {
         int tint(int dx, int dz, long chunkKey);
 
