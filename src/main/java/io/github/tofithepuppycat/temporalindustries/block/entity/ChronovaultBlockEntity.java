@@ -131,7 +131,8 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
         Map<Long, Long> costs = new HashMap<>();
         for (TemporalCommit commit : timeline.getCommitsForChunk(ownChunk)) {
             costs.put(commit.getId(), timeline.computeJumpCost(ownChunk, commit.getGameTime(), headId, level,
-                    AbstractTimelineMachineBlockEntity::costOf, commit.getId(), pos -> worldData.isGlued(dimension, pos)));
+                    AbstractTimelineMachineBlockEntity::costOf, commit.getId(), pos -> worldData.isGlued(dimension, pos),
+                    NODE_JUMP_FE_SURCHARGE));
         }
         return costs;
     }
