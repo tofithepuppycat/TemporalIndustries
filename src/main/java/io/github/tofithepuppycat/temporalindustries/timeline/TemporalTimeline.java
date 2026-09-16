@@ -559,10 +559,13 @@ public class TemporalTimeline {
     }
 
     /** The energy cost of jumping chunkPos to targetGameTime from fromCommitId: costFn summed over
-     * every block position whose state would actually change. Read-only; never charges for a
+     * every block position whose state would actually change, plus nodeJumpSurcharge if the jump
+     * resolves to a different graph node than fromCommitId (even when that node happens to carry
+     * no block diff, e.g. hopping across an identical branch). Read-only; never charges for a
      * glued position, since a jump will never touch it. */
     public long computeJumpCost(ChunkPos chunkPos, long targetGameTime, long fromCommitId, Level level,
-                                 ToLongFunction<BlockState> costFn, long preferredCommitId, Predicate<BlockPos> isGlued) {
+                                 ToLongFunction<BlockState> costFn, long preferredCommitId, Predicate<BlockPos> isGlued,
+                                 long nodeJumpSurcharge) {
         DesiredState desired = resolveDesiredState(chunkPos, targetGameTime, fromCommitId, preferredCommitId);
         long total = 0L;
         for (Map.Entry<BlockPos, BlockState> entry : desired.states().entrySet()) {
@@ -571,6 +574,11 @@ public class TemporalTimeline {
             if (!level.getBlockState(entry.getKey()).equals(desiredState)) {
                 total += costFn.applyAsLong(desiredState);
             }
+        }
+
+        List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
+        if (!chunkCommits.isEmpty() && resolveTarget(chunkCommits, targetGameTime, preferredCommitId) != fromCommitId) {
+            total += nodeJumpSurcharge;
         }
         return total;
     }
