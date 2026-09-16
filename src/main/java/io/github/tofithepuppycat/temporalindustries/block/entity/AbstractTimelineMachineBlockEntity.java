@@ -53,13 +53,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     /** Entropy is a balance between order (0) and chaos ({@link #ENTROPY_MAX}), backed by two
      * FluidTanks whose contents always sum to ENTROPY_MAX. It drifts toward chaos while the
      * selected view sits away from the present, raising jump cost and autotrack drain; a jump
-     * into the past adds chaos, into the future adds order. */
+     * into the future adds chaos, into the past adds order. */
     public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
     private static final int ENTROPY_DRIFT_INTERVAL_TICKS = 20; // 1 second
     private static final int ENTROPY_DRIFT_STEP = 10; // per interval tick
     private static final int JUMP_ENTROPY_SHIFT = 250; // flat shift per successful jump
     private static final double ENTROPY_COST_SCALE = 1.0; // jump-cost multiplier at max distance from balance
+    protected static final long NODE_JUMP_FE_SURCHARGE = 500; // flat extra cost when a jump lands on a different graph node than the chunk's current head
     private static final int AUTOTRACK_BASE_FE_PER_TICK = 1;
     private static final double AUTOTRACK_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
 
@@ -470,14 +471,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long total = 0L;
         for (ChunkPos chunk : getAllChunks()) {
             long head = timeline.getChunkHeadId(chunk);
-            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued);
+            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued, NODE_JUMP_FE_SURCHARGE);
         }
         return Math.round(total * jumpCostMultiplier());
     }
 
     /** Checks out targetGameTime for every chunk and applies it to the live world, paying the
      * combined jump cost from the energy pool first; returns INSUFFICIENT_ENERGY without acting if
-     * underfunded. On success, shifts entropy toward chaos for a jump into the past, order for the future. */
+     * underfunded. On success, shifts entropy toward chaos for a jump into the future, order for the past. */
     public JumpResult applyTimelineView(long targetGameTime, long targetCommitId, long previousSelectedGameTime) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
 
@@ -497,7 +498,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long totalCost = 0L;
         for (int i = 0; i < chunks.size(); i++) {
             previousHeads[i] = timeline.getChunkHeadId(chunks.get(i));
-            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued);
+            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued, NODE_JUMP_FE_SURCHARGE);
         }
         totalCost = Math.round(totalCost * jumpCostMultiplier());
 
@@ -521,7 +522,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         worldData.setDirty();
 
         if (targetGameTime != previousSelectedGameTime) {
-            shiftEntropyToward(targetGameTime < previousSelectedGameTime ? JUMP_ENTROPY_SHIFT : -JUMP_ENTROPY_SHIFT);
+            shiftEntropyToward(targetGameTime > previousSelectedGameTime ? JUMP_ENTROPY_SHIFT : -JUMP_ENTROPY_SHIFT);
         }
 
         serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
