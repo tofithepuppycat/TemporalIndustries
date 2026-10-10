@@ -38,6 +38,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.UUID;
 
 /**
  * Central event hub: records player-caused block changes into PlayerTemporalState, buffers
@@ -127,12 +128,15 @@ public final class TemporalChangeListener {
         }
     }
 
-    /** Whether this change will be recorded anywhere (tracked chunk, or an armed player's
-     * anchor), checked before paying for full block-entity NBT serialization. */
+    /** Whether this change will be recorded anywhere (tracked chunk, a repository's claimed
+     * chunk, or an armed player's anchor), checked before paying for full block-entity NBT
+     * serialization. */
     private static boolean shouldRecord(ServerLevel level, TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
         ResourceLocation dimension = level.dimension().location();
         if (data.isGlued(dimension, pos)) return false;
-        if (data.isTracked(dimension, new ChunkPos(pos))) return true;
+        ChunkPos chunkPos = new ChunkPos(pos);
+        if (data.isTracked(dimension, chunkPos)) return true;
+        if (data.getClaimingRepo(dimension, chunkPos) != null) return true;
         if (player == null) return false;
         PlayerTemporalState state = data.getPlayerState(player.getUUID());
         return state != null && state.isArmed();
@@ -151,10 +155,18 @@ public final class TemporalChangeListener {
             }
         }
 
-        // 2. Buffer for the timeline if this chunk is tracked by a Time Machine
+        // 2. Buffer for the old per-dimension timeline if this chunk is tracked by a Time Machine
         ChunkPos chunkPos = new ChunkPos(pos);
         if (data.isTracked(dimension, chunkPos)) {
             data.recordTrackedBlockChange(dimension, chunkPos, delta);
+        }
+
+        // 3. Buffer for the new per-machine repository if this chunk is claimed by one. Not
+        // flushed periodically -- it just accumulates until that repository's owner explicitly
+        // Commits (see TemporalWorldData#commitRepository).
+        UUID repoId = data.getClaimingRepo(dimension, chunkPos);
+        if (repoId != null) {
+            data.recordRepoBlockChange(repoId, chunkPos, delta);
         }
     }
 
@@ -195,12 +207,14 @@ public final class TemporalChangeListener {
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
-        if (!data.isTracked(dimension, chunkPos)) return;
+        UUID repoId = data.getClaimingRepo(dimension, chunkPos);
+        if (!data.isTracked(dimension, chunkPos) && repoId == null) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
-        data.recordEntityDelta(dimension, chunkPos,
-                new EntityDelta(entity.getUUID(), EntityDelta.Type.SPAWNED, null, stateTag));
+        EntityDelta delta = new EntityDelta(entity.getUUID(), EntityDelta.Type.SPAWNED, null, stateTag);
+        if (data.isTracked(dimension, chunkPos)) data.recordEntityDelta(dimension, chunkPos, delta);
+        if (repoId != null) data.recordRepoEntityDelta(repoId, chunkPos, delta);
     }
 
     @SubscribeEvent
@@ -213,12 +227,14 @@ public final class TemporalChangeListener {
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
-        if (!data.isTracked(dimension, chunkPos)) return;
+        UUID repoId = data.getClaimingRepo(dimension, chunkPos);
+        if (!data.isTracked(dimension, chunkPos) && repoId == null) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
-        data.recordEntityDelta(dimension, chunkPos,
-                new EntityDelta(entity.getUUID(), EntityDelta.Type.REMOVED, stateTag, null));
+        EntityDelta delta = new EntityDelta(entity.getUUID(), EntityDelta.Type.REMOVED, stateTag, null);
+        if (data.isTracked(dimension, chunkPos)) data.recordEntityDelta(dimension, chunkPos, delta);
+        if (repoId != null) data.recordRepoEntityDelta(repoId, chunkPos, delta);
     }
 
     /** Fires before the interaction runs, so this just snapshots "before" state; the diff happens
@@ -231,11 +247,12 @@ public final class TemporalChangeListener {
 
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        if (!data.isTracked(level.dimension().location(), chunkPos)) return;
+        ResourceLocation dimension = level.dimension().location();
+        if (!data.isTracked(dimension, chunkPos) && data.getClaimingRepo(dimension, chunkPos) == null) return;
 
         CompoundTag before = new CompoundTag();
         entity.save(before);
-        PENDING_ENTITY_CHECKS.add(new PendingEntityCheck(entity, level.dimension().location(), chunkPos, before));
+        PENDING_ENTITY_CHECKS.add(new PendingEntityCheck(entity, dimension, chunkPos, before));
     }
 
     private static void processPendingEntityChecks(MinecraftServer server) {
@@ -247,9 +264,15 @@ public final class TemporalChangeListener {
 
             CompoundTag after = new CompoundTag();
             check.entity().save(after);
-            if (!after.equals(check.before())) {
-                data.recordEntityDelta(check.dimension(), check.chunkPos(), new EntityDelta(
-                        check.entity().getUUID(), EntityDelta.Type.MODIFIED, check.before(), after));
+            if (after.equals(check.before())) continue;
+
+            EntityDelta delta = new EntityDelta(check.entity().getUUID(), EntityDelta.Type.MODIFIED, check.before(), after);
+            if (data.isTracked(check.dimension(), check.chunkPos())) {
+                data.recordEntityDelta(check.dimension(), check.chunkPos(), delta);
+            }
+            UUID repoId = data.getClaimingRepo(check.dimension(), check.chunkPos());
+            if (repoId != null) {
+                data.recordRepoEntityDelta(repoId, check.chunkPos(), delta);
             }
         }
         PENDING_ENTITY_CHECKS.clear();
@@ -309,7 +332,7 @@ public final class TemporalChangeListener {
         long gameTime = server.overworld().getGameTime();
         if (gameTime % FLUSH_INTERVAL_TICKS != 0) return;
 
-        TemporalWorldData.get(server).flushPendingDeltas(gameTime);
+        TemporalWorldData.get(server).flushPendingDeltas(server, gameTime);
         EntropyChargingService.tick(server);
     }
 }

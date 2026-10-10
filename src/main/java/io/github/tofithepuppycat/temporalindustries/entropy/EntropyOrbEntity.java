@@ -32,7 +32,7 @@ import java.util.function.Predicate;
  * {@link EntropyReceptacle} in hand.
  */
 public class EntropyOrbEntity extends Entity {
-    private static final int LIFETIME = 6000;
+    private static final int LIFETIME = 600;
     private static final int MAX_FOLLOW_DIST = 8;
     // Orbs only merge when they are practically touching, and stop merging once they carry
     // MERGE_VALUE_LIMIT, so a machine emitting steadily leaves a visible stream of small orbs

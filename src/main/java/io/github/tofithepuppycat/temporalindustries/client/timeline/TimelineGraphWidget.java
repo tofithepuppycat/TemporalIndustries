@@ -1,12 +1,11 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashMap;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.OptionalLong;
-import java.util.Set;
 
 import net.minecraft.client.gui.Font;
 import net.minecraft.client.gui.GuiGraphics;
@@ -17,7 +16,7 @@ import net.minecraft.util.FormattedCharSequence;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 
 /**
  * Renders and drives a machine's commit graph — node layout, pan/zoom, click-to-select, hover
@@ -26,6 +25,10 @@ import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
  *
  * <p>Callers own the on-screen rectangle the graph draws into and pass it into every
  * render/interaction call; the widget itself holds only pan/zoom/selection state.
+ *
+ * <p>One repository = one commit tree, so edges come straight from each node's own
+ * {@link CommitNode#parentId()} and there's no separate local-parent map to reconcile. Lineage
+ * labels are the repository's real branch names, not synthetic ones invented here.
  */
 @SuppressWarnings("null")
 public final class TimelineGraphWidget {
@@ -66,25 +69,22 @@ public final class TimelineGraphWidget {
             0xFF26A69A, // teal
     };
 
-    /** Lineage display names, cycling Alpha, Beta, Gamma... */
-    private static final String[] GREEK_NAMES = {
-            "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta",
-            "Iota", "Kappa", "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi",
-            "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega",
-    };
-
     private final List<RenderedCommit> renderedCommits = new ArrayList<>();
-    /** commitId -> GREEK_NAMES index of its lineage. Rebuilt each render() call. */
-    private final Map<Long, Integer> timelineIndexById = new HashMap<>();
 
     // Layout only needs recomputing when the commit list reference changes, not on every render()
     // call. cachedLayoutCommits is the list identity layout was last computed from.
-    private List<TemporalCommit> cachedLayoutCommits = null;
-    private Map<Long, TemporalCommit> byId = new HashMap<>();
+    private List<CommitNode> cachedLayoutCommits = null;
+    private Map<Long, CommitNode> byId = new HashMap<>();
     private Map<Long, Integer> rowById = new HashMap<>();
     private Map<Long, Double> columnById = new HashMap<>();
+    /** commitId -> the branch label drawn under it; only branch tips get one, like a git ref. */
     private Map<Long, String> labelById = new HashMap<>();
+    /** commitId -> the name of the branch whose line it belongs to, for the hover tooltip. */
+    private Map<Long, String> branchNameById = new HashMap<>();
     private Map<Long, Integer> forkOffsetById = new HashMap<>();
+    /** Render order: parents always before children, so layout/drawing can read a parent's
+     * position while laying out its child. */
+    private List<CommitNode> drawOrder = new ArrayList<>();
 
     // Pan/zoom
     private boolean draggingView = false;
@@ -119,21 +119,20 @@ public final class TimelineGraphWidget {
 
         guiGraphics.blit(INNER_TEXTURE, graphX, graphY, 0, 0, graphWidth, graphHeight, INNER_TEXTURE_SIZE, INNER_TEXTURE_SIZE);
 
-        List<TemporalCommit> commits = TimelineProjectionManager.getCommits();
+        List<CommitNode> commits = TimelineProjectionManager.getCommits();
         if (commits.isEmpty()) return;
 
-        Map<Long, Long> localParentById = TimelineProjectionManager.getLocalParents();
-
         if (commits != cachedLayoutCommits) {
-            computeLayout(commits, localParentById);
+            computeLayout(commits, TimelineProjectionManager.getBranchTips());
         }
+        if (drawOrder.isEmpty()) return;
 
         long headCommitId = TimelineProjectionManager.getHeadCommitId();
 
         if (!viewInitialized) {
-            TemporalCommit centerOn = byId.getOrDefault(headCommitId, commits.get(commits.size() - 1));
-            double centerColumn = columnById.get(centerOn.getId());
-            int centerRow = rowById.get(centerOn.getId());
+            CommitNode centerOn = byId.getOrDefault(headCommitId, drawOrder.get(drawOrder.size() - 1));
+            double centerColumn = columnById.get(centerOn.id());
+            int centerRow = rowById.get(centerOn.id());
             viewOffsetX = (graphWidth / 2.0D) - centerColumn * COLUMN_SPACING * zoom;
             viewOffsetY = (graphHeight / 2.0D) - centerRow * ROW_SPACING * zoom;
             viewInitialized = true;
@@ -147,19 +146,18 @@ public final class TimelineGraphWidget {
         int viewMinY = graphY;
         int viewMaxX = graphX + graphWidth;
         int viewMaxY = graphY + graphHeight;
-        for (TemporalCommit commit : commits) {
-            int pointX = nodeX(graphX, columnById.get(commit.getId())) + forkOffsetById.getOrDefault(commit.getId(), 0);
-            int pointY = nodeY(graphY, rowById.get(commit.getId()));
+        for (CommitNode commit : drawOrder) {
+            int pointX = nodeX(graphX, columnById.get(commit.id())) + forkOffsetById.getOrDefault(commit.id(), 0);
+            int pointY = nodeY(graphY, rowById.get(commit.id()));
 
-            int lane = rowById.get(commit.getId()) % LANE_COLORS.length;
+            int lane = rowById.get(commit.id()) % LANE_COLORS.length;
             int laneColor = LANE_COLORS[lane];
 
-            long localParentId = localParentById.getOrDefault(commit.getId(), -1L);
-            boolean hasParent = localParentId >= 0 && byId.get(localParentId) != null;
-            if (hasParent) {
-                TemporalCommit parent = byId.get(localParentId);
-                int parentX = nodeX(graphX, columnById.get(parent.getId())) + forkOffsetById.getOrDefault(parent.getId(), 0);
-                int parentY = nodeY(graphY, rowById.get(parent.getId()));
+            long parentId = commit.parentId();
+            CommitNode parent = parentId < 0 ? null : byId.get(parentId);
+            if (parent != null) {
+                int parentX = nodeX(graphX, columnById.get(parent.id())) + forkOffsetById.getOrDefault(parent.id(), 0);
+                int parentY = nodeY(graphY, rowById.get(parent.id()));
 
                 // Skip lines entirely outside the viewport rather than rasterizing off-screen.
                 boolean lineVisible = Math.max(parentX, pointX) >= viewMinX && Math.min(parentX, pointX) <= viewMaxX
@@ -172,24 +170,21 @@ public final class TimelineGraphWidget {
             boolean nodeVisible = pointX + r >= viewMinX && pointX - r <= viewMaxX
                     && pointY + r >= viewMinY && pointY - r <= viewMaxY;
             if (nodeVisible) {
-                boolean selected = commit.getId() == TimelineProjectionManager.getSelectedCommitId();
-                boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
+                boolean selected = commit.id() == TimelineProjectionManager.getSelectedCommitId();
                 int color = selected ? 0xFFFFFFFF : laneColor;
 
-                int shapeRadius = commit.isPlayerMarked() ? markerRadius(r) : r;
+                // There's no BRANCH commit type any more (branches are just named tips into the
+                // regular tree), so the old hollow-ring branch-marker shape is gone. The remaining
+                // shape distinction is author-based: a commit a player made renders as an enlarged
+                // diamond, one the machine produced on its own (e.g. a reset's fresh baseline)
+                // stays a plain square.
+                int shapeRadius = commit.authored() ? markerRadius(r) : r;
 
-                if (commit.getId() == headCommitId) {
+                if (commit.id() == headCommitId) {
                     drawHeadHalo(guiGraphics, pointX, pointY, shapeRadius);
                 }
 
-                if (isBranch) {
-                    // Branch points render as a hollow ring, distinct from a plain commit.
-                    int outer = r + 1;
-                    int inner = Math.max(1, r - 1);
-                    guiGraphics.fill(pointX - outer, pointY - outer, pointX + outer + 1, pointY + outer + 1, color);
-                    guiGraphics.fill(pointX - inner, pointY - inner, pointX + inner + 1, pointY + inner + 1, 0xFF000000);
-                } else if (commit.isPlayerMarked()) {
-                    // Player-marked commits render as an enlarged diamond, distinct from an automatic square.
+                if (commit.authored()) {
                     drawDiamond(guiGraphics, pointX, pointY, shapeRadius, color);
                 } else {
                     guiGraphics.fill(pointX - r, pointY - r, pointX + r + 1, pointY + r + 1, color);
@@ -202,21 +197,16 @@ public final class TimelineGraphWidget {
         // Redraw the selected node's highlight on top, in case a later-drawn sibling overlapped it.
         long selectedCommitId = TimelineProjectionManager.getSelectedCommitId();
         for (RenderedCommit rc : renderedCommits) {
-            if (rc.commit.getId() != selectedCommitId) {
+            if (rc.commit.id() != selectedCommitId) {
                 continue;
             }
             int selectedColor = 0xFFFFFFFF;
             // Drawn larger too, so the selection is obvious even near a similar lane color.
             int selectedRadius = selectedRadius(rc.hitRadius);
-            if (rc.commit.getId() == headCommitId) {
+            if (rc.commit.id() == headCommitId) {
                 drawHeadHalo(guiGraphics, rc.x, rc.y, selectedRadius);
             }
-            if (rc.commit.getType() == TemporalCommit.Type.BRANCH) {
-                int outer = selectedRadius + 1;
-                int inner = Math.max(1, selectedRadius - 1);
-                guiGraphics.fill(rc.x - outer, rc.y - outer, rc.x + outer + 1, rc.y + outer + 1, selectedColor);
-                guiGraphics.fill(rc.x - inner, rc.y - inner, rc.x + inner + 1, rc.y + inner + 1, 0xFF000000);
-            } else if (rc.commit.isPlayerMarked()) {
+            if (rc.commit.authored()) {
                 drawDiamond(guiGraphics, rc.x, rc.y, selectedRadius, selectedColor);
             } else {
                 guiGraphics.fill(rc.x - selectedRadius, rc.y - selectedRadius, rc.x + selectedRadius + 1, rc.y + selectedRadius + 1, selectedColor);
@@ -224,13 +214,13 @@ public final class TimelineGraphWidget {
             break;
         }
 
-        for (TemporalCommit commit : commits) {
-            String label = labelById.get(commit.getId());
+        for (CommitNode commit : drawOrder) {
+            String label = labelById.get(commit.id());
             if (label == null) {
                 continue;
             }
-            int pointX = nodeX(graphX, columnById.get(commit.getId())) + forkOffsetById.getOrDefault(commit.getId(), 0);
-            int pointY = nodeY(graphY, rowById.get(commit.getId()));
+            int pointX = nodeX(graphX, columnById.get(commit.id())) + forkOffsetById.getOrDefault(commit.id(), 0);
+            int pointY = nodeY(graphY, rowById.get(commit.id()));
             if (pointX < viewMinX || pointX > viewMaxX || pointY < viewMinY || pointY > viewMaxY) {
                 continue;
             }
@@ -240,84 +230,106 @@ public final class TimelineGraphWidget {
         guiGraphics.disableScissor();
     }
 
-    private void computeLayout(List<TemporalCommit> commits, Map<Long, Long> localParentById) {
-        // Assign each commit a lane (row): the first child continues its parent's lane, additional
-        // children fork into new lanes.
+    /**
+     * Lays out one real parent-child tree. Each commit gets a lane (row): a parent's first child
+     * continues its lane, extra children fork into fresh ones. Walking the tree top-down (rather
+     * than iterating the commit list in arbitrary order) is what lets the single parentId edge
+     * replace the old separate local-parents map.
+     */
+    private void computeLayout(List<CommitNode> commits, Map<String, Long> branchTips) {
         byId = new HashMap<>();
         rowById = new HashMap<>();
         columnById = new HashMap<>();
         labelById = new HashMap<>();
+        branchNameById = new HashMap<>();
         forkOffsetById = new HashMap<>();
-        Map<Long, Integer> childCountByParent = new HashMap<>();
-        timelineIndexById.clear();
-        // Branch labels are only shown once that lineage has a node of its own.
-        Set<Long> pendingBranchLabelIds = new HashSet<>();
+        drawOrder = new ArrayList<>();
 
-        long baseGameTime = commits.get(0).getGameTime();
-        int nextRow = 1;
-        int nextTimelineIndex = 0;
-        for (int i = 0; i < commits.size(); i++) {
-            TemporalCommit commit = commits.get(i);
-            byId.put(commit.getId(), commit);
+        for (CommitNode commit : commits) byId.put(commit.id(), commit);
 
-            long localParentId = localParentById.getOrDefault(commit.getId(), -1L);
-            boolean isBranch = commit.getType() == TemporalCommit.Type.BRANCH;
-            boolean isRoot = localParentId < 0;
-
-            // The root commit starts its own lineage too, same as any branch point.
-            int timelineIndex;
-            if (isRoot || isBranch) {
-                timelineIndex = nextTimelineIndex++;
+        Map<Long, List<CommitNode>> childrenByParent = new HashMap<>();
+        List<CommitNode> roots = new ArrayList<>();
+        for (CommitNode commit : commits) {
+            CommitNode parent = commit.parentId() < 0 ? null : byId.get(commit.parentId());
+            if (parent == null) {
+                roots.add(commit);
             } else {
-                timelineIndex = timelineIndexById.getOrDefault(localParentId, 0);
+                childrenByParent.computeIfAbsent(commit.parentId(), k -> new ArrayList<>()).add(commit);
             }
-            timelineIndexById.put(commit.getId(), timelineIndex);
-            if (isRoot) {
-                labelById.put(commit.getId(), GREEK_NAMES[timelineIndex % GREEK_NAMES.length] + " Timeline");
-            } else if (isBranch) {
-                labelById.put(commit.getId(), GREEK_NAMES[timelineIndex % GREEK_NAMES.length] + " Timeline");
-                pendingBranchLabelIds.add(commit.getId());
-            }
-            // A non-branch commit checked out onto this branch point means the label can stay.
-            if (!isRoot && !isBranch) {
-                pendingBranchLabelIds.remove(localParentId);
-            }
-
-            int row;
-            if (isRoot) {
-                row = 0;
-                forkOffsetById.put(commit.getId(), 0);
-            } else {
-                int parentRow = rowById.getOrDefault(localParentId, 0);
-                int childIndex = childCountByParent.getOrDefault(localParentId, 0);
-                childCountByParent.put(localParentId, childIndex + 1);
-                // Row 0 is reserved for the trunk; re-checking out an existing branch reuses its row.
-                boolean forksRow = childIndex != 0 || (isBranch && parentRow == 0);
-                row = forksRow ? nextRow++ : parentRow;
-                int parentOffset = forkOffsetById.getOrDefault(localParentId, 0);
-                forkOffsetById.put(commit.getId(), forksRow ? parentOffset + BRANCH_X_OFFSET : parentOffset);
-            }
-            rowById.put(commit.getId(), row);
-            // Saturating rather than linear so a lineage stale for a long real-time gap doesn't
-            // strand its next node far off; eases toward MAX_COLUMN_OFFSET without ever flattening.
-            double elapsedTicks = commit.getGameTime() - baseGameTime;
-            double distanceOffset = MAX_COLUMN_OFFSET * elapsedTicks
-                    / (elapsedTicks + MAX_COLUMN_OFFSET * TICKS_PER_COLUMN);
-            // Enforced against this commit's own local parent, not registration-order predecessor,
-            // since a branch marker's gameTime can be earlier than commits already ahead of it.
-            double column = distanceOffset;
-            if (!isRoot) {
-                double parentColumn = columnById.get(localParentId);
-                column = Math.max(column, parentColumn + MIN_COLUMN_GAP);
-            }
-            columnById.put(commit.getId(), column);
+        }
+        // Deterministic ordering, so a node doesn't hop lanes between polls.
+        roots.sort(Comparator.comparingLong(CommitNode::id));
+        for (List<CommitNode> children : childrenByParent.values()) {
+            children.sort(Comparator.comparingLong(CommitNode::id));
         }
 
-        for (Long stillEmptyBranchId : pendingBranchLabelIds) {
-            labelById.remove(stillEmptyBranchId);
+        long baseGameTime = Long.MAX_VALUE;
+        for (CommitNode commit : commits) baseGameTime = Math.min(baseGameTime, commit.gameTime());
+
+        int[] nextRow = {0};
+        for (CommitNode root : roots) {
+            layoutSubtree(root, null, true, childrenByParent, baseGameTime, nextRow);
+        }
+
+        assignBranchNames(branchTips);
+        for (Map.Entry<String, Long> entry : branchTips.entrySet()) {
+            // Only tips get a drawn label, so a branch reads like a git ref pinned to its head
+            // rather than labelling every commit on the line.
+            if (byId.containsKey(entry.getValue())) labelById.put(entry.getValue(), entry.getKey());
         }
 
         cachedLayoutCommits = commits;
+    }
+
+    private void layoutSubtree(CommitNode commit, CommitNode parent, boolean continuesParentLane,
+                               Map<Long, List<CommitNode>> childrenByParent, long baseGameTime, int[] nextRow) {
+        int row;
+        int forkOffset;
+        if (parent == null) {
+            row = nextRow[0]++;
+            forkOffset = 0;
+        } else {
+            int parentRow = rowById.getOrDefault(parent.id(), 0);
+            int parentOffset = forkOffsetById.getOrDefault(parent.id(), 0);
+            row = continuesParentLane ? parentRow : nextRow[0]++;
+            forkOffset = continuesParentLane ? parentOffset : parentOffset + BRANCH_X_OFFSET;
+        }
+        rowById.put(commit.id(), row);
+        forkOffsetById.put(commit.id(), forkOffset);
+
+        // Saturating rather than linear so a lineage stale for a long real-time gap doesn't strand
+        // its next node far off; eases toward MAX_COLUMN_OFFSET without ever flattening.
+        double elapsedTicks = commit.gameTime() - baseGameTime;
+        double column = MAX_COLUMN_OFFSET * elapsedTicks / (elapsedTicks + MAX_COLUMN_OFFSET * TICKS_PER_COLUMN);
+        if (parent != null) {
+            column = Math.max(column, columnById.get(parent.id()) + MIN_COLUMN_GAP);
+        }
+        columnById.put(commit.id(), column);
+        drawOrder.add(commit);
+
+        List<CommitNode> children = childrenByParent.getOrDefault(commit.id(), List.of());
+        for (int i = 0; i < children.size(); i++) {
+            layoutSubtree(children.get(i), commit, i == 0, childrenByParent, baseGameTime, nextRow);
+        }
+    }
+
+    /**
+     * Attributes every commit to a branch name for the hover tooltip, by walking each tip's
+     * ancestry and claiming whatever isn't claimed yet. Tips are visited oldest-first (ascending
+     * id), so shared trunk history belongs to the branch that created it and a later fork only
+     * owns the commits unique to it — the same reading a git log gives.
+     */
+    private void assignBranchNames(Map<String, Long> branchTips) {
+        List<Map.Entry<String, Long>> tips = new ArrayList<>(branchTips.entrySet());
+        tips.sort(Map.Entry.comparingByValue());
+
+        for (Map.Entry<String, Long> tip : tips) {
+            long cur = tip.getValue();
+            while (cur >= 0 && byId.containsKey(cur) && !branchNameById.containsKey(cur)) {
+                branchNameById.put(cur, tip.getKey());
+                cur = byId.get(cur).parentId();
+            }
+        }
     }
 
     private int nodeRadius() {
@@ -417,10 +429,10 @@ public final class TimelineGraphWidget {
         }
         RenderedCommit clicked = getCommitAt((int) mouseX, (int) mouseY);
         if (clicked != null) {
-            if (clicked.commit.getId() == TimelineProjectionManager.getSelectedCommitId()) {
+            if (clicked.commit.id() == TimelineProjectionManager.getSelectedCommitId()) {
                 TimelineProjectionManager.clearSelectedCommit();
             } else {
-                TimelineProjectionManager.setSelectedCommit(clicked.commit.getId());
+                TimelineProjectionManager.setSelectedCommit(clicked.commit.id());
             }
         } else {
             draggingView = true;
@@ -483,23 +495,25 @@ public final class TimelineGraphWidget {
         RenderedCommit hovered = getCommitAt(mouseX, mouseY);
         if (hovered == null) return List.of();
 
-        TemporalCommit commit = hovered.commit;
-        int timelineIndex = timelineIndexById.getOrDefault(commit.getId(), 0);
-        String timelineName = GREEK_NAMES[timelineIndex % GREEK_NAMES.length];
-        List<Component> tooltip = new ArrayList<>(List.of(
-                Component.literal(timelineName + " Timeline"),
-                Component.literal("Commit: " + commit.getShortHash()),
-                Component.literal("Recorded: " + formatGameDayTime(commit.getGameTime()))
-        ));
-        switch (commit.getType()) {
-            case BRANCH -> tooltip.add(Component.literal("Branch point"));
-            case SNAPSHOT -> tooltip.add(Component.literal("Full snapshot"));
-            case DELTA -> tooltip.add(Component.literal("Changes: " + commit.getTotalChangeCount()));
+        CommitNode commit = hovered.commit;
+        String branchName = branchNameById.get(commit.id());
+        List<Component> tooltip = new ArrayList<>();
+        if (branchName != null) {
+            tooltip.add(Component.literal(branchName + " Timeline"));
         }
-        if (commit.isPlayerMarked()) {
-            tooltip.add(Component.literal("Manual save point"));
+        tooltip.add(Component.literal("Commit: " + commit.shortHash()));
+        tooltip.add(Component.literal("Recorded: " + formatGameDayTime(commit.gameTime())));
+        tooltip.add(Component.literal("Chunks: " + commit.chunkCount()));
+        if (commit.hasFullBaseline()) {
+            tooltip.add(Component.literal("Includes a full baseline"));
         }
-        OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.getId());
+        if (commit.blockChangeCount() > 0) {
+            tooltip.add(Component.literal("Changes: " + commit.blockChangeCount()));
+        }
+        if (TimelineProjectionManager.isBranchTip(commit.id())) {
+            tooltip.add(Component.literal("Branch tip"));
+        }
+        OptionalLong jumpCost = TimelineProjectionManager.getJumpCost(commit.id());
         if (jumpCost.isPresent()) {
             tooltip.add(Component.literal("Jump cost: " + EnergyDisplay.format(jumpCost.getAsLong()) + " FE"));
         }
@@ -515,17 +529,5 @@ public final class TimelineGraphWidget {
         return String.format("Day %d | %02d:%02d", day, hour, minute);
     }
 
-    private static final class RenderedCommit {
-        private final TemporalCommit commit;
-        private final int x;
-        private final int y;
-        private final int hitRadius;
-
-        private RenderedCommit(TemporalCommit commit, int x, int y, int hitRadius) {
-            this.commit = commit;
-            this.x = x;
-            this.y = y;
-            this.hitRadius = hitRadius;
-        }
-    }
+    private record RenderedCommit(CommitNode commit, int x, int y, int hitRadius) {}
 }

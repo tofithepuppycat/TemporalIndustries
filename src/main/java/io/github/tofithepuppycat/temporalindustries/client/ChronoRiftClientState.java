@@ -24,4 +24,11 @@ public final class ChronoRiftClientState {
     public static boolean isTracked(ChunkPos pos) {
         return trackedChunks.contains(pos.toLong());
     }
+
+    /** Unconditionally drops all tracked chunks; called on world/server disconnect so a previous
+     * world's tracked rift chunks can't bleed into the next one joined (the rift dimension key is
+     * the same ResourceLocation across every world). */
+    public static void clearAll() {
+        trackedChunks.clear();
+    }
 }

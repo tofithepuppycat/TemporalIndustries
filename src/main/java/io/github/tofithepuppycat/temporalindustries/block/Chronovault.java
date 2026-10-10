@@ -5,6 +5,7 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.dimension.RiftDeviceLock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
@@ -75,6 +76,10 @@ public class Chronovault extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(@NotNull BlockState blockState, @NotNull Level level, @NotNull BlockPos blockPos, @NotNull Player player, @NotNull BlockHitResult blockHitResult) {
+        if (RiftDeviceLock.blockIfInRift(level, player)) {
+            return InteractionResult.FAIL;
+        }
+
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }

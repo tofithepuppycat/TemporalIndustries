@@ -4,9 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
@@ -15,7 +13,6 @@ import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -28,13 +25,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
-import java.util.HashMap;
-import java.util.HashSet;
 import java.util.LinkedHashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
 
@@ -52,7 +44,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     private static final int ENERGY_CAPACITY = 500_000;
     private static final int ENERGY_TRANSFER  = 5_000;
 
-    public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_TRACKED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
+    public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
 
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
@@ -61,39 +53,19 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
     }
 
+    /** Re-asserts this machine's claim on its home + additional chunks. Claiming is idempotent and
+     * cheap; the actual baseline {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot}
+     * capture happens lazily inside the repository's first commit touching each chunk, never here. */
     @Override
     public void onLoad() {
         super.onLoad();
-
-        if (level instanceof ServerLevel serverLevel) {
-            MinecraftServer server = serverLevel.getServer();
-            if (server != null) {
-                TemporalWorldData worldData = TemporalWorldData.get(server);
-                ResourceLocation dimension = level.dimension().location();
-                TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
-
-                if (autoTrackingEnabled) worldData.trackChunk(dimension, getHomeChunkPos(), worldPosition, serverLevel);
-                ensureSnapshotted(worldData, timeline, serverLevel, getHomeChunkPos());
-                for (long key : additionalChunks) {
-                    ChunkPos chunk = new ChunkPos(key);
-                    if (autoTrackingEnabled) worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
-                    ensureSnapshotted(worldData, timeline, serverLevel, chunk);
-                }
-            }
-        }
+        if (level instanceof ServerLevel) claimOwnChunks();
     }
 
     @Override
     public void setRemoved() {
         super.setRemoved();
-        if (level != null && !level.isClientSide && level.getServer() != null) {
-            TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-            ResourceLocation dimension = level.dimension().location();
-            worldData.untrackChunk(dimension, getHomeChunkPos(), worldPosition);
-            for (long key : additionalChunks) {
-                worldData.untrackChunk(dimension, new ChunkPos(key), worldPosition);
-            }
-        }
+        releaseOwnChunks();
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronosphereBlockEntity be) {
@@ -137,6 +109,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return additionalChunks.size() + 1;
     }
 
+    /** Claims or releases pos for this machine's repository. Releasing leaves the repository's
+     * recorded history for that chunk intact — claiming only governs future capture. */
     public ToggleResult toggleChunk(ChunkPos pos, boolean add) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
 
@@ -151,143 +125,25 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         if (add) {
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
-            if (worldData.isTracked(dimension, pos)) return ToggleResult.ALREADY_TRACKED_ELSEWHERE;
 
-            if (autoTrackingEnabled) worldData.trackChunk(dimension, pos, worldPosition, serverLevel);
+            if (worldData.claimChunk(dimension, pos, getRepositoryId())
+                    == TemporalWorldData.ClaimResult.ALREADY_CLAIMED_ELSEWHERE) {
+                return ToggleResult.ALREADY_CLAIMED_ELSEWHERE;
+            }
+
             additionalChunks.add(key);
-            ensureSnapshotted(worldData, worldData.getOrCreateTimeline(dimension), serverLevel, pos);
+            TemporalRepository repo = getRepository();
+            if (repo != null) repo.captureClaimBaseline(serverLevel, pos);
+            worldData.setDirty();
             setChanged();
             return ToggleResult.ADDED;
         } else {
             if (!additionalChunks.remove(key)) return ToggleResult.NOT_SELECTED;
-            worldData.untrackChunk(dimension, pos, worldPosition);
+            worldData.releaseChunk(dimension, pos, getRepositoryId());
+            worldData.setDirty();
             setChanged();
             return ToggleResult.REMOVED;
         }
-    }
-
-    // chunkPos null means the shared "All" view (the GUI's default tab); otherwise one specific
-    // claimed chunk's own graph. jump() always moves every claimed chunk together regardless.
-    @Override
-    public List<ChunkPos> getViewableChunks() {
-        return getAllChunks();
-    }
-
-    @Override
-    public List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyList();
-        if (chunkPos != null) return timeline.getCommitsForChunk(chunkPos);
-        return sharedCommits(timeline);
-    }
-
-    /**
-     * The shared "All" view: only commits relevant to EVERY claimed chunk, in creation order.
-     * Deliberately an intersection rather than a union — unioning per-chunk commit lists would mix
-     * lineages with no local-parent link, causing the graph layout to stack them all as fresh roots.
-     */
-    private List<TemporalCommit> sharedCommits(TemporalTimeline timeline) {
-        List<ChunkPos> chunks = getAllChunks();
-        List<TemporalCommit> shared = new ArrayList<>(timeline.getCommitsForChunk(chunks.get(0)));
-        for (int i = 1; i < chunks.size() && !shared.isEmpty(); i++) {
-            Set<Long> idsInChunk = new HashSet<>();
-            for (TemporalCommit commit : timeline.getCommitsForChunk(chunks.get(i))) {
-                idsInChunk.add(commit.getId());
-            }
-            shared.removeIf(commit -> !idsInChunk.contains(commit.getId()));
-        }
-        shared.sort(Comparator.comparingLong(TemporalCommit::getId));
-        return shared;
-    }
-
-    @Override
-    public Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyMap();
-        if (chunkPos != null) return timeline.getLocalParentsForChunk(chunkPos);
-
-        // Shared view: re-link each shared commit to its nearest ancestor that is ALSO shared,
-        // since its raw local parent is often a commit only some chunks have.
-        Set<Long> sharedIds = new HashSet<>();
-        for (TemporalCommit commit : sharedCommits(timeline)) sharedIds.add(commit.getId());
-
-        Map<Long, Long> rawParents = timeline.getLocalParentsForChunk(getHomeChunkPos());
-        Map<Long, Long> relinked = new HashMap<>();
-        for (long id : sharedIds) {
-            relinked.put(id, nearestSharedAncestor(rawParents, sharedIds, id));
-        }
-        return relinked;
-    }
-
-    /** Walks commitId's local-parent chain upward until it reaches a commit in sharedIds, or -1.
-     * Guarded against a cycle in persisted parent links so a corrupt save can't hang the tick. */
-    private static long nearestSharedAncestor(Map<Long, Long> rawParents, Set<Long> sharedIds, long commitId) {
-        Set<Long> visited = new HashSet<>();
-        long current = rawParents.getOrDefault(commitId, -1L);
-        while (current >= 0 && visited.add(current)) {
-            if (sharedIds.contains(current)) return current;
-            current = rawParents.getOrDefault(current, -1L);
-        }
-        return -1L;
-    }
-
-    @Override
-    public long getChunkHeadId(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return -1L;
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return -1L;
-        if (chunkPos != null) return timeline.getChunkHeadId(chunkPos);
-
-        // The home chunk's head is frequently not itself shared by every claimed chunk, so the
-        // "live world is here" pulse must resolve by nearest gameTime instead of walking the
-        // home chunk's local-parent chain, which can dead-end on a fresh per-chunk branch marker.
-        long homeHead = timeline.getChunkHeadId(getHomeChunkPos());
-        TemporalCommit homeHeadCommit = timeline.getCommitById(homeHead);
-        if (homeHeadCommit == null) return -1L;
-        List<TemporalCommit> shared = sharedCommits(timeline);
-        if (shared.isEmpty()) return -1L;
-        return TemporalCommit.resolveNearest(shared, homeHeadCommit.getGameTime());
-    }
-
-    /**
-     * Total cost is only priced for the currently selected node, not every node in the graph, since
-     * pricing every commit would be O(H x claimedChunks x avgChunkHistory) and stall the server tick
-     * on every GUI poll. Un-selected nodes simply render without a jump-cost line.
-     */
-    @Override
-    public Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
-        long selectedId = getSelectedCommitId(chunkPos);
-        if (selectedId == -1L) return Collections.emptyMap();
-
-        for (TemporalCommit commit : getChunkCommits(chunkPos)) {
-            if (commit.getId() == selectedId) {
-                return Map.of(selectedId, computeTotalJumpCost(commit.getGameTime(), selectedId));
-            }
-        }
-        return Collections.emptyMap();
-    }
-
-    /** One snapshot per claimed chunk, so the in-world ghost preview covers everything a jump would touch. */
-    @Override
-    public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyList();
-
-        List<ChunkTimelineSnapshot> snapshots = new ArrayList<>();
-        for (ChunkPos chunk : getAllChunks()) {
-            snapshots.add(new ChunkTimelineSnapshot(chunk,
-                    timeline.getCommitsForChunk(chunk),
-                    timeline.getLocalParentsForChunk(chunk),
-                    timeline.getChunkHeadId(chunk)));
-        }
-        return snapshots;
     }
 
     @Override
