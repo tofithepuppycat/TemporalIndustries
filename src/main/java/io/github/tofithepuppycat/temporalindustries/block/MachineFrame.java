@@ -57,9 +57,12 @@ public class MachineFrame extends BaseEntityBlock {
     }
 
     /** Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from {@code player}'s inventory to fill
-     * as many of {@code missing} positions as they can afford. Shared by every frame-completed controller. */
+     * as many of {@code missing} positions as they can afford. Positions occupied by existing terrain
+     * (anything not replaceable, e.g. stone) are skipped so forming never overwrites blocks.
+     * Shared by every frame-completed controller. */
     public static void fillFromInventory(Level level, List<BlockPos> missing, ServerPlayer player) {
         for (BlockPos pos : missing) {
+            if (!level.getBlockState(pos).canBeReplaced()) continue;
             if (!takeOneMachineFrame(player)) return;
             level.setBlockAndUpdate(pos, Registration.MACHINE_FRAME_BLOCK.get().defaultBlockState());
         }
