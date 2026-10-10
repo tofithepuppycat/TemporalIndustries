@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.device;
 
+import net.minecraft.core.Direction;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -28,12 +29,14 @@ public final class ChronoRecording {
 
     /**
      * INSERT/EXTRACT: items handed to or taken from a container-capable block, detected as an
-     * inventory diff across a container GUI open/close. MODIFY: a right-click that changes a
-     * block's state in place (stripping, tilling, waxing, etc.) without placing a new block,
-     * detected generically as a before/after blockstate diff. ATTACK: the player melee-damaging
-     * a living entity, recording the final post-reduction damage for direct reapplication on replay.
+     * inventory diff across a container GUI open/close. BREAK/ATTACK: breaking a block / hitting
+     * an entity. USE_BLOCK/USE_ITEM/USE_ENTITY/RELEASE_ITEM/MOUNT/DISMOUNT: the player's raw
+     * interactions, replayed by the projector's fake player through the same code paths a real
+     * player would trigger (placing, stripping, throwing potions, breeding, riding...).
+     * <p>
+     * Recordings store the ordinal, so reordering or removing types invalidates saved recordings.
      */
-    public enum ActionType { BREAK, PLACE, INSERT, EXTRACT, MODIFY, ATTACK }
+    public enum ActionType { BREAK, INSERT, EXTRACT, ATTACK, USE_BLOCK, USE_ITEM, RELEASE_ITEM, USE_ENTITY, MOUNT, DISMOUNT }
 
     /** Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
      * any recorded actions on top. */
@@ -45,8 +48,8 @@ public final class ChronoRecording {
     public static int actionEnergyCost(ActionType type) {
         return switch (type) {
             case ATTACK -> 45;
-            case BREAK, PLACE, MODIFY -> 18;
-            case INSERT, EXTRACT -> 9;
+            case BREAK, USE_BLOCK, USE_ITEM, USE_ENTITY -> 18;
+            case INSERT, EXTRACT, RELEASE_ITEM, MOUNT, DISMOUNT -> 9;
         };
     }
 
@@ -55,18 +58,50 @@ public final class ChronoRecording {
     public static final int MAX_ENERGY_PER_TICK = 500;
 
     /**
-     * {@code item}: block placed (PLACE) or item transferred (INSERT/EXTRACT); null for BREAK.
-     * {@code count}: only meaningful for INSERT/EXTRACT. {@code blockState}/{@code blockEntity}
-     * (PLACE/MODIFY): the exact resulting state and block entity data, so configured modded blocks
-     * reproduce faithfully. {@code tool} (BREAK only): a phantom tool used only so the drop
-     * calculation respects "requires correct tool" blocks, never pulled from the projector's
-     * inventory. {@code targetEntityType}/{@code targetBaby}/{@code damage} (ATTACK only): replay
-     * looks for the nearest matching living entity near the recorded position rather than tracking
-     * the original entity's identity, since it may no longer exist.
+     * {@code item}/{@code count}: the item transferred (INSERT/EXTRACT only). {@code tool} (BREAK
+     * only): a phantom tool used only so the drop calculation respects "requires correct tool"
+     * blocks, never pulled from the projector's inventory. {@code targetEntityType}/{@code targetBaby}
+     * (ATTACK, USE_ENTITY, MOUNT): replay looks for the nearest matching entity near the recorded
+     * position rather than tracking the original entity's identity, since it may no longer exist.
+     * {@code interaction} (USE_*, ATTACK) holds what the fake player needs to repeat the action faithfully.
      */
     public record Action(int dx, int dy, int dz, ActionType type, @Nullable ResourceLocation item, int count,
-                          @Nullable CompoundTag blockState, @Nullable CompoundTag blockEntity, @Nullable ResourceLocation tool,
-                          @Nullable ResourceLocation targetEntityType, boolean targetBaby, float damage) {}
+                          @Nullable ResourceLocation tool, @Nullable ResourceLocation targetEntityType,
+                          boolean targetBaby, @Nullable Interaction interaction) {}
+
+    /**
+     * How the player performed an interaction. {@code hitX/Y/Z} are relative to the clicked block
+     * (USE_BLOCK) or to the clicked entity's position (USE_ENTITY), so replay can re-anchor them.
+     * {@code specific} marks an entity "interact at" (armor stands etc.) as opposed to a plain
+     * entity interact. {@code strength} is the attack cooldown charge (ATTACK). {@code heldStack}
+     * is the full stack in use, components included, so e.g. the right potion is thrown.
+     */
+    public record Interaction(boolean offHand, @Nullable Direction face, float hitX, float hitY, float hitZ,
+                               boolean inside, boolean sneaking, boolean specific, float strength,
+                               @Nullable CompoundTag heldStack) {
+        public CompoundTag toTag() {
+            CompoundTag tag = new CompoundTag();
+            tag.putBoolean("Off", offHand);
+            tag.putInt("Face", face == null ? -1 : face.get3DDataValue());
+            tag.putFloat("HX", hitX);
+            tag.putFloat("HY", hitY);
+            tag.putFloat("HZ", hitZ);
+            tag.putBoolean("Inside", inside);
+            tag.putBoolean("Sneak", sneaking);
+            tag.putBoolean("Specific", specific);
+            tag.putFloat("Strength", strength);
+            if (heldStack != null) tag.put("Held", heldStack);
+            return tag;
+        }
+
+        public static Interaction fromTag(CompoundTag tag) {
+            int face = tag.contains("Face") ? tag.getInt("Face") : -1;
+            return new Interaction(tag.getBoolean("Off"), face < 0 ? null : Direction.from3DDataValue(face),
+                    tag.getFloat("HX"), tag.getFloat("HY"), tag.getFloat("HZ"), tag.getBoolean("Inside"),
+                    tag.getBoolean("Sneak"), tag.getBoolean("Specific"), tag.getFloat("Strength"),
+                    tag.contains("Held") ? tag.getCompound("Held") : null);
+        }
+    }
 
     private final UUID ownerId;
     private final String ownerName;
@@ -205,17 +240,17 @@ public final class ChronoRecording {
         for (int i = 0; i < actionList.size(); i++) {
             CompoundTag a = actionList.getCompound(i);
             int tick = a.getInt("Tick");
-            ActionType type = ActionType.values()[a.getInt("Type")];
+            int typeOrdinal = a.getInt("Type");
+            if (typeOrdinal < 0 || typeOrdinal >= ActionType.values().length) continue;
+            ActionType type = ActionType.values()[typeOrdinal];
             ResourceLocation item = a.contains("Item") ? ResourceLocation.tryParse(a.getString("Item")) : null;
             int count = a.contains("Count") ? a.getInt("Count") : 1;
-            CompoundTag blockState = a.contains("BlockState") ? a.getCompound("BlockState") : null;
-            CompoundTag blockEntity = a.contains("BlockEntity") ? a.getCompound("BlockEntity") : null;
             ResourceLocation tool = a.contains("Tool") ? ResourceLocation.tryParse(a.getString("Tool")) : null;
             ResourceLocation targetEntityType = a.contains("TargetType") ? ResourceLocation.tryParse(a.getString("TargetType")) : null;
             boolean targetBaby = a.getBoolean("TargetBaby");
-            float damage = a.getFloat("Damage");
+            Interaction interaction = a.contains("Use") ? Interaction.fromTag(a.getCompound("Use")) : null;
             Action action = new Action(a.getInt("DX"), a.getInt("DY"), a.getInt("DZ"), type, item, count,
-                    blockState, blockEntity, tool, targetEntityType, targetBaby, damage);
+                    tool, targetEntityType, targetBaby, interaction);
             actionsByTick.computeIfAbsent(tick, k -> new ArrayList<>()).add(action);
         }
 
