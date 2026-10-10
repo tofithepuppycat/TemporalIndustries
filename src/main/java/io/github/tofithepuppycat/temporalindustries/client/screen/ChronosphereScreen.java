@@ -93,7 +93,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
     private static final int BUTTON_ROW_Y_OFFSET = 200;
     private static final int ACTION_BUTTON_SIZE = IconButtonRenderer.SIZE;
-    private static final int ACTION_BUTTON_GAP = 6;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
     /** How often the map overlay re-fetches terrain thumbnails while open. */
@@ -113,7 +112,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int CONFIRM_BUTTON_WIDTH = 66;
 
     private static final int GHOST_TOGGLE_BUTTON_WIDTH = 170;
-    private static final int GHOST_ICON_GAP = 4;
     private static final int GHOST_TOGGLE_BUTTON_Y_OFFSET = 100;
     private static final int GHOST_TOGGLE_HINT_Y_OFFSET = 124;
     /** Was a literal 130 before the ghost-preview toggle needed the space above it; shifted down
@@ -234,11 +232,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         gridX = panelX() + (CONTENT_SIZE - MAP_GRID.gridPixels()) / 2;
         gridY = panelY() + MAP_GRID_Y_OFFSET;
 
-        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 4 + ACTION_BUTTON_GAP * 3)) / 2;
-        showChangesX = groupX;
-        jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
-        commitX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
-        deleteBranchX = commitX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        // Show Changes in the left corner, Delete Branch in the right corner, Commit and Jump
+        // evenly spaced between them (Commit left of Jump).
+        int rowLeft = panelX() + GRAPH_X_OFFSET;
+        int rowRight = panelX() + CONTENT_SIZE - GRAPH_X_OFFSET - ACTION_BUTTON_SIZE;
+        showChangesX = rowLeft;
+        deleteBranchX = rowRight;
+        commitX = rowLeft + (rowRight - rowLeft) / 3;
+        jumpX = rowLeft + (rowRight - rowLeft) * 2 / 3;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
         commitY = showChangesY;
@@ -319,9 +320,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
         int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
 
-        int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
-        int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
-        if (isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), ghostToggleButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
             TimelineProjectionManager.toggleGhostBlockMode();
             return;
         }
@@ -548,20 +548,17 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 panelX() + 20, panelY() + 60, CONTENT_SIZE - 40, TEXT_SECONDARY);
 
         boolean ghostEnabled = TimelineProjectionManager.isGhostBlockModeEnabled();
-        int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
-        int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
-        drawOverlayButton(guiGraphics, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                Component.empty(), ghostEnabled ? 0xFF3A6A8A : 0xFF3A3A3A,
-                isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
-        // Label plus a true/false icon showing the current state, centered together in the button.
-        Component ghostLabel = Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_label");
-        int ghostGroupWidth = font.width(ghostLabel) + GHOST_ICON_GAP + IconButtonRenderer.SIZE;
-        int ghostGroupX = ghostToggleX + (GHOST_TOGGLE_BUTTON_WIDTH - ghostGroupWidth) / 2;
-        guiGraphics.drawString(font, ghostLabel, ghostGroupX,
-                ghostToggleY + (DELETE_BUTTON_HEIGHT - 8) / 2, 0xFFFFFFFF, false);
+        // Plain label text with a two-layer icon button (background + true/false icon) to its right.
+        int ghostRowX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
+        int ghostButtonX = ghostToggleButtonX();
+        int ghostButtonY = ghostToggleButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_label"),
+                ghostRowX, ghostButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int ghostTint = isMouseOverRect(mouseX, mouseY, ghostButtonX, ghostButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, ghostButtonX, ghostButtonY, ghostTint);
         IconButtonRenderer.renderIcon(guiGraphics, ghostEnabled ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
-                ghostGroupX + font.width(ghostLabel) + GHOST_ICON_GAP,
-                ghostToggleY + (DELETE_BUTTON_HEIGHT - IconButtonRenderer.SIZE) / 2);
+                ghostButtonX, ghostButtonY);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_hint",
                         TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT),
                 panelX() + CONTENT_SIZE / 2, panelY() + GHOST_TOGGLE_HINT_Y_OFFSET, TEXT_MUTED);
@@ -590,6 +587,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.branch_label",
                         ChronosphereClientState.getCurrentBranch()),
                 panelX() + CONTENT_SIZE / 2, panelY() + BRANCH_LABEL_Y_OFFSET, TEXT_SECONDARY);
+    }
+
+    private int ghostToggleButtonX() {
+        return panelX() + (CONTENT_SIZE + GHOST_TOGGLE_BUTTON_WIDTH) / 2 - IconButtonRenderer.SIZE;
+    }
+
+    private int ghostToggleButtonY() {
+        return panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET + (DELETE_BUTTON_HEIGHT - IconButtonRenderer.SIZE) / 2;
     }
 
     private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
