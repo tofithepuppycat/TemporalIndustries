@@ -7,6 +7,98 @@
     "east": "temporalindustries:block/order_pylon",
     "west": "temporalindustries:block/order_pylon",
     "up": "temporalindustries:block/machine_base_up",
-    "down": "temporalindustries:block/machine_base_down"
-  }
+    "down": "temporalindustries:block/machine_base_down",
+    "glow_north": "temporalindustries:block/order_pylon_e",
+    "glow_south": "temporalindustries:block/order_pylon_e",
+    "glow_east": "temporalindustries:block/order_pylon_e",
+    "glow_west": "temporalindustries:block/order_pylon_e"
+  },
+  "render_type": "minecraft:cutout",
+  "elements": [
+    {
+      "from": [
+        0,
+        0,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#north",
+          "cullface": "north"
+        },
+        "south": {
+          "texture": "#south",
+          "cullface": "south"
+        },
+        "east": {
+          "texture": "#east",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#west",
+          "cullface": "west"
+        },
+        "up": {
+          "texture": "#up",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#down",
+          "cullface": "down"
+        }
+      }
+    },
+    {
+      "from": [
+        -0.01,
+        -0.01,
+        -0.01
+      ],
+      "to": [
+        16.01,
+        16.01,
+        16.01
+      ],
+      "shade": false,
+      "faces": {
+        "north": {
+          "texture": "#glow_north",
+          "cullface": "north",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "south": {
+          "texture": "#glow_south",
+          "cullface": "south",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "east": {
+          "texture": "#glow_east",
+          "cullface": "east",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "west": {
+          "texture": "#glow_west",
+          "cullface": "west",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        }
+      }
+    }
+  ]
 }
