@@ -18,7 +18,6 @@ import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
-import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
@@ -50,13 +49,12 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int TEXT_SECONDARY = 0xFF5A5A5A;
     private static final int COLOR_BORDER = 0xFF000000;
 
-    // Auto-track/settings tabs: a vertical stack overlapping the panel's right edge, drawn BEFORE
-    // the panel background in render() so its edge tucks them in.
+    // Settings tab: overlaps the panel's right edge, drawn BEFORE the panel background in render()
+    // so its edge tucks it in. (The auto-tracking tab that used to sit above it is gone — claimed
+    // chunks are always captured now, so there's nothing left to toggle.)
     private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
     private static final int TAB_OVERLAP = 5;
-    private static final int AUTO_TRACK_Y_OFFSET = 40;
-    private static final int TAB_ROW_SPACING = 4;
-    private static final int SETTINGS_Y_OFFSET = AUTO_TRACK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
+    private static final int SETTINGS_Y_OFFSET = 40;
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
@@ -94,8 +92,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     /** Whether the settings overlay is showing the "are you sure" step; reset when the overlay closes. */
     private boolean deleteHistoryConfirmPending = false;
 
-    private int autoTrackX;
-    private int autoTrackY;
     private int settingsX;
     private int settingsY;
     private int showChangesX;
@@ -133,16 +129,23 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         jumpY = showChangesY;
         deleteBranchY = showChangesY;
 
-        autoTrackX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
-        autoTrackY = panelY() + AUTO_TRACK_Y_OFFSET;
         settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         settingsY = panelY() + SETTINGS_Y_OFFSET;
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
         // Force a full response regardless of any cache from a previously viewed machine.
-        PacketDistributor.sendToServer(
-                new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE, Long.MIN_VALUE));
+        requestTimelineView(true);
+    }
+
+    /** Requests the repository's commit graph plus the preview for the current selection. forceFull
+     * bypasses the server's "nothing changed" skip. */
+    private void requestTimelineView(boolean forceFull) {
+        long lastKnownHead = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getHeadCommitId();
+        long lastKnownPreviewVersion = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getPreviewVersion();
+        PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(
+                menu.getBlockPos(), lastKnownHead, lastKnownPreviewVersion,
+                TimelineProjectionManager.getSelectedCommitId()));
     }
 
     @Override
@@ -160,11 +163,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         ticksSinceSync++;
         if (ticksSinceSync >= SYNC_INTERVAL_TICKS) {
             ticksSinceSync = 0;
-            PacketDistributor.sendToServer(
-                    new TimelinePreviewRequestPacket(menu.getBlockPos(), TimelineProjectionManager.getHeadCommitId(),
-                            TimelineProjectionManager.getPreviewVersion()));
+            requestTimelineView(false);
         }
-
     }
 
     private void toggleShowChanges() {
@@ -197,24 +197,27 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         if (!TimelineProjectionManager.hasSelection()) {
             return;
         }
-        long target = TimelineProjectionManager.getSelectedGameTime();
-        long targetCommitId = TimelineProjectionManager.getSelectedCommitId();
-        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), target, targetCommitId));
+        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(),
+                TimelineProjectionManager.getSelectedCommitId()));
         TimelineProjectionManager.clearSelectedCommit();
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
     }
 
+    /** Deletes the branch whose tip is the selected node. Selecting a branch *by its tip* keeps the
+     * existing one-click graph interaction: branch tips are the nodes carrying a name label, so the
+     * thing being deleted is the thing the player can see and point at. */
     private void deleteSelectedBranch() {
-        if (!TimelineProjectionManager.isSelectedBranchDeletable()) {
+        String branchName = TimelineProjectionManager.getSelectedBranchName();
+        if (branchName == null || !TimelineProjectionManager.isSelectedBranchDeletable()) {
             return;
         }
-        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), TimelineProjectionManager.getSelectedCommitId()));
+        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), branchName));
         TimelineProjectionManager.clearSelectedCommit();
-        // Deleting a branch doesn't move the chunk's head, so the server's "nothing changed" skip
-        // would otherwise suppress a reply; force a full resync to pick up the removed commits.
-        PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(menu.getBlockPos(), Long.MIN_VALUE, Long.MIN_VALUE));
+        // Deleting a branch doesn't move the head, so the server's "nothing changed" skip would
+        // otherwise suppress a reply; force a full resync to pick up the removed commits.
+        requestTimelineView(true);
     }
 
     private static Component showChangesLabel(boolean enabled) {
@@ -324,32 +327,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         return mouseX >= barX && mouseX <= barX + ENTROPY_BAR_WIDTH && mouseY >= barY && mouseY <= barY + ENTROPY_BAR_HEIGHT;
     }
 
-    private void renderAutoTrackTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        boolean enabled = menu.getBlockEntity().isAutoTrackingEnabled();
-        boolean hovered = isMouseOverAutoTrackTab(mouseX, mouseY);
-        int tint = enabled ? 0xB0CC5555 : (hovered ? 0x40000000 : 0);
-
-        IconTabRenderer.renderBackground(guiGraphics, autoTrackX, autoTrackY, tint);
-
-        // Placeholder icon: a filled "record" dot.
-        int glyphColor = enabled ? 0xFFFFEDED : TEXT_PRIMARY;
-        int dotSize = 10;
-        int dotX = autoTrackX + (TAB_ROW_SIZE - dotSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
-        int dotY = autoTrackY + (TAB_ROW_SIZE - dotSize) / 2;
-        guiGraphics.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, glyphColor);
-    }
-
-    private boolean isMouseOverAutoTrackTab(double mouseX, double mouseY) {
-        return mouseX >= autoTrackX && mouseX <= autoTrackX + TAB_ROW_SIZE
-                && mouseY >= autoTrackY && mouseY <= autoTrackY + TAB_ROW_SIZE;
-    }
-
-    private static Component autoTrackTooltip(boolean enabled) {
-        return Component.translatable(enabled
-                ? "gui.temporalindustries.timeline_machine.auto_track_tooltip_on"
-                : "gui.temporalindustries.timeline_machine.auto_track_tooltip_off");
-    }
-
     private void renderSettingsTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean hovered = isMouseOverSettingsTab(mouseX, mouseY);
         int tint = hovered ? 0x40000000 : 0;
@@ -426,7 +403,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     }
 
     private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderAutoTrackTab(guiGraphics, mouseX, mouseY);
         renderSettingsTab(guiGraphics, mouseX, mouseY);
     }
 
@@ -449,10 +425,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             return;
         }
 
-        if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, autoTrackTooltip(menu.getBlockEntity().isAutoTrackingEnabled()), mouseX, mouseY);
-            return;
-        }
         if (isMouseOverSettingsTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.settings_tooltip"), mouseX, mouseY);
             return;
@@ -471,11 +443,21 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            Component label = TimelineProjectionManager.isSelectedBranchDeletable()
-                    ? Component.translatable("gui.temporalindustries.chronovault.delete_branch")
-                    : Component.translatable("gui.temporalindustries.chronovault.delete_branch_in_use");
-            guiGraphics.renderTooltip(font, label, mouseX, mouseY);
+            guiGraphics.renderTooltip(font, deleteBranchTooltip(), mouseX, mouseY);
         }
+    }
+
+    /** Names the branch the button would delete, so it's obvious what's about to go; falls back to
+     * explaining why it's disabled when the selection isn't a deletable branch tip. */
+    static Component deleteBranchTooltip() {
+        String branchName = TimelineProjectionManager.getSelectedBranchName();
+        if (branchName == null) {
+            return Component.translatable("gui.temporalindustries.chronovault.delete_branch_select_tip");
+        }
+        if (!TimelineProjectionManager.isSelectedBranchDeletable()) {
+            return Component.translatable("gui.temporalindustries.chronovault.delete_branch_in_use");
+        }
+        return Component.translatable("gui.temporalindustries.chronovault.delete_branch_named", branchName);
     }
 
     /** Shared with {@link ChronosphereScreen}'s identical entropy bar tooltip. */
@@ -488,12 +470,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button == 0 && isMouseOverAutoTrackTab(mouseX, mouseY)) {
-            boolean newState = !menu.getBlockEntity().isAutoTrackingEnabled();
-            PacketDistributor.sendToServer(new TimelineMachineToggleAutoTrackPacket(menu.getBlockPos(), newState));
-            return true;
-        }
-
         if (button == 0 && isMouseOverSettingsTab(mouseX, mouseY)) {
             settingsOverlayOpen = !settingsOverlayOpen;
             deleteHistoryConfirmPending = false;
@@ -524,6 +500,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
 
         if (button == 0 && graphWidget.mouseClicked(mouseX, mouseY, panelX() + GRAPH_X_OFFSET, panelY() + GRAPH_Y_OFFSET, GRAPH_WIDTH, GRAPH_HEIGHT)) {
+            // The ghost preview is resolved server-side per selected commit, so ask for the new
+            // one right away instead of letting it lag until the next periodic poll.
+            requestTimelineView(false);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);

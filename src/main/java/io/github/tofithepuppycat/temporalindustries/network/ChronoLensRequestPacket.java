@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
@@ -14,7 +15,7 @@ import net.minecraft.world.level.Level;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-import java.util.HashMap;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -38,8 +39,16 @@ public class ChronoLensRequestPacket implements CustomPacketPayload {
             TemporalTimeline timeline = TemporalWorldData.get(sender.getServer()).getTimeline(Level.OVERWORLD.location());
             List<TemporalCommit> trunk = timeline == null ? List.of() : timeline.getTrunkCommits();
 
-            Map<Long, Long> localParents = new HashMap<>();
-            for (TemporalCommit commit : trunk) localParents.put(commit.getId(), commit.getParentId());
+            // The Chrono Lens still reads the old per-dimension timeline, but it shares the
+            // repository-shaped graph packet, so project its trunk into CommitNodes. The mapping is
+            // exact rather than lossy: the lens only ever sends a linear trunk whose edges are
+            // already real parent ids, which is precisely what a CommitNode carries.
+            List<CommitNode> nodes = new ArrayList<>(trunk.size());
+            for (TemporalCommit commit : trunk) {
+                nodes.add(new CommitNode(commit.getId(), commit.getParentId(), commit.getGameTime(),
+                        commit.getShortHash(), commit.isPlayerMarked(), 1, commit.getTotalChangeCount(),
+                        commit.getType() == TemporalCommit.Type.SNAPSHOT));
+            }
 
             long headCommitId = timeline == null ? -1L : timeline.getLatestCommitId();
             long placedGameTime = trunk.isEmpty() ? 0L : trunk.get(0).getGameTime();
@@ -49,12 +58,12 @@ public class ChronoLensRequestPacket implements CustomPacketPayload {
                     placedGameTime,
                     placedGameTime,
                     sender.level().getGameTime(),
-                    trunk,
-                    localParents,
-                    headCommitId,
-                    -1L,
+                    nodes,
                     Map.of(),
-                    List.of(),
+                    "",
+                    headCommitId,
+                    Map.of(),
+                    Map.of(),
                     List.of(),
                     headCommitId));
         });

@@ -27,17 +27,20 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final BlockPos machinePos;
     private final List<Long> selectedChunkKeys;
     private final List<Long> blockedChunkKeys;
-    private final boolean autoTrackingEnabled;
-    /** How many of selectedChunkKeys are currently tracked (recording deltas). */
-    private final int trackedCount;
+    /** How many of selectedChunkKeys this machine's repository actually holds the claim on. Equal
+     * to the claimed count in the normal case; lower only if another machine got in first. */
+    private final int capturedCount;
+    /** The named branch currently checked out for this machine's repository. */
+    private final String currentBranch;
 
     public ChronosphereStateSyncPacket(BlockPos machinePos, List<Long> selectedChunkKeys,
-                                       List<Long> blockedChunkKeys, boolean autoTrackingEnabled, int trackedCount) {
+                                       List<Long> blockedChunkKeys, int capturedCount,
+                                       String currentBranch) {
         this.machinePos = machinePos;
         this.selectedChunkKeys = selectedChunkKeys;
         this.blockedChunkKeys = blockedChunkKeys;
-        this.autoTrackingEnabled = autoTrackingEnabled;
-        this.trackedCount = trackedCount;
+        this.capturedCount = capturedCount;
+        this.currentBranch = currentBranch;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereStateSyncPacket packet) {
@@ -46,8 +49,8 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         for (long key : packet.selectedChunkKeys) buf.writeLong(key);
         buf.writeVarInt(packet.blockedChunkKeys.size());
         for (long key : packet.blockedChunkKeys) buf.writeLong(key);
-        buf.writeBoolean(packet.autoTrackingEnabled);
-        buf.writeVarInt(packet.trackedCount);
+        buf.writeVarInt(packet.capturedCount);
+        buf.writeUtf(packet.currentBranch, 64);
     }
 
     public static ChronosphereStateSyncPacket decode(RegistryFriendlyByteBuf buf) {
@@ -58,16 +61,17 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         int blockedCount = buf.readVarInt();
         List<Long> blocked = new ArrayList<>(blockedCount);
         for (int i = 0; i < blockedCount; i++) blocked.add(buf.readLong());
-        boolean autoTrackingEnabled = buf.readBoolean();
-        int trackedCount = buf.readVarInt();
-        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, autoTrackingEnabled, trackedCount);
+        int capturedCount = buf.readVarInt();
+        String currentBranch = buf.readUtf(64);
+        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, capturedCount, currentBranch);
     }
 
     public static void handle(ChronosphereStateSyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> {
             Set<Long> selected = new HashSet<>(packet.selectedChunkKeys);
             Set<Long> blocked = new HashSet<>(packet.blockedChunkKeys);
-            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked, packet.autoTrackingEnabled, packet.trackedCount);
+            ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked,
+                    packet.capturedCount, packet.currentBranch);
         });
     }
 

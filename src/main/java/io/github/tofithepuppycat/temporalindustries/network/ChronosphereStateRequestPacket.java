@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
+import java.util.UUID;
 
 /** Client -> server: periodic poll for a Chronosphere's map state (which chunks are claimed/blocked)
  * and the current jump-cost preview, so the GUI stays live while open. */
@@ -67,6 +68,7 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
 
         TemporalWorldData worldData = TemporalWorldData.get(sender.serverLevel().getServer());
         ResourceLocation dimension = sender.serverLevel().dimension().location();
+        UUID repoId = machine.getRepositoryId();
         ChunkPos home = machine.getHomeChunkPos();
         List<Long> blocked = new ArrayList<>();
         int radius = ChronosphereBlockEntity.MAX_RADIUS;
@@ -75,21 +77,22 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
                 if (!ChronosphereBlockEntity.isWithinRadius(dx, dz)) continue;
                 ChunkPos pos = new ChunkPos(home.x + dx, home.z + dz);
                 long key = pos.toLong();
-                if (!selected.contains(key) && worldData.isTracked(dimension, pos)) {
+                if (!selected.contains(key) && worldData.getClaimingRepo(dimension, pos) != null) {
                     blocked.add(key);
                 }
             }
         }
 
-        // Claimed chunks actually being tracked right now; can be fewer than selected.size() if
-        // auto-tracking is off, or if another owner is tracking one of these chunks.
-        int trackedCount = 0;
+        // Claimed chunks this machine's repository actually owns. Lower than selected.size() only
+        // when another machine already held the claim on one of them.
+        int capturedCount = 0;
         for (long key : selected) {
-            if (worldData.isTracked(dimension, new ChunkPos(key))) trackedCount++;
+            if (repoId.equals(worldData.getClaimingRepo(dimension, new ChunkPos(key)))) capturedCount++;
         }
 
         PacketDistributor.sendToPlayer(sender, new ChronosphereStateSyncPacket(
-                machinePos, new ArrayList<>(selected), blocked, machine.isAutoTrackingEnabled(), trackedCount));
+                machinePos, new ArrayList<>(selected), blocked, capturedCount,
+                machine.getCurrentNamedBranch()));
     }
 
     @Override

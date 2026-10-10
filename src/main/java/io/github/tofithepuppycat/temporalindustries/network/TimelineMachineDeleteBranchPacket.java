@@ -11,8 +11,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: deletes a branched-off lineage from a timeline machine's chunk history,
- * provided it isn't the branch currently checked out. Shared by the Chronosphere and Chronovault screens. */
+/** Client -> server: deletes a named branch (and the history unique to it) from a timeline
+ * machine's repository, provided it isn't the branch currently checked out. Branches are named
+ * refs into one commit tree now, so this carries a name rather than a commit id. Shared by the
+ * Chronosphere and Chronovault screens. */
 public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
     public static final Type<TimelineMachineDeleteBranchPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_delete_branch"));
@@ -21,20 +23,20 @@ public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
             StreamCodec.of(TimelineMachineDeleteBranchPacket::encode, TimelineMachineDeleteBranchPacket::decode);
 
     private final BlockPos machinePos;
-    private final long branchCommitId;
+    private final String branchName;
 
-    public TimelineMachineDeleteBranchPacket(BlockPos machinePos, long branchCommitId) {
+    public TimelineMachineDeleteBranchPacket(BlockPos machinePos, String branchName) {
         this.machinePos = machinePos;
-        this.branchCommitId = branchCommitId;
+        this.branchName = branchName;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, TimelineMachineDeleteBranchPacket packet) {
         buf.writeBlockPos(packet.machinePos);
-        buf.writeLong(packet.branchCommitId);
+        buf.writeUtf(packet.branchName, 64);
     }
 
     public static TimelineMachineDeleteBranchPacket decode(RegistryFriendlyByteBuf buf) {
-        return new TimelineMachineDeleteBranchPacket(buf.readBlockPos(), buf.readLong());
+        return new TimelineMachineDeleteBranchPacket(buf.readBlockPos(), buf.readUtf(64));
     }
 
     public static void handle(TimelineMachineDeleteBranchPacket packet, IPayloadContext context) {
@@ -47,7 +49,7 @@ public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
             if (!(menu.getTimelineProvider() instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            machine.deleteBranch(packet.branchCommitId);
+            machine.deleteBranch(packet.branchName);
         });
     }
 

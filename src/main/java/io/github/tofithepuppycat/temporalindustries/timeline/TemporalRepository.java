@@ -33,10 +33,6 @@ import java.util.function.ToLongFunction;
  * head are left exactly as rendered.
  */
 public final class TemporalRepository {
-    /** Per-chunk delta-count threshold before that chunk's next entry is forced FULL again,
-     * bounding how far a resolve ever has to walk back for that chunk. */
-    public static final int DELTA_SNAPSHOT_THRESHOLD = 50;
-
     /** Auto-generated branch names, styled like git but without needing the player to type
      * anything: Alpha, Beta, Gamma, ... Omega, then Alpha2, Beta2, and so on. */
     private static final String[] BRANCH_NAME_POOL = {
@@ -109,10 +105,11 @@ public final class TemporalRepository {
 
     /**
      * Bundles pendingBlockChanges/pendingEntityChanges (both keyed by chunkPos.toLong()) into one
-     * new commit attached as a child of the current head. Each touched chunk's entry is FULL when
-     * that chunk has never been committed before or its own delta counter has reached {@link
-     * #DELTA_SNAPSHOT_THRESHOLD} (which resets only that chunk's counter); otherwise DELTA. Chunks
-     * aren't forced full just because a sibling chunk in the same commit hit its own threshold.
+     * new commit attached as a child of the current head. Every touched chunk's entry is always
+     * FULL — a complete {@link ChunkSnapshot} of that chunk at commit time — so that jumping to
+     * any commit can read a chunk's state directly off it instead of walking back to the nearest
+     * baseline and replaying deltas forward. This trades larger per-commit storage for commits and
+     * rollbacks that are both O(1) per chunk.
      *
      * <p>If the current head already has another child (i.e. the head isn't a tip — the player
      * jumped back and is now committing new changes), this forks: the existing line keeps its
@@ -131,18 +128,10 @@ public final class TemporalRepository {
         Map<Long, ChunkEntry> entries = new HashMap<>();
         for (long chunkKey : chunkKeys) {
             ChunkState state = chunkStates.computeIfAbsent(chunkKey, k -> new ChunkState());
-            if (!state.hasBaseline || state.deltaCount >= DELTA_SNAPSHOT_THRESHOLD) {
-                ChunkPos pos = new ChunkPos(chunkKey);
-                entries.put(chunkKey, ChunkEntry.full(ChunkSnapshot.capture(level, pos)));
-                state.hasBaseline = true;
-                state.deltaCount = 0;
-            } else {
-                List<BlockChangeDelta> blockChanges = new ArrayList<>(
-                        pendingBlockChanges.getOrDefault(chunkKey, Collections.emptyMap()).values());
-                List<EntityDelta> entityChanges = pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
-                entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
-                state.deltaCount++;
-            }
+            ChunkPos pos = new ChunkPos(chunkKey);
+            entries.put(chunkKey, ChunkEntry.full(ChunkSnapshot.capture(level, pos)));
+            state.hasBaseline = true;
+            state.deltaCount = 0;
         }
 
         long parentId = headCommitId;
@@ -150,12 +139,12 @@ public final class TemporalRepository {
         RepoCommit newCommit = new RepoCommit(id, parentId, gameTime, author, entries);
         commits.put(id, newCommit);
 
-        if (currentBranchName == null) {
-            currentBranchName = generateBranchName();
-        }
         if (parentId == RepoCommit.NO_PARENT) {
             rootCommitId = id;
-        } else if (childCount.getOrDefault(parentId, 0) > 0) {
+            if (currentBranchName == null) {
+                currentBranchName = generateBranchName();
+            }
+        } else if (childCount.getOrDefault(parentId, 0) > 0 || currentBranchName == null) {
             currentBranchName = generateBranchName();
         }
         childCount.merge(parentId, 1, Integer::sum);
@@ -416,20 +405,18 @@ public final class TemporalRepository {
      * (see {@link #chunksAffectedByJump}); chunks the move doesn't touch are left as rendered.
      * Never creates a commit or a fork by itself — see {@link #commit} for lazy forking. Never
      * overwrites a position isGlued reports true for.
-     * @return the chunks actually updated */
-    public Set<ChunkPos> jumpTo(long targetCommitId, ServerLevel level, Predicate<BlockPos> isGlued) {
-        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return Set.of();
+     * @return every position whose block state actually changed, so callers can animate the jump */
+    public List<BlockPos> jumpTo(long targetCommitId, ServerLevel level, Predicate<BlockPos> isGlued) {
+        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return List.of();
 
         Set<Long> affectedChunks = chunksAffectedByJump(headCommitId, targetCommitId);
         List<BlockPos> deferredSettle = new ArrayList<>();
         Map<UUID, net.minecraft.nbt.CompoundTag> desiredEntities = new HashMap<>();
-        Set<ChunkPos> result = new HashSet<>();
 
         for (long chunkKey : affectedChunks) {
             ResolvedChunkState desired = resolveChunkStateAt(targetCommitId, chunkKey);
             applyBlockStates(desired.states(), desired.blockEntityTags(), level, isGlued, deferredSettle);
             desiredEntities.putAll(desired.entityTags());
-            result.add(new ChunkPos(chunkKey));
         }
 
         settleBlocks(level, deferredSettle);
@@ -440,7 +427,7 @@ public final class TemporalRepository {
         for (Map.Entry<String, Long> entry : branchTips.entrySet()) {
             if (entry.getValue() == targetCommitId) { currentBranchName = entry.getKey(); break; }
         }
-        return result;
+        return deferredSettle;
     }
 
     /** The energy cost of jumping to targetCommitId: costFn summed over every block position

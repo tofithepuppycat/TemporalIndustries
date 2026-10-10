@@ -93,5 +93,7 @@ public class ClientModEvents {
         ChronosphereClientState.clearAll();
         ChunkThumbnailClientState.clearAll();
         GlueSelectionClientState.clear();
+        EntropyCondenserRangeClientState.clear();
+        ChronoRiftClientState.clearAll();
     }
 }

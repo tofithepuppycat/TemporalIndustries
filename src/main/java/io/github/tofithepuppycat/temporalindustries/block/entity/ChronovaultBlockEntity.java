@@ -1,14 +1,11 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
@@ -20,14 +17,13 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-import java.util.Collections;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.Objects;
 
-/** Block entity for the Chronovault: holds per-machine energy/time state and reads/writes the
- * shared {@link TemporalTimeline} for its own single chunk. */
+/** Block entity for the Chronovault: holds per-machine energy/time state and owns a
+ * {@link TemporalRepository} covering its own single chunk. The repository-backed timeline view is
+ * entirely inherited from {@link AbstractTimelineMachineBlockEntity}; the only thing this class
+ * decides is which chunk it claims. */
 public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     private static final int ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000;
@@ -48,26 +44,19 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     @Override
     public void onLoad() {
         super.onLoad();
+        if (!(level instanceof ServerLevel)) return;
 
-        if (level instanceof ServerLevel serverLevel) {
-            if (serverLevel.getServer() != null) {
-                TemporalWorldData worldData = TemporalWorldData.get(serverLevel.getServer());
-                ChunkPos chunkPos = getChunkPos();
-                ResourceLocation dimension = level.dimension().location();
-                if (autoTrackingEnabled) worldData.trackChunk(dimension, chunkPos, worldPosition, serverLevel);
+        claimOwnChunks();
 
-                TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
-                ensureSnapshotted(worldData, timeline, serverLevel, chunkPos);
-
-                // Restore placedGameTime from the timeline on reload.
-                if (placedGameTime == UNSET_TIME) {
-                    long earliest = timeline.getEarliestGameTimeForChunk(chunkPos);
-                    if (earliest != -1L) {
-                        placedGameTime  = earliest;
-                        selectedGameTime = Math.max(placedGameTime, selectedGameTime == UNSET_TIME ? placedGameTime : selectedGameTime);
-                        setChanged();
-                    }
-                }
+        // Restore placedGameTime from the repository's root commit on reload, so a reloaded machine
+        // doesn't clamp its own history out of the selectable window.
+        if (placedGameTime == UNSET_TIME) {
+            TemporalRepository repo = getRepository();
+            RepoCommit root = repo == null ? null : repo.getCommit(repo.getRootCommitId());
+            if (root != null) {
+                placedGameTime = root.getGameTime();
+                selectedGameTime = Math.max(placedGameTime, selectedGameTime == UNSET_TIME ? placedGameTime : selectedGameTime);
+                setChanged();
             }
         }
     }
@@ -75,72 +64,12 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     @Override
     public void setRemoved() {
         super.setRemoved();
-        if (level != null && !level.isClientSide && level.getServer() != null) {
-            TemporalWorldData.get(level.getServer())
-                    .untrackChunk(level.dimension().location(), getChunkPos(), worldPosition);
-        }
+        releaseOwnChunks();
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronovaultBlockEntity be) {
         if (level.isClientSide) return;
         be.commonTick(level);
-    }
-
-    /** All commits relevant to this machine's chunk, in chronological order. chunkPos is ignored (one chunk only). */
-    @Override
-    public List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyList();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyList();
-        return timeline.getCommitsForChunk(getChunkPos());
-    }
-
-    /** commitId -> the id it locally forked from, so the client can lay out the graph by real branch topology. */
-    @Override
-    public Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return Collections.emptyMap();
-        return timeline.getLocalParentsForChunk(getChunkPos());
-    }
-
-    /** The commit this machine's chunk's live world currently reflects; not always the last entry in getChunkCommits(). */
-    @Override
-    public long getChunkHeadId(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return -1L;
-        TemporalTimeline timeline = TemporalWorldData.get(level.getServer())
-                .getTimeline(level.dimension().location());
-        if (timeline == null) return -1L;
-        return timeline.getChunkHeadId(getChunkPos());
-    }
-
-    /** commitId -> energy cost of jumping this machine's chunk there from its current head, for
-     * every commit relevant to this chunk. Used to preview cost per node in the timeline GUI. */
-    @Override
-    public Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos) {
-        if (level == null || level.isClientSide || level.getServer() == null) return Collections.emptyMap();
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        TemporalTimeline timeline = worldData.getTimeline(dimension);
-        if (timeline == null) return Collections.emptyMap();
-
-        ChunkPos ownChunk = getChunkPos();
-        long headId = timeline.getChunkHeadId(ownChunk);
-        Map<Long, Long> costs = new HashMap<>();
-        for (TemporalCommit commit : timeline.getCommitsForChunk(ownChunk)) {
-            costs.put(commit.getId(), timeline.computeJumpCost(ownChunk, commit.getGameTime(), headId, level,
-                    AbstractTimelineMachineBlockEntity::costOf, commit.getId(), pos -> worldData.isGlued(dimension, pos),
-                    NODE_JUMP_FE_SURCHARGE));
-        }
-        return costs;
-    }
-
-    @Override
-    public List<ChunkTimelineSnapshot> getPreviewChunkSnapshots() {
-        ChunkPos chunkPos = getChunkPos();
-        return List.of(new ChunkTimelineSnapshot(chunkPos, getChunkCommits(chunkPos), getChunkLocalParents(chunkPos), getChunkHeadId(chunkPos)));
     }
 
     @Override

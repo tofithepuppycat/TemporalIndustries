@@ -5,6 +5,8 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineBlockChangeFlashPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineJumpEffectPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -14,6 +16,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -24,6 +28,7 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -283,6 +288,13 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         orderTank.drain(JUMP_ENTROPY_SHIFT, IFluidHandler.FluidAction.EXECUTE);
         setChanged();
         syncToClients();
+
+        if (level instanceof ServerLevel serverLevel) {
+            PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
+                    new TimelineJumpEffectPacket(worldPosition, false));
+            PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(targetPos),
+                    new TimelineBlockChangeFlashPacket(List.of(targetPos), false));
+        }
 
         return JumpResult.SUCCESS;
     }

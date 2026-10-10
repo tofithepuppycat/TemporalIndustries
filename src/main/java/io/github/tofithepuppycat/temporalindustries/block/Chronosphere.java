@@ -6,6 +6,7 @@ import org.jetbrains.annotations.Nullable;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.dimension.RiftDeviceLock;
 import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -108,6 +109,9 @@ public class Chronosphere extends BaseEntityBlock {
         if (!(stack.getItem() instanceof PortableChronoMarkerItem)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
+        if (RiftDeviceLock.blockIfInRift(level, player)) {
+            return ItemInteractionResult.FAIL;
+        }
         if (level.isClientSide) {
             return ItemInteractionResult.SUCCESS;
         }
@@ -131,6 +135,10 @@ public class Chronosphere extends BaseEntityBlock {
 
     @Override
     protected InteractionResult useWithoutItem(@NotNull BlockState blockState, @NotNull Level level, @NotNull BlockPos blockPos, @NotNull Player player, @NotNull BlockHitResult blockHitResult) {
+        if (RiftDeviceLock.blockIfInRift(level, player)) {
+            return InteractionResult.FAIL;
+        }
+
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }

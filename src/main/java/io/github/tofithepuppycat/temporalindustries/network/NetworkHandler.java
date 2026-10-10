@@ -45,11 +45,6 @@ public class NetworkHandler {
                 ChronosphereStateSyncPacket::handle);
 
         registrar.playToServer(
-                TimelineMachineToggleAutoTrackPacket.TYPE,
-                TimelineMachineToggleAutoTrackPacket.STREAM_CODEC,
-                TimelineMachineToggleAutoTrackPacket::handle);
-
-        registrar.playToServer(
                 ChronosphereMapRequestPacket.TYPE,
                 ChronosphereMapRequestPacket.STREAM_CODEC,
                 ChronosphereMapRequestPacket::handle);
@@ -68,6 +63,11 @@ public class NetworkHandler {
                 TimelineMachineDeleteBranchPacket.TYPE,
                 TimelineMachineDeleteBranchPacket.STREAM_CODEC,
                 TimelineMachineDeleteBranchPacket::handle);
+
+        registrar.playToServer(
+                TimelineMachineCommitPacket.TYPE,
+                TimelineMachineCommitPacket.STREAM_CODEC,
+                TimelineMachineCommitPacket::handle);
 
         registrar.playToServer(
                 GlueRegionRequestPacket.TYPE,
@@ -113,6 +113,16 @@ public class NetworkHandler {
                 AnchorRewindEffectPacket.TYPE,
                 AnchorRewindEffectPacket.STREAM_CODEC,
                 AnchorRewindEffectPacket::handle);
+
+        registrar.playToClient(
+                TimelineJumpEffectPacket.TYPE,
+                TimelineJumpEffectPacket.STREAM_CODEC,
+                TimelineJumpEffectPacket::handle);
+
+        registrar.playToClient(
+                TimelineBlockChangeFlashPacket.TYPE,
+                TimelineBlockChangeFlashPacket.STREAM_CODEC,
+                TimelineBlockChangeFlashPacket::handle);
 
         registrar.playToServer(
                 LootGeneratorSetTablePacket.TYPE,

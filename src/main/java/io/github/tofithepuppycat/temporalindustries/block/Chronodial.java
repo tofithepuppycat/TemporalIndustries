@@ -2,6 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.dimension.RiftDeviceLock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.network.chat.Component;
@@ -61,6 +62,10 @@ public class Chronodial extends BaseEntityBlock {
     @Override
     protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
                                                 @NotNull Player player, @NotNull BlockHitResult hitResult) {
+        if (RiftDeviceLock.blockIfInRift(level, player)) {
+            return InteractionResult.FAIL;
+        }
+
         if (level.isClientSide) {
             return InteractionResult.SUCCESS;
         }

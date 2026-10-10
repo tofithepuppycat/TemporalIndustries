@@ -5,7 +5,6 @@ import io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.texture.DynamicTexture;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FastColor;
 import net.minecraft.world.level.material.MapColor;
 import org.jetbrains.annotations.Nullable;
 
@@ -61,8 +60,11 @@ public final class ChunkThumbnailClientState {
         NativeImage image = new NativeImage(size, size, false);
         for (int z = 0; z < size; z++) {
             for (int x = 0; x < size; x++) {
-                int argb = MapColor.getColorFromPackedId(colors[z * size + x] & 0xFF);
-                image.setPixelRGBA(x, z, FastColor.ABGR32.fromArgb32(argb));
+                // MapColor#calculateRGBColor (reached via getColorFromPackedId) already packs its
+                // result in NativeImage's native pixel order, same as vanilla's MapRenderer feeds
+                // it straight into setPixelRGBA — wrapping it in FastColor.ABGR32.fromArgb32 here
+                // double-converts it and swaps red/blue (blue water rendered pink).
+                image.setPixelRGBA(x, z, MapColor.getColorFromPackedId(colors[z * size + x] & 0xFF));
             }
         }
 

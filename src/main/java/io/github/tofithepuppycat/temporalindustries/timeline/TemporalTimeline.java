@@ -45,6 +45,15 @@ public class TemporalTimeline {
     /** chunkPos.toLong() -> the commit that chunk's live world currently reflects. */
     private final Map<Long, Long> chunkHeadId = new HashMap<>();
 
+    /** Named refs into the commit graph (git-like branches), keyed by name. Lazily seeded with a
+     * {@link #MAIN_BRANCH} branch from the current {@link #chunkHeadId} map the first time branch
+     * APIs are touched, so old saves need no migration step. */
+    private final Map<String, TemporalBranch> branches = new HashMap<>();
+    public static final String MAIN_BRANCH = "main";
+    /** The branch currently checked out onto the live world; advances automatically as new
+     * DELTA/SNAPSHOT commits land (see {@link #registerCommit}), same as a real git branch. */
+    private String currentBranchName = MAIN_BRANCH;
+
     /** Forgets chunkPos's entire recorded history without touching the live world. Commits shared
      * with other chunks stay registered globally; only this chunk's reference is dropped. Callers
      * needing history to resume must give the chunk a fresh baseline afterward. */
@@ -74,6 +83,20 @@ public class TemporalTimeline {
         List<Long> ids = chunkIndex.get(chunkKey);
         if (ids != null) ids.removeIf(subtree::contains);
         localParents.keySet().removeAll(subtree);
+
+        // Any named branch whose recorded head for this chunk falls inside the deleted subtree
+        // loses that chunk; a branch left covering no chunks (and not currently checked out) is
+        // itself forgotten, so deleting a branch's commits also cleans up its name.
+        Iterator<TemporalBranch> it = branches.values().iterator();
+        while (it.hasNext()) {
+            TemporalBranch candidate = it.next();
+            if (subtree.contains(candidate.getChunkHead(chunkPos))) {
+                candidate.removeChunkHead(chunkPos);
+                if (candidate.getChunkHeads().isEmpty() && !candidate.getName().equals(currentBranchName)) {
+                    it.remove();
+                }
+            }
+        }
         return true;
     }
 
@@ -130,13 +153,25 @@ public class TemporalTimeline {
 
     /** Checks out targetGameTime for chunkPos, preferring preferredCommitId as the exact target
      * over gameTime-only resolution when it's one of chunkPos's own commits (pass
-     * {@link TemporalCommit#NO_PREFERRED_COMMIT} to always resolve by gameTime alone).
+     * {@link TemporalCommit#NO_PREFERRED_COMMIT} to always resolve by gameTime alone). Entirely
+     * seamless, git-like checkout: the caller never names or picks a branch explicitly.
      *
-     * <p>No-op if this chunk has no history yet, or its head is already at the resolved point.
-     * Landing on a childless point just moves the chunk's head there; otherwise forks a zero-diff
-     * marker commit scoped to this chunk. */
+     * <ul>
+     * <li>No-op if this chunk has no history yet, or its head is already at the resolved point.
+     * <li>If the target point is already part of some other branch's recorded lineage for this
+     * chunk, implicitly switches the currently checked-out branch to it (a real {@code git
+     * checkout <branch>}, not a new commit) and just moves the head there.
+     * <li>If the target point has no existing children, just moves the head — still on whichever
+     * branch is already checked out.
+     * <li>Otherwise the target point already has later history recorded past it on this chunk, so
+     * landing on it would diverge: forks a zero-diff marker commit scoped to this chunk under a
+     * freshly auto-named branch (reuseBranchName if given, so one jump across several chunks
+     * shares a single new branch instead of minting one per chunk).
+     * </ul>
+     * @param reuseBranchName a branch name to reuse if this checkout forks a brand-new branch
+     * (from an earlier chunk in the same multi-chunk jump), or null to generate a fresh one */
     @Nullable
-    public TemporalCommit branch(ChunkPos chunkPos, long targetGameTime, long preferredCommitId) {
+    public CheckoutOutcome branch(ChunkPos chunkPos, long targetGameTime, long preferredCommitId, @Nullable String reuseBranchName) {
         List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
         if (chunkCommits.isEmpty()) return null;
 
@@ -146,14 +181,24 @@ public class TemporalTimeline {
         long parent = resolveTarget(chunkCommits, targetGameTime, preferredCommitId);
         if (parent == currentHead) return null;
 
+        String owner = findOwningBranch(chunkPos, parent);
+        if (owner != null) {
+            chunkHeadId.put(chunkKey, parent);
+            currentBranchName = owner;
+            return new CheckoutOutcome(null, owner, false);
+        }
+
         if (!TemporalCommit.hasChild(localParents, parent)) {
             chunkHeadId.put(chunkKey, parent);
             return null;
         }
 
+        String name = reuseBranchName != null ? reuseBranchName : generateBranchName();
         TemporalCommit marker = TemporalCommit.branch(nextId++, parent, targetGameTime, chunkKey);
         registerCommit(marker);
-        return marker;
+        branches.computeIfAbsent(name, n -> new TemporalBranch(n, Collections.emptyMap())).setChunkHead(chunkPos, marker.getId());
+        currentBranchName = name;
+        return new CheckoutOutcome(marker, name, true);
     }
 
     /** targetGameTime resolved to a specific commit for chunkPos — preferredCommitId directly if
@@ -185,8 +230,86 @@ public class TemporalTimeline {
         }
         if (commit.getType() == TemporalCommit.Type.BRANCH) {
             indexChunkTouch(commit.getBranchChunkPos(), commit.getId(), commit.getParentId());
+        } else {
+            // A real commit (not a checkout marker) advances whichever named branch is currently
+            // checked out, same as git moving the current branch forward on every commit.
+            TemporalBranch active = getOrCreateCurrentBranch();
+            for (ChunkDelta cd : commit.getChunkDeltas()) {
+                active.setChunkHead(cd.getChunkPos(), commit.getId());
+            }
+            for (ChunkSnapshot snapshot : commit.getChunkSnapshots()) {
+                active.setChunkHead(snapshot.getChunkPos(), commit.getId());
+            }
         }
     }
+
+    // -------------------------------------------------------------------------
+    // Named branches (git-like refs over the per-chunk commit graph above)
+
+    /** currentBranchName's TemporalBranch, lazily seeding a {@link #MAIN_BRANCH} from the current
+     * {@link #chunkHeadId} map if branches hasn't been touched yet (old-save migration). */
+    private TemporalBranch getOrCreateCurrentBranch() {
+        TemporalBranch branch = branches.get(currentBranchName);
+        if (branch == null) {
+            branch = new TemporalBranch(currentBranchName, new HashMap<>(chunkHeadId));
+            branches.put(currentBranchName, branch);
+        }
+        return branch;
+    }
+
+    public String getCurrentBranchName() {
+        getOrCreateCurrentBranch();
+        return currentBranchName;
+    }
+
+    /** Auto-generated branch names, styled like git but without needing the player to type
+     * anything: Alpha, Beta, Gamma, ... Omega, then Alpha2, Beta2, and so on. */
+    private static final String[] BRANCH_NAME_POOL = {
+            "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa",
+            "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega"
+    };
+    private int nextBranchNameIndex = 0;
+
+    private String generateBranchName() {
+        String base = BRANCH_NAME_POOL[nextBranchNameIndex % BRANCH_NAME_POOL.length];
+        int cycle = nextBranchNameIndex / BRANCH_NAME_POOL.length;
+        nextBranchNameIndex++;
+        return cycle == 0 ? base : base + (cycle + 1);
+    }
+
+    /** The branch (other than currentBranchName) whose recorded lineage for chunkPos already
+     * contains targetCommitId, so landing on it is a {@code git checkout <branch>} of history that
+     * already exists rather than a fresh fork. Returns null if targetCommitId is reachable from the
+     * current branch's own lineage (no switch needed) or no other branch claims it. */
+    @Nullable
+    private String findOwningBranch(ChunkPos chunkPos, long targetCommitId) {
+        List<TemporalCommit> chunkCommits = getCommitsForChunk(chunkPos);
+        Map<Long, Long> localParents = getLocalParentsForChunk(chunkPos);
+
+        TemporalBranch current = getOrCreateCurrentBranch();
+        long currentHead = current.getChunkHead(chunkPos);
+        if (currentHead != -1L) {
+            for (TemporalCommit c : TemporalCommit.ancestryChain(chunkCommits, localParents, currentHead)) {
+                if (c.getId() == targetCommitId) return null;
+            }
+        }
+
+        for (TemporalBranch candidate : branches.values()) {
+            if (candidate.getName().equals(currentBranchName)) continue;
+            long head = candidate.getChunkHead(chunkPos);
+            if (head == -1L) continue;
+            for (TemporalCommit c : TemporalCommit.ancestryChain(chunkCommits, localParents, head)) {
+                if (c.getId() == targetCommitId) return candidate.getName();
+            }
+        }
+        return null;
+    }
+
+    /** Result of {@link #branch}: branchName/created are non-null/true only when a branch switch
+     * or a fresh fork actually happened, so a caller checking out several chunks in one player
+     * action can feed a freshly-created name back in as reuseBranchName for the next chunk — one
+     * jump across many chunks always produces at most one new branch, instead of one per chunk. */
+    public record CheckoutOutcome(@Nullable TemporalCommit marker, String branchName, boolean created) {}
 
     private void indexChunkTouch(long chunkKey, long commitId, long localParentId) {
         chunkIndex.computeIfAbsent(chunkKey, k -> new ArrayList<>()).add(commitId);
@@ -244,6 +367,31 @@ public class TemporalTimeline {
             if (commit.getType() != TemporalCommit.Type.BRANCH) trunk.add(commit);
         }
         return trunk;
+    }
+
+    /** Every commit ever registered in this dimension, trunk and every chunk's branches alike, in
+     * creation order — unlike {@link #getCommitsForChunk}, nothing is left out for not touching a
+     * particular chunk. */
+    public List<TemporalCommit> getAllCommits() {
+        return new ArrayList<>(commits);
+    }
+
+    /** commitId -> the id it locally forked from, unioned across every chunk's own {@link
+     * #chunkLocalParent} map in this dimension, so the display graph shows every chunk's branches
+     * rather than just the chunks one particular view cares about.
+     *
+     * <p>Deliberately NOT built from {@link TemporalCommit#getParentId()}: a DELTA/SNAPSHOT's own
+     * parentId chains it to the previous dimension-wide trunk commit, which is the wrong edge once
+     * a chunk has branched — new commits touching that chunk must still render as children of its
+     * BRANCH marker, not of the trunk it forked away from. chunkLocalParent already tracks the
+     * correct per-chunk edge (see {@link #indexChunkTouch}); this only merges it across every
+     * chunk instead of one. A commit bundling chunks on different lineages (rare: independent
+     * machines/markers diverging different claimed chunks) has no single correct parent across all
+     * of them, so the last chunk merged simply wins — display-only, never consulted by rollback. */
+    public Map<Long, Long> getGlobalParents() {
+        Map<Long, Long> parents = new HashMap<>();
+        for (Map<Long, Long> perChunk : chunkLocalParent.values()) parents.putAll(perChunk);
+        return parents;
     }
 
     /** The id of chunkPos's own latest commit at or before targetGameTime, or -1 if none exists
@@ -611,6 +759,13 @@ public class TemporalTimeline {
             }
         }
         tag.put("ChunkLocalParents", localParentList);
+
+        ListTag branchList = new ListTag();
+        for (TemporalBranch branch : branches.values()) branchList.add(branch.toTag());
+        tag.put("Branches", branchList);
+        tag.putString("CurrentBranch", currentBranchName);
+        tag.putInt("NextBranchNameIndex", nextBranchNameIndex);
+
         return tag;
     }
 
@@ -635,6 +790,18 @@ public class TemporalTimeline {
                     .computeIfAbsent(entryTag.getLong("Chunk"), k -> new HashMap<>())
                     .put(entryTag.getLong("Commit"), entryTag.getLong("Parent"));
         }
+
+        if (tag.contains("Branches", Tag.TAG_LIST)) {
+            ListTag branchList = tag.getList("Branches", Tag.TAG_COMPOUND);
+            for (int i = 0; i < branchList.size(); i++) {
+                TemporalBranch branch = TemporalBranch.fromTag(branchList.getCompound(i));
+                timeline.branches.put(branch.getName(), branch);
+            }
+        }
+        if (tag.contains("CurrentBranch")) {
+            timeline.currentBranchName = tag.getString("CurrentBranch");
+        }
+        timeline.nextBranchNameIndex = tag.getInt("NextBranchNameIndex");
         return timeline;
     }
 }
