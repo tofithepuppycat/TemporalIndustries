@@ -2,8 +2,13 @@ package io.github.tofithepuppycat.temporalindustries.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.culling.Frustum;
+import net.minecraft.world.entity.player.Player;
+import net.neoforged.fml.ModList;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -22,6 +27,14 @@ public class EntropyOrbRenderer extends EntityRenderer<EntropyOrbEntity> {
         super(context);
         this.shadowRadius = 0.15F;
         this.shadowStrength = 0.75F;
+    }
+
+    /** Orbs are only visible to a player wearing Entropy Glasses. */
+    @Override
+    public boolean shouldRender(EntropyOrbEntity entity, Frustum frustum, double camX, double camY, double camZ) {
+        Player player = Minecraft.getInstance().player;
+        return player != null && ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player)
+                && super.shouldRender(entity, frustum, camX, camY, camZ);
     }
 
     @Override

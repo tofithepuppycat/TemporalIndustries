@@ -4,9 +4,10 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineBlockChangeFlashPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineJumpEffectPacket;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -16,7 +17,6 @@ import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -32,18 +32,28 @@ import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.UUID;
 import java.util.function.Predicate;
 
 /**
- * Shared logic between {@link ChronovaultBlockEntity} (one tracked chunk) and
- * {@link ChronosphereBlockEntity} (up to 25, sharing one energy pool). Subclasses only differ in
- * how many chunks a jump touches ({@link #getAllChunks()}) and energy pool size; everything else
- * (energy storage, game time clamping, re-snapshotting, jump/checkout, NBT) lives here.
+ * Shared logic between {@link ChronovaultBlockEntity} (one claimed chunk) and
+ * {@link ChronosphereBlockEntity} (up to 121, sharing one energy pool). Subclasses only differ in
+ * how many chunks they claim ({@link #getAllChunks()}) and energy pool size; everything else
+ * (energy storage, game time clamping, the repository-backed {@link TimelineViewProvider}
+ * implementation, jump/checkout, NBT) lives here.
+ *
+ * <p>Each machine owns exactly one {@link TemporalRepository}, keyed by {@link #repositoryId} and
+ * held in {@link TemporalWorldData}. Claimed chunks are always captured — there's no auto-tracking
+ * toggle any more — and commits only ever happen on explicit player action.
  */
 @SuppressWarnings("null")
 public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
@@ -60,15 +70,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     private static final int ENTROPY_DRIFT_STEP = 10; // per interval tick
     private static final int JUMP_ENTROPY_SHIFT = 250; // flat shift per successful jump
     private static final double ENTROPY_COST_SCALE = 1.0; // jump-cost multiplier at max distance from balance
-    protected static final long NODE_JUMP_FE_SURCHARGE = 500; // flat extra cost when a jump lands on a different graph node than the chunk's current head
-    private static final int AUTOTRACK_BASE_FE_PER_TICK = 1;
-    private static final double AUTOTRACK_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
+    protected static final long NODE_JUMP_FE_SURCHARGE = 500; // flat extra cost when a jump lands on a different commit than the repository's current head
+    private static final int CAPTURE_BASE_FE_PER_TICK = 1;
+    private static final double CAPTURE_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
 
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
-    /** Whether this machine is recording DELTA commits for getAllChunks(). Defaults off for a
-     * Chronosphere, on for a Chronovault. */
-    protected boolean autoTrackingEnabled = false;
+    /** This machine's repository identity, generated on first use and persisted forever after.
+     * Repositories outlive the machine that made them (see TemporalWorldData), so this is the only
+     * handle back to recorded history across a break/replace. */
+    @Nullable private UUID repositoryId;
 
     private final class MachineFluidHandler implements IFluidHandler {
         @Override public int getTanks() { return 2; }
@@ -272,82 +283,165 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     /** Every chunk a jump on this machine moves together, home/primary chunk first. */
     public abstract List<ChunkPos> getAllChunks();
 
-    public boolean isAutoTrackingEnabled() {
-        return autoTrackingEnabled;
-    }
+    // -------------------------------------------------------------------------
+    // Repository access
 
-    /** Flips auto-tracking, immediately (un)tracking every chunk getAllChunks() returns. */
-    public void setAutoTrackingEnabled(boolean enabled) {
-        if (enabled == autoTrackingEnabled) return;
-        autoTrackingEnabled = enabled;
-
-        if (level instanceof ServerLevel serverLevel && level.getServer() != null) {
-            TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-            ResourceLocation dimension = level.dimension().location();
-            for (ChunkPos chunk : getAllChunks()) {
-                if (enabled) {
-                    worldData.trackChunk(dimension, chunk, worldPosition, serverLevel);
-                } else {
-                    worldData.untrackChunk(dimension, chunk, worldPosition);
-                }
-            }
+    /** This machine's repository id, minting one on first call. Persisted via NBT, so a machine
+     * keeps its history across reloads. */
+    public UUID getRepositoryId() {
+        if (repositoryId == null) {
+            repositoryId = UUID.randomUUID();
+            setChanged();
         }
-        setChanged();
-        syncToClients();
+        return repositoryId;
     }
 
-    /** A chunk with no commits yet gets a full baseline instead of waiting for its first delta. */
-    protected static void ensureSnapshotted(TemporalWorldData worldData, TemporalTimeline timeline, ServerLevel serverLevel, ChunkPos chunkPos) {
-        if (!timeline.getCommitsForChunk(chunkPos).isEmpty()) return;
-        timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
-        worldData.setDirty();
+    /** This machine's repository, created on first access. Null only on the client or before the
+     * block entity has a level. */
+    @Nullable
+    public TemporalRepository getRepository() {
+        if (level == null || level.isClientSide || level.getServer() == null) return null;
+        return TemporalWorldData.get(level.getServer())
+                .getOrCreateRepository(getRepositoryId(), level.dimension().location());
     }
 
-    /** Wipes recorded history for every chunk getAllChunks() returns and re-baselines from current
-     * live state (no blocks change). Also resets placed/selected game time to now. */
+    @Nullable
+    protected TemporalWorldData worldData() {
+        if (level == null || level.isClientSide || level.getServer() == null) return null;
+        return TemporalWorldData.get(level.getServer());
+    }
+
+    /** Claims every chunk getAllChunks() returns for this machine's repository. Idempotent, so
+     * it's safe to call from onLoad() on every world load. Also captures each chunk's claim
+     * baseline (see {@link TemporalRepository#captureClaimBaseline}) so an edit made before this
+     * repository's first commit still has a true "before" to roll back to. */
+    protected void claimOwnChunks() {
+        TemporalWorldData data = worldData();
+        if (data == null || !(level instanceof ServerLevel serverLevel)) return;
+        ResourceLocation dimension = level.dimension().location();
+        TemporalRepository repo = getRepository();
+        for (ChunkPos chunk : getAllChunks()) {
+            data.claimChunk(dimension, chunk, getRepositoryId());
+            if (repo != null) repo.captureClaimBaseline(serverLevel, chunk);
+        }
+        data.setDirty();
+    }
+
+    /** Releases every chunk this machine's repository claims. The repository and its history are
+     * untouched — only future capture stops. */
+    protected void releaseOwnChunks() {
+        TemporalWorldData data = worldData();
+        if (data == null) return;
+        data.releaseAllClaimedChunks(getRepositoryId());
+        data.setDirty();
+    }
+
+    /** Commits everything this machine's claimed chunks have accumulated since its last commit,
+     * baselining any claimed chunk that doesn't have history yet. Manual only — the new model has
+     * no periodic auto-flush. */
+    public void commitNow() {
+        if (!(level instanceof ServerLevel) || level.getServer() == null) return;
+        RepoCommit created = TemporalWorldData.get(level.getServer())
+                .commitRepository(level.getServer(), getRepositoryId(), level.getGameTime(), null);
+        if (created != null) {
+            setChanged();
+            syncToClients();
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // TimelineViewProvider
+
+    @Override
+    public List<RepoCommit> getRepositoryCommits() {
+        TemporalRepository repo = getRepository();
+        return repo == null ? List.of() : new ArrayList<>(repo.getAllCommits());
+    }
+
+    @Override
+    public Map<String, Long> getBranchTips() {
+        TemporalRepository repo = getRepository();
+        return repo == null ? Map.of() : repo.getBranchTips();
+    }
+
+    @Override
+    public long getHeadCommitId() {
+        TemporalRepository repo = getRepository();
+        return repo == null ? RepoCommit.NO_PARENT : repo.getHeadCommitId();
+    }
+
+    /** The branch currently checked out. Switching branches stays entirely implicit: a jump moves
+     * the head onto whichever named line it lands on, and committing off a non-tip forks a fresh
+     * one — so there's no explicit checkout entry point here. */
+    @Override
+    public String getCurrentNamedBranch() {
+        TemporalRepository repo = getRepository();
+        String name = repo == null ? null : repo.getCurrentBranchName();
+        return name == null ? "" : name;
+    }
+
+    @Override
+    public List<ChunkPos> getClaimedChunks() {
+        return getAllChunks();
+    }
+
+    @Override
+    public Map<Long, Long> getJumpCosts(long selectedCommitId) {
+        if (selectedCommitId < 0) return Map.of();
+        TemporalRepository repo = getRepository();
+        if (repo == null || repo.getCommit(selectedCommitId) == null) return Map.of();
+        return Map.of(selectedCommitId, computeTotalJumpCost(selectedCommitId));
+    }
+
+    @Override
+    public Map<ChunkPos, Map<BlockPos, BlockState>> previewJumpTargetStates(long targetCommitId) {
+        TemporalRepository repo = getRepository();
+        return repo == null ? Map.of() : repo.previewJumpTargetStates(targetCommitId);
+    }
+
+    @Override
+    public boolean isGluedPos(BlockPos pos) {
+        TemporalWorldData data = worldData();
+        return data != null && level != null && data.isGlued(level.dimension().location(), pos);
+    }
+
+    /** Wipes this machine's repository and re-baselines every claimed chunk from current live
+     * state (no blocks change). Also resets placed/selected game time to now. */
     public void deleteAllHistory() {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
 
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(level.dimension().location());
-
-        for (ChunkPos chunk : getAllChunks()) {
-            timeline.clearChunkHistory(chunk);
-            ensureSnapshotted(worldData, timeline, serverLevel, chunk);
-        }
+        TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        TemporalRepository repo = data.getOrCreateRepository(getRepositoryId(), level.dimension().location());
+        repo.reset(serverLevel, level.getGameTime(), null, getAllChunks());
 
         placedGameTime = level.getGameTime();
         selectedGameTime = placedGameTime;
-        worldData.setDirty();
+        data.setDirty();
         setChanged();
         syncToClients();
     }
 
-    /** Deletes branchCommitId and everything forked from it, scoped to this machine's home chunk
-     * (its only chunk for a Chronovault; a Chronosphere's shared graph can only ever show a BRANCH
-     * commit belonging to its home chunk, since a branch marker is exclusive to the one chunk it
-     * was checked out for). No-op if the branch's chunk head sits inside it. */
+    /** Deletes a named branch and the history unique to it. No-op if that branch is the one
+     * currently checked out, or doesn't exist. */
     @Override
-    public boolean deleteBranch(long branchCommitId) {
-        if (!(level instanceof ServerLevel) || level.getServer() == null) return false;
+    public boolean deleteBranch(String branchName) {
+        TemporalRepository repo = getRepository();
+        TemporalWorldData data = worldData();
+        if (repo == null || data == null) return false;
 
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        TemporalTimeline timeline = worldData.getTimeline(level.dimension().location());
-        if (timeline == null) return false;
-
-        boolean deleted = timeline.deleteBranch(getAllChunks().get(0), branchCommitId);
+        boolean deleted = repo.deleteBranch(branchName);
         if (deleted) {
-            worldData.setDirty();
+            data.setDirty();
             setChanged();
             syncToClients();
         }
         return deleted;
     }
 
-    private static final int SNAPSHOT_CHECK_INTERVAL_TICKS = 1200; // 1 minute
-
-    /** Clamps placed/selected game time and, once a minute, re-snapshots any claimed chunk whose
-     * history has drifted far enough from its last baseline. Called from each subclass's static tick entrypoint. */
+    /** Clamps placed/selected game time and drifts entropy. Called from each subclass's static
+     * tick entrypoint. There's no periodic re-snapshot pass any more: each chunk's own delta
+     * counter inside {@link TemporalRepository} decides when its next entry must be a full
+     * baseline, so nothing needs to be scheduled from out here. */
     protected final void commonTick(Level level) {
         if (placedGameTime == UNSET_TIME) {
             placedGameTime = level.getGameTime();
@@ -361,17 +455,11 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             setChanged();
         }
 
-        if (level instanceof ServerLevel serverLevel && now % SNAPSHOT_CHECK_INTERVAL_TICKS == 0) {
-            maybeResnapshot(serverLevel);
-        }
-
         if (now % ENTROPY_DRIFT_INTERVAL_TICKS == 0) {
             driftEntropy(now);
         }
 
-        if (autoTrackingEnabled) {
-            drainAutoTrackingEnergy();
-        }
+        drainCaptureEnergy();
     }
 
     /** Ticks entropy one step toward chaos while the selected view is behind the present, or back toward balance once caught up. */
@@ -384,11 +472,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         shiftEntropyToward(step);
     }
 
-    /** Per-tick FE drain while auto-tracking is on, scaled by distance from entropy balance. Skips
-     * (rather than disabling tracking) when energy is insufficient, so history keeps recording. */
-    private void drainAutoTrackingEnergy() {
+    /** Per-tick FE drain for keeping claimed chunks under capture, scaled by distance from entropy
+     * balance. Unconditional now that the auto-tracking toggle is gone (claimed chunks are always
+     * captured), so the running cost follows the claim rather than a flag. Skips rather than
+     * stopping capture when energy is insufficient, so history keeps recording. */
+    private void drainCaptureEnergy() {
         double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
-        int feThisTick = (int) Math.round(AUTOTRACK_BASE_FE_PER_TICK + AUTOTRACK_ENTROPY_SCALE * distance);
+        int feThisTick = (int) Math.round(CAPTURE_BASE_FE_PER_TICK + CAPTURE_ENTROPY_SCALE * distance);
         energyStorage.consumeInternal(Math.min(feThisTick, energyStorage.getEnergyStored()));
     }
 
@@ -414,93 +504,75 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return ClientboundBlockEntityDataPacket.create(this);
     }
 
-    /** Skips chunks the world isn't currently tracking, so this timer can't manufacture a commit
-     * on its own; untracked chunks only accumulate history the player explicitly recorded. */
-    private void maybeResnapshot(ServerLevel serverLevel) {
-        MinecraftServer server = serverLevel.getServer();
-        if (server == null) return;
+    @Override
+    public JumpResult jump(long targetCommitId) {
+        if (level == null || level.isClientSide) return JumpResult.SUCCESS;
+        return applyTimelineView(targetCommitId);
+    }
 
-        TemporalWorldData worldData = TemporalWorldData.get(server);
-        ResourceLocation dimension = serverLevel.dimension().location();
-        TemporalTimeline timeline = worldData.getOrCreateTimeline(dimension);
-        for (ChunkPos chunkPos : getAllChunks()) {
-            if (!worldData.isTracked(dimension, chunkPos)) continue;
-            if (timeline.getCommitsSinceSnapshot(chunkPos) < TemporalTimeline.SNAPSHOT_COMMIT_THRESHOLD) continue;
-            timeline.addSnapshot(serverLevel.getGameTime(), List.of(ChunkSnapshot.capture(serverLevel, chunkPos)));
-            worldData.setDirty();
+    @Override
+    public void setSelectedCommit(long commitId, boolean applyToWorld) {
+        if (level == null || level.isClientSide) return;
+        TemporalRepository repo = getRepository();
+        RepoCommit target = repo == null ? null : repo.getCommit(commitId);
+        if (target == null) return;
+
+        if (applyToWorld) {
+            applyTimelineView(commitId);
+            return;
         }
+        selectedGameTime = clampToPlacedWindow(target.getGameTime());
+        setChanged();
     }
 
-    @Override
-    public JumpResult jump(long targetGameTime, long targetCommitId) {
-        if (level == null || level.isClientSide) return JumpResult.SUCCESS;
-        return setSelectedGameTime(targetGameTime, targetCommitId, true);
-    }
-
-    @Override
-    public void setSelectedGameTime(long targetGameTime, boolean applyToWorld) {
-        setSelectedGameTime(targetGameTime, TemporalCommit.NO_PREFERRED_COMMIT, applyToWorld);
-    }
-
-    /** Same as {@link #setSelectedGameTime(long, boolean)}, with an explicit target commit id. */
-    public JumpResult setSelectedGameTime(long targetGameTime, long targetCommitId, boolean applyToWorld) {
-        if (level == null || level.isClientSide) return JumpResult.SUCCESS;
-
+    private long clampToPlacedWindow(long gameTime) {
+        if (level == null) return gameTime;
         long min = placedGameTime == UNSET_TIME ? 0L : placedGameTime;
         long max = level.getGameTime();
-        long clamped = Math.max(min, Math.min(max, targetGameTime));
-        if (selectedGameTime == clamped && !applyToWorld) return JumpResult.SUCCESS;
-
-        long previousSelectedGameTime = selectedGameTime;
-        selectedGameTime = clamped;
-        JumpResult result = applyToWorld ? applyTimelineView(clamped, targetCommitId, previousSelectedGameTime) : JumpResult.SUCCESS;
-        setChanged();
-        return result;
+        return Math.max(min, Math.min(max, gameTime));
     }
 
-    /** Read-only total cost of jumping every chunk to targetGameTime, including the entropy
-     * multiplier; kept in sync with {@link #applyTimelineView} so previews never diverge. */
-    public long computeTotalJumpCost(long targetGameTime, long targetCommitId) {
-        if (level == null || level.getServer() == null) return 0L;
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        TemporalTimeline timeline = worldData.getTimeline(dimension);
-        if (timeline == null) return 0L;
+    /** Read-only total cost of jumping the repository to targetCommitId, including the entropy
+     * multiplier and the cross-node surcharge; kept in sync with {@link #applyTimelineView} so
+     * previews never diverge from what a jump actually charges. */
+    public long computeTotalJumpCost(long targetCommitId) {
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return 0L;
+        TemporalRepository repo = getRepository();
+        if (repo == null) return 0L;
 
-        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
-        long total = 0L;
-        for (ChunkPos chunk : getAllChunks()) {
-            long head = timeline.getChunkHeadId(chunk);
-            total += timeline.computeJumpCost(chunk, targetGameTime, head, level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued, NODE_JUMP_FE_SURCHARGE);
-        }
+        long total = repo.computeJumpCost(targetCommitId, serverLevel,
+                AbstractTimelineMachineBlockEntity::costOf, gluePredicate(), NODE_JUMP_FE_SURCHARGE);
         return Math.round(total * jumpCostMultiplier());
     }
 
-    /** Checks out targetGameTime for every chunk and applies it to the live world, paying the
-     * combined jump cost from the energy pool first; returns INSUFFICIENT_ENERGY without acting if
-     * underfunded. On success, shifts entropy toward chaos for a jump into the future, order for the past. */
-    public JumpResult applyTimelineView(long targetGameTime, long targetCommitId, long previousSelectedGameTime) {
+    private Predicate<BlockPos> gluePredicate() {
+        TemporalWorldData data = worldData();
+        if (data == null || level == null) return pos -> false;
+        ResourceLocation dimension = level.dimension().location();
+        return pos -> data.isGlued(dimension, pos);
+    }
+
+    /**
+     * Moves the repository's head to targetCommitId and writes the result to the live world,
+     * paying the jump cost from the energy pool first; returns INSUFFICIENT_ENERGY without acting
+     * if underfunded. Jumping never commits and never forks on its own — forking is lazy, and only
+     * happens when the player commits while off a tip (see {@link TemporalRepository#commit}).
+     *
+     * <p>On success, shifts entropy toward chaos for a jump into the future and order for a jump
+     * into the past, with the direction read off the target commit's own recorded gameTime versus
+     * the time currently being viewed.
+     */
+    public JumpResult applyTimelineView(long targetCommitId) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        ResourceLocation dimension = level.dimension().location();
-        TemporalTimeline timeline = worldData.getTimeline(dimension);
-        if (timeline == null) return JumpResult.SUCCESS;
+        TemporalRepository repo = worldData.getOrCreateRepository(getRepositoryId(), level.dimension().location());
+        RepoCommit target = repo.getCommit(targetCommitId);
+        if (target == null) return JumpResult.SUCCESS;
 
-        // Flush pending deltas first, or a block placed moments ago could be skipped by the jump below.
-        worldData.flushPendingDeltas(level.getGameTime());
-
-        List<ChunkPos> chunks = getAllChunks();
-        Predicate<BlockPos> isGlued = pos -> worldData.isGlued(dimension, pos);
-
-        // Capture every chunk's head before branch() moves any of them.
-        long[] previousHeads = new long[chunks.size()];
-        long totalCost = 0L;
-        for (int i = 0; i < chunks.size(); i++) {
-            previousHeads[i] = timeline.getChunkHeadId(chunks.get(i));
-            totalCost += timeline.computeJumpCost(chunks.get(i), targetGameTime, previousHeads[i], level, AbstractTimelineMachineBlockEntity::costOf, targetCommitId, isGlued, NODE_JUMP_FE_SURCHARGE);
-        }
-        totalCost = Math.round(totalCost * jumpCostMultiplier());
+        Predicate<BlockPos> isGlued = gluePredicate();
+        long totalCost = Math.round(repo.computeJumpCost(targetCommitId, serverLevel,
+                AbstractTimelineMachineBlockEntity::costOf, isGlued, NODE_JUMP_FE_SURCHARGE) * jumpCostMultiplier());
 
         if (totalCost > energyStorage.getEnergyStored()) {
             serverLevel.playSound(null, worldPosition, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
@@ -508,25 +580,51 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
         energyStorage.consumeInternal(totalCost);
 
-        // Deferred across every claimed chunk: settling one chunk right after it's written can reach
-        // into a sibling chunk this jump hasn't reached yet, which would still look like its old,
-        // unjumped state to that settle pass and can wrongly destroy blocks at the boundary between
-        // them (e.g. a crop next to a chunk edge). Settling only once everything is written avoids it.
-        List<BlockPos> deferredSettle = new ArrayList<>();
-        for (int i = 0; i < chunks.size(); i++) {
-            ChunkPos chunk = chunks.get(i);
-            timeline.branch(chunk, targetGameTime, targetCommitId);
-            timeline.applyChunkAtTime(chunk, targetGameTime, previousHeads[i], serverLevel, targetCommitId, isGlued, deferredSettle);
-        }
-        TemporalTimeline.settleBlocks(serverLevel, deferredSettle);
+        // jumpTo already defers neighbour settling until every affected chunk has been written, so
+        // a settle pass can't see a sibling chunk in its pre-jump state across a chunk boundary.
+        List<BlockPos> changedPositions = repo.jumpTo(targetCommitId, serverLevel, isGlued);
         worldData.setDirty();
 
+        long previousSelectedGameTime = selectedGameTime;
+        long targetGameTime = target.getGameTime();
+        boolean intoFuture = targetGameTime > previousSelectedGameTime;
+        selectedGameTime = clampToPlacedWindow(targetGameTime);
         if (targetGameTime != previousSelectedGameTime) {
-            shiftEntropyToward(targetGameTime > previousSelectedGameTime ? JUMP_ENTROPY_SHIFT : -JUMP_ENTROPY_SHIFT);
+            shiftEntropyToward(intoFuture ? JUMP_ENTROPY_SHIFT : -JUMP_ENTROPY_SHIFT);
         }
+        setChanged();
+        syncToClients();
 
         serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
+        PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
+                new TimelineJumpEffectPacket(worldPosition, intoFuture));
+        broadcastBlockChangeFlashes(serverLevel, changedPositions, intoFuture);
         return JumpResult.SUCCESS;
+    }
+
+    /** Fans a jump's rewritten positions out as {@link TimelineBlockChangeFlashPacket}s, one per
+     * affected chunk so only players actually tracking that chunk receive it, and sampled down if
+     * the jump touched an unusually large area so a single jump can't flood the network. */
+    private static final int MAX_FLASH_POSITIONS = 1500;
+
+    private static void broadcastBlockChangeFlashes(ServerLevel level, List<BlockPos> changed, boolean intoFuture) {
+        if (changed.isEmpty()) return;
+
+        List<BlockPos> sampled = changed;
+        if (changed.size() > MAX_FLASH_POSITIONS) {
+            sampled = new ArrayList<>(changed);
+            Collections.shuffle(sampled);
+            sampled = sampled.subList(0, MAX_FLASH_POSITIONS);
+        }
+
+        Map<ChunkPos, List<BlockPos>> byChunk = new HashMap<>();
+        for (BlockPos pos : sampled) {
+            byChunk.computeIfAbsent(new ChunkPos(pos), k -> new ArrayList<>()).add(pos);
+        }
+        for (Map.Entry<ChunkPos, List<BlockPos>> entry : byChunk.entrySet()) {
+            PacketDistributor.sendToPlayersTrackingChunk(level, entry.getKey(),
+                    new TimelineBlockChangeFlashPacket(entry.getValue(), intoFuture));
+        }
     }
 
     protected static long costOf(BlockState state) {
@@ -547,7 +645,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.putLong("SelectedGameTime", selectedGameTime);
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
-        tag.putBoolean("AutoTrackingEnabled", autoTrackingEnabled);
+        if (repositoryId != null) tag.putUUID("RepositoryId", repositoryId);
     }
 
     @Override
@@ -566,7 +664,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             orderTank.setFluid(new FluidStack(Registration.ORDER_FLUID.get(), ENTROPY_MAX - legacyChaos));
             chaosTank.setFluid(new FluidStack(Registration.CHAOS_FLUID.get(), legacyChaos));
         }
-        // Absent means a pre-existing save; leave subclass constructor's default in place.
-        if (tag.contains("AutoTrackingEnabled")) autoTrackingEnabled = tag.getBoolean("AutoTrackingEnabled");
+        // Absent means a pre-rework save (or a machine that's never been ticked); getRepositoryId()
+        // mints one lazily on first use rather than forcing one here on the client too.
+        if (tag.hasUUID("RepositoryId")) repositoryId = tag.getUUID("RepositoryId");
     }
 }

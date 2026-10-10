@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -53,9 +54,19 @@ public class UpdateSelectedTimePacket implements CustomPacketPayload {
             }
 
             BlockEntity blockEntity = sender.level().getBlockEntity(packet.machinePos);
-            if (blockEntity instanceof ChronovaultBlockEntity) {
-                ChronovaultBlockEntity chronovaultBlockEntity = (ChronovaultBlockEntity) blockEntity;
-                chronovaultBlockEntity.setSelectedGameTime(packet.targetGameTime, false);
+            if (blockEntity instanceof ChronovaultBlockEntity machine) {
+                // Selection is per-commit now, so the requested time is resolved to the nearest
+                // recorded commit rather than stored as a free-floating timestamp.
+                long nearest = -1L;
+                long bestDistance = Long.MAX_VALUE;
+                for (RepoCommit commit : machine.getRepositoryCommits()) {
+                    long distance = Math.abs(commit.getGameTime() - packet.targetGameTime);
+                    if (distance < bestDistance) {
+                        bestDistance = distance;
+                        nearest = commit.getId();
+                    }
+                }
+                if (nearest >= 0) machine.setSelectedCommit(nearest, false);
             }
         });
     }

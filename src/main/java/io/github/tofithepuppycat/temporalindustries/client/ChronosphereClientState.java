@@ -12,8 +12,8 @@ public final class ChronosphereClientState {
     private static BlockPos activeMachinePos;
     private static Set<Long> selectedChunks = new HashSet<>();
     private static Set<Long> blockedChunks = new HashSet<>();
-    private static boolean autoTrackingEnabled = false;
-    private static int trackedCount = 0;
+    private static int capturedCount = 0;
+    private static String currentBranch = "";
 
     private ChronosphereClientState() {}
 
@@ -32,21 +32,21 @@ public final class ChronosphereClientState {
         activeMachinePos = null;
         selectedChunks = new HashSet<>();
         blockedChunks = new HashSet<>();
-        autoTrackingEnabled = false;
-        trackedCount = 0;
+        capturedCount = 0;
+        currentBranch = "";
     }
 
     public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked,
-                                        boolean serverAutoTrackingEnabled, int serverTrackedCount) {
+                                        int serverCapturedCount, String serverCurrentBranch) {
         activeMachinePos = machinePos;
         selectedChunks = serverSelected;
         blockedChunks = serverBlocked;
-        autoTrackingEnabled = serverAutoTrackingEnabled;
-        trackedCount = serverTrackedCount;
+        capturedCount = serverCapturedCount;
+        currentBranch = serverCurrentBranch;
     }
 
-    public static boolean isAutoTrackingEnabled() {
-        return autoTrackingEnabled;
+    public static String getCurrentBranch() {
+        return currentBranch;
     }
 
     public static boolean isSelected(long chunkKey) {
@@ -61,14 +61,14 @@ public final class ChronosphereClientState {
         return selectedChunks.size();
     }
 
-    /** Every claimed chunk's packed key, used to build the Chronosphere GUI's per-chunk timeline tabs. */
+    /** Every claimed chunk's packed key, used to drive the Chronosphere GUI's claim map. */
     public static Set<Long> getSelectedChunks() {
         return selectedChunks;
     }
 
-    /** How many claimed chunks are currently tracked; may be less than getSelectedCount() when
-     * auto-tracking is off. */
-    public static int getTrackedCount() {
-        return trackedCount;
+    /** How many claimed chunks this machine's repository actually holds the claim on; below
+     * getSelectedCount() only when another machine beat it to one. */
+    public static int getCapturedCount() {
+        return capturedCount;
     }
 }

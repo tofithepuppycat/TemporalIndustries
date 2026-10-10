@@ -2,8 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -11,7 +10,9 @@ import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.ArrayList;
@@ -19,8 +20,15 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Server -> client: response to {@link TimelinePreviewRequestPacket}, carrying a machine's chunk
- * commit graph for {@link TimelineProjectionManager}. */
+/**
+ * Server -> client: response to {@link TimelinePreviewRequestPacket}, carrying a machine's
+ * repository graph (as lightweight {@link CommitNode}s), its branch refs, and the already-resolved
+ * ghost-preview block diff for the player's selected commit.
+ *
+ * <p>Note what is deliberately absent: no {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkEntry}
+ * payload and no chunk snapshots. The server resolves the preview itself and ships only the
+ * resulting target block states, so the client never needs a commit's actual contents.
+ */
 public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     public static final Type<TimelinePreviewSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_preview_sync"));
@@ -32,35 +40,35 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     private final long placedGameTime;
     private final long selectedGameTime;
     private final long currentGameTime;
-    private final List<TemporalCommit> commits;
-    private final Map<Long, Long> localParents;
+    private final List<CommitNode> commits;
+    private final Map<String, Long> branchTips;
+    private final String currentBranch;
     private final long headCommitId;
-    private final long selectedCommitId;
-    /** commitId -> energy cost of jumping there from the chunk's current head. */
+    /** commitId -> energy cost of jumping there from the current head. */
     private final Map<Long, Long> jumpCosts;
-    /** One commit-graph snapshot per chunk the ghost preview covers. */
-    private final List<ChunkTimelineSnapshot> previewChunkSnapshots;
-    /** Every glued region in the machine's dimension; a jump skips these positions. */
-    private final List<BoundingBox> gluedRegions;
-    /** Fingerprint matching {@link TimelinePreviewRequestPacket#lastKnownPreviewVersion}. */
+    /** Resolved target state of every block the selected jump would change, glue already filtered. */
+    private final Map<BlockPos, BlockState> previewTargetStates;
+    /** Every chunk the machine has claimed, for the in-world boundary outline. */
+    private final List<ChunkPos> previewChunks;
+    /** Fingerprint matching {@link TimelinePreviewRequestPacket}'s lastKnownPreviewVersion. */
     private final long previewVersion;
 
     public TimelinePreviewSyncPacket(BlockPos machinePos, long placedGameTime, long selectedGameTime,
-                                     long currentGameTime, List<TemporalCommit> commits,
-                                     Map<Long, Long> localParents, long headCommitId, long selectedCommitId,
-                                     Map<Long, Long> jumpCosts, List<ChunkTimelineSnapshot> previewChunkSnapshots,
-                                     List<BoundingBox> gluedRegions, long previewVersion) {
+                                     long currentGameTime, List<CommitNode> commits,
+                                     Map<String, Long> branchTips, String currentBranch, long headCommitId,
+                                     Map<Long, Long> jumpCosts, Map<BlockPos, BlockState> previewTargetStates,
+                                     List<ChunkPos> previewChunks, long previewVersion) {
         this.machinePos = machinePos;
         this.placedGameTime = placedGameTime;
         this.selectedGameTime = selectedGameTime;
         this.currentGameTime = currentGameTime;
         this.commits = commits;
-        this.localParents = localParents;
+        this.branchTips = branchTips;
+        this.currentBranch = currentBranch;
         this.headCommitId = headCommitId;
-        this.selectedCommitId = selectedCommitId;
         this.jumpCosts = jumpCosts;
-        this.previewChunkSnapshots = previewChunkSnapshots;
-        this.gluedRegions = gluedRegions;
+        this.previewTargetStates = previewTargetStates;
+        this.previewChunks = previewChunks;
         this.previewVersion = previewVersion;
     }
 
@@ -70,14 +78,14 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         buf.writeLong(packet.selectedGameTime);
         buf.writeLong(packet.currentGameTime);
 
-        // Commits/parent map can carry unbounded block/entity delta NBT, so DEFLATE the body rather
-        // than writing it raw to keep large timelines off the per-connection rate limit.
+        // The preview diff can run to tens of thousands of positions, so DEFLATE the body rather
+        // than writing it raw to keep large payloads off the per-connection rate limit.
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.buffer());
         body.writeVarInt(packet.commits.size());
-        for (TemporalCommit commit : packet.commits) TemporalCommit.encode(commit, body);
-        body.writeVarInt(packet.localParents.size());
-        for (Map.Entry<Long, Long> entry : packet.localParents.entrySet()) {
-            body.writeLong(entry.getKey());
+        for (CommitNode node : packet.commits) CommitNode.encode(node, body);
+        body.writeVarInt(packet.branchTips.size());
+        for (Map.Entry<String, Long> entry : packet.branchTips.entrySet()) {
+            body.writeUtf(entry.getKey(), 64);
             body.writeLong(entry.getValue());
         }
         body.writeVarInt(packet.jumpCosts.size());
@@ -85,17 +93,13 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             body.writeLong(entry.getKey());
             body.writeLong(entry.getValue());
         }
-        body.writeVarInt(packet.previewChunkSnapshots.size());
-        for (ChunkTimelineSnapshot snapshot : packet.previewChunkSnapshots) ChunkTimelineSnapshot.encode(snapshot, body);
-        body.writeVarInt(packet.gluedRegions.size());
-        for (BoundingBox region : packet.gluedRegions) {
-            body.writeInt(region.minX());
-            body.writeInt(region.minY());
-            body.writeInt(region.minZ());
-            body.writeInt(region.maxX());
-            body.writeInt(region.maxY());
-            body.writeInt(region.maxZ());
+        body.writeVarInt(packet.previewTargetStates.size());
+        for (Map.Entry<BlockPos, BlockState> entry : packet.previewTargetStates.entrySet()) {
+            body.writeBlockPos(entry.getKey());
+            body.writeVarInt(Block.getId(entry.getValue()));
         }
+        body.writeVarInt(packet.previewChunks.size());
+        for (ChunkPos chunk : packet.previewChunks) body.writeLong(chunk.toLong());
 
         byte[] rawBody = new byte[body.readableBytes()];
         body.readBytes(rawBody);
@@ -104,8 +108,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         buf.writeVarInt(rawBody.length);
         buf.writeByteArray(CompressionUtil.compress(rawBody));
 
+        buf.writeUtf(packet.currentBranch, 64);
         buf.writeLong(packet.headCommitId);
-        buf.writeLong(packet.selectedCommitId);
         buf.writeLong(packet.previewVersion);
     }
 
@@ -123,40 +127,43 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                     + rawBodyLength + " but got " + rawBody.length);
         }
         FriendlyByteBuf body = new FriendlyByteBuf(Unpooled.wrappedBuffer(rawBody));
-        int size = body.readVarInt();
-        List<TemporalCommit> commits = new ArrayList<>(size);
-        for (int i = 0; i < size; i++) commits.add(TemporalCommit.decode(body));
-        int localParentCount = body.readVarInt();
-        Map<Long, Long> localParents = new HashMap<>();
-        for (int i = 0; i < localParentCount; i++) {
-            long commitId = body.readLong();
-            long parentId = body.readLong();
-            localParents.put(commitId, parentId);
+
+        int commitCount = body.readVarInt();
+        List<CommitNode> commits = new ArrayList<>(commitCount);
+        for (int i = 0; i < commitCount; i++) commits.add(CommitNode.decode(body));
+
+        int branchCount = body.readVarInt();
+        Map<String, Long> branchTips = new HashMap<>();
+        for (int i = 0; i < branchCount; i++) {
+            String name = body.readUtf(64);
+            branchTips.put(name, body.readLong());
         }
+
         int jumpCostCount = body.readVarInt();
         Map<Long, Long> jumpCosts = new HashMap<>();
         for (int i = 0; i < jumpCostCount; i++) {
             long commitId = body.readLong();
-            long cost = body.readLong();
-            jumpCosts.put(commitId, cost);
+            jumpCosts.put(commitId, body.readLong());
         }
+
+        int previewCount = body.readVarInt();
+        Map<BlockPos, BlockState> previewTargetStates = new HashMap<>();
+        for (int i = 0; i < previewCount; i++) {
+            BlockPos pos = body.readBlockPos();
+            previewTargetStates.put(pos, Block.stateById(body.readVarInt()));
+        }
+
         int previewChunkCount = body.readVarInt();
-        List<ChunkTimelineSnapshot> previewChunkSnapshots = new ArrayList<>(previewChunkCount);
-        for (int i = 0; i < previewChunkCount; i++) previewChunkSnapshots.add(ChunkTimelineSnapshot.decode(body));
-        int gluedRegionCount = body.readVarInt();
-        List<BoundingBox> gluedRegions = new ArrayList<>(gluedRegionCount);
-        for (int i = 0; i < gluedRegionCount; i++) {
-            gluedRegions.add(new BoundingBox(body.readInt(), body.readInt(), body.readInt(),
-                    body.readInt(), body.readInt(), body.readInt()));
-        }
+        List<ChunkPos> previewChunks = new ArrayList<>(previewChunkCount);
+        for (int i = 0; i < previewChunkCount; i++) previewChunks.add(new ChunkPos(body.readLong()));
         body.release();
 
+        String currentBranch = buf.readUtf(64);
         long headCommitId = buf.readLong();
-        long selectedCommitId = buf.readLong();
         long previewVersion = buf.readLong();
-        return new TimelinePreviewSyncPacket(machinePos, placedGameTime, selectedGameTime,
-                currentGameTime, commits, localParents, headCommitId, selectedCommitId, jumpCosts, previewChunkSnapshots,
-                gluedRegions, previewVersion);
+        return new TimelinePreviewSyncPacket(machinePos, placedGameTime, selectedGameTime, currentGameTime,
+                commits, branchTips, currentBranch, headCommitId, jumpCosts, previewTargetStates,
+                previewChunks, previewVersion);
     }
 
     public static void handle(TimelinePreviewSyncPacket packet, IPayloadContext context) {
@@ -165,11 +172,12 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                 packet.placedGameTime,
                 packet.currentGameTime,
                 packet.commits,
-                packet.localParents,
+                packet.branchTips,
+                packet.currentBranch,
                 packet.headCommitId,
                 packet.jumpCosts,
-                packet.previewChunkSnapshots,
-                packet.gluedRegions,
+                packet.previewTargetStates,
+                packet.previewChunks,
                 packet.previewVersion));
     }
 

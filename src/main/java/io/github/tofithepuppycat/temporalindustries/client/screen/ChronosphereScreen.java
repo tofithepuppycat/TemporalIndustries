@@ -1,7 +1,9 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import java.util.HashSet;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.jetbrains.annotations.NotNull;
@@ -19,9 +21,9 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereStateRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineToggleAutoTrackPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
@@ -91,17 +93,29 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     /** How often the map overlay re-fetches terrain thumbnails while open. */
     private static final int MAP_SYNC_INTERVAL_TICKS = 100;
 
-    // Bookmark/auto-track/settings tabs: a vertical stack overlapping the panel's right edge,
-    // like a vanilla recipe-book tab. Drawn BEFORE the panel background so its edge tucks them in.
+    // Bookmark/settings tabs: a vertical stack overlapping the panel's right edge, like a vanilla
+    // recipe-book tab. Drawn BEFORE the panel background so its edge tucks them in. (The
+    // auto-tracking tab that used to sit between them is gone — claimed chunks are always captured
+    // now, so there's nothing left to toggle.)
     private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
     private static final int TAB_OVERLAP = 5;
     private static final int BOOKMARK_Y_OFFSET = 40;
     private static final int TAB_ROW_SPACING = 4;
-    private static final int AUTO_TRACK_Y_OFFSET = BOOKMARK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
-    private static final int SETTINGS_Y_OFFSET = AUTO_TRACK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
+    private static final int SETTINGS_Y_OFFSET = BOOKMARK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
+    private static final int COMMIT_BUTTON_WIDTH = 100;
+    private static final int COMMIT_BUTTON_Y_OFFSET = 34;
+
+    private static final int GHOST_TOGGLE_BUTTON_WIDTH = 170;
+    private static final int GHOST_TOGGLE_BUTTON_Y_OFFSET = 100;
+    private static final int GHOST_TOGGLE_HINT_Y_OFFSET = 124;
+    /** Was a literal 130 before the ghost-preview toggle needed the space above it; shifted down
+     * along with {@link #BRANCH_LABEL_Y_OFFSET} by the same amount. */
+    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = 150;
+
+    private static final int BRANCH_LABEL_Y_OFFSET = 178;
 
     /** 15px cells rather than the grid's 32px default, to fit the title and footer lines inside CONTENT_SIZE. */
     private static final int MAP_CELL_SIZE = 15;
@@ -136,6 +150,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private boolean mapDragAdding = false;
     private final Set<Long> mapDragTouchedChunks = new HashSet<>();
 
+    /** Claims/releases made while the map overlay is open, held locally and only sent to the
+     * server as one batch when the overlay closes (or the whole GUI closes), rather than one
+     * packet per chunk touched. Keyed by chunk, so a chunk toggled back and forth during the same
+     * visit collapses to its final state. */
+    private final Map<Long, Boolean> pendingChunkToggles = new LinkedHashMap<>();
+
     /** Ctrl+drag alternative: rather than toggling cells as the cursor crosses them, the whole
      * rectangle between the press point and the release point is applied at once on release. */
     private boolean mapRectDragActive = false;
@@ -145,10 +165,19 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int mapRectHoverDz;
     private static final int COLOR_RECT_PREVIEW = 0x803D9BE0;
 
+    /** Zoom/pan for the map overlay: the viewport stays fixed at the unzoomed grid's footprint
+     * (so layout around it doesn't move), while the grid itself scales up and pans within it. */
+    private static final float MAP_MIN_ZOOM = 1.0F;
+    private static final float MAP_MAX_ZOOM = 3.0F;
+    private static final float MAP_ZOOM_STEP = 0.25F;
+    private float mapZoom = MAP_MIN_ZOOM;
+    private int mapPanX = 0;
+    private int mapPanY = 0;
+    /** Right-click pan state for the zoomed map. */
+    private boolean mapPanDragActive = false;
+
     private int bookmarkX;
     private int bookmarkY;
-    private int autoTrackX;
-    private int autoTrackY;
     private int settingsX;
     private int settingsY;
     private int gridX;
@@ -193,8 +222,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         bookmarkX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         bookmarkY = panelY() + BOOKMARK_Y_OFFSET;
-        autoTrackX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
-        autoTrackY = panelY() + AUTO_TRACK_Y_OFFSET;
         settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         settingsY = panelY() + SETTINGS_Y_OFFSET;
         gridX = panelX() + (CONTENT_SIZE - MAP_GRID.gridPixels()) / 2;
@@ -211,27 +238,47 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
         ChronosphereClientState.setActiveMachine(menu.getBlockPos());
-        TimelineProjectionManager.setSelectedViewChunk(null);
 
         requestTimelineView(true);
         PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
     }
 
-    /** Requests the shared "All" view's commit graph. forceFull bypasses the server's
-     * "nothing changed" skip, needed right after opening since a stale cached head id could
-     * otherwise coincidentally match and cause the server to wrongly skip replying. */
+    /** Requests the repository's commit graph plus the preview for the current selection. forceFull
+     * bypasses the server's "nothing changed" skip, needed right after opening since a stale cached
+     * head id could otherwise coincidentally match and cause the server to wrongly skip replying. */
     private void requestTimelineView(boolean forceFull) {
         long lastKnownHead = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getHeadCommitId();
         long lastKnownPreviewVersion = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getPreviewVersion();
         PacketDistributor.sendToServer(new TimelinePreviewRequestPacket(
-                menu.getBlockPos(), lastKnownHead, lastKnownPreviewVersion, null));
+                menu.getBlockPos(), lastKnownHead, lastKnownPreviewVersion,
+                TimelineProjectionManager.getSelectedCommitId()));
     }
 
     @Override
     public void onClose() {
+        flushPendingChunkToggles();
         graphWidget.onClose();
         ChunkThumbnailClientState.clearAll();
         super.onClose();
+    }
+
+    /** The claim map's selected/blocked view, as if pendingChunkToggles had already been applied;
+     * used so dragging reflects instantly without waiting on a server round trip. */
+    private Set<Long> effectiveSelectedChunks() {
+        Set<Long> effective = new HashSet<>(ChronosphereClientState.getSelectedChunks());
+        for (Map.Entry<Long, Boolean> entry : pendingChunkToggles.entrySet()) {
+            if (entry.getValue()) effective.add(entry.getKey());
+            else effective.remove(entry.getKey());
+        }
+        return effective;
+    }
+
+    /** Sends every pending claim/release as one batch packet and clears them; a no-op if nothing
+     * was touched this visit. */
+    private void flushPendingChunkToggles() {
+        if (pendingChunkToggles.isEmpty()) return;
+        PacketDistributor.sendToServer(ChronosphereToggleChunkPacket.fromPending(menu.getBlockPos(), pendingChunkToggles));
+        pendingChunkToggles.clear();
     }
 
     @Override
@@ -261,7 +308,21 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than Button widgets. */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
-        int buttonY = panelY() + 130;
+        int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
+
+        int commitX = panelX() + (CONTENT_SIZE - COMMIT_BUTTON_WIDTH) / 2;
+        int commitY = panelY() + COMMIT_BUTTON_Y_OFFSET;
+        if (isMouseOverRect(mouseX, mouseY, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+            PacketDistributor.sendToServer(new TimelineMachineCommitPacket(menu.getBlockPos()));
+            return;
+        }
+
+        int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
+        int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+            TimelineProjectionManager.toggleGhostBlockMode();
+            return;
+        }
 
         if (deleteHistoryConfirmPending) {
             int confirmX = panelX() + (CONTENT_SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
@@ -285,20 +346,22 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!TimelineProjectionManager.hasSelection()) {
             return;
         }
-        long target = TimelineProjectionManager.getSelectedGameTime();
-        long targetCommitId = TimelineProjectionManager.getSelectedCommitId();
-        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), target, targetCommitId));
+        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(),
+                TimelineProjectionManager.getSelectedCommitId()));
         TimelineProjectionManager.clearSelectedCommit();
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
     }
 
+    /** Deletes the branch whose tip is the selected node — see
+     * {@link ChronovaultScreen#deleteBranchTooltip()} for why branch tips are the selection unit. */
     private void deleteSelectedBranch() {
-        if (!TimelineProjectionManager.isSelectedBranchDeletable()) {
+        String branchName = TimelineProjectionManager.getSelectedBranchName();
+        if (branchName == null || !TimelineProjectionManager.isSelectedBranchDeletable()) {
             return;
         }
-        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), TimelineProjectionManager.getSelectedCommitId()));
+        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), branchName));
         TimelineProjectionManager.clearSelectedCommit();
         // Deleting a branch doesn't move any chunk's head, so the server's "nothing changed" skip
         // would otherwise suppress a reply; force a full resync to pick up the removed commits.
@@ -309,6 +372,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return Component.translatable(enabled
                 ? "gui.temporalindustries.chronovault.hide_changes"
                 : "gui.temporalindustries.chronovault.show_changes");
+    }
+
+    private static Component ghostPreviewLabel(boolean enabled) {
+        return Component.translatable(enabled
+                ? "gui.temporalindustries.timeline_machine.ghost_preview_disable"
+                : "gui.temporalindustries.timeline_machine.ghost_preview_enable");
     }
 
     private long getCurrentGameTime() {
@@ -429,8 +498,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         // Placeholder icon: a 3x3 grid glyph, echoing the claim map it opens.
         int glyphColor = mapOverlayOpen ? 0xFFF0FAFF : TEXT_PRIMARY;
-        int cell = 5;
-        int gap = 2;
+        int cell = 4;
+        int gap = 1;
         int glyphSize = cell * 3 + gap * 2;
         int glyphX = bookmarkX + (TAB_ROW_SIZE - glyphSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
         int glyphY = bookmarkY + (TAB_ROW_SIZE - glyphSize) / 2;
@@ -446,26 +515,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private boolean isMouseOverBookmark(double mouseX, double mouseY) {
         return mouseX >= bookmarkX && mouseX <= bookmarkX + TAB_ROW_SIZE
                 && mouseY >= bookmarkY && mouseY <= bookmarkY + TAB_ROW_SIZE;
-    }
-
-    private void renderAutoTrackTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        boolean enabled = ChronosphereClientState.isAutoTrackingEnabled();
-        boolean hovered = isMouseOverAutoTrackTab(mouseX, mouseY);
-        int tint = enabled ? 0xB0CC5555 : (hovered ? 0x40000000 : 0);
-
-        IconTabRenderer.renderBackground(guiGraphics, autoTrackX, autoTrackY, tint);
-
-        // Placeholder icon: a filled "record" dot.
-        int glyphColor = enabled ? 0xFFFFEDED : TEXT_PRIMARY;
-        int dotSize = 10;
-        int dotX = autoTrackX + (TAB_ROW_SIZE - dotSize) / 2 + IconTabRenderer.ICON_X_NUDGE;
-        int dotY = autoTrackY + (TAB_ROW_SIZE - dotSize) / 2;
-        guiGraphics.fill(dotX, dotY, dotX + dotSize, dotY + dotSize, glyphColor);
-    }
-
-    private boolean isMouseOverAutoTrackTab(double mouseX, double mouseY) {
-        return mouseX >= autoTrackX && mouseX <= autoTrackX + TAB_ROW_SIZE
-                && mouseY >= autoTrackY && mouseY <= autoTrackY + TAB_ROW_SIZE;
     }
 
     private void renderSettingsTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -487,11 +536,27 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.settings_title"),
                 panelX() + CONTENT_SIZE / 2, panelY() + 16, TEXT_PRIMARY);
 
+        int commitX = panelX() + (CONTENT_SIZE - COMMIT_BUTTON_WIDTH) / 2;
+        int commitY = panelY() + COMMIT_BUTTON_Y_OFFSET;
+        drawOverlayButton(guiGraphics, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                Component.translatable("gui.temporalindustries.timeline_machine.commit_button"),
+                0xFF3A6A3A, isMouseOverRect(mouseX, mouseY, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
                 panelX() + 20, panelY() + 60, CONTENT_SIZE - 40, TEXT_SECONDARY);
 
+        boolean ghostEnabled = TimelineProjectionManager.isGhostBlockModeEnabled();
+        int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
+        int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
+        drawOverlayButton(guiGraphics, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                ghostPreviewLabel(ghostEnabled), ghostEnabled ? 0xFF3A6A8A : 0xFF3A3A3A,
+                isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_hint",
+                        TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT),
+                panelX() + CONTENT_SIZE / 2, panelY() + GHOST_TOGGLE_HINT_Y_OFFSET, TEXT_MUTED);
+
         int buttonX = panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
-        int buttonY = panelY() + 130;
+        int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
 
         if (deleteHistoryConfirmPending) {
             drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
@@ -510,6 +575,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                     Component.translatable("gui.temporalindustries.timeline_machine.delete_history_button"),
                     0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
         }
+
+        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.branch_label",
+                        ChronosphereClientState.getCurrentBranch()),
+                panelX() + CONTENT_SIZE / 2, panelY() + BRANCH_LABEL_Y_OFFSET, TEXT_SECONDARY);
     }
 
     private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
@@ -556,11 +625,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 panelX() + CONTENT_SIZE / 2, panelY() + MAP_TITLE_Y_OFFSET, TEXT_PRIMARY);
 
         ChunkPos home = new ChunkPos(menu.getBlockPos());
-        MAP_GRID.render(guiGraphics, gridX, gridY, home, new ChunkSelectionGrid.CellPainter() {
+        Set<Long> effectiveSelected = effectiveSelectedChunks();
+
+        int viewportSize = mapViewportSize();
+        guiGraphics.enableScissor(gridX, gridY, gridX + viewportSize, gridY + viewportSize);
+        MAP_GRID.render(guiGraphics, zoomedGridX(), zoomedGridY(), mapZoom, home, new ChunkSelectionGrid.CellPainter() {
             @Override
             public int tint(int dx, int dz, long chunkKey) {
                 if (dx == 0 && dz == 0) return COLOR_HOME;
-                if (ChronosphereClientState.isSelected(chunkKey)) return COLOR_SELECTED;
+                if (effectiveSelected.contains(chunkKey)) return COLOR_SELECTED;
                 if (ChronosphereClientState.isBlocked(chunkKey)) return COLOR_BLOCKED;
                 return COLOR_AVAILABLE;
             }
@@ -572,33 +645,85 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         });
 
         if (mapRectDragActive) {
-            MAP_GRID.renderRectHighlight(guiGraphics, gridX, gridY,
+            MAP_GRID.renderRectHighlight(guiGraphics, zoomedGridX(), zoomedGridY(), mapZoom,
                     mapRectStartDx, mapRectStartDz, mapRectHoverDx, mapRectHoverDz, COLOR_RECT_PREVIEW);
         }
+        guiGraphics.disableScissor();
 
         // menu.getBlockEntity() is the client's stale copy (toggleChunk() only calls setChanged(),
-        // not a synced mutator), so ChronosphereClientState is the only client-accurate source.
-        int claimedCount = ChronosphereClientState.getSelectedCount();
-        int footerY = gridY + MAP_GRID.gridPixels() + MAP_FOOTER_GAP;
+        // not a synced mutator), so ChronosphereClientState (plus this visit's pending toggles) is
+        // the only client-accurate source.
+        int selectedCount = effectiveSelected.size();
+        int footerY = gridY + viewportSize + MAP_FOOTER_GAP;
         drawCenteredNoShadow(guiGraphics, Component.literal(
-                claimedCount + "/" + TOTAL_CLAIMABLE + " chunks claimed"),
+                selectedCount + "/" + TOTAL_CLAIMABLE + " chunks selected"),
                 panelX() + CONTENT_SIZE / 2, footerY, TEXT_SECONDARY);
-        int trackedCount = ChronosphereClientState.getTrackedCount();
-        int trackedColor = trackedCount == claimedCount ? 0xFF2E8B45 : 0xFFB5701E;
+        int capturedCount = ChronosphereClientState.getCapturedCount();
+        int capturedColor = capturedCount == selectedCount ? 0xFF2E8B45 : 0xFFB5701E;
         drawCenteredNoShadow(guiGraphics, Component.literal(
-                trackedCount + "/" + claimedCount + " chunks tracked"),
-                panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING, trackedColor);
+                capturedCount + "/" + selectedCount + " chunks captured"),
+                panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING, capturedColor);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
                 panelX() + CONTENT_SIZE / 2, footerY + MAP_FOOTER_LINE_SPACING * 2, TEXT_MUTED);
     }
 
+    /** The map viewport's fixed on-screen footprint; stays the unzoomed grid size so the title/
+     * footer layout around it never moves, while the grid itself scales and pans within it. */
+    private int mapViewportSize() {
+        return MAP_GRID.gridPixels();
+    }
+
+    private int mapMaxPanX() {
+        return Math.max(0, MAP_GRID.gridPixels(mapZoom) - mapViewportSize());
+    }
+
+    private int mapMaxPanY() {
+        return mapMaxPanX(); // grid is square
+    }
+
+    private void clampMapPan() {
+        mapPanX = Math.min(Math.max(mapPanX, 0), mapMaxPanX());
+        mapPanY = Math.min(Math.max(mapPanY, 0), mapMaxPanY());
+    }
+
+    /** The scaled grid's top-left, after panning; feeds both rendering and hit-testing so they agree. */
+    private int zoomedGridX() {
+        return gridX - mapPanX;
+    }
+
+    private int zoomedGridY() {
+        return gridY - mapPanY;
+    }
+
+    private void resetMapZoom() {
+        mapZoom = MAP_MIN_ZOOM;
+        mapPanX = 0;
+        mapPanY = 0;
+    }
+
+    private void adjustMapZoom(double scrollAmount, double mouseX, double mouseY) {
+        float oldZoom = mapZoom;
+        float newZoom = (float) Math.min(MAP_MAX_ZOOM, Math.max(MAP_MIN_ZOOM,
+                mapZoom + Math.signum(scrollAmount) * MAP_ZOOM_STEP));
+        if (newZoom == oldZoom) return;
+
+        // Keep the chunk under the cursor stationary across the zoom change, so scrolling in
+        // feels like zooming toward the pointer rather than toward the viewport's corner.
+        double anchorXInGrid = mouseX - zoomedGridX();
+        double anchorYInGrid = mouseY - zoomedGridY();
+        double scale = newZoom / oldZoom;
+        mapZoom = newZoom;
+        mapPanX = (int) Math.round(mapPanX + anchorXInGrid * (scale - 1));
+        mapPanY = (int) Math.round(mapPanY + anchorYInGrid * (scale - 1));
+        clampMapPan();
+    }
+
     private ChunkPos getGridCellAt(double mouseX, double mouseY) {
-        return MAP_GRID.cellAt(mouseX, mouseY, gridX, gridY, new ChunkPos(menu.getBlockPos()));
+        return MAP_GRID.cellAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), mapZoom, new ChunkPos(menu.getBlockPos()));
     }
 
     private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         renderBookmark(guiGraphics, mouseX, mouseY);
-        renderAutoTrackTab(guiGraphics, mouseX, mouseY);
         renderSettingsTab(guiGraphics, mouseX, mouseY);
     }
 
@@ -624,8 +749,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (mapOverlayOpen) {
             if (isMouseOverBookmark(mouseX, mouseY)) {
                 guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
-            } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
-                guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
             }
             return;
         }
@@ -642,8 +765,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverBookmark(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
-        } else if (isMouseOverAutoTrackTab(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, autoTrackTooltip(), mouseX, mouseY);
         } else if (isMouseOverSettingsTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.settings_tooltip"), mouseX, mouseY);
         } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
@@ -651,17 +772,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            Component label = TimelineProjectionManager.isSelectedBranchDeletable()
-                    ? Component.translatable("gui.temporalindustries.chronovault.delete_branch")
-                    : Component.translatable("gui.temporalindustries.chronovault.delete_branch_in_use");
-            guiGraphics.renderTooltip(font, label, mouseX, mouseY);
+            guiGraphics.renderTooltip(font, ChronovaultScreen.deleteBranchTooltip(), mouseX, mouseY);
         }
-    }
-
-    private static Component autoTrackTooltip() {
-        return Component.translatable(ChronosphereClientState.isAutoTrackingEnabled()
-                ? "gui.temporalindustries.timeline_machine.auto_track_tooltip_on"
-                : "gui.temporalindustries.timeline_machine.auto_track_tooltip_off");
     }
 
     @Override
@@ -684,12 +796,17 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0 && isMouseOverBookmark(mouseX, mouseY)) {
+            if (mapOverlayOpen) {
+                flushPendingChunkToggles();
+            }
             mapOverlayOpen = !mapOverlayOpen;
             settingsOverlayOpen = false;
             deleteHistoryConfirmPending = false;
             mapDragActive = false;
             mapDragTouchedChunks.clear();
             mapRectDragActive = false;
+            mapPanDragActive = false;
+            resetMapZoom();
             if (mapOverlayOpen) {
                 ticksSinceMapSync = 0;
                 PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(menu.getBlockPos()));
@@ -697,13 +814,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             return true;
         }
 
-        if (button == 0 && isMouseOverAutoTrackTab(mouseX, mouseY)) {
-            boolean newState = !ChronosphereClientState.isAutoTrackingEnabled();
-            PacketDistributor.sendToServer(new TimelineMachineToggleAutoTrackPacket(menu.getBlockPos(), newState));
-            return true;
-        }
-
         if (button == 0 && isMouseOverSettingsTab(mouseX, mouseY)) {
+            if (mapOverlayOpen) {
+                flushPendingChunkToggles();
+            }
             settingsOverlayOpen = !settingsOverlayOpen;
             mapOverlayOpen = false;
             deleteHistoryConfirmPending = false;
@@ -713,24 +827,26 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (mapOverlayOpen) {
             if (button == 0) {
                 if (hasControlDown()) {
-                    int[] start = MAP_GRID.clampedOffsetAt(mouseX, mouseY, gridX, gridY);
+                    int[] start = MAP_GRID.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), mapZoom);
                     mapRectStartDx = mapRectHoverDx = start[0];
                     mapRectStartDz = mapRectHoverDz = start[1];
                     mapRectDragActive = true;
                     mapDragTouchedChunks.clear();
                     ChunkPos home = new ChunkPos(menu.getBlockPos());
                     long startKey = new ChunkPos(home.x + start[0], home.z + start[1]).toLong();
-                    mapDragAdding = !ChronosphereClientState.isSelected(startKey);
+                    mapDragAdding = !effectiveSelectedChunks().contains(startKey);
                 } else {
                     ChunkPos clicked = getGridCellAt(mouseX, mouseY);
                     if (clicked != null && !clicked.equals(new ChunkPos(menu.getBlockPos()))) {
                         long key = clicked.toLong();
                         mapDragActive = true;
-                        mapDragAdding = !ChronosphereClientState.isSelected(key);
+                        mapDragAdding = !effectiveSelectedChunks().contains(key);
                         mapDragTouchedChunks.clear();
                         applyMapDragToggle(key);
                     }
                 }
+            } else if (button == 1 && mapZoom > MAP_MIN_ZOOM) {
+                mapPanDragActive = true;
             }
             // Modal: swallow clicks so nothing underneath reacts to them.
             return true;
@@ -759,17 +875,21 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         }
 
         if (button == 0 && graphWidget.mouseClicked(mouseX, mouseY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {
+            // The ghost preview is resolved server-side per selected commit, so ask for the new
+            // one right away instead of letting it lag until the next periodic poll.
+            requestTimelineView(false);
             return true;
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
-    /** Sends a toggle packet for {@code key} using the drag's fixed direction, once per cell per
-     * drag, skipping chunks blocked by another machine when claiming. */
+    /** Records {@code key}'s claim/release using the drag's fixed direction, once per cell per
+     * drag, skipping chunks blocked by another machine when claiming. Not sent to the server
+     * until the map overlay closes; see {@link #flushPendingChunkToggles()}. */
     private void applyMapDragToggle(long key) {
         if (!mapDragTouchedChunks.add(key)) return;
         if (mapDragAdding && ChronosphereClientState.isBlocked(key)) return;
-        PacketDistributor.sendToServer(new ChronosphereToggleChunkPacket(menu.getBlockPos(), key, mapDragAdding));
+        pendingChunkToggles.put(key, mapDragAdding);
     }
 
     /** Applies the rectangle between the press point and the release point, in the direction
@@ -792,8 +912,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
         if (mapOverlayOpen) {
-            if (button == 0 && mapRectDragActive) {
-                int[] hover = MAP_GRID.clampedOffsetAt(mouseX, mouseY, gridX, gridY);
+            if (button == 1 && mapPanDragActive) {
+                mapPanX -= (int) Math.round(dragX);
+                mapPanY -= (int) Math.round(dragY);
+                clampMapPan();
+            } else if (button == 0 && mapRectDragActive) {
+                int[] hover = MAP_GRID.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), mapZoom);
                 mapRectHoverDx = hover[0];
                 mapRectHoverDz = hover[1];
             } else if (button == 0 && mapDragActive) {
@@ -822,6 +946,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
             mapDragActive = false;
             mapDragTouchedChunks.clear();
+            mapPanDragActive = false;
             return true;
         }
         if (button == 0 && graphWidget.mouseReleased()) {
@@ -833,6 +958,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
         if (mapOverlayOpen) {
+            adjustMapZoom(scrollY, mouseX, mouseY);
             return true;
         }
         if (graphWidget.mouseScrolled(mouseX, mouseY, scrollY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {

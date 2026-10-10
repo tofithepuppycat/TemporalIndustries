@@ -49,6 +49,7 @@ import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerIte
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
+import io.github.tofithepuppycat.temporalindustries.item.TimeDilatorItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.DecayAcceleratorMenu;
@@ -166,6 +167,9 @@ public class Registration {
 
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
+
+    public static final DeferredItem<Item> TIME_DILATOR_ITEM = ITEMS.register("time_dilator",
+            () -> new TimeDilatorItem(new Item.Properties().durability(64)));
 
     public static final DeferredItem<Item> CHRONOSCOPE_ITEM = ITEMS.register("chronoscope",
             () -> new ChronoscopeItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
@@ -471,6 +475,7 @@ public class Registration {
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(PORTABLE_CHRONO_MARKER_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
+                        output.accept(TIME_DILATOR_ITEM);
                         output.accept(CHRONOSCOPE_ITEM);
                         output.accept(ENTROPY_GLASSES_ITEM);
                         output.accept(DUAL_ENTROPY_CELL_ITEM);

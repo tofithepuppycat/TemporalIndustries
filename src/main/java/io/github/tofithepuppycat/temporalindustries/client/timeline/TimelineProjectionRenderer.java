@@ -1,21 +1,31 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
+import java.util.PriorityQueue;
 import java.util.Set;
 
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import org.joml.Matrix4f;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderStateShard;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.texture.OverlayTexture;
+import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -39,6 +49,59 @@ public class TimelineProjectionRenderer {
     private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
     /** Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject. */
     private static final float WALL_ALPHA_SCALE = 0.35F;
+    /** Depth-test disabled: a wall sitting exactly on a chunk edge is coplanar with whatever's
+     * actually built up to that edge, and no fixed world-space offset reliably avoids z-fighting
+     * against it at every distance. Rendering the wall as an always-visible overlay (like a glowing
+     * force field, visible through terrain) sidesteps the depth comparison entirely instead. */
+    private static final RenderType WALL_RENDER_TYPE = RenderType.create(
+            "temporalindustries_claim_wall",
+            DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS,
+            256,
+            false,
+            true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.POSITION_COLOR_SHADER)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setDepthTestState(RenderStateShard.NO_DEPTH_TEST)
+                    .setWriteMaskState(RenderStateShard.COLOR_WRITE)
+                    .createCompositeState(false));
+
+    /** Ghost-block mode's render type: a copy of vanilla's {@link RenderType#entityTranslucent},
+     * not the chunk-batching {@link RenderType#translucent()}. The chunk shader lights itself
+     * entirely in the vertex stage via a {@code ChunkOffset} uniform and an {@code ivec2 UV2}
+     * lightmap sample tied to the compiled-chunk batching system — it isn't meant for one-off draws
+     * like this, and using it rendered every ghost near-black (only the atlas's edge-bleed pixels
+     * showed any color). {@link BlockRenderDispatcher#renderSingleBlock} itself falls back to the
+     * entity-translucent equivalent for exactly this reason when no render type is forced; this
+     * mirrors that, then adds {@link RenderStateShard#POLYGON_OFFSET_LAYERING} — the same shard
+     * vanilla's own block-breaking "crumbling" overlay uses to sit flush on an existing block's
+     * faces without z-fighting. A CHANGE entry's ghost occupies the exact same cube as the block
+     * already there, so without the bias the two flicker at equal depth; polygon offset nudges the
+     * ghost's depth slightly toward the camera at the hardware level, without moving its geometry.
+     *
+     * <p>Targets {@link RenderStateShard#MAIN_TARGET} rather than the dedicated translucent target
+     * vanilla terrain uses: that target gets composited back onto the main framebuffer at a fixed
+     * point earlier in the frame, and we render after that (at {@code AFTER_TRANSLUCENT_BLOCKS}), so
+     * anything written to it this late never gets composited. */
+    private static final RenderType GHOST_BLOCK_RENDER_TYPE = RenderType.create(
+            "temporalindustries_ghost_block",
+            DefaultVertexFormat.NEW_ENTITY,
+            VertexFormat.Mode.QUADS,
+            1536,
+            true,
+            true,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                    .setTextureState(new RenderStateShard.TextureStateShard(TextureAtlas.LOCATION_BLOCKS, false, false))
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .setLightmapState(RenderStateShard.LIGHTMAP)
+                    .setOverlayState(RenderStateShard.OVERLAY)
+                    .setOutputState(RenderStateShard.MAIN_TARGET)
+                    .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
+                    .createCompositeState(true));
 
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event) {
@@ -62,13 +125,26 @@ public class TimelineProjectionRenderer {
         double cameraZ = camera.getPosition().z;
 
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
-        VertexConsumer quadBuffer = bufferSource.getBuffer(RenderType.debugQuads());
 
         double blinkPhase = (System.currentTimeMillis() % BLINK_PERIOD_MS) / (double) BLINK_PERIOD_MS;
         float alpha = BLINK_ALPHA_MIN + (BLINK_ALPHA_MAX - BLINK_ALPHA_MIN)
                 * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase));
 
-        renderClaimBoundary(poseStack, quadBuffer, level, cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
+        VertexConsumer wallBuffer = bufferSource.getBuffer(WALL_RENDER_TYPE);
+        renderClaimBoundary(poseStack, wallBuffer, level, cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
+        bufferSource.endBatch(WALL_RENDER_TYPE);
+
+        if (TimelineProjectionManager.isGhostBlockModeEnabled()) {
+            renderGhostBlocks(poseStack, bufferSource, entries, cameraX, cameraY, cameraZ, alpha);
+        } else {
+            renderMarkers(poseStack, bufferSource, entries, cameraX, cameraY, cameraZ, alpha);
+        }
+    }
+
+    private static void renderMarkers(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
+                                       List<TimelineProjectionManager.ProjectionEntry> entries,
+                                       double cameraX, double cameraY, double cameraZ, float alpha) {
+        VertexConsumer quadBuffer = bufferSource.getBuffer(RenderType.debugQuads());
 
         for (TimelineProjectionManager.ProjectionEntry entry : entries) {
             BlockPos pos = entry.getPos();
@@ -93,10 +169,83 @@ public class TimelineProjectionRenderer {
     }
 
     /**
+     * Renders real, translucent block models instead of colored decals, capped to the
+     * {@link TimelineProjectionManager#GHOST_BLOCK_RENDER_LIMIT} positions nearest the camera —
+     * full block models cost far more to draw than the decals' flat quads, so previewing every
+     * affected position across a large claim would tank the framerate. Every model is forced onto
+     * the translucent render type (regardless of the block's own layer) so the blink alpha applies
+     * uniformly; a position being removed renders its current block with a red tint instead of the
+     * target air state, since there'd otherwise be nothing to show. Rendered at
+     * {@link LightTexture#FULL_BRIGHT} rather than the position's real world light, since the
+     * entity-translucent shader this uses applies its own directional diffuse shading on top of the
+     * lightmap sample (unlike real terrain, which bakes brightness into vertex color directly) —
+     * tying that to the actual local light level made ghosts in anything but full daylight look
+     * considerably dimmer than the real block they're previewing.
+     */
+    private static void renderGhostBlocks(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
+                                           List<TimelineProjectionManager.ProjectionEntry> entries,
+                                           double cameraX, double cameraY, double cameraZ, float alpha) {
+        List<TimelineProjectionManager.ProjectionEntry> nearest =
+                nearestEntries(entries, cameraX, cameraY, cameraZ, TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT);
+        if (nearest.isEmpty()) return;
+
+        MultiBufferSource forcedGhost = renderType -> bufferSource.getBuffer(GHOST_BLOCK_RENDER_TYPE);
+
+        for (TimelineProjectionManager.ProjectionEntry entry : nearest) {
+            boolean removal = entry.getType() == TimelineProjectionManager.ProjectionType.REMOVE;
+            BlockState renderState = removal ? entry.getCurrentState() : entry.getTargetState();
+            if (renderState.isAir()) continue;
+
+            BlockPos pos = entry.getPos();
+
+            RenderSystem.setShaderColor(removal ? 1.0F : 1.0F, removal ? 0.45F : 1.0F, removal ? 0.45F : 1.0F, alpha);
+            poseStack.pushPose();
+            poseStack.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
+            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                    renderState, poseStack, forcedGhost, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+            poseStack.popPose();
+        }
+
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+        bufferSource.endBatch(GHOST_BLOCK_RENDER_TYPE);
+    }
+
+    private record RankedEntry(TimelineProjectionManager.ProjectionEntry entry, double distSqr) {}
+
+    /** The limit nearest entries to (cameraX, cameraY, cameraZ), via a bounded max-heap (farthest
+     * kept entry at the top, evicted first) so the cost stays O(entries.size() * log(limit))
+     * instead of a full sort. */
+    private static List<TimelineProjectionManager.ProjectionEntry> nearestEntries(
+            List<TimelineProjectionManager.ProjectionEntry> entries, double cameraX, double cameraY, double cameraZ, int limit) {
+        if (entries.size() <= limit) return entries;
+
+        PriorityQueue<RankedEntry> farthestFirst = new PriorityQueue<>(limit,
+                Comparator.comparingDouble(RankedEntry::distSqr).reversed());
+        for (TimelineProjectionManager.ProjectionEntry entry : entries) {
+            BlockPos pos = entry.getPos();
+            double dx = (pos.getX() + 0.5) - cameraX;
+            double dy = (pos.getY() + 0.5) - cameraY;
+            double dz = (pos.getZ() + 0.5) - cameraZ;
+            double distSqr = dx * dx + dy * dy + dz * dz;
+
+            if (farthestFirst.size() < limit) {
+                farthestFirst.add(new RankedEntry(entry, distSqr));
+            } else if (distSqr < farthestFirst.peek().distSqr()) {
+                farthestFirst.poll();
+                farthestFirst.add(new RankedEntry(entry, distSqr));
+            }
+        }
+
+        List<TimelineProjectionManager.ProjectionEntry> result = new java.util.ArrayList<>(farthestFirst.size());
+        for (RankedEntry ranked : farthestFirst) result.add(ranked.entry());
+        return result;
+    }
+
+    /**
      * Draws a wall along every chunk edge on the OUTER boundary of the previewed claim, skipping
-     * interior edges so a multi-chunk claim reads as one enclosure. If a single claimed chunk's
-     * own tab is open (see {@link TimelineProjectionManager#getSelectedViewChunk()}), that chunk
-     * gets a full box on every side too, so it's outlined even in the middle of the claim.
+     * interior edges so a multi-chunk claim reads as one enclosure. There's only one shared commit
+     * graph per machine now, so there are no per-chunk tabs and no single chunk to single out —
+     * a one-chunk claim already gets a full box, since all four of its neighbours are unclaimed.
      */
     private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer, Level level,
                                             double cameraX, double cameraY, double cameraZ, float alpha) {
@@ -107,7 +256,6 @@ public class TimelineProjectionRenderer {
 
         Set<Long> claimed = new HashSet<>();
         for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
-        ChunkPos selectedChunk = TimelineProjectionManager.getSelectedViewChunk();
 
         Matrix4f matrix = poseStack.last().pose();
         float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
@@ -116,25 +264,24 @@ public class TimelineProjectionRenderer {
         float yTop = (float) (level.getMaxBuildHeight() - cameraY);
 
         for (ChunkPos chunk : chunks) {
-            boolean forceAllWalls = chunk.equals(selectedChunk);
             float minX = (float) (chunk.getMinBlockX() - cameraX);
             float maxX = (float) (chunk.getMinBlockX() + 16 - cameraX);
             float minZ = (float) (chunk.getMinBlockZ() - cameraZ);
             float maxZ = (float) (chunk.getMinBlockZ() + 16 - cameraZ);
 
-            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
+            if (!claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, minX, yBottom, maxZ,
                         minX, yTop, maxZ, minX, yTop, minZ);
             }
-            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
+            if (!claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, maxX, yBottom, minZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, maxX, yTop, minZ);
             }
-            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
+            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, maxX, yBottom, minZ,
                         maxX, yTop, minZ, minX, yTop, minZ);
             }
-            if (forceAllWalls || !claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
+            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
                 quad(matrix, buffer, r, g, b, alpha, minX, yBottom, maxZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, minX, yTop, maxZ);
             }

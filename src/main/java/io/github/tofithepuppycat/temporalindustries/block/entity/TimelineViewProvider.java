@@ -1,68 +1,73 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkTimelineSnapshot;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalCommit;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
+import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
-import org.jetbrains.annotations.Nullable;
+import net.minecraft.world.level.block.state.BlockState;
 
 import java.util.List;
 import java.util.Map;
 
 /**
- * Exposes a chunk's commit graph plus the shared jump/select controls, for whichever block entity
- * is currently showing {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget}
- * in its GUI. Implemented by {@link ChronovaultBlockEntity} (always its own single chunk) and
- * {@link ChronosphereBlockEntity} (chunkPos null means the shared "All" view across every claimed
- * chunk). jump() always moves every chunk a provider controls together.
+ * Exposes one machine's repository — a single commit tree, shared across every chunk the machine
+ * has claimed — plus the jump/select controls, for whichever block entity is currently showing
+ * {@link io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget} in its
+ * GUI. Implemented by {@link ChronovaultBlockEntity} (one claimed chunk) and
+ * {@link ChronosphereBlockEntity} (up to 121).
+ *
+ * <p>Repo-scoped, not chunk-scoped: unlike the old per-dimension timeline there is exactly one
+ * commit graph per machine, so the graph needs no chunk parameter. "Which chunks are claimed"
+ * ({@link #getClaimedChunks()}) is a separate, still-per-chunk concern, used only for the claim
+ * map and the in-world preview boundary.
  */
 public interface TimelineViewProvider {
-    /** Outcome of a {@link #jump(long, long)}: SUCCESS covers an actual jump or a no-op;
+    /** Outcome of a {@link #jump(long)}: SUCCESS covers an actual jump or a no-op;
      * INSUFFICIENT_ENERGY lets callers show a chat message instead of silently doing nothing. */
     enum JumpResult { SUCCESS, INSUFFICIENT_ENERGY }
 
-    /** Chunks this provider can show a separate timeline tab for, home chunk first. Empty when
-     * there's only one chunk (a Time Machine). */
-    default List<ChunkPos> getViewableChunks() {
-        return List.of();
-    }
+    /** Every commit in this machine's repository. Edges come from each commit's own
+     * {@link RepoCommit#getParentId()} — there's no separate local-parent map any more. */
+    List<RepoCommit> getRepositoryCommits();
 
-    /** Commits relevant to chunkPos in chronological order, or the shared view when chunkPos is null. */
-    List<TemporalCommit> getChunkCommits(@Nullable ChunkPos chunkPos);
+    /** Branch name -> the commit it currently points to. */
+    Map<String, Long> getBranchTips();
 
-    /** commitId -> the id it locally forked from within chunkPos's (or the shared view's) history. */
-    Map<Long, Long> getChunkLocalParents(@Nullable ChunkPos chunkPos);
+    /** The commit the live world currently reflects for this machine's claimed chunks. */
+    long getHeadCommitId();
 
-    /** The commit chunkPos's (or the shared view's) live world currently reflects. */
-    long getChunkHeadId(@Nullable ChunkPos chunkPos);
+    /** The named branch currently checked out, or an empty string if this repo has no commits. */
+    String getCurrentNamedBranch();
 
-    /** Id of the commit nearest the current selectedGameTime. */
-    default long getSelectedCommitId(@Nullable ChunkPos chunkPos) {
-        return TemporalCommit.resolveNearest(getChunkCommits(chunkPos), getSelectedGameTime());
-    }
+    /** commitId -> energy cost of jumping there from the current head. Only ever prices
+     * selectedCommitId (pass -1 for none): pricing every node would be
+     * O(nodes x claimedChunks x history) and stall the server tick on every GUI poll, so
+     * un-selected nodes simply render without a jump-cost line. */
+    Map<Long, Long> getJumpCosts(long selectedCommitId);
 
-    /** commitId -> energy cost of jumping there from the current head. For a Chronosphere this is
-     * always the total cost across every claimed chunk, since jump() moves everything together. */
-    Map<Long, Long> getChunkJumpCosts(@Nullable ChunkPos chunkPos);
-
-    /** One commit-graph snapshot per chunk that should show the in-world ghost preview when
-     * "Show Changes" is on. */
-    List<ChunkTimelineSnapshot> getPreviewChunkSnapshots();
+    /** Chunks this machine has claimed, home chunk first. Used for the claim map and to outline
+     * the preview boundary in-world — NOT for the commit graph, which is repo-wide. */
+    List<ChunkPos> getClaimedChunks();
 
     long getPlacedGameTime();
     long getSelectedGameTime();
 
-    /** Jumps to the commit at targetGameTime, applying it to the live world immediately. Prefers
-     * targetCommitId as the exact checkout target since gameTime alone can't distinguish a branch
-     * marker from the commit it forked from. Pass {@link TemporalCommit#NO_PREFERRED_COMMIT} to
-     * resolve by gameTime alone. */
-    JumpResult jump(long targetGameTime, long targetCommitId);
+    /** Per affected chunk, that chunk's resolved target block states if the player jumped to
+     * targetCommitId right now. Read-only; shares its resolution logic with the real jump so the
+     * ghost preview can't diverge from it. */
+    Map<ChunkPos, Map<BlockPos, BlockState>> previewJumpTargetStates(long targetCommitId);
 
-    /** Updates selectedGameTime, optionally applying it to the live world. */
-    void setSelectedGameTime(long targetGameTime, boolean applyToWorld);
+    /** Whether pos is glued, and so would be skipped by a jump (and by the ghost preview). */
+    boolean isGluedPos(BlockPos pos);
 
-    /** Deletes the given BRANCH commit and everything forked from it, scoped to whichever chunk it
-     * belongs to, provided that chunk's head doesn't currently sit inside it (i.e. it isn't the
-     * branch currently checked out). No-op if branchCommitId isn't a deletable branch.
+    /** Jumps to targetCommitId, applying it to the live world immediately. The target time is read
+     * off the commit itself, so no separate gameTime parameter is needed. */
+    JumpResult jump(long targetCommitId);
+
+    /** Points selectedGameTime at commitId's recorded time, optionally applying it to the world. */
+    void setSelectedCommit(long commitId, boolean applyToWorld);
+
+    /** Deletes branchName and the history unique to it, provided it isn't the branch currently
+     * checked out.
      * @return true if the branch was deleted */
-    boolean deleteBranch(long branchCommitId);
+    boolean deleteBranch(String branchName);
 }

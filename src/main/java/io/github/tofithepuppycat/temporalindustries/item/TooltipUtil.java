@@ -17,7 +17,9 @@ public final class TooltipUtil {
         if (Screen.hasShiftDown()) {
             for (String key : translationKeys) {
                 String text = Component.translatable(key).getString();
-                tooltip.add(EntropyDisplay.colorTokens(text, ChatFormatting.GRAY));
+                for (String line : text.split("\n")) {
+                    tooltip.add(EntropyDisplay.colorTokens(line, ChatFormatting.GRAY));
+                }
             }
         } else {
             tooltip.add(Component.translatable("tooltip.temporalindustries.hold_shift")
