@@ -1,0 +1,23 @@
+{
+  "display": {
+    "icon": {
+      "id": "temporalindustries:echo_projector"
+    },
+    "title": {
+      "translate": "advancements.temporalindustries.killed_by_your_echo.title"
+    },
+    "description": {
+      "translate": "advancements.temporalindustries.killed_by_your_echo.description"
+    },
+    "frame": "challenge",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": true,
+    "background": "minecraft:textures/block/amethyst_block.png"
+  },
+  "criteria": {
+    "killed_by_echo": {
+      "trigger": "minecraft:impossible"
+    }
+  }
+}

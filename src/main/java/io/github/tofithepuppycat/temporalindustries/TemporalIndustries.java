@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCellComp
 import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig;
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
+import io.github.tofithepuppycat.temporalindustries.device.EchoKillListener;
 import io.github.tofithepuppycat.temporalindustries.device.TimeDilationListener;
 import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftBorderListener;
 import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftChunkListener;
@@ -15,6 +16,7 @@ import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.Mod;
 import net.neoforged.fml.config.ModConfig;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.neoforge.common.NeoForge;
 import net.neoforged.neoforge.event.AddReloadListenerEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
@@ -43,10 +45,16 @@ public class TemporalIndustries
         NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(new EnergyCostReloadListener()));
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent event) -> ItemEnergyCosts.compute(event.getServer()));
 
-        NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onBlockBreak);
-        NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onRightClickBlock);
-        NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onEntityPlace);
-        NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onLivingDamage);
+        // LOWEST so interactions another mod already cancelled (claims, protection) never get recorded.
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onBlockBreak);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onRightClickBlock);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onRightClickItem);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onUseItemStop);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onEntityInteract);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onEntityInteractSpecific);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onAttackEntity);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onEntityMount);
+        NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, true, EchoKillListener::onLivingDeath);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onContainerOpen);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onContainerClose);
         NeoForge.EVENT_BUS.addListener(ChronoActionRecorder::onPlayerLoggedOut);
