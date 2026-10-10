@@ -271,10 +271,12 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
 
-        boolean deleteActive = TimelineProjectionManager.isSelectedBranchDeletable();
-        int deleteTint = !deleteActive ? 0x80000000 : (isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
-        IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
-        IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        // Hidden entirely until a deletable branch tip is selected.
+        if (TimelineProjectionManager.isSelectedBranchDeletable()) {
+            int deleteTint = isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+            IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
+            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        }
     }
 
     private boolean isMouseOverShowChangesButton(double mouseX, double mouseY) {
@@ -288,7 +290,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     }
 
     private boolean isMouseOverDeleteBranchButton(double mouseX, double mouseY) {
-        return mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
+        return TimelineProjectionManager.isSelectedBranchDeletable()
+                && mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
                 && mouseY >= deleteBranchY && mouseY <= deleteBranchY + ACTION_BUTTON_SIZE;
     }
 
@@ -447,16 +450,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Names the branch the button would delete, so it's obvious what's about to go; falls back to
-     * explaining why it's disabled when the selection isn't a deletable branch tip. */
+    /** Names the branch the button would delete, so it's obvious what's about to go. Only shown
+     * while the button is visible, i.e. a deletable branch tip is selected. */
     static Component deleteBranchTooltip() {
         String branchName = TimelineProjectionManager.getSelectedBranchName();
-        if (branchName == null) {
-            return Component.translatable("gui.temporalindustries.chronovault.delete_branch_select_tip");
-        }
-        if (!TimelineProjectionManager.isSelectedBranchDeletable()) {
-            return Component.translatable("gui.temporalindustries.chronovault.delete_branch_in_use");
-        }
         return Component.translatable("gui.temporalindustries.chronovault.delete_branch_named", branchName);
     }
 
