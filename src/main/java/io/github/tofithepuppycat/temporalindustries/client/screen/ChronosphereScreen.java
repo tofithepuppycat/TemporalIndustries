@@ -49,6 +49,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_eye.png");
     private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_jump.png");
+    private static final ResourceLocation ICON_PUSH_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_push.png");
+    private static final ResourceLocation ICON_TRUE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_true.png");
+    private static final ResourceLocation ICON_FALSE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_false.png");
     private static final ResourceLocation ICON_TRASHCAN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_trashcan.png");
     private static final int ICON_CONFIG_SIZE = 26;
@@ -105,10 +111,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
-    private static final int COMMIT_BUTTON_WIDTH = 100;
-    private static final int COMMIT_BUTTON_Y_OFFSET = 34;
 
     private static final int GHOST_TOGGLE_BUTTON_WIDTH = 170;
+    private static final int GHOST_ICON_GAP = 4;
     private static final int GHOST_TOGGLE_BUTTON_Y_OFFSET = 100;
     private static final int GHOST_TOGGLE_HINT_Y_OFFSET = 124;
     /** Was a literal 130 before the ghost-preview toggle needed the space above it; shifted down
@@ -186,6 +191,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int showChangesY;
     private int jumpX;
     private int jumpY;
+    private int commitX;
+    private int commitY;
     private int deleteBranchX;
     private int deleteBranchY;
 
@@ -227,12 +234,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         gridX = panelX() + (CONTENT_SIZE - MAP_GRID.gridPixels()) / 2;
         gridY = panelY() + MAP_GRID_Y_OFFSET;
 
-        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 3 + ACTION_BUTTON_GAP * 2)) / 2;
+        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 4 + ACTION_BUTTON_GAP * 3)) / 2;
         showChangesX = groupX;
         jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
-        deleteBranchX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        commitX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        deleteBranchX = commitX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
+        commitY = showChangesY;
         deleteBranchY = showChangesY;
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
@@ -310,13 +319,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
         int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
 
-        int commitX = panelX() + (CONTENT_SIZE - COMMIT_BUTTON_WIDTH) / 2;
-        int commitY = panelY() + COMMIT_BUTTON_Y_OFFSET;
-        if (isMouseOverRect(mouseX, mouseY, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
-            PacketDistributor.sendToServer(new TimelineMachineCommitPacket(menu.getBlockPos()));
-            return;
-        }
-
         int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
         int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
         if (isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
@@ -374,12 +376,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 : "gui.temporalindustries.chronovault.show_changes");
     }
 
-    private static Component ghostPreviewLabel(boolean enabled) {
-        return Component.translatable(enabled
-                ? "gui.temporalindustries.timeline_machine.ghost_preview_disable"
-                : "gui.temporalindustries.timeline_machine.ghost_preview_enable");
-    }
-
     private long getCurrentGameTime() {
         if (minecraft == null || minecraft.level == null) {
             return 0L;
@@ -400,7 +396,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         }
     }
 
-    /** Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while nothing is selected. */
+    /** Show Changes / Jump / Commit: icon buttons; Show Changes tints on while active, Jump dims while nothing is selected. */
     private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
         int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
@@ -412,10 +408,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
 
-        boolean deleteActive = TimelineProjectionManager.isSelectedBranchDeletable();
-        int deleteTint = !deleteActive ? 0x80000000 : (isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
-        IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
-        IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        int commitTint = isMouseOverCommitButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, commitX, commitY, commitTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_PUSH_TEXTURE, commitX, commitY);
+
+        // Hidden entirely until a deletable branch tip is selected.
+        if (TimelineProjectionManager.isSelectedBranchDeletable()) {
+            int deleteTint = isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+            IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
+            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        }
     }
 
     private boolean isMouseOverShowChangesButton(double mouseX, double mouseY) {
@@ -428,8 +430,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
     }
 
+    private boolean isMouseOverCommitButton(double mouseX, double mouseY) {
+        return mouseX >= commitX && mouseX <= commitX + ACTION_BUTTON_SIZE
+                && mouseY >= commitY && mouseY <= commitY + ACTION_BUTTON_SIZE;
+    }
+
     private boolean isMouseOverDeleteBranchButton(double mouseX, double mouseY) {
-        return mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
+        return TimelineProjectionManager.isSelectedBranchDeletable()
+                && mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
                 && mouseY >= deleteBranchY && mouseY <= deleteBranchY + ACTION_BUTTON_SIZE;
     }
 
@@ -536,12 +544,6 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.settings_title"),
                 panelX() + CONTENT_SIZE / 2, panelY() + 16, TEXT_PRIMARY);
 
-        int commitX = panelX() + (CONTENT_SIZE - COMMIT_BUTTON_WIDTH) / 2;
-        int commitY = panelY() + COMMIT_BUTTON_Y_OFFSET;
-        drawOverlayButton(guiGraphics, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                Component.translatable("gui.temporalindustries.timeline_machine.commit_button"),
-                0xFF3A6A3A, isMouseOverRect(mouseX, mouseY, commitX, commitY, COMMIT_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
-
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
                 panelX() + 20, panelY() + 60, CONTENT_SIZE - 40, TEXT_SECONDARY);
 
@@ -549,8 +551,17 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         int ghostToggleX = panelX() + (CONTENT_SIZE - GHOST_TOGGLE_BUTTON_WIDTH) / 2;
         int ghostToggleY = panelY() + GHOST_TOGGLE_BUTTON_Y_OFFSET;
         drawOverlayButton(guiGraphics, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
-                ghostPreviewLabel(ghostEnabled), ghostEnabled ? 0xFF3A6A8A : 0xFF3A3A3A,
+                Component.empty(), ghostEnabled ? 0xFF3A6A8A : 0xFF3A3A3A,
                 isMouseOverRect(mouseX, mouseY, ghostToggleX, ghostToggleY, GHOST_TOGGLE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+        // Label plus a true/false icon showing the current state, centered together in the button.
+        Component ghostLabel = Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_label");
+        int ghostGroupWidth = font.width(ghostLabel) + GHOST_ICON_GAP + IconButtonRenderer.SIZE;
+        int ghostGroupX = ghostToggleX + (GHOST_TOGGLE_BUTTON_WIDTH - ghostGroupWidth) / 2;
+        guiGraphics.drawString(font, ghostLabel, ghostGroupX,
+                ghostToggleY + (DELETE_BUTTON_HEIGHT - 8) / 2, 0xFFFFFFFF, false);
+        IconButtonRenderer.renderIcon(guiGraphics, ghostEnabled ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                ghostGroupX + font.width(ghostLabel) + GHOST_ICON_GAP,
+                ghostToggleY + (DELETE_BUTTON_HEIGHT - IconButtonRenderer.SIZE) / 2);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_hint",
                         TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT),
                 panelX() + CONTENT_SIZE / 2, panelY() + GHOST_TOGGLE_HINT_Y_OFFSET, TEXT_MUTED);
@@ -771,6 +782,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
+        } else if (isMouseOverCommitButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.commit_tooltip"), mouseX, mouseY);
         } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, ChronovaultScreen.deleteBranchTooltip(), mouseX, mouseY);
         }
@@ -866,6 +879,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         if (button == 0 && isMouseOverJumpButton(mouseX, mouseY)) {
             jumpAndClose();
+            return true;
+        }
+
+        if (button == 0 && isMouseOverCommitButton(mouseX, mouseY)) {
+            PacketDistributor.sendToServer(new TimelineMachineCommitPacket(menu.getBlockPos()));
             return true;
         }
 
