@@ -1,0 +1,18 @@
+{
+  "parent": "temporalindustries:root",
+  "display": {
+    "icon": { "id": "temporalindustries:temporal_anchor" },
+    "title": { "translate": "advancements.temporalindustries.temporal_anchor.title" },
+    "description": { "translate": "advancements.temporalindustries.temporal_anchor.description" },
+    "frame": "task",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_item": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [ { "items": "temporalindustries:temporal_anchor" } ] }
+    }
+  }
+}

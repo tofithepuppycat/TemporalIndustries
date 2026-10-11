@@ -1,4 +1,5 @@
 {
+  "parent": "temporalindustries:echo_record",
   "display": {
     "icon": {
       "id": "temporalindustries:echo_projector"
@@ -12,8 +13,7 @@
     "frame": "challenge",
     "show_toast": true,
     "announce_to_chat": true,
-    "hidden": true,
-    "background": "minecraft:textures/block/amethyst_block.png"
+    "hidden": true
   },
   "criteria": {
     "killed_by_echo": {

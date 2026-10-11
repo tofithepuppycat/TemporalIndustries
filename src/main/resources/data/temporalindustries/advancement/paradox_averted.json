@@ -1,4 +1,5 @@
 {
+  "parent": "temporalindustries:chronodial",
   "display": {
     "icon": {
       "id": "temporalindustries:chronodial"
@@ -12,8 +13,7 @@
     "frame": "task",
     "show_toast": true,
     "announce_to_chat": true,
-    "hidden": false,
-    "background": "minecraft:textures/block/amethyst_block.png"
+    "hidden": false
   },
   "criteria": {
     "attempted_use": {
