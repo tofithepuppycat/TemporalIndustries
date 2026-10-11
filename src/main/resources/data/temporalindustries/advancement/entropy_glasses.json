@@ -1,0 +1,18 @@
+{
+  "parent": "temporalindustries:entropy_condenser",
+  "display": {
+    "icon": { "id": "temporalindustries:entropy_glasses" },
+    "title": { "translate": "advancements.temporalindustries.entropy_glasses.title" },
+    "description": { "translate": "advancements.temporalindustries.entropy_glasses.description" },
+    "frame": "goal",
+    "show_toast": true,
+    "announce_to_chat": true,
+    "hidden": false
+  },
+  "criteria": {
+    "has_item": {
+      "trigger": "minecraft:inventory_changed",
+      "conditions": { "items": [ { "items": "temporalindustries:entropy_glasses" } ] }
+    }
+  }
+}
