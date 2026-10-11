@@ -105,10 +105,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return additionalChunks;
     }
 
-    public int getChunkCount() {
-        return additionalChunks.size() + 1;
-    }
-
     /** Claims or releases pos for this machine's repository. Releasing leaves the repository's
      * recorded history for that chunk intact — claiming only governs future capture. */
     public ToggleResult toggleChunk(ChunkPos pos, boolean add) {

@@ -228,20 +228,12 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         return worldPosition.relative(getBlockState().getValue(Chronodial.FACING));
     }
 
-    public boolean hasMarker() {
-        return markerGameTime != UNSET_TIME;
-    }
-
     public boolean isPowered() {
         return powered;
     }
 
     public void setPowered(boolean powered) {
         this.powered = powered;
-    }
-
-    public long getMarkerGameTime() {
-        return markerGameTime;
     }
 
     /** Captures the target block's current state (and block entity data, if any) as the marker. */

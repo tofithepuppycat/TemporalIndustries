@@ -331,10 +331,6 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return cachedRecording;
     }
 
-    public boolean isLoopActive() {
-        return active;
-    }
-
     /** Whether the loop is running or paused (out of energy), plus the recording's average and
      * peak per-tick energy cost so a player can judge whether their power supply can sustain it. */
     @Override

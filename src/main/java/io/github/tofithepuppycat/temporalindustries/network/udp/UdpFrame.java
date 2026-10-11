@@ -69,14 +69,6 @@ public final class UdpFrame {
         return buf.array();
     }
 
-    public static byte[] buildNack(int sessionId, int fragIndex) {
-        ByteBuffer buf = ByteBuffer.allocate(9).order(ByteOrder.BIG_ENDIAN);
-        buf.put(TYPE_NACK);
-        buf.putInt(sessionId);
-        buf.putInt(fragIndex);
-        return buf.array();
-    }
-
     public static byte[] buildTransferDone(int sessionId, int crc32) {
         ByteBuffer buf = ByteBuffer.allocate(9).order(ByteOrder.BIG_ENDIAN);
         buf.put(TYPE_TRANSFER_DONE);

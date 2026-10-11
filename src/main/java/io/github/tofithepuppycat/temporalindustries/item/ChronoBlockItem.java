@@ -3,7 +3,6 @@ package io.github.tofithepuppycat.temporalindustries.item;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
