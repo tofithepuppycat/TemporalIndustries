@@ -124,6 +124,11 @@ public class NetworkHandler {
                 TimelineBlockChangeFlashPacket.STREAM_CODEC,
                 TimelineBlockChangeFlashPacket::handle);
 
+        registrar.playToClient(
+                LifelineShieldPacket.TYPE,
+                LifelineShieldPacket.STREAM_CODEC,
+                LifelineShieldPacket::handle);
+
         registrar.playToServer(
                 LootGeneratorSetTablePacket.TYPE,
                 LootGeneratorSetTablePacket.STREAM_CODEC,
