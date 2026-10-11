@@ -80,6 +80,8 @@
 	"block.temporalindustries.chronodial.glasses_has_data": "Has saved block data",
 	"block.temporalindustries.chronodial.glasses_fe_cost": "Restore cost: %s FE",
 	"block.temporalindustries.chronodial.glasses_entropy_cost": "Restore cost: +%s Entropy",
+	"block.temporalindustries.temporal_lifeline": "Temporal Lifeline",
+	"block.temporalindustries.temporal_lifeline.tooltip": "Place touching a Chronosphere. Explosions can no longer destroy blocks in that Chronosphere's claimed chunks.",
 	"block.temporalindustries.chronosphere": "Chronosphere",
 	"block.temporalindustries.chronosphere.tooltip": "Multi-chunk upgrade of the Chronovault.",
 	"container.temporalindustries.chronosphere": "Chronosphere",

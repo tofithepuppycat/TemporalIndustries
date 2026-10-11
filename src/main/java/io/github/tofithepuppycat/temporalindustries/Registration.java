@@ -4,6 +4,7 @@ import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MO
 import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
+import io.github.tofithepuppycat.temporalindustries.block.TemporalLifeline;
 import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
@@ -20,6 +21,7 @@ import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.TemporalLifelineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
@@ -191,6 +193,12 @@ public class Registration {
 
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
             () -> new ChronoBlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+
+    public static final DeferredBlock<TemporalLifeline> TEMPORAL_LIFELINE_BLOCK = BLOCKS.register("temporal_lifeline",
+            () -> new TemporalLifeline(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 1200.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 7)));
+
+    public static final DeferredItem<Item> TEMPORAL_LIFELINE_ITEM = ITEMS.register("temporal_lifeline",
+            () -> new ChronoBlockItem(TEMPORAL_LIFELINE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> DUAL_ENTROPY_CELL_ITEM = ITEMS.register("dual_entropy_cell",
             () -> new DualEntropyCellItem(new Item.Properties().stacksTo(1)));
@@ -376,6 +384,9 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronodialBlockEntity>> CHRONODIAL_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronodial",
             () -> BlockEntityType.Builder.of(ChronodialBlockEntity::new, CHRONODIAL_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<TemporalLifelineBlockEntity>> TEMPORAL_LIFELINE_BLOCK_ENTITY = BLOCK_ENTITIES.register("temporal_lifeline",
+            () -> BlockEntityType.Builder.of(TemporalLifelineBlockEntity::new, TEMPORAL_LIFELINE_BLOCK.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOSPHERE_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronosphere",
             () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOSPHERE_BLOCK.get()).build(null));
 
@@ -458,6 +469,7 @@ public class Registration {
                         output.accept(CHRONODIAL_ITEM);
                         output.accept(CHRONOVAULT_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
+                        output.accept(TEMPORAL_LIFELINE_ITEM);
                         output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(SCHRODINGER_GENERATOR_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
