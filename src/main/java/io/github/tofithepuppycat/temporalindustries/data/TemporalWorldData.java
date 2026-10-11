@@ -181,11 +181,6 @@ public class TemporalWorldData extends SavedData {
                 .merge(pos.immutable(), durationTicks, Math::max);
     }
 
-    public boolean isAccelerated(ResourceLocation dimension, BlockPos pos) {
-        Map<BlockPos, Integer> dimMap = acceleratedBlocks.get(dimension);
-        return dimMap != null && dimMap.containsKey(pos);
-    }
-
     /** Ticks every accelerated position in dimension down by one, forgetting any that expire.
      * @return the positions that were active this tick, for the caller to re-tick. */
     public Set<BlockPos> tickAcceleratedBlocks(ResourceLocation dimension) {
@@ -366,32 +361,11 @@ public class TemporalWorldData extends SavedData {
     // -------------------------------------------------------------------------
     // Chunk tracking
 
-    /** Registers owner as wanting chunkPos tracked. Idempotent per owner, so a single matching
-     * untrackChunk always fully releases it. Queues chunkPos for a baseline snapshot at the next
-     * flush ({@link #markChunkPending}) rather than capturing one immediately. */
-    public void trackChunk(ResourceLocation dimension, ChunkPos pos, Object owner, ServerLevel level) {
-        trackedChunkOwners.computeIfAbsent(dimension, d -> new HashMap<>())
-                .computeIfAbsent(pos.toLong(), c -> new HashSet<>())
-                .add(owner);
-        markChunkPending(dimension, pos);
-    }
-
     /** Queues chunkPos for a baseline snapshot (if it doesn't already have history) at the next
      * flush, instead of capturing a {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot}
      * immediately. Cheap — no world access happens until the flush actually drains this. */
     public void markChunkPending(ResourceLocation dimension, ChunkPos pos) {
         pendingClaimedChunks.computeIfAbsent(dimension, d -> new HashSet<>()).add(pos.toLong());
-    }
-
-    /** Un-queues chunkPos, so a claim toggled off again before the next flush never wastes a
-     * baseline capture. No-op if the chunk already has history or was never queued. */
-    public void unmarkChunkPending(ResourceLocation dimension, ChunkPos pos) {
-        Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
-        if (dimChunks != null && dimChunks.containsKey(pos.toLong())) return; // still claimed by someone else
-        Set<Long> pending = pendingClaimedChunks.get(dimension);
-        if (pending == null) return;
-        pending.remove(pos.toLong());
-        if (pending.isEmpty()) pendingClaimedChunks.remove(dimension);
     }
 
     /** Releases owner's claim on chunkPos. The chunk stays tracked if any other owner still claims
@@ -404,17 +378,6 @@ public class TemporalWorldData extends SavedData {
         owners.remove(owner);
         if (owners.isEmpty()) dimChunks.remove(pos.toLong());
         if (dimChunks.isEmpty()) trackedChunkOwners.remove(dimension);
-    }
-
-    /** Releases every chunk owner currently claims, across every dimension. */
-    public void untrackAllForOwner(Object owner) {
-        for (Map<Long, Set<Object>> dimChunks : trackedChunkOwners.values()) {
-            dimChunks.values().removeIf(owners -> {
-                owners.remove(owner);
-                return owners.isEmpty();
-            });
-        }
-        trackedChunkOwners.values().removeIf(Map::isEmpty);
     }
 
     public boolean isTracked(ResourceLocation dimension, ChunkPos pos) {
@@ -481,10 +444,6 @@ public class TemporalWorldData extends SavedData {
     @Nullable
     public PlayerTemporalState getPlayerState(UUID playerId) {
         return playerStates.get(playerId);
-    }
-
-    public void removePlayerState(UUID playerId) {
-        playerStates.remove(playerId);
     }
 
     // -------------------------------------------------------------------------

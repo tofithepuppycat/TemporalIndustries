@@ -33,23 +33,6 @@ final class FluidBarRenderer {
         guiGraphics.disableScissor();
     }
 
-    /** Fills left-to-right over a horizontal bar. */
-    static void renderHorizontal(GuiGraphics guiGraphics, int x, int y, int width, int height,
-                                  int amount, int capacity, FluidType fluidType, int tintColor) {
-        if (capacity <= 0 || amount <= 0) return;
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * width));
-        filled = Math.min(width, filled);
-
-        TextureAtlasSprite sprite = stillSprite(fluidType);
-        float[] rgb = unpackColor(tintColor);
-
-        guiGraphics.enableScissor(x, y, x + filled, y + height);
-        for (int drawX = x; drawX < x + filled; drawX += 16) {
-            guiGraphics.blit(drawX, y, 0, 16, height, sprite, rgb[0], rgb[1], rgb[2], 1f);
-        }
-        guiGraphics.disableScissor();
-    }
-
     private static TextureAtlasSprite stillSprite(FluidType fluidType) {
         ResourceLocation stillTexture = IClientFluidTypeExtensions.of(fluidType).getStillTexture();
         return Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS).apply(stillTexture);

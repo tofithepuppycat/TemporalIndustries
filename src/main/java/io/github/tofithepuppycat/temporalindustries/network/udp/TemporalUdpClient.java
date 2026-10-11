@@ -57,11 +57,6 @@ public final class TemporalUdpClient {
         INSTANCE.disconnectInternal();
     }
 
-    /** Registers the callback that receives fully reassembled + decompressed payloads. */
-    public static void setPayloadHandler(Consumer<byte[]> handler) {
-        payloadHandler = handler;
-    }
-
     private void connectInternal(String serverHost, int udpPort) {
         disconnectInternal();
         try {

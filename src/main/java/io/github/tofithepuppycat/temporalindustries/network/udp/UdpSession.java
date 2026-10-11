@@ -67,12 +67,6 @@ public class UdpSession {
         return acked.cardinality() == totalFragments;
     }
 
-    /** Returns the index of the first un-acked fragment, or -1 if all acked. */
-    public int nextUnacked() {
-        int next = acked.nextClearBit(0);
-        return next < totalFragments ? next : -1;
-    }
-
     public long payloadLength() {
         return payload == null ? 0 : payload.length;
     }
@@ -105,14 +99,5 @@ public class UdpSession {
             pos += frag.length;
         }
         return out;
-    }
-
-    /** Returns the index of the first missing (not yet received) fragment, or -1. */
-    public int firstMissing() {
-        if (fragments == null) return -1;
-        for (int i = 0; i < fragments.length; i++) {
-            if (fragments[i] == null) return i;
-        }
-        return -1;
     }
 }
