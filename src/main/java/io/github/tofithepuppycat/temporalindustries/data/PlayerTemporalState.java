@@ -81,11 +81,6 @@ public class PlayerTemporalState {
         this.changes.clear();
     }
 
-    public void clearCheckpoint() {
-        checkpoint = null;
-        changes.clear();
-    }
-
     @Nullable
     public ChronoRiftOrigin getChronoRiftOrigin() {
         return chronoRiftOrigin;

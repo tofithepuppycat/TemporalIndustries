@@ -29,7 +29,6 @@ public final class TemporalUdpServer {
     private static final Logger LOGGER = LogManager.getLogger();
     private static final int UDP_PORT_OFFSET = 1;
     private static final int RECEIVE_BUFFER = 2048;
-    private static final int RETRANSMIT_DELAY_MS = 200;
 
     private static TemporalUdpServer INSTANCE;
 

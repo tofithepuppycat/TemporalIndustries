@@ -333,25 +333,6 @@ public class TemporalTimeline {
         return Collections.unmodifiableMap(chunkLocalParent.getOrDefault(chunkPos.toLong(), Collections.emptyMap()));
     }
 
-    public long getEarliestGameTimeForChunk(ChunkPos chunkPos) {
-        List<Long> ids = chunkIndex.get(chunkPos.toLong());
-        if (ids == null || ids.isEmpty()) return -1L;
-        TemporalCommit first = byId.get(ids.get(0));
-        return first == null ? -1L : first.getGameTime();
-    }
-
-    public long getLatestGameTimeForChunk(ChunkPos chunkPos) {
-        List<Long> ids = chunkIndex.get(chunkPos.toLong());
-        if (ids == null || ids.isEmpty()) return -1L;
-        TemporalCommit last = byId.get(ids.get(ids.size() - 1));
-        return last == null ? -1L : last.getGameTime();
-    }
-
-    @Nullable
-    public TemporalCommit getCommitById(long id) {
-        return byId.get(id);
-    }
-
     public long getLatestCommitId() {
         return commits.isEmpty() ? -1L : commits.getLast().getId();
     }
@@ -374,24 +355,6 @@ public class TemporalTimeline {
      * particular chunk. */
     public List<TemporalCommit> getAllCommits() {
         return new ArrayList<>(commits);
-    }
-
-    /** commitId -> the id it locally forked from, unioned across every chunk's own {@link
-     * #chunkLocalParent} map in this dimension, so the display graph shows every chunk's branches
-     * rather than just the chunks one particular view cares about.
-     *
-     * <p>Deliberately NOT built from {@link TemporalCommit#getParentId()}: a DELTA/SNAPSHOT's own
-     * parentId chains it to the previous dimension-wide trunk commit, which is the wrong edge once
-     * a chunk has branched — new commits touching that chunk must still render as children of its
-     * BRANCH marker, not of the trunk it forked away from. chunkLocalParent already tracks the
-     * correct per-chunk edge (see {@link #indexChunkTouch}); this only merges it across every
-     * chunk instead of one. A commit bundling chunks on different lineages (rare: independent
-     * machines/markers diverging different claimed chunks) has no single correct parent across all
-     * of them, so the last chunk merged simply wins — display-only, never consulted by rollback. */
-    public Map<Long, Long> getGlobalParents() {
-        Map<Long, Long> parents = new HashMap<>();
-        for (Map<Long, Long> perChunk : chunkLocalParent.values()) parents.putAll(perChunk);
-        return parents;
     }
 
     /** The id of chunkPos's own latest commit at or before targetGameTime, or -1 if none exists

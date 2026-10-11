@@ -30,7 +30,6 @@ import java.util.Map;
  * maximize run length against typically Y/Z-layered terrain.
  */
 public final class ChunkSnapshot {
-    private static final int SECTION_VOLUME = 16 * 16 * 16;
 
     /** Bottom-up (y, then z, then x) order; used so rollback restores blocks deterministically
      * (support before dependent) instead of in arbitrary HashMap iteration order. */

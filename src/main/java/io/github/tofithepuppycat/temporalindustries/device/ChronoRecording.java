@@ -147,7 +147,6 @@ public final class ChronoRecording {
     public double getStartZ() { return startZ; }
     @Nullable public ResourceLocation getDimension() { return dimension; }
     public int frameCount() { return frames.size(); }
-    public double durationSeconds() { return frames.size() / 20.0; }
 
     /** Wraps around the loop; negative ticks wrap backwards correctly too. */
     public Frame frameAt(int tick) {
