@@ -25,7 +25,7 @@ public final class IconTabRenderer {
      * menu_icon_base.png's art sits left of center, so nudge it (and icons on top of it) right to
      * center on the tab.
      */
-    public static final int ICON_X_NUDGE = 2;
+    public static final int ICON_X_NUDGE = 1;
 
     private IconTabRenderer() {}
 

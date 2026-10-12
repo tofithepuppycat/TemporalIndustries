@@ -67,8 +67,8 @@ public interface TimelineViewProvider {
     void setSelectedCommit(long commitId, boolean applyToWorld);
 
     /**
-     * Deletes branchName and the history unique to it, provided it isn't the branch currently
-     * checked out.
+     * Deletes commitId and every commit descended from it, provided it isn't on the current head's
+     * ancestry.
      */
-    boolean deleteBranch(String branchName);
+    boolean deleteCommit(long commitId);
 }

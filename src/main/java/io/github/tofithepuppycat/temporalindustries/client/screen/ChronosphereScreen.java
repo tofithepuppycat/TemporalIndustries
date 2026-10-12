@@ -24,7 +24,7 @@ import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereBindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereUnbindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RepositorySuggestRequestPacket;
-import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
@@ -88,9 +88,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
      */
     private static final int GRAPH_HEIGHT = 154;
 
-    private static final int ENERGY_BAR_X_OFFSET = 160;
+    private static final int ENERGY_BAR_X_OFFSET = 165;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
-    private static final int ENERGY_BAR_WIDTH = 57;
+    private static final int ENERGY_BAR_WIDTH = 52;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
     private static final int ENTROPY_BAR_X_OFFSET = 6;
@@ -241,8 +241,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int jumpY;
     private int commitX;
     private int commitY;
-    private int deleteBranchX;
-    private int deleteBranchY;
+    private int deleteCommitX;
+    private int deleteCommitY;
 
     public ChronosphereScreen(ChronosphereMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -289,13 +289,13 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         int rowLeft = panelX() + GRAPH_X_OFFSET;
         int rowRight = panelX() + CONTENT_SIZE - GRAPH_X_OFFSET - ACTION_BUTTON_SIZE;
         showChangesX = rowLeft;
-        deleteBranchX = rowRight;
+        deleteCommitX = rowRight;
         commitX = rowLeft + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
         jumpX = panelX() + (CONTENT_SIZE - JUMP_BUTTON_WIDTH) / 2;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
         commitY = showChangesY;
-        deleteBranchY = showChangesY;
+        deleteCommitY = showChangesY;
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
@@ -592,23 +592,21 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(),
                 TimelineProjectionManager.getSelectedCommitId()));
         TimelineProjectionManager.clearSelectedCommit();
+        TimelineProjectionManager.disableShowChanges();
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
     }
 
-    /**
-     * Deletes the branch whose tip is the selected node — see {@link
-     * ChronovaultScreen#deleteBranchTooltip()} for why branch tips are the selection unit.
-     */
-    private void deleteSelectedBranch() {
-        String branchName = TimelineProjectionManager.getSelectedBranchName();
-        if (branchName == null || !TimelineProjectionManager.isSelectedBranchDeletable()) {
+    /** Deletes the selected commit and everything descended from it. */
+    private void deleteSelectedCommit() {
+        if (!TimelineProjectionManager.isSelectedCommitDeletable()) {
             return;
         }
-        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), branchName));
+        PacketDistributor.sendToServer(new TimelineMachineDeleteCommitPacket(menu.getBlockPos(),
+                TimelineProjectionManager.getSelectedCommitId()));
         TimelineProjectionManager.clearSelectedCommit();
-        // Deleting a branch doesn't move any chunk's head, so the server's "nothing changed" skip
+        // Deleting a commit doesn't move any chunk's head, so the server's "nothing changed" skip
         // would otherwise suppress a reply; force a full resync to pick up the removed commits.
         requestTimelineView(true);
     }
@@ -668,11 +666,11 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         IconButtonRenderer.renderBackground(guiGraphics, commitX, commitY, commitTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_PUSH_TEXTURE, commitX, commitY);
 
-        // Hidden entirely until a deletable branch tip is selected.
-        if (TimelineProjectionManager.isSelectedBranchDeletable()) {
-            int deleteTint = isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
-            IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
-            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        // Hidden entirely until a deletable commit is selected.
+        if (TimelineProjectionManager.isSelectedCommitDeletable()) {
+            int deleteTint = isMouseOverDeleteCommitButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+            IconButtonRenderer.renderBackground(guiGraphics, deleteCommitX, deleteCommitY, deleteTint);
+            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteCommitX, deleteCommitY);
         }
     }
 
@@ -691,10 +689,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 && mouseY >= commitY && mouseY <= commitY + ACTION_BUTTON_SIZE;
     }
 
-    private boolean isMouseOverDeleteBranchButton(double mouseX, double mouseY) {
-        return TimelineProjectionManager.isSelectedBranchDeletable()
-                && mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
-                && mouseY >= deleteBranchY && mouseY <= deleteBranchY + ACTION_BUTTON_SIZE;
+    private boolean isMouseOverDeleteCommitButton(double mouseX, double mouseY) {
+        return TimelineProjectionManager.isSelectedCommitDeletable()
+                && mouseX >= deleteCommitX && mouseX <= deleteCommitX + ACTION_BUTTON_SIZE
+                && mouseY >= deleteCommitY && mouseY <= deleteCommitY + ACTION_BUTTON_SIZE;
     }
 
     private int graphTop() {
@@ -743,13 +741,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private void renderBookmark(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        boolean hovered = isMouseOverBookmark(mouseX, mouseY);
-        int tint = mapOverlayOpen ? (0xB0 << 24 | (COLOR_SELECTED & 0xFFFFFF)) : (hovered ? 0x40000000 : 0);
-
-        IconTabRenderer.renderBackground(guiGraphics, bookmarkX, bookmarkY, tint);
+        IconTabRenderer.renderBackground(guiGraphics, bookmarkX, bookmarkY, 0);
 
         // Placeholder icon: a 3x3 grid glyph, echoing the claim map it opens.
-        int glyphColor = mapOverlayOpen ? 0xFFF0FAFF : TEXT_PRIMARY;
+        int glyphColor = TEXT_PRIMARY;
         int cell = 4;
         int gap = 1;
         int glyphSize = cell * 3 + gap * 2;
@@ -770,10 +765,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private void renderSettingsTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        boolean hovered = isMouseOverSettingsTab(mouseX, mouseY);
-        int tint = hovered ? 0x40000000 : 0;
-
-        IconTabRenderer.renderBackground(guiGraphics, settingsX, settingsY, tint);
+        IconTabRenderer.renderBackground(guiGraphics, settingsX, settingsY, 0);
         IconTabRenderer.renderIcon(guiGraphics, ICON_CONFIG_TEXTURE, ICON_CONFIG_SIZE, settingsX, settingsY);
     }
 
@@ -1012,9 +1004,19 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         return MAP_GRID.cellAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), mapZoom, new ChunkPos(menu.getBlockPos()));
     }
 
-    private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        renderBookmark(guiGraphics, mouseX, mouseY);
-        renderSettingsTab(guiGraphics, mouseX, mouseY);
+    /** Draws the tabs whose overlay is not the open one (all of them when none is open). */
+    private void renderInactiveTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!mapOverlayOpen) renderBookmark(guiGraphics, mouseX, mouseY);
+        if (mapOverlayOpen || !settingsOverlayOpen) renderSettingsTab(guiGraphics, mouseX, mouseY);
+    }
+
+    /** Draws the open overlay's tab, if any, on top of the overlay. */
+    private void renderActiveTab(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (mapOverlayOpen) {
+            renderBookmark(guiGraphics, mouseX, mouseY);
+        } else if (settingsOverlayOpen) {
+            renderSettingsTab(guiGraphics, mouseX, mouseY);
+        }
     }
 
     @Override
@@ -1022,7 +1024,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         renderBackground(guiGraphics, mouseX, mouseY, partialTick);
 
         // Tabs are drawn BEFORE the panel background so its opaque texture tucks in their overlap.
-        if (isBound()) renderTabs(guiGraphics, mouseX, mouseY);
+        // The tab of the open overlay is drawn after it instead, so it sits on top.
+        if (isBound()) renderInactiveTabs(guiGraphics, mouseX, mouseY);
 
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
         renderLabels(guiGraphics, mouseX, mouseY);
@@ -1045,6 +1048,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (settingsOverlayOpen) {
             renderSettingsOverlay(guiGraphics, mouseX, mouseY);
         }
+        renderActiveTab(guiGraphics, mouseX, mouseY);
 
         if (mapOverlayOpen) {
             if (isMouseOverBookmark(mouseX, mouseY)) {
@@ -1077,8 +1081,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         } else if (isMouseOverCommitButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.commit_tooltip"), mouseX, mouseY);
-        } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, ChronovaultScreen.deleteBranchTooltip(), mouseX, mouseY);
+        } else if (isMouseOverDeleteCommitButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, ChronovaultScreen.deleteCommitTooltip(), mouseX, mouseY);
         }
     }
 
@@ -1195,8 +1199,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             return true;
         }
 
-        if (button == 0 && isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            deleteSelectedBranch();
+        if (button == 0 && isMouseOverDeleteCommitButton(mouseX, mouseY)) {
+            deleteSelectedCommit();
             return true;
         }
 

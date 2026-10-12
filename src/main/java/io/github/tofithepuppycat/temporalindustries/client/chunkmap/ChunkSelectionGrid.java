@@ -15,7 +15,6 @@ public final class ChunkSelectionGrid {
     public static final int DEFAULT_CELL_SIZE = 32;
     public static final int CELL_GAP = 0;
 
-    private static final int MIN_INSET_CELL_SIZE = 8;
     private static final int FRAME_BORDER = 0xFF3A3A3A;
     private static final int HOVER_FILL = 0x30FFFFFF;
     private static final int HOVER_BORDER = 0xFFFFFFFF;
@@ -87,10 +86,9 @@ public final class ChunkSelectionGrid {
                 int dz = row - radius;
                 if (!isWithinRadius(dx, dz)) continue;
 
-                int inset = cs >= MIN_INSET_CELL_SIZE ? 1 : 0;
-                int cellX = gridX + col * cs + inset;
-                int cellY = gridY + row * cs + inset;
-                int size = cs - inset * 2;
+                int cellX = gridX + col * cs;
+                int cellY = gridY + row * cs;
+                int size = cs;
                 long key = new ChunkPos(anchor.x + dx, anchor.z + dz).toLong();
 
                 int tint = painter.tint(dx, dz, key);
