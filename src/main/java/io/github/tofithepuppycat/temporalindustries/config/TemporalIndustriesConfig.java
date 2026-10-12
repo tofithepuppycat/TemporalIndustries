@@ -6,9 +6,9 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import org.apache.commons.lang3.tuple.Pair;
 
 /**
- * The mod's single common config ({@code config/temporalindustries-common.toml}), split into
- * per-feature sections so each feature's settings live together under their own TOML header while
- * still sharing one file and one {@link ModConfigSpec}.
+ * The mod's single common config ({@code config/temporalindustries-common.toml}), split into per-
+ * feature sections so each feature's settings live together under their own TOML header while still
+ * sharing one file and one {@link ModConfigSpec}.
  */
 public final class TemporalIndustriesConfig {
     public final EnergyCostConfig energyCosts;

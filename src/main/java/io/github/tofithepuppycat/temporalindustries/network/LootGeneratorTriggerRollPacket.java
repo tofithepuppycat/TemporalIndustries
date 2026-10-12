@@ -12,8 +12,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: press the Loot Generator's play icon, triggering
- * {@link LootGeneratorBlockEntity#beginGeneration()}. */
+/**
+ * Client -> server: press the Loot Generator's play icon, triggering {@link
+ * LootGeneratorBlockEntity#beginGeneration()}.
+ */
 public class LootGeneratorTriggerRollPacket implements CustomPacketPayload {
     public static final Type<LootGeneratorTriggerRollPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_trigger_roll"));

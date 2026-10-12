@@ -20,13 +20,13 @@ import java.util.List;
 
 /**
  * Handheld tool: right-click a block to speed up its own ticking for a while, making crops grow,
- * furnaces smelt, and this mod's machines process faster. The targeted block is re-ticked several
- * extra times per server tick (see {@link io.github.tofithepuppycat.temporalindustries.device.TimeDilationListener}),
- * on top of the one tick it already gets normally; it doesn't touch neighboring blocks or chunks.
+ * furnaces smelt, and this mod's machines process faster.
  */
 @SuppressWarnings("null")
 public class TimeDilatorItem extends Item {
-    /** Extra ticks applied per server tick, on top of the block's normal one -> 8x overall speed. */
+    /**
+     * Extra ticks applied per server tick, on top of the block's normal one -> 8x overall speed.
+     */
     public static final int EXTRA_TICKS_PER_SERVER_TICK = 7;
     /** How long one application lasts. */
     public static final int DURATION_TICKS = 3 * 20;

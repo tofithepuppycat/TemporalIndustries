@@ -23,9 +23,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/** Generic structural filler block used to complete multiblock machines, starting with the
- * {@link LootGenerator}. Forwards clicks to whatever controller its {@link MachineFrameBlockEntity}
- * currently points at. */
+/**
+ * Generic structural filler block used to complete multiblock machines, starting with the {@link
+ * LootGenerator}.
+ */
 public class MachineFrame extends BaseEntityBlock {
     // Whether this frame is confirmed part of a formed multiblock (drives connected-texture rendering).
     public static final BooleanProperty CONNECTED = BooleanProperty.create("connected");
@@ -47,8 +48,10 @@ public class MachineFrame extends BaseEntityBlock {
         builder.add(CONNECTED);
     }
 
-    /** Sets whether {@code pos} should render as part of a formed multiblock; no-ops if already set
-     * or not actually a MachineFrame. */
+    /**
+     * Sets whether {@code pos} should render as part of a formed multiblock; no-ops if already set
+     * or not actually a MachineFrame.
+     */
     public static void setConnected(Level level, BlockPos pos, boolean connected) {
         BlockState state = level.getBlockState(pos);
         if (state.is(Registration.MACHINE_FRAME_BLOCK.get()) && state.getValue(CONNECTED) != connected) {
@@ -56,10 +59,10 @@ public class MachineFrame extends BaseEntityBlock {
         }
     }
 
-    /** Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from {@code player}'s inventory to fill
-     * as many of {@code missing} positions as they can afford. Positions occupied by existing terrain
-     * (anything not replaceable, e.g. stone) are skipped so forming never overwrites blocks.
-     * Shared by every frame-completed controller. */
+    /**
+     * Auto-consumes {@link Registration#MACHINE_FRAME_ITEM} from {@code player}'s inventory to fill
+     * as many of {@code missing} positions as they can afford.
+     */
     public static void fillFromInventory(Level level, List<BlockPos> missing, ServerPlayer player) {
         for (BlockPos pos : missing) {
             if (!level.getBlockState(pos).canBeReplaced()) continue;

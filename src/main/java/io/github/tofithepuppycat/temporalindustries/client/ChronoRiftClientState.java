@@ -6,9 +6,11 @@ import java.util.HashSet;
 import java.util.Map;
 import java.util.Set;
 
-/** Client-side mirror of which Chrono Rift chunks the server considers "tracked" (have valid
- * reconstructed history), fed by {@link io.github.tofithepuppycat.temporalindustries.network.ChronoRiftChunkTrackedSyncPacket}.
- * Consumed by the boundary shader ({@link ChronoRiftBoundaryRenderer}). */
+/**
+ * Client-side mirror of which Chrono Rift chunks the server considers "tracked" (have valid
+ * reconstructed history), fed by {@link
+ * io.github.tofithepuppycat.temporalindustries.network.ChronoRiftChunkTrackedSyncPacket}.
+ */
 public final class ChronoRiftClientState {
     private static final Set<Long> trackedChunks = new HashSet<>();
 
@@ -25,9 +27,11 @@ public final class ChronoRiftClientState {
         return trackedChunks.contains(pos.toLong());
     }
 
-    /** Unconditionally drops all tracked chunks; called on world/server disconnect so a previous
+    /**
+     * Unconditionally drops all tracked chunks; called on world/server disconnect so a previous
      * world's tracked rift chunks can't bleed into the next one joined (the rift dimension key is
-     * the same ResourceLocation across every world). */
+     * the same ResourceLocation across every world).
+     */
     public static void clearAll() {
         trackedChunks.clear();
     }

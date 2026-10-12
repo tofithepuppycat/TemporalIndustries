@@ -25,10 +25,6 @@ import java.util.Set;
 /**
  * Standalone (non-container) screen for the Portable Chrono Marker's sneak-right-click area select,
  * using {@link ChunkSelectionGrid} to let the player pick which chunks form the marker's shape.
- * Opened directly via {@link #open} since there's no block/BlockEntity backing this item's action.
- *
- * <p>Only saves a selection onto the item; a plain right-click with the marker is what actually
- * records a save point. Selection stays client-side until "Save" is pressed.
  */
 @SuppressWarnings("null")
 public class ChronoMarkerMapScreen extends Screen {
@@ -56,7 +52,10 @@ public class ChronoMarkerMapScreen extends Screen {
             PortableChronoMarkerItem.MAP_SHAPE, GRID_CELL_SIZE);
 
     private final ChunkPos anchor;
-    /** Chunk keys currently chosen for marking; always contains the anchor chunk, which can't be deselected. */
+    /**
+     * Chunk keys currently chosen for marking; always contains the anchor chunk, which can't be
+     * deselected.
+     */
     private final Set<Long> selected = new LinkedHashSet<>();
 
     private int leftPos;
@@ -71,7 +70,9 @@ public class ChronoMarkerMapScreen extends Screen {
         this.selected.add(anchor.toLong());
     }
 
-    /** Opens this screen client-side only — call from inside a {@code level.isClientSide} branch. */
+    /**
+     * Opens this screen client-side only — call from inside a {@code level.isClientSide} branch.
+     */
     public static void open(ChunkPos anchor) {
         Minecraft.getInstance().setScreen(new ChronoMarkerMapScreen(anchor));
     }
@@ -122,8 +123,10 @@ public class ChronoMarkerMapScreen extends Screen {
         return false;
     }
 
-    /** Skips the vanilla world-blur post-process, just dimming the world instead, to match
-     * {@link net.minecraft.client.gui.screens.inventory.AbstractContainerScreen}'s behavior. */
+    /**
+     * Skips the vanilla world-blur post-process, just dimming the world instead, to match {@link
+     * net.minecraft.client.gui.screens.inventory.AbstractContainerScreen}'s behavior.
+     */
     @Override
     public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(guiGraphics);
@@ -158,7 +161,14 @@ public class ChronoMarkerMapScreen extends Screen {
             public ResourceLocation texture(long chunkKey) {
                 return ChunkThumbnailClientState.getTexture(chunkKey);
             }
+
+            @Override
+            public boolean emphasized(int dx, int dz, long chunkKey) {
+                return (dx == 0 && dz == 0) || selected.contains(chunkKey);
+            }
         });
+        GRID.renderHover(guiGraphics, gridX, gridY, 1.0F, mouseX, mouseY);
+        GRID.renderFrame(guiGraphics, gridX, gridY, GRID.gridPixels());
 
         int footerY = gridY + GRID.gridPixels() + 6;
         Component count = Component.translatable("gui.temporalindustries.chrono_marker.map_count", selected.size());

@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
+import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
@@ -24,10 +25,6 @@ import java.util.Map;
  * Server -> client: response to {@link TimelinePreviewRequestPacket}, carrying a machine's
  * repository graph (as lightweight {@link CommitNode}s), its branch refs, and the already-resolved
  * ghost-preview block diff for the player's selected commit.
- *
- * <p>Note what is deliberately absent: no {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkEntry}
- * payload and no chunk snapshots. The server resolves the preview itself and ships only the
- * resulting target block states, so the client never needs a commit's actual contents.
  */
 public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     public static final Type<TimelinePreviewSyncPacket> TYPE =
@@ -45,8 +42,10 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     private final String currentBranch;
     private final long headCommitId;
     /** commitId -> energy cost of jumping there from the current head. */
-    private final Map<Long, Long> jumpCosts;
-    /** Resolved target state of every block the selected jump would change, glue already filtered. */
+    private final Map<Long, JumpCostBreakdown> jumpCosts;
+    /**
+     * Resolved target state of every block the selected jump would change, glue already filtered.
+     */
     private final Map<BlockPos, BlockState> previewTargetStates;
     /** Every chunk the machine has claimed, for the in-world boundary outline. */
     private final List<ChunkPos> previewChunks;
@@ -56,7 +55,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     public TimelinePreviewSyncPacket(BlockPos machinePos, long placedGameTime, long selectedGameTime,
                                      long currentGameTime, List<CommitNode> commits,
                                      Map<String, Long> branchTips, String currentBranch, long headCommitId,
-                                     Map<Long, Long> jumpCosts, Map<BlockPos, BlockState> previewTargetStates,
+                                     Map<Long, JumpCostBreakdown> jumpCosts, Map<BlockPos, BlockState> previewTargetStates,
                                      List<ChunkPos> previewChunks, long previewVersion) {
         this.machinePos = machinePos;
         this.placedGameTime = placedGameTime;
@@ -89,9 +88,9 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             body.writeLong(entry.getValue());
         }
         body.writeVarInt(packet.jumpCosts.size());
-        for (Map.Entry<Long, Long> entry : packet.jumpCosts.entrySet()) {
+        for (Map.Entry<Long, JumpCostBreakdown> entry : packet.jumpCosts.entrySet()) {
             body.writeLong(entry.getKey());
-            body.writeLong(entry.getValue());
+            JumpCostBreakdown.encode(entry.getValue(), body);
         }
         body.writeVarInt(packet.previewTargetStates.size());
         for (Map.Entry<BlockPos, BlockState> entry : packet.previewTargetStates.entrySet()) {
@@ -140,10 +139,10 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         }
 
         int jumpCostCount = body.readVarInt();
-        Map<Long, Long> jumpCosts = new HashMap<>();
+        Map<Long, JumpCostBreakdown> jumpCosts = new HashMap<>();
         for (int i = 0; i < jumpCostCount; i++) {
             long commitId = body.readLong();
-            jumpCosts.put(commitId, body.readLong());
+            jumpCosts.put(commitId, JumpCostBreakdown.decode(body));
         }
 
         int previewCount = body.readVarInt();

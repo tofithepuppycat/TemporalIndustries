@@ -5,12 +5,7 @@ import org.jetbrains.annotations.Nullable;
 import java.net.InetSocketAddress;
 import java.util.BitSet;
 
-/**
- * Tracks one in-flight bulk-transfer session.
- *
- * Server-side: holds the full payload, sends fragments, retransmits on NACK.
- * Client-side: reassembles incoming fragments, signals completion.
- */
+/** Tracks one in-flight bulk-transfer session. */
 public class UdpSession {
     private final int sessionId;
     private final int totalFragments;
@@ -71,7 +66,7 @@ public class UdpSession {
         return payload == null ? 0 : payload.length;
     }
 
-    /** Stores an inbound fragment. Returns true if this was the last one needed. */
+    /** Stores an inbound fragment. */
     public boolean receiveFragment(int fragIndex, byte[] data) {
         if (fragments == null) throw new IllegalStateException("Not a receive session");
         if (fragments[fragIndex] == null) {
@@ -83,10 +78,7 @@ public class UdpSession {
 
     public boolean isComplete() { return receivedCount == totalFragments; }
 
-    /**
-     * Reassembles all fragments into a single byte array.
-     * Only valid once isComplete() returns true.
-     */
+    /** Reassembles all fragments into a single byte array. */
     @Nullable
     public byte[] reassemble() {
         if (fragments == null || !isComplete()) return null;

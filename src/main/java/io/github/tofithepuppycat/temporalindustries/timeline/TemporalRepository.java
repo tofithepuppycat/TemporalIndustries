@@ -10,6 +10,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
@@ -20,21 +21,14 @@ import java.util.function.Predicate;
 import java.util.function.ToLongFunction;
 
 /**
- * One machine's repository: a tree of {@link RepoCommit}s (single parent per commit, root at
- * {@link #rootCommitId}), with one {@link #headCommitId} tracking the commit currently rendered
- * in-world. Unlike the old per-dimension {@link TemporalTimeline}, a repository belongs to a
- * single machine and each chunk's full/delta decision is tracked independently (see {@link
- * ChunkState}) rather than sharing one repo-wide counter.
- *
- * <p>Commits are created only by explicit player action ({@link #commit}) — there is no periodic
- * auto-flush. Jumping ({@link #jumpTo}) moves the head and updates in-world chunks but never
- * forks by itself; forking only happens lazily, the moment a new commit is made while the head
- * isn't at a tip (see {@link #commit}). Chunks untouched by the commits between the old and new
- * head are left exactly as rendered.
+ * One machine's repository: a tree of {@link RepoCommit}s (single parent per commit, root at {@link
+ * #rootCommitId}), with one {@link #headCommitId} tracking the commit currently rendered in-world.
  */
 public final class TemporalRepository {
-    /** Auto-generated branch names, styled like git but without needing the player to type
-     * anything: Alpha, Beta, Gamma, ... Omega, then Alpha2, Beta2, and so on. */
+    /**
+     * Auto-generated branch names, styled like git but without needing the player to type anything:
+     * Alpha, Beta, Gamma, ...
+     */
     private static final String[] BRANCH_NAME_POOL = {
             "Alpha", "Beta", "Gamma", "Delta", "Epsilon", "Zeta", "Eta", "Theta", "Iota", "Kappa",
             "Lambda", "Mu", "Nu", "Xi", "Omicron", "Pi", "Rho", "Sigma", "Tau", "Upsilon", "Phi", "Chi", "Psi", "Omega"
@@ -49,23 +43,26 @@ public final class TemporalRepository {
     private final Map<Long, Integer> childCount = new HashMap<>();
     /** chunkKey -> that chunk's own full/delta bookkeeping, independent of every other chunk. */
     private final Map<Long, ChunkState> chunkStates = new HashMap<>();
-    /** chunkKey -> that chunk's state the instant it was first claimed, captured eagerly rather
-     * than lazily at the chunk's first commit. Without this, a chunk edited before ever being
-     * committed would have no recorded "before" at all — the lazy per-commit FULL capture only
-     * ever sees the already-edited state — so jumping to any commit before that first commit
-     * would have nothing to revert the chunk to. Read-only fallback for {@link #resolveChunkStateAt};
-     * never touched once set. */
+    /**
+     * chunkKey -> that chunk's state the instant it was first claimed, captured eagerly rather than
+     * lazily at the chunk's first commit.
+     */
     private final Map<Long, ChunkSnapshot> claimBaselines = new HashMap<>();
     /** Branch name -> the commit it currently points to. */
     private final Map<String, Long> branchTips = new HashMap<>();
     @Nullable private String currentBranchName = null;
     private int nextBranchNameIndex = 0;
 
+    /** The player-facing handle a Chronosphere uses to find this repository again. */
+    private String name = "";
+
     public TemporalRepository(ResourceLocation dimension) {
         this.dimension = dimension;
     }
 
     public ResourceLocation getDimension() { return dimension; }
+    public String getName() { return name; }
+    public void setName(String name) { this.name = name; }
     public boolean isEmpty() { return rootCommitId == RepoCommit.NO_PARENT; }
     public long getHeadCommitId() { return headCommitId; }
     public long getRootCommitId() { return rootCommitId; }
@@ -83,9 +80,7 @@ public final class TemporalRepository {
         return state != null && state.hasBaseline;
     }
 
-    /** Records pos's current state as its claim baseline, if it doesn't already have one.
-     * Idempotent, so it's safe to call on every claim (including re-claims on world load) without
-     * worrying about clobbering a baseline with a later, already-edited state. */
+    /** Records pos's current state as its claim baseline, if it doesn't already have one. */
     public void captureClaimBaseline(ServerLevel level, ChunkPos pos) {
         claimBaselines.computeIfAbsent(pos.toLong(), k -> ChunkSnapshot.capture(level, pos));
     }
@@ -100,22 +95,16 @@ public final class TemporalRepository {
         int deltaCount;
     }
 
-    // -------------------------------------------------------------------------
-    // Committing
+
+    /**
+     * A chunk's delta chain is cut with a fresh FULL once it reaches this many deltas, bounding how
+     * many entries {@link #resolveChunkStateAt} ever replays.
+     */
+    private static final int MAX_DELTA_CHAIN = 32;
 
     /**
      * Bundles pendingBlockChanges/pendingEntityChanges (both keyed by chunkPos.toLong()) into one
-     * new commit attached as a child of the current head. Every touched chunk's entry is always
-     * FULL — a complete {@link ChunkSnapshot} of that chunk at commit time — so that jumping to
-     * any commit can read a chunk's state directly off it instead of walking back to the nearest
-     * baseline and replaying deltas forward. This trades larger per-commit storage for commits and
-     * rollbacks that are both O(1) per chunk.
-     *
-     * <p>If the current head already has another child (i.e. the head isn't a tip — the player
-     * jumped back and is now committing new changes), this forks: the existing line keeps its
-     * branch name and this commit starts a fresh one named with the next unused Greek letter.
-     *
-     * @return the new commit, or null if both maps were empty (nothing to commit)
+     * new commit attached as a child of the current head.
      */
     @Nullable
     public RepoCommit commit(ServerLevel level, Map<Long, Map<BlockPos, BlockChangeDelta>> pendingBlockChanges,
@@ -125,14 +114,28 @@ public final class TemporalRepository {
         chunkKeys.addAll(pendingEntityChanges.keySet());
         if (chunkKeys.isEmpty()) return null;
 
+        boolean firstCommit = headCommitId == RepoCommit.NO_PARENT;
         Map<Long, ChunkEntry> entries = new HashMap<>();
         for (long chunkKey : chunkKeys) {
             ChunkState state = chunkStates.computeIfAbsent(chunkKey, k -> new ChunkState());
-            ChunkPos pos = new ChunkPos(chunkKey);
-            entries.put(chunkKey, ChunkEntry.full(ChunkSnapshot.capture(level, pos)));
-            state.hasBaseline = true;
-            state.deltaCount = 0;
+            ChunkSnapshot snapshot = ChunkSnapshot.capture(level, new ChunkPos(chunkKey));
+
+            ResolvedChunkState head = firstCommit || !state.hasBaseline || deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN
+                    ? ResolvedChunkState.EMPTY : resolveChunkStateAt(headCommitId, chunkKey);
+            if (head.states().isEmpty()) {
+                entries.put(chunkKey, ChunkEntry.full(snapshot));
+                state.hasBaseline = true;
+                state.deltaCount = 0;
+                continue;
+            }
+
+            List<BlockChangeDelta> blockChanges = diffAgainst(head, snapshot);
+            List<EntityDelta> entityChanges = pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
+            if (blockChanges.isEmpty() && entityChanges.isEmpty()) continue;
+            entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
+            state.deltaCount++;
         }
+        if (entries.isEmpty()) return null;
 
         long parentId = headCommitId;
         long id = nextId++;
@@ -154,9 +157,52 @@ public final class TemporalRepository {
         return newCommit;
     }
 
-    /** Ensures this repository has at least a root commit, baselining every chunk in chunks that
-     * doesn't already have one. No-op (returns null) if chunks is empty or every chunk already
-     * has history. */
+    /**
+     * Number of consecutive DELTA entries for chunkKey on commitId's ancestry, newest first,
+     * stopping at the nearest FULL entry.
+     */
+    private int deltaDepth(long commitId, long chunkKey) {
+        int depth = 0;
+        long cur = commitId;
+        while (cur != RepoCommit.NO_PARENT) {
+            RepoCommit c = commits.get(cur);
+            if (c == null) break;
+            ChunkEntry e = c.getChunkEntries().get(chunkKey);
+            if (e != null) {
+                if (e.getType() == ChunkEntry.Type.FULL) break;
+                depth++;
+            }
+            cur = c.getParentId();
+        }
+        return depth;
+    }
+
+    /**
+     * Every block position whose state or block entity data differs between the resolved head state
+     * and the freshly captured snapshot, with head's values as "previous".
+     */
+    private static List<BlockChangeDelta> diffAgainst(ResolvedChunkState head, ChunkSnapshot snapshot) {
+        Map<BlockPos, BlockState> before = head.states();
+        Map<BlockPos, CompoundTag> beforeBE = head.blockEntityTags();
+        Map<BlockPos, CompoundTag> afterBE = snapshot.getBlockEntityTags();
+        BlockState air = Blocks.AIR.defaultBlockState();
+
+        List<BlockChangeDelta> changes = new ArrayList<>();
+        for (Map.Entry<BlockPos, BlockState> entry : snapshot.toBlockStateMap().entrySet()) {
+            BlockPos pos = entry.getKey();
+            BlockState prev = before.getOrDefault(pos, air);
+            CompoundTag prevTag = beforeBE.get(pos);
+            CompoundTag newTag = afterBE.get(pos);
+            if (prev.equals(entry.getValue()) && Objects.equals(prevTag, newTag)) continue;
+            changes.add(new BlockChangeDelta(pos, prev, entry.getValue(), prevTag, newTag));
+        }
+        return changes;
+    }
+
+    /**
+     * Ensures this repository has at least a root commit, baselining every chunk in chunks that
+     * doesn't already have one.
+     */
     @Nullable
     public RepoCommit ensureBaseline(ServerLevel level, Collection<ChunkPos> chunks, long gameTime, @Nullable UUID author) {
         Map<Long, Map<BlockPos, BlockChangeDelta>> pendingBlocks = new HashMap<>();
@@ -177,10 +223,8 @@ public final class TemporalRepository {
         return cycle == 0 ? base : base + (cycle + 1);
     }
 
-    // -------------------------------------------------------------------------
-    // Navigation (ancestry, LCA, touched-chunk diffing)
 
-    /** commitId's ancestry, root-first, commitId last. Empty if commitId isn't known. */
+    /** commitId's ancestry, root-first, commitId last. */
     private List<RepoCommit> ancestryChain(long commitId) {
         LinkedList<RepoCommit> chain = new LinkedList<>();
         long cur = commitId;
@@ -193,8 +237,10 @@ public final class TemporalRepository {
         return chain;
     }
 
-    /** The lowest common ancestor of a and b, or {@link RepoCommit#NO_PARENT} if they share none
-     * (shouldn't occur within one repository's single-rooted tree, barring an invalid id). */
+    /**
+     * The lowest common ancestor of a and b, or {@link RepoCommit#NO_PARENT} if they share none
+     * (shouldn't occur within one repository's single-rooted tree, barring an invalid id).
+     */
     private long findLowestCommonAncestor(long a, long b) {
         List<RepoCommit> chainA = ancestryChain(a);
         List<RepoCommit> chainB = ancestryChain(b);
@@ -206,8 +252,10 @@ public final class TemporalRepository {
         return lca;
     }
 
-    /** Every chunk key touched by any commit strictly between fromExclusive and toInclusive,
-     * walking toInclusive's parent chain. */
+    /**
+     * Every chunk key touched by any commit strictly between fromExclusive and toInclusive, walking
+     * toInclusive's parent chain.
+     */
     private Set<Long> touchedChunksBetween(long fromExclusive, long toInclusive) {
         Set<Long> touched = new HashSet<>();
         long cur = toInclusive;
@@ -225,12 +273,14 @@ public final class TemporalRepository {
         static final ResolvedChunkState EMPTY = new ResolvedChunkState(Map.of(), Map.of(), Map.of());
     }
 
-    /** chunkKey's resolved block/block-entity/entity state at commitId: walks commitId's ancestry
+    /**
+     * chunkKey's resolved block/block-entity/entity state at commitId: walks commitId's ancestry
      * back to the nearest FULL entry for that chunk, or — if no commit ever gave it one, meaning
-     * every commit touching it so far was made before it had a baseline — falls back to its
-     * {@link #claimBaselines} snapshot from the moment it was claimed, then overlays every entry
-     * after that point up to commitId (latest write wins, same as a full/delta commit's natural
-     * git-like history). Read-only; touches nothing in the world. */
+     * every commit touching it so far was made before it had a baseline — falls back to its {@link
+     * #claimBaselines} snapshot from the moment it was claimed, then overlays every entry after
+     * that point up to commitId (latest write wins, same as a full/delta commit's natural git-like
+     * history).
+     */
     private ResolvedChunkState resolveChunkStateAt(long commitId, long chunkKey) {
         List<RepoCommit> chain = ancestryChain(commitId);
         int fullIndex = -1;
@@ -277,9 +327,66 @@ public final class TemporalRepository {
         return new ResolvedChunkState(states, beTags, entityTags);
     }
 
-    /** Every chunk whose world state could change by moving the head from fromCommitId to
+    /**
+     * What a jump from fromCommitId to toCommitId has to write for one chunk, as a sparse state:
+     * only positions some commit on the path between the two touched, mapped to their value at
+     * toCommitId.
+     */
+    private ResolvedChunkState resolveJumpDiff(long fromCommitId, long toCommitId, long chunkKey) {
+        long lca = findLowestCommonAncestor(fromCommitId, toCommitId);
+        Map<BlockPos, BlockState> states = new HashMap<>();
+        Map<BlockPos, CompoundTag> beTags = new HashMap<>();
+        Map<UUID, CompoundTag> entityTags = new HashMap<>();
+
+        // Undo side, newest first so the oldest change's "previous" wins.
+        long cur = fromCommitId;
+        while (cur != lca && cur != RepoCommit.NO_PARENT) {
+            RepoCommit c = commits.get(cur);
+            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey);
+            ChunkEntry e = c.getChunkEntries().get(chunkKey);
+            if (e != null) {
+                if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey);
+                for (BlockChangeDelta change : e.getBlockChanges()) {
+                    states.put(change.getPos(), change.getPreviousState());
+                    beTags.put(change.getPos(), change.getPreviousBlockEntityTag());
+                }
+                for (EntityDelta change : e.getEntityChanges()) {
+                    entityTags.put(change.getEntityId(),
+                            change.getType() == EntityDelta.Type.SPAWNED ? null : change.getStateBefore());
+                }
+            }
+            cur = c.getParentId();
+        }
+
+        // Replay side, oldest first so the newest change wins.
+        LinkedList<RepoCommit> forward = new LinkedList<>();
+        cur = toCommitId;
+        while (cur != lca && cur != RepoCommit.NO_PARENT) {
+            RepoCommit c = commits.get(cur);
+            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey);
+            forward.addFirst(c);
+            cur = c.getParentId();
+        }
+        for (RepoCommit c : forward) {
+            ChunkEntry e = c.getChunkEntries().get(chunkKey);
+            if (e == null) continue;
+            if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey);
+            for (BlockChangeDelta change : e.getBlockChanges()) {
+                states.put(change.getPos(), change.getNewState());
+                beTags.put(change.getPos(), change.getNewBlockEntityTag());
+            }
+            for (EntityDelta change : e.getEntityChanges()) {
+                entityTags.put(change.getEntityId(),
+                        change.getType() == EntityDelta.Type.REMOVED ? null : change.getStateAfter());
+            }
+        }
+        return new ResolvedChunkState(states, beTags, entityTags);
+    }
+
+    /**
+     * Every chunk whose world state could change by moving the head from fromCommitId to
      * targetCommitId — i.e. touched by some commit on either side of their lowest common ancestor.
-     * Chunks outside this set are deliberately left exactly as currently rendered. */
+     */
     private Set<Long> chunksAffectedByJump(long fromCommitId, long targetCommitId) {
         long lca = findLowestCommonAncestor(fromCommitId, targetCommitId);
         Set<Long> touched = new HashSet<>(touchedChunksBetween(lca, fromCommitId));
@@ -287,39 +394,41 @@ public final class TemporalRepository {
         return touched;
     }
 
-    // -------------------------------------------------------------------------
-    // Read-only preview
 
     /**
      * Every chunk affected by jumping from the current head to targetCommitId, mapped to that
-     * chunk's fully resolved target block states. Shares {@link #chunksAffectedByJump} and
-     * {@link #resolveChunkStateAt} with the real {@link #jumpTo}, so the client's "Show Changes"
-     * ghost preview can never diverge from what a jump would actually write. Touches nothing in
-     * the world and creates no commits.
+     * chunk's fully resolved target block states.
      */
     public Map<ChunkPos, Map<BlockPos, BlockState>> previewJumpTargetStates(long targetCommitId) {
-        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return Map.of();
-
         Map<ChunkPos, Map<BlockPos, BlockState>> result = new HashMap<>();
-        for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
-            result.put(new ChunkPos(chunkKey), resolveChunkStateAt(targetCommitId, chunkKey).states());
+        for (ChunkPos chunk : previewAffectedChunks(targetCommitId)) {
+            result.put(chunk, previewChunkTargetStates(targetCommitId, chunk));
         }
         return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Branch deletion / full reset
-
     /**
-     * Deletes branchName and the history unique to it. Refuses (returns false) when branchName
-     * doesn't exist, or when its tip is on the current head's ancestry path — i.e. that line is
-     * what the world currently reflects, so dropping it would strand the head.
-     *
-     * <p>Only commits reachable *backward* from the branch tip that no other branch tip and not
-     * the head also reach are removed; shared history and the root always survive. Per-chunk
-     * full/delta bookkeeping is rebuilt afterwards from whatever history is left, so a chunk whose
-     * only baseline lived on the deleted branch correctly gets a fresh FULL on its next commit.
+     * Just the chunk set of {@link #previewJumpTargetStates}, without resolving any of them, so a
+     * caller can resolve lazily (nearest first, stopping at a budget) instead of paying for every
+     * chunk of a huge claim up front.
      */
+    public Set<ChunkPos> previewAffectedChunks(long targetCommitId) {
+        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return Set.of();
+
+        Set<ChunkPos> result = new HashSet<>();
+        for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
+            result.add(new ChunkPos(chunkKey));
+        }
+        return result;
+    }
+
+    /** One chunk's resolved target block states; see {@link #previewJumpTargetStates}. */
+    public Map<BlockPos, BlockState> previewChunkTargetStates(long targetCommitId, ChunkPos chunk) {
+        return resolveJumpDiff(headCommitId, targetCommitId, chunk.toLong()).states();
+    }
+
+
+    /** Deletes branchName and the history unique to it. */
     public boolean deleteBranch(String branchName) {
         Long tipBoxed = branchTips.get(branchName);
         if (tipBoxed == null) return false;
@@ -360,7 +469,7 @@ public final class TemporalRepository {
     /**
      * Wipes this repository back to empty and immediately re-baselines every chunk in
      * chunksToRebaseline from live world state as a fresh root commit — the live world is never
-     * touched, only the recorded history. Equivalent to the old model's deleteAllHistory.
+     * touched, only the recorded history.
      */
     public void reset(ServerLevel level, long gameTime, @Nullable UUID author, Collection<ChunkPos> chunksToRebaseline) {
         commits.clear();
@@ -380,9 +489,10 @@ public final class TemporalRepository {
         commit(level, pendingBlocks, Collections.emptyMap(), gameTime, author);
     }
 
-    /** Recomputes every chunk's hasBaseline/deltaCount from the current head's ancestry, after
-     * commits have been removed. Scoped to the head's line because that's the only history a
-     * subsequent commit's resolve would walk. */
+    /**
+     * Recomputes every chunk's hasBaseline/deltaCount from the current head's ancestry, after
+     * commits have been removed.
+     */
     private void rebuildChunkStates() {
         chunkStates.clear();
         for (RepoCommit c : ancestryChain(headCommitId)) {
@@ -398,14 +508,11 @@ public final class TemporalRepository {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Jumping
 
-    /** Moves the head to targetCommitId and updates every in-world chunk affected by the move
-     * (see {@link #chunksAffectedByJump}); chunks the move doesn't touch are left as rendered.
-     * Never creates a commit or a fork by itself — see {@link #commit} for lazy forking. Never
-     * overwrites a position isGlued reports true for.
-     * @return every position whose block state actually changed, so callers can animate the jump */
+    /**
+     * Moves the head to targetCommitId and updates every in-world chunk affected by the move (see
+     * {@link #chunksAffectedByJump}); chunks the move doesn't touch are left as rendered.
+     */
     public List<BlockPos> jumpTo(long targetCommitId, ServerLevel level, Predicate<BlockPos> isGlued) {
         if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return List.of();
 
@@ -414,7 +521,7 @@ public final class TemporalRepository {
         Map<UUID, net.minecraft.nbt.CompoundTag> desiredEntities = new HashMap<>();
 
         for (long chunkKey : affectedChunks) {
-            ResolvedChunkState desired = resolveChunkStateAt(targetCommitId, chunkKey);
+            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, chunkKey);
             applyBlockStates(desired.states(), desired.blockEntityTags(), level, isGlued, deferredSettle);
             desiredEntities.putAll(desired.entityTags());
         }
@@ -430,17 +537,27 @@ public final class TemporalRepository {
         return deferredSettle;
     }
 
-    /** The energy cost of jumping to targetCommitId: costFn summed over every block position
-     * (across every affected chunk) whose state would actually change, plus nodeJumpSurcharge if
-     * targetCommitId differs from the current head at all. Read-only; never charges for a glued
-     * position, since a jump will never touch it. */
+    /**
+     * The block-change cost of jumping to targetCommitId: costFn summed over every block position
+     * (across every affected chunk) whose state would actually change.
+     */
     public long computeJumpCost(long targetCommitId, ServerLevel level, ToLongFunction<BlockState> costFn,
-                                 Predicate<BlockPos> isGlued, long nodeJumpSurcharge) {
+                                 Predicate<BlockPos> isGlued) {
+        return computeJumpCost(targetCommitId, level, costFn, isGlued, false);
+    }
+
+    /**
+     * As above; with loadedChunksOnly, chunks that aren't currently loaded are left out of the sum
+     * instead of being force-loaded by getBlockState.
+     */
+    public long computeJumpCost(long targetCommitId, ServerLevel level, ToLongFunction<BlockState> costFn,
+                                 Predicate<BlockPos> isGlued, boolean loadedChunksOnly) {
         if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return 0L;
 
-        long total = nodeJumpSurcharge;
+        long total = 0L;
         for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
-            ResolvedChunkState desired = resolveChunkStateAt(targetCommitId, chunkKey);
+            if (loadedChunksOnly && !level.hasChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey))) continue;
+            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, chunkKey);
             for (Map.Entry<BlockPos, BlockState> entry : desired.states().entrySet()) {
                 if (isGlued.test(entry.getKey())) continue;
                 if (!level.getBlockState(entry.getKey()).equals(entry.getValue())) {
@@ -451,11 +568,11 @@ public final class TemporalRepository {
         return total;
     }
 
-    /** Two passes, bottom-up ({@link ChunkSnapshot#BOTTOM_UP_ORDER}): the first writes every
-     * changed block with {@code UPDATE_KNOWN_SHAPE}, skipping neighbor-shape/destroy cascades so a
-     * support block about to be restored can't desync against a transient mid-restore state. The
-     * second ({@link #settleBlocks}) then fires normal neighbor updates once every chunk in this
-     * jump has its final state in place. */
+    /**
+     * Two passes, bottom-up ({@link ChunkSnapshot#BOTTOM_UP_ORDER}): the first writes every changed
+     * block with {@code UPDATE_KNOWN_SHAPE}, skipping neighbor-shape/destroy cascades so a support
+     * block about to be restored can't desync against a transient mid-restore state.
+     */
     private void applyBlockStates(Map<BlockPos, BlockState> states, Map<BlockPos, net.minecraft.nbt.CompoundTag> beTags,
                                    ServerLevel level, Predicate<BlockPos> isGlued, List<BlockPos> deferredSettle) {
         List<BlockPos> positions = new ArrayList<>(states.keySet());
@@ -502,12 +619,11 @@ public final class TemporalRepository {
         }
     }
 
-    // -------------------------------------------------------------------------
-    // Persistence
 
     public CompoundTag toTag() {
         CompoundTag tag = new CompoundTag();
         tag.putString("Dimension", dimension.toString());
+        tag.putString("Name", name);
         tag.putLong("NextId", nextId);
         tag.putLong("RootCommitId", rootCommitId);
         tag.putLong("HeadCommitId", headCommitId);
@@ -561,6 +677,7 @@ public final class TemporalRepository {
     public static TemporalRepository fromTag(CompoundTag tag) {
         ResourceLocation dimension = ResourceLocation.tryParse(tag.getString("Dimension"));
         TemporalRepository repo = new TemporalRepository(dimension);
+        repo.name = tag.getString("Name");
         repo.nextId = tag.getLong("NextId");
         repo.rootCommitId = tag.getLong("RootCommitId");
         repo.headCommitId = tag.getLong("HeadCommitId");

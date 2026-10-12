@@ -5,9 +5,9 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 import java.util.List;
 
 /**
- * Modpack-editable extra hot/cold sources for the Seebeck Generator, on top of the
- * {@code seebeck_hot_sources}/{@code seebeck_cold_sources} tags, so modpacks can register new
- * source blocks without needing a datapack. Read by {@link SeebeckGeneratorBlockEntity}.
+ * Modpack-editable extra hot/cold sources for the Seebeck Generator, on top of the {@code
+ * seebeck_hot_sources}/{@code seebeck_cold_sources} tags, so modpacks can register new source
+ * blocks without needing a datapack.
  */
 public final class SeebeckSourceConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> extraHotSources;

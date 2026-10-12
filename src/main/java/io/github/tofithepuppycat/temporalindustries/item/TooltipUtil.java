@@ -8,8 +8,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 
 import java.util.List;
 
-/** Gates flavor/how-to-use tooltip lines behind Shift so tooltips stay short by default. Functional
- * status lines (contents, charge, mode) should stay outside this call, always visible. */
+/** Gates flavor/how-to-use tooltip lines behind Shift so tooltips stay short by default. */
 public final class TooltipUtil {
     private TooltipUtil() {}
 

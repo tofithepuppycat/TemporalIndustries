@@ -33,37 +33,32 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * Handheld player save-point tool. Right-click captures a fresh {@link ChunkSnapshot} of every chunk
- * in the marker's shape and diffs it against the chunk's timeline head, committing a DELTA (or a
- * fresh SNAPSHOT once drifted far enough) — the same commit types auto-tracking produces, so the
- * save point is restorable like any other. Unlike a placed machine, it never registers continuous
- * background tracking; it only touches the timeline at the moment of a save. The resulting commit is
- * flagged player-marked so the graph can highlight it.
- *
- * <p>A plain right-click marks a shape around the player — the default fixed square, or the
- * player's saved custom selection (see {@link #getSavedOffsets}) re-centred on their position.
- * Sneak + right-click opens {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronoMarkerMapScreen}
- * to pick a custom shape; the map screen only saves the selection, it never marks by itself.
- */
+/** Handheld player save-point tool. */
 @SuppressWarnings("null")
 public class PortableChronoMarkerItem extends Item {
     private static final int RADIUS_CHUNKS = 2;
-    /** Radius (in chunks) offered by the sneak-right-click area-select map; matches the Chronosphere's claim radius. */
+    /**
+     * Radius (in chunks) offered by the sneak-right-click area-select map; matches the
+     * Chronosphere's claim radius.
+     */
     public static final int MAP_RADIUS_CHUNKS = ChronosphereBlockEntity.MAX_RADIUS;
-    /** The area-select map's claimable outline (square, matching the Chronosphere's claim shape). */
+    /**
+     * The area-select map's claimable outline (square, matching the Chronosphere's claim shape).
+     */
     public static final ChunkArea.Shape MAP_SHAPE = ChunkArea.Shape.SQUARE;
     private static final int WAVE_DURATION_TICKS = 15;
     private static final double RING_SPEED = 6.0D;
 
-    /** NBT key for the player's saved custom shape: flat [dx0, dz0, ...] chunk offsets relative to
-     * where the marker is used. Absent/empty falls back to the fixed {@link #RADIUS_CHUNKS} square. */
+    /**
+     * NBT key for the player's saved custom shape: flat [dx0, dz0, ...] chunk offsets relative to
+     * where the marker is used.
+     */
     private static final String TAG_SHAPE_OFFSETS = "ShapeOffsets";
 
     /** One chunk offset in a saved custom shape, relative to where the marker is used. */
     public record ChunkOffset(int dx, int dz) {}
 
-    /** playerId -> gameTime the current terrain-tracing wave started. Cosmetic only, never persisted. */
+    /** playerId -> gameTime the current terrain-tracing wave started. */
     private static final Map<UUID, Long> ACTIVE_WAVE_START = new HashMap<>();
 
     public PortableChronoMarkerItem(Properties properties) {
@@ -100,9 +95,10 @@ public class PortableChronoMarkerItem extends Item {
         spawnWave(player, serverLevel, visualRadius);
     }
 
-    /** Records a save point across {@code chunks} from two point-in-time captures (no continuous
-     * tracking). Ensures each chunk has a baseline, then diffs it into a DELTA or, once drifted far
-     * enough, a fresh SNAPSHOT — matching what auto-tracking would produce. */
+    /**
+     * Records a save point across {@code chunks} from two point-in-time captures (no continuous
+     * tracking).
+     */
     public static void recordMark(ServerPlayer player, ServerLevel level, List<ChunkPos> chunks) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
@@ -146,7 +142,9 @@ public class PortableChronoMarkerItem extends Item {
         return chunks;
     }
 
-    /** Every chunk a plain right-click with {@code stack} would mark, centred on {@code center}. */
+    /**
+     * Every chunk a plain right-click with {@code stack} would mark, centred on {@code center}.
+     */
     public static List<ChunkPos> chunksForMark(ItemStack stack, ChunkPos center) {
         List<ChunkOffset> offsets = getSavedOffsets(stack);
         if (offsets.isEmpty()) return chunksInRadius(center);
@@ -171,7 +169,10 @@ public class PortableChronoMarkerItem extends Item {
         return offsets;
     }
 
-    /** Persists {@code offsets} onto {@code stack} as its custom shape, replacing any previous selection. */
+    /**
+     * Persists {@code offsets} onto {@code stack} as its custom shape, replacing any previous
+     * selection.
+     */
     public static void saveOffsets(ItemStack stack, List<ChunkOffset> offsets) {
         int[] flat = new int[offsets.size() * 2];
         for (int i = 0; i < offsets.size(); i++) {
@@ -196,8 +197,10 @@ public class PortableChronoMarkerItem extends Item {
         return radius;
     }
 
-    /** Sparse particle grid along the edges of the capture square, so the player can see where
-     * tracking currently ends. */
+    /**
+     * Sparse particle grid along the edges of the capture square, so the player can see where
+     * tracking currently ends.
+     */
     private static void spawnBoundaryWall(ServerPlayer player, ServerLevel level, int radiusChunks) {
         if (level.getGameTime() % 4 != 0) return;
 
@@ -220,7 +223,10 @@ public class PortableChronoMarkerItem extends Item {
         }
     }
 
-    /** Expanding ring of particles tracing the terrain outward from the player after a mark, until it reaches the capture radius. */
+    /**
+     * Expanding ring of particles tracing the terrain outward from the player after a mark, until
+     * it reaches the capture radius.
+     */
     private static void spawnWave(ServerPlayer player, ServerLevel level, int radiusChunks) {
         Long start = ACTIVE_WAVE_START.get(player.getUUID());
         if (start == null) return;

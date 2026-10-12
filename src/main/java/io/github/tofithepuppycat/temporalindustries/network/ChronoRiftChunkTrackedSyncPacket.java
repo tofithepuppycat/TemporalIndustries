@@ -11,8 +11,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server -> client: which Chrono Rift chunks (by chunk-key) currently have valid reconstructed
- * history ("tracked") vs none ("untracked"), sent on rift entry and again as chunks lazily fill. */
+/**
+ * Server -> client: which Chrono Rift chunks (by chunk-key) currently have valid reconstructed
+ * history ("tracked") vs none ("untracked"), sent on rift entry and again as chunks lazily fill.
+ */
 public class ChronoRiftChunkTrackedSyncPacket implements CustomPacketPayload {
     public static final Type<ChronoRiftChunkTrackedSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_rift_chunk_tracked_sync"));

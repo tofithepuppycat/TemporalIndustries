@@ -16,8 +16,10 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Entropy Manipulator GUI: an input/output slot pair plus both entropy
- * tanks' fill/capacity, the liquid material tank's fill/capacity/fluid, and processing progress. */
+/**
+ * Container menu for the Entropy Manipulator GUI: an input/output slot pair plus both entropy
+ * tanks' fill/capacity, the liquid material tank's fill/capacity/fluid, and processing progress.
+ */
 @SuppressWarnings("null")
 public class EntropyManipulatorMenu extends AbstractContainerMenu {
     private static final int INPUT_SLOT_X = 55;
@@ -98,12 +100,16 @@ public class EntropyManipulatorMenu extends AbstractContainerMenu {
         data.set(10, preview.isEmpty() ? -1 : BuiltInRegistries.ITEM.getId(preview.getItem()));
     }
 
-    /** Number of recipes currently matching the input; the GUI only shows the cycle icon above 1. */
+    /**
+     * Number of recipes currently matching the input; the GUI only shows the cycle icon above 1.
+     */
     public int getRecipeOptionCount() {
         return data.get(9);
     }
 
-    /** Registry id of the currently selected output item, or -1 if there's no ambiguity to preview. */
+    /**
+     * Registry id of the currently selected output item, or -1 if there's no ambiguity to preview.
+     */
     public int getSelectedRecipeOutputId() {
         return data.get(10);
     }

@@ -18,10 +18,9 @@ import java.util.Optional;
 import java.util.UUID;
 
 /**
- * Read-only view of a finished Echo Record recording, parsed once from the item's
- * {@link DataComponents#CUSTOM_DATA} tag and reused by the Echo Projector for playback instead
- * of re-reading NBT every tick/frame. Frame positions and actions are stored relative to the
- * recording's start position so playback can re-anchor the path anywhere.
+ * Read-only view of a finished Echo Record recording, parsed once from the item's {@link
+ * DataComponents#CUSTOM_DATA} tag and reused by the Echo Projector for playback instead of re-
+ * reading NBT every tick/frame.
  */
 public final class ChronoRecording {
 
@@ -29,22 +28,20 @@ public final class ChronoRecording {
 
     /**
      * INSERT/EXTRACT: items handed to or taken from a container-capable block, detected as an
-     * inventory diff across a container GUI open/close. BREAK/ATTACK: breaking a block / hitting
-     * an entity. USE_BLOCK/USE_ITEM/USE_ENTITY/RELEASE_ITEM/MOUNT/DISMOUNT: the player's raw
-     * interactions, replayed by the projector's fake player through the same code paths a real
-     * player would trigger (placing, stripping, throwing potions, breeding, riding...).
-     * <p>
-     * Recordings store the ordinal, so reordering or removing types invalidates saved recordings.
+     * inventory diff across a container GUI open/close.
      */
     public enum ActionType { BREAK, INSERT, EXTRACT, ATTACK, USE_BLOCK, USE_ITEM, RELEASE_ITEM, USE_ENTITY, MOUNT, DISMOUNT }
 
-    /** Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
-     * any recorded actions on top. */
+    /**
+     * Flat energy the Chrono Loop Projector charges every tick just to keep a loop running, before
+     * any recorded actions on top.
+     */
     public static final int ENERGY_PER_TICK = 15;
 
-    /** Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
-     * {@link #ENERGY_PER_TICK}. ATTACK is priced highest since it's the only action type that harms
-     * mobs. Lives here so recordings can report their own cost without a live projector instance. */
+    /**
+     * Energy charged by the Chrono Loop Projector for replaying one action of this type, on top of
+     * {@link #ENERGY_PER_TICK}.
+     */
     public static int actionEnergyCost(ActionType type) {
         return switch (type) {
             case ATTACK -> 45;
@@ -53,29 +50,18 @@ public final class ChronoRecording {
         };
     }
 
-    /** Hard ceiling on what any single tick can cost, so a burst of many actions on one tick
-     * (e.g. a sweeping-edge hit on a mob farm) can't stall the loop indefinitely. */
+    /**
+     * Hard ceiling on what any single tick can cost, so a burst of many actions on one tick (e.g. a
+     * sweeping-edge hit on a mob farm) can't stall the loop indefinitely.
+     */
     public static final int MAX_ENERGY_PER_TICK = 500;
 
-    /**
-     * {@code item}/{@code count}: the item transferred (INSERT/EXTRACT only). {@code tool} (BREAK
-     * only): a phantom tool used only so the drop calculation respects "requires correct tool"
-     * blocks, never pulled from the projector's inventory. {@code targetEntityType}/{@code targetBaby}
-     * (ATTACK, USE_ENTITY, MOUNT): replay looks for the nearest matching entity near the recorded
-     * position rather than tracking the original entity's identity, since it may no longer exist.
-     * {@code interaction} (USE_*, ATTACK) holds what the fake player needs to repeat the action faithfully.
-     */
+    /** {@code item}/{@code count}: the item transferred (INSERT/EXTRACT only). */
     public record Action(int dx, int dy, int dz, ActionType type, @Nullable ResourceLocation item, int count,
                           @Nullable ResourceLocation tool, @Nullable ResourceLocation targetEntityType,
                           boolean targetBaby, @Nullable Interaction interaction) {}
 
-    /**
-     * How the player performed an interaction. {@code hitX/Y/Z} are relative to the clicked block
-     * (USE_BLOCK) or to the clicked entity's position (USE_ENTITY), so replay can re-anchor them.
-     * {@code specific} marks an entity "interact at" (armor stands etc.) as opposed to a plain
-     * entity interact. {@code strength} is the attack cooldown charge (ATTACK). {@code heldStack}
-     * is the full stack in use, components included, so e.g. the right potion is thrown.
-     */
+    /** How the player performed an interaction. */
     public record Interaction(boolean offHand, @Nullable Direction face, float hitX, float hitY, float hitZ,
                                boolean inside, boolean sneaking, boolean specific, float strength,
                                @Nullable CompoundTag heldStack) {
@@ -154,8 +140,10 @@ public final class ChronoRecording {
         return frames.get(((tick % size) + size) % size);
     }
 
-    /** Cumulative horizontal distance travelled up to fractional loop-tick t, for driving a walk
-     * animation. Has a harmless small discontinuity right at the loop seam. */
+    /**
+     * Cumulative horizontal distance travelled up to fractional loop-tick t, for driving a walk
+     * animation.
+     */
     public float limbSwingAt(double t) {
         int size = frames.size();
         int a = (((int) Math.floor(t)) % size + size) % size;
@@ -177,9 +165,10 @@ public final class ChronoRecording {
         return actionsByTick.getOrDefault(tick, Collections.emptyList());
     }
 
-    /** What the Chrono Loop Projector actually charges for replaying loop-tick {@code tick}:
-     * {@link #ENERGY_PER_TICK} plus that tick's recorded actions, clamped to
-     * {@link #MAX_ENERGY_PER_TICK}. */
+    /**
+     * What the Chrono Loop Projector actually charges for replaying loop-tick {@code tick}: {@link
+     * #ENERGY_PER_TICK} plus that tick's recorded actions, clamped to {@link #MAX_ENERGY_PER_TICK}.
+     */
     public int energyCostAt(int tick) {
         int actionsCost = 0;
         for (Action action : actionsAt(tick)) {
@@ -188,8 +177,10 @@ public final class ChronoRecording {
         return Math.min(ENERGY_PER_TICK + actionsCost, MAX_ENERGY_PER_TICK);
     }
 
-    /** This recording's total per-tick cost spread evenly across the loop's length, i.e. what the
-     * Chrono Loop Projector spends per tick on average while replaying it. */
+    /**
+     * This recording's total per-tick cost spread evenly across the loop's length, i.e. what the
+     * Chrono Loop Projector spends per tick on average while replaying it.
+     */
     public double averageEnergyPerTick() {
         if (frames.isEmpty()) return 0.0;
 
@@ -202,8 +193,10 @@ public final class ChronoRecording {
         return (double) total / frames.size();
     }
 
-    /** The single most expensive tick in this recording, already clamped to
-     * {@link #MAX_ENERGY_PER_TICK} — the most the projector will ever demand in one instant. */
+    /**
+     * The single most expensive tick in this recording, already clamped to {@link
+     * #MAX_ENERGY_PER_TICK} — the most the projector will ever demand in one instant.
+     */
     public int peakEnergyPerTick() {
         int peak = ENERGY_PER_TICK;
         for (int tick : actionsByTick.keySet()) {

@@ -15,9 +15,11 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.InputEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** While sneaking, the scroll wheel configures the held item instead of changing hotbar slot: a
+/**
+ * While sneaking, the scroll wheel configures the held item instead of changing hotbar slot: a
  * Temporal Anchor cycles its rewind mode, a cell picks how much liquid entropy one right-click
- * pours into a machine. */
+ * pours into a machine.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class SneakScrollInputHandler {
     private SneakScrollInputHandler() {}

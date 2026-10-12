@@ -3,10 +3,15 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import org.joml.Matrix4f;
 
-/** Shared debug-quad box/outline drawing for in-world overlay renderers: a translucent fill plus a
- * thin edged outline for a camera-relative axis-aligned region. */
+/**
+ * Shared debug-quad box/outline drawing for in-world overlay renderers: a translucent fill plus a
+ * thin edged outline for a camera-relative axis-aligned region.
+ */
 public final class BoxOutlineRenderer {
-    /** Grows every rendered box outward by this much on every axis to avoid z-fighting with block faces. */
+    /**
+     * Grows every rendered box outward by this much on every axis to avoid z-fighting with block
+     * faces.
+     */
     public static final float SURFACE_OUTSET = 0.004F;
 
     private BoxOutlineRenderer() {}

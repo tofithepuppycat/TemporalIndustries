@@ -15,8 +15,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 import java.util.List;
 
-/** Client -> server: asks which existing repositories an unbound Chronosphere could adopt whose
- * names match the text typed so far. Answered with a {@link RepositorySuggestSyncPacket}. */
+/**
+ * Client -> server: asks which existing repositories an unbound Chronosphere could adopt whose
+ * names match the text typed so far.
+ */
 public class RepositorySuggestRequestPacket implements CustomPacketPayload {
     public static final Type<RepositorySuggestRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "repository_suggest_request"));

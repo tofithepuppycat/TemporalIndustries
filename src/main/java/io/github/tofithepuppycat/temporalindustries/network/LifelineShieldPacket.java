@@ -13,8 +13,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Server -> client: a Temporal Lifeline just cancelled an explosion's block damage. Carries the
- * blast centre and radius for the shockwave, plus (lifeline, saved block) pairs for the beams. */
+/** Server -> client: a Temporal Lifeline just cancelled an explosion's block damage. */
 public class LifelineShieldPacket implements CustomPacketPayload {
     public static final Type<LifelineShieldPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "lifeline_shield"));

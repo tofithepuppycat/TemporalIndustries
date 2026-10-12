@@ -9,8 +9,7 @@ import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 
 /**
  * Awards "Grand...child paradox?" when a player dies to their own Echo, whether it hit them
- * directly or through something it threw, shot or set off. Also counts when something else (a
- * Temporal Anchor) cancels the death, since the echo still landed the killing blow.
+ * directly or through something it threw, shot or set off.
  */
 public final class EchoKillListener {
     private static final ResourceLocation ADVANCEMENT_ID =

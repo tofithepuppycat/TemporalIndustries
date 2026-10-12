@@ -47,9 +47,8 @@ import java.util.Map;
 
 /**
  * Spends liquid Order or Chaos to transmute whatever sits in its input slot, or the fluid in its
- * liquid tank, into the output of a matching {@link EntropyManipulatorRecipe} loaded from
- * {@code data/temporalindustries/recipe/}. Item input takes priority over the liquid tank
- * whenever both are present.
+ * liquid tank, into the output of a matching {@link EntropyManipulatorRecipe} loaded from {@code
+ * data/temporalindustries/recipe/}.
  */
 @SuppressWarnings("null")
 public class EntropyManipulatorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -136,8 +135,10 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     private int maxProgress = PROCESS_TICKS;
     @Nullable
     private EntropyType activeType = null;
-    /** Player's chosen output per input item, for inputs with more than one matching recipe
-     * (e.g. Order+sand could yield glass, sandstone, or gravel); cycled via the GUI. */
+    /**
+     * Player's chosen output per input item, for inputs with more than one matching recipe (e.g.
+     * Order+sand could yield glass, sandstone, or gravel); cycled via the GUI.
+     */
     private final Map<Item, ResourceLocation> preferredRecipes = new HashMap<>();
 
     public EntropyManipulatorBlockEntity(BlockPos pos, BlockState state) {
@@ -224,9 +225,7 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
                 : new EntropyManipulatorRecipe.Input(ItemStack.EMPTY, liquidTank.getFluid());
     }
 
-    /** Every recipe whose input matches, sorted by id for a stable pick/cycle order. Several
-     * recipes can share an input and entropy type (e.g. Order+sand can yield glass, sandstone, or
-     * gravel), so this list may legitimately contain more than one entry. */
+    /** Every recipe whose input matches, sorted by id for a stable pick/cycle order. */
     private List<RecipeHolder<EntropyManipulatorRecipe>> getMatchingRecipes(EntropyManipulatorRecipe.Input recipeInput) {
         if (level == null) return List.of();
         var recipeManager = level.getRecipeManager();
@@ -237,8 +236,10 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
                 .toList();
     }
 
-    /** Among ambiguous matches, prefers the player's saved choice for this input item, falling
-     * back to the first (stably ordered) candidate. */
+    /**
+     * Among ambiguous matches, prefers the player's saved choice for this input item, falling back
+     * to the first (stably ordered) candidate.
+     */
     @Nullable
     private RecipeHolder<EntropyManipulatorRecipe> pickPreferred(List<RecipeHolder<EntropyManipulatorRecipe>> matches, ItemStack input) {
         if (matches.isEmpty()) return null;
@@ -264,22 +265,28 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         return chosen == null ? null : chosen.value();
     }
 
-    /** How many recipes currently match the input slot/tank, regardless of whether entropy is
-     * available to run them; the GUI only offers cycling when this is more than one. */
+    /**
+     * How many recipes currently match the input slot/tank, regardless of whether entropy is
+     * available to run them; the GUI only offers cycling when this is more than one.
+     */
     public int getMatchingRecipeCount() {
         return getMatchingRecipes(currentInput()).size();
     }
 
-    /** The output item the manipulator will currently produce for the input, ignoring entropy
-     * availability, for GUI preview purposes. */
+    /**
+     * The output item the manipulator will currently produce for the input, ignoring entropy
+     * availability, for GUI preview purposes.
+     */
     public ItemStack getSelectedRecipePreview(HolderLookup.Provider registries) {
         EntropyManipulatorRecipe.Input recipeInput = currentInput();
         RecipeHolder<EntropyManipulatorRecipe> chosen = pickPreferred(getMatchingRecipes(recipeInput), recipeInput.item());
         return chosen == null ? ItemStack.EMPTY : chosen.value().getResultItem(registries);
     }
 
-    /** Advances the player's chosen output for the current input item to the next matching recipe,
-     * wrapping around; a no-op if there's no ambiguity to resolve. */
+    /**
+     * Advances the player's chosen output for the current input item to the next matching recipe,
+     * wrapping around; a no-op if there's no ambiguity to resolve.
+     */
     public void cyclePreferredRecipe() {
         EntropyManipulatorRecipe.Input recipeInput = currentInput();
         ItemStack input = recipeInput.item();

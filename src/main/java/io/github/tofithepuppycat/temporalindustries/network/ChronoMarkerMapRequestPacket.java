@@ -15,9 +15,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Client -> server: request terrain thumbnails for the Portable Chrono Marker's area-select map,
+/**
+ * Client -> server: request terrain thumbnails for the Portable Chrono Marker's area-select map,
  * keyed by an arbitrary anchor chunk (the player's position when they opened the screen) since the
- * marker has no block/menu to validate against; trust is anchored to the sender's current position. */
+ * marker has no block/menu to validate against; trust is anchored to the sender's current position.
+ */
 public class ChronoMarkerMapRequestPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerMapRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_map_request"));

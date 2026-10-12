@@ -21,8 +21,10 @@ import java.util.List;
 import java.util.Set;
 import java.util.UUID;
 
-/** Client -> server: periodic poll for a Chronosphere's map state (which chunks are claimed/blocked)
- * and the current jump-cost preview, so the GUI stays live while open. */
+/**
+ * Client -> server: periodic poll for a Chronosphere's map state (which chunks are claimed/blocked)
+ * and the current jump-cost preview, so the GUI stays live while open.
+ */
 public class ChronosphereStateRequestPacket implements CustomPacketPayload {
     public static final Type<ChronosphereStateRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_state_request"));
@@ -60,15 +62,16 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
         });
     }
 
-    /** Builds and sends a full state snapshot for machine to sender. Also used by
-     * ChronosphereToggleChunkPacket for an immediate refresh after a click. */
+    /** Builds and sends a full state snapshot for machine to sender. */
     public static void sendStateSync(ServerPlayer sender, ChronosphereBlockEntity machine, BlockPos machinePos) {
+        UUID repoId = machine.getRepositoryId();
+        if (repoId == null) return;
+
         Set<Long> selected = new HashSet<>();
         for (ChunkPos pos : machine.getAllChunks()) selected.add(pos.toLong());
 
         TemporalWorldData worldData = TemporalWorldData.get(sender.serverLevel().getServer());
         ResourceLocation dimension = sender.serverLevel().dimension().location();
-        UUID repoId = machine.getRepositoryId();
         ChunkPos home = machine.getHomeChunkPos();
         List<Long> blocked = new ArrayList<>();
         int radius = ChronosphereBlockEntity.MAX_RADIUS;

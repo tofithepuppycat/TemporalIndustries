@@ -41,11 +41,7 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Transfers liquid Order/Chaos between marked blocks. Input/output positions are recorded on
- * {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem} before placement and
- * handed off via {@link #setMarks}. Requires a single {@link MachineFrame} directly below to run.
- */
+/** Transfers liquid Order/Chaos between marked blocks. */
 @SuppressWarnings("null")
 public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController, EntropyInfoProvider {
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
@@ -55,7 +51,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
     private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    /** Spark texture so the flow of fluid along a leg reads as distinct from the structure outlines. */
+    /**
+     * Spark texture so the flow of fluid along a leg reads as distinct from the structure outlines.
+     */
     private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
     private static final ColorParticleOption CHAOS_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.CHAOS);
     /** Interior joints in the jagged transmit bolt, not counting its two fixed endpoints. */
@@ -87,7 +85,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private int ticksSinceStructureCheck = 0;
     private int outputCursor = 0;
 
-    /** Which entropy type this pylon is restricted to, or {@code null} for the dual pylon that routes whichever is present. */
+    /**
+     * Which entropy type this pylon is restricted to, or {@code null} for the dual pylon that
+     * routes whichever is present.
+     */
     @Nullable
     private final EntropyType filter;
     private final DustParticleOptions formedParticle;
@@ -138,7 +139,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return worldPosition.below();
     }
 
-    /** The frame position below this pylon if it still needs a {@link MachineFrame} block; empty once one's present. */
+    /**
+     * The frame position below this pylon if it still needs a {@link MachineFrame} block; empty
+     * once one's present.
+     */
     public List<BlockPos> findMissing() {
         if (level == null) return List.of();
         BlockPos framePos = framePos();
@@ -149,8 +153,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return level.getBlockState(framePos).is(Registration.MACHINE_FRAME_BLOCK.get()) ? List.of() : List.of(framePos);
     }
 
-    /** Re-checks for a {@link MachineFrame} directly below and updates {@link #formed}, syncing to
-     * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed. */
+    /**
+     * Re-checks for a {@link MachineFrame} directly below and updates {@link #formed}, syncing to
+     * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed.
+     */
     public boolean checkStructure() {
         if (level == null) return formed;
         boolean wasFormed = formed;
@@ -180,8 +186,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return formed;
     }
 
-    /** Order-colored outline traced along the edges of the pylon and its completing frame's
-     * bounding box, fired once when the structure transitions from unformed to formed. */
+    /**
+     * Order-colored outline traced along the edges of the pylon and its completing frame's bounding
+     * box, fired once when the structure transitions from unformed to formed.
+     */
     private void spawnFormedParticles(ServerLevel serverLevel, BlockPos framePos) {
         int minX = Math.min(worldPosition.getX(), framePos.getX());
         int minY = Math.min(worldPosition.getY(), framePos.getY());
@@ -218,8 +226,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         transferOnce();
     }
 
-    /** One transfer attempt per marked input, against the next marked output in rotation, so every
-     * pair gets visited over time instead of always favoring the first output. */
+    /**
+     * One transfer attempt per marked input, against the next marked output in rotation, so every
+     * pair gets visited over time instead of always favoring the first output.
+     */
     private void transferOnce() {
         for (BlockPos inPos : inputs) {
             IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
@@ -234,8 +244,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Whether {@code stack} is allowed to move through this pylon: anything if {@link #filter} is
-     * {@code null} (dual pylon), otherwise only the matching entropy type. */
+    /**
+     * Whether {@code stack} is allowed to move through this pylon: anything if {@link #filter} is
+     * {@code null} (dual pylon), otherwise only the matching entropy type.
+     */
     private boolean acceptsFluid(FluidStack stack) {
         return filter == null || EntropyFluids.typeOf(stack.getFluid()) == filter;
     }
@@ -267,9 +279,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** A jagged bolt from {@code from} to {@code to}, colored by {@code type}, drawn every tick a
-     * transfer moves fluid so the flow direction reads at a glance. Re-jittered fresh each call so
-     * it flickers like real lightning rather than sitting static. */
+    /**
+     * A jagged bolt from {@code from} to {@code to}, colored by {@code type}, drawn every tick a
+     * transfer moves fluid so the flow direction reads at a glance.
+     */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
         ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
         Vector3f start = centerOf(from);
@@ -279,8 +292,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         }
     }
 
-    /** Builds a jagged path from {@code start} to {@code end}: straight sub-segments with jittered
-     * interior joints, densely resampled so the zigzag reads as a continuous bolt. */
+    /**
+     * Builds a jagged path from {@code start} to {@code end}: straight sub-segments with jittered
+     * interior joints, densely resampled so the zigzag reads as a continuous bolt.
+     */
     private static List<Vector3f> lightningArc(Vector3f start, Vector3f end, RandomSource random) {
         Vector3f direction = new Vector3f(end).sub(start);
         if (direction.lengthSquared() < 1.0E-6F) return List.of(start);

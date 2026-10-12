@@ -21,18 +21,15 @@ import java.util.List;
 import java.util.Map;
 
 /**
- * A full-chunk baseline: every block in the chunk, not just what changed (contrast
- * {@link BlockChangeDelta}). Backs {@link TemporalCommit.Type#SNAPSHOT} commits so a history walk
- * never has to go back further than the nearest one.
- *
- * <p>Each 16-cube section that's uniform (stone/air/bedrock) collapses to a single stored state;
- * non-uniform sections fall back to a palette + run-length encoding, scanned y-major/z/x to
- * maximize run length against typically Y/Z-layered terrain.
+ * A full-chunk baseline: every block in the chunk, not just what changed (contrast {@link
+ * BlockChangeDelta}).
  */
 public final class ChunkSnapshot {
 
-    /** Bottom-up (y, then z, then x) order; used so rollback restores blocks deterministically
-     * (support before dependent) instead of in arbitrary HashMap iteration order. */
+    /**
+     * Bottom-up (y, then z, then x) order; used so rollback restores blocks deterministically
+     * (support before dependent) instead of in arbitrary HashMap iteration order.
+     */
     public static final Comparator<BlockPos> BOTTOM_UP_ORDER =
             Comparator.<BlockPos>comparingInt(pos -> pos.getY())
                     .thenComparingInt(pos -> pos.getZ())
@@ -55,8 +52,10 @@ public final class ChunkSnapshot {
     public int sectionCount() { return sections.size(); }
     public int minSectionY() { return minSectionY; }
 
-    /** Whether section sectionIndex is the same single uniform state in both this snapshot and
-     * other's, letting a whole section be recognized as identical in O(1). */
+    /**
+     * Whether section sectionIndex is the same single uniform state in both this snapshot and
+     * other's, letting a whole section be recognized as identical in O(1).
+     */
     public boolean sectionTriviallyEquals(ChunkSnapshot other, int sectionIndex) {
         SnapshotSection a = sections.get(sectionIndex);
         SnapshotSection b = other.sections.get(sectionIndex);
@@ -68,8 +67,7 @@ public final class ChunkSnapshot {
         sections.get(sectionIndex).collectInto(chunkPos, minSectionY + sectionIndex, out);
     }
 
-    /** Every block position this baseline covers, expanded from its section encoding. Read-only;
-     * unlike {@link #applyTo}, never touches the world. */
+    /** Every block position this baseline covers, expanded from its section encoding. */
     public Map<BlockPos, BlockState> toBlockStateMap() {
         Map<BlockPos, BlockState> map = new HashMap<>();
         for (int i = 0; i < sections.size(); i++) {
@@ -221,8 +219,10 @@ public final class ChunkSnapshot {
             return new SnapshotSection(palette, indices, lengths);
         }
 
-        /** Writes this section's captured state into a map, keyed by absolute position; explicit
-         * about air rather than skipping it. */
+        /**
+         * Writes this section's captured state into a map, keyed by absolute position; explicit
+         * about air rather than skipping it.
+         */
         void collectInto(ChunkPos chunkPos, int sectionY, Map<BlockPos, BlockState> out) {
             int baseX = chunkPos.getMinBlockX();
             int baseZ = chunkPos.getMinBlockZ();

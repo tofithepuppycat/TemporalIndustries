@@ -24,9 +24,11 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.function.Supplier;
 
-/** Routes liquid Order/Chaos between blocks marked via {@link io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem};
- * see {@link EntropicPylonBlockEntity} for the transfer logic. Only runs once completed by a
- * {@link MachineFrame} directly below it. */
+/**
+ * Routes liquid Order/Chaos between blocks marked via {@link
+ * io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem}; see {@link
+ * EntropicPylonBlockEntity} for the transfer logic.
+ */
 @SuppressWarnings("null")
 public class EntropicPylon extends BaseEntityBlock {
     // Whether the pylon is actually routing entropy - see EntropicPylonBlockEntity#checkStructure.

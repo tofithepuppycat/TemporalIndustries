@@ -12,9 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: forces an immediate, playerMarked commit of everything accumulated so far,
- * instead of waiting for the next automatic flush tick. Shared by the Chronosphere and Chronovault
- * screens, same pattern as {@link TimelineMachineDeleteHistoryPacket}. */
+/**
+ * Client -> server: forces an immediate, playerMarked commit of everything accumulated so far,
+ * instead of waiting for the next automatic flush tick.
+ */
 public class TimelineMachineCommitPacket implements CustomPacketPayload {
     public static final Type<TimelineMachineCommitPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_commit"));

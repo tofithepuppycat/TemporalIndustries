@@ -12,8 +12,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Server -> client: the repository names matching a {@link RepositorySuggestRequestPacket}'s
- * query, for {@link ChronosphereClientState}. */
+/**
+ * Server -> client: the repository names matching a {@link RepositorySuggestRequestPacket}'s query,
+ * for {@link ChronosphereClientState}.
+ */
 public class RepositorySuggestSyncPacket implements CustomPacketPayload {
     public static final Type<RepositorySuggestSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "repository_suggest_sync"));

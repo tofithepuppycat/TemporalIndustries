@@ -10,9 +10,12 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-/** Client-side reaction to {@link io.github.tofithepuppycat.temporalindustries.network.TimelineJumpEffectPacket}:
- * a swirling particle burst around a timeline machine the instant it lands on a different commit,
- * kept separate from the packet class so that class doesn't need to reference client-only types. */
+/**
+ * Client-side reaction to {@link
+ * io.github.tofithepuppycat.temporalindustries.network.TimelineJumpEffectPacket}: a swirling
+ * particle burst around a timeline machine the instant it lands on a different commit, kept
+ * separate from the packet class so that class doesn't need to reference client-only types.
+ */
 public final class TimelineJumpClientHandler {
     private static final Vector3f FUTURE_COLOR = colorOf(EntropyType.CHAOS);
     private static final Vector3f PAST_COLOR = colorOf(EntropyType.ORDER);
@@ -70,9 +73,11 @@ public final class TimelineJumpClientHandler {
         }
     }
 
-    /** Flashes every block a jump just rewrote: a brief shell of colored sparks hugging each
-     * position, so the rewrite reads as a wave settling across the claimed area instead of
-     * popping in silently. */
+    /**
+     * Flashes every block a jump just rewrote: a brief shell of colored sparks hugging each
+     * position, so the rewrite reads as a wave settling across the claimed area instead of popping
+     * in silently.
+     */
     public static void onBlockChangeFlash(List<BlockPos> positions, boolean intoFuture) {
         ClientLevel level = Minecraft.getInstance().level;
         if (level == null) {

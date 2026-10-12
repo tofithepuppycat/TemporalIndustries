@@ -33,9 +33,10 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-/** Spends liquid Chaos to roll a player-chosen loot table into its own chest-sized inventory; see
- * {@link LootGeneratorBlockEntity}. Acts as the controller of a small {@link MachineFrame}
- * multiblock ({@link LootGeneratorStructure}) - the machine only works once that frame is formed. */
+/**
+ * Spends liquid Chaos to roll a player-chosen loot table into its own chest-sized inventory; see
+ * {@link LootGeneratorBlockEntity}.
+ */
 @SuppressWarnings("null")
 public class LootGenerator extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
@@ -101,8 +102,10 @@ public class LootGenerator extends BaseEntityBlock {
         return InteractionResult.CONSUME;
     }
 
-    /** Opens the GUI if the frame is formed, otherwise auto-fills from the player's inventory or
-     * highlights what's missing. Shared by direct clicks and forwarded clicks from a {@link MachineFrame} satellite. */
+    /**
+     * Opens the GUI if the frame is formed, otherwise auto-fills from the player's inventory or
+     * highlights what's missing.
+     */
     public static InteractionResult interact(Level level, BlockPos pos, LootGeneratorBlockEntity be, ServerPlayer serverPlayer) {
         if (be.checkStructure()) {
             serverPlayer.openMenu(be, buf -> buf.writeBlockPos(pos));

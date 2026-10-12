@@ -10,8 +10,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
  * Server -> client notification sent when a Temporal Anchor reverts a player's timeline after
- * death. Carries the corrected hunger values (vanilla has no generic resync packet for hunger,
- * since the client predicts it locally) plus enough context to show a "timeline restored" message.
+ * death.
  */
 public class AnchorStatusPacket implements CustomPacketPayload {
     public static final Type<AnchorStatusPacket> TYPE =

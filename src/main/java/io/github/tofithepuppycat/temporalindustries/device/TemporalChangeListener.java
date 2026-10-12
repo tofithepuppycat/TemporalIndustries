@@ -41,10 +41,10 @@ import java.util.List;
 import java.util.UUID;
 
 /**
- * Central event hub: records player-caused block changes into PlayerTemporalState, buffers
- * changes for tracked chunks and flushes them into timeline commits, tracks entity spawns/deaths
- * in tracked chunks, and intercepts an armed player's death to rewind them via their Temporal
- * Anchor before the death screen shows.
+ * Central event hub: records player-caused block changes into PlayerTemporalState, buffers changes
+ * for tracked chunks and flushes them into timeline commits, tracks entity spawns/deaths in tracked
+ * chunks, and intercepts an armed player's death to rewind them via their Temporal Anchor before
+ * the death screen shows.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalChangeListener {
@@ -105,8 +105,10 @@ public final class TemporalChangeListener {
         handleBlockChange(level, data, pos, delta, player);
     }
 
-    /** Covers bulk block placement not attributable to a single EntityPlaceEvent (e.g. a sapling
-     * growing into a tree), where NeoForge fires one MultiPlaceEvent with a snapshot per block. */
+    /**
+     * Covers bulk block placement not attributable to a single EntityPlaceEvent (e.g. a sapling
+     * growing into a tree), where NeoForge fires one MultiPlaceEvent with a snapshot per block.
+     */
     @SubscribeEvent
     public static void onBlockMultiPlace(BlockEvent.EntityMultiPlaceEvent event) {
         if (event.isCanceled()) return;
@@ -128,9 +130,10 @@ public final class TemporalChangeListener {
         }
     }
 
-    /** Whether this change will be recorded anywhere (tracked chunk, a repository's claimed
-     * chunk, or an armed player's anchor), checked before paying for full block-entity NBT
-     * serialization. */
+    /**
+     * Whether this change will be recorded anywhere (tracked chunk, a repository's claimed chunk,
+     * or an armed player's anchor), checked before paying for full block-entity NBT serialization.
+     */
     private static boolean shouldRecord(ServerLevel level, TemporalWorldData data, BlockPos pos, @Nullable ServerPlayer player) {
         ResourceLocation dimension = level.dimension().location();
         if (data.isGlued(dimension, pos)) return false;
@@ -155,23 +158,23 @@ public final class TemporalChangeListener {
             }
         }
 
-        // 2. Buffer for the old per-dimension timeline if this chunk is tracked by a Time Machine
+        // 2. Buffer for the per-dimension timeline if this chunk is tracked by a Time Machine
         ChunkPos chunkPos = new ChunkPos(pos);
         if (data.isTracked(dimension, chunkPos)) {
             data.recordTrackedBlockChange(dimension, chunkPos, delta);
         }
 
-        // 3. Buffer for the new per-machine repository if this chunk is claimed by one. Not
-        // flushed periodically -- it just accumulates until that repository's owner explicitly
-        // Commits (see TemporalWorldData#commitRepository).
+        // 3.
         UUID repoId = data.getClaimingRepo(dimension, chunkPos);
         if (repoId != null) {
             data.recordRepoBlockChange(repoId, chunkPos, delta);
         }
     }
 
-    /** Left-clicking while holding Temporal Glue deletes every glued region along the player's
-     * sight line instead of breaking whatever block is under the crosshair. */
+    /**
+     * Left-clicking while holding Temporal Glue deletes every glued region along the player's sight
+     * line instead of breaking whatever block is under the crosshair.
+     */
     @SubscribeEvent
     public static void onLeftClickGlue(PlayerInteractEvent.LeftClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -182,8 +185,10 @@ public final class TemporalChangeListener {
         TemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
     }
 
-    /** Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on
-     * a block at all. */
+    /**
+     * Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on a
+     * block at all.
+     */
     @SubscribeEvent
     public static void onLeftClickEmptyGlue(PlayerInteractEvent.LeftClickEmpty event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
@@ -237,8 +242,10 @@ public final class TemporalChangeListener {
         if (repoId != null) data.recordRepoEntityDelta(repoId, chunkPos, delta);
     }
 
-    /** Fires before the interaction runs, so this just snapshots "before" state; the diff happens
-     * at the end of the same tick once the interaction has applied its effect. */
+    /**
+     * Fires before the interaction runs, so this just snapshots "before" state; the diff happens at
+     * the end of the same tick once the interaction has applied its effect.
+     */
     @SubscribeEvent
     public static void onEntityInteract(PlayerInteractEvent.EntityInteract event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;

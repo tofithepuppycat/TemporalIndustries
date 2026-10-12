@@ -11,7 +11,9 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Server -> client: the full list of registered loot table ids, in reply to a suggestions request. */
+/**
+ * Server -> client: the full list of registered loot table ids, in reply to a suggestions request.
+ */
 public class LootTableSuggestionsSyncPacket implements CustomPacketPayload {
     public static final Type<LootTableSuggestionsSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_table_suggestions_sync"));

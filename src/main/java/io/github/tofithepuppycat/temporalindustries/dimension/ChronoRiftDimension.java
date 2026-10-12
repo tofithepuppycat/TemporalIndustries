@@ -9,10 +9,12 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.Level;
 import org.jetbrains.annotations.Nullable;
 
-/** The Chrono Rift: a shared, data-driven void dimension (see
- * {@code data/temporalindustries/dimension/chrono_rift.json}) that {@link
- * io.github.tofithepuppycat.temporalindustries.timeline.ChronoRiftFiller} paints with
- * reconstructed Overworld history on demand, chunk by chunk. */
+/**
+ * The Chrono Rift: a shared, data-driven void dimension (see {@code
+ * data/temporalindustries/dimension/chrono_rift.json}) that {@link
+ * io.github.tofithepuppycat.temporalindustries.timeline.ChronoRiftFiller} paints with reconstructed
+ * Overworld history on demand, chunk by chunk.
+ */
 public final class ChronoRiftDimension {
     public static final ResourceLocation ID = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_rift");
     public static final ResourceKey<Level> LEVEL_KEY = ResourceKey.create(Registries.DIMENSION, ID);

@@ -26,9 +26,10 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Machine that spends liquid Order/Chaos to transmute whatever sits in its input slot or liquid
+/**
+ * Machine that spends liquid Order/Chaos to transmute whatever sits in its input slot or liquid
  * tank into the next item in an entropy chain; see {@link EntropyManipulatorBlockEntity}.
- * {@link #FACING} picks the "front" face the same way {@link EntropyCondenser}'s does. */
+ */
 @SuppressWarnings("null")
 public class EntropyManipulator extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;

@@ -13,8 +13,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Server -> client copy of the resolved item energy costs, which are only computed server-side
- * but are needed by the client to show jump cost tooltips. */
+/**
+ * Server -> client copy of the resolved item energy costs, which are only computed server-side but
+ * are needed by the client to show jump cost tooltips.
+ */
 public class ItemCostSyncPacket implements CustomPacketPayload {
     public static final Type<ItemCostSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "item_cost_sync"));

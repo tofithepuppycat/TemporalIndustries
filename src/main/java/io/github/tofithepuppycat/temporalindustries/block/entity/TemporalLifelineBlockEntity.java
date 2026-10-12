@@ -17,9 +17,7 @@ import java.util.UUID;
 
 /**
  * Holds no state of its own; it only keeps this lifeline in a registry of loaded lifelines so the
- * explosion handler can find them without scanning the world. Which repository it protects is
- * resolved live from the adjacent Chronosphere, so placing or removing a Chronosphere needs no
- * bookkeeping here.
+ * explosion handler can find them without scanning the world.
  */
 public class TemporalLifelineBlockEntity extends BlockEntity {
     private static final Set<GlobalPos> LOADED = new HashSet<>();
@@ -44,8 +42,10 @@ public class TemporalLifelineBlockEntity extends BlockEntity {
         LOADED.clear();
     }
 
-    /** Each repository currently protected by a loaded lifeline touching a Chronosphere in level,
-     * mapped to one such lifeline's position (the beam origin). */
+    /**
+     * Each repository currently protected by a loaded lifeline touching a Chronosphere in level,
+     * mapped to one such lifeline's position (the beam origin).
+     */
     public static Map<UUID, BlockPos> protectingLifelines(ServerLevel level) {
         Map<UUID, BlockPos> result = new HashMap<>();
         for (GlobalPos global : LOADED) {
@@ -56,13 +56,14 @@ public class TemporalLifelineBlockEntity extends BlockEntity {
         return result;
     }
 
-    /** The repository of any Chronosphere touching pos with a face, or null if none does. */
+    /** The repository of any bound Chronosphere touching pos with a face, or null if none does. */
     @Nullable
     public static UUID connectedRepository(ServerLevel level, BlockPos pos) {
         for (Direction dir : Direction.values()) {
             BlockPos neighbour = pos.relative(dir);
             if (level.isLoaded(neighbour) && level.getBlockEntity(neighbour) instanceof ChronosphereBlockEntity sphere) {
-                return sphere.getRepositoryId();
+                UUID repoId = sphere.getRepositoryId();
+                if (repoId != null) return repoId;
             }
         }
         return null;

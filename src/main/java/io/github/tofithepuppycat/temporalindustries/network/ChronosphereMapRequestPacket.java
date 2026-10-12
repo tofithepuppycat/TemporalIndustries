@@ -18,9 +18,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Client -> server: request terrain thumbnails for every claimable cell in a Chronosphere's map —
+/**
+ * Client -> server: request terrain thumbnails for every claimable cell in a Chronosphere's map —
  * sent once when the map overlay opens and periodically while it stays open, since the underlying
- * terrain can change (players building, explosions, growth) while the player is looking at it. */
+ * terrain can change (players building, explosions, growth) while the player is looking at it.
+ */
 public class ChronosphereMapRequestPacket implements CustomPacketPayload {
     public static final Type<ChronosphereMapRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_map_request"));

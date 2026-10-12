@@ -12,8 +12,9 @@ import org.jetbrains.annotations.Nullable;
 
 /**
  * Tethers the chunks of an adjacent {@link Chronosphere}'s repository against explosions: while
- * touching a Chronosphere with any face, explosions can no longer destroy blocks inside that
- * Chronosphere's claimed chunks (see {@link io.github.tofithepuppycat.temporalindustries.device.TemporalLifelineListener}).
+ * touching a Chronosphere with any face, explosions cannot destroy blocks inside that
+ * Chronosphere's claimed chunks (see {@link
+ * io.github.tofithepuppycat.temporalindustries.device.TemporalLifelineListener}).
  */
 public class TemporalLifeline extends BaseEntityBlock {
     private static final MapCodec<TemporalLifeline> CODEC = simpleCodec(TemporalLifeline::new);
