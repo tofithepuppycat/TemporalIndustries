@@ -220,37 +220,55 @@ public final class ItemEnergyCosts {
                 .toList();
 
         int totalDerived = 0;
-        boolean changed = true;
-        while (changed) {
-            changed = false;
-            for (RecipeHolder<?> holder : recipes) {
-                Recipe<?> recipe = holder.value();
-                ItemStack result = recipe.getResultItem(registries);
-                if (result.isEmpty() || costs.containsKey(result.getItem())) continue;
-
-                NonNullList<Ingredient> ingredients = recipe.getIngredients();
-                if (ingredients.isEmpty()) continue;
-
-                long total = 0;
-                boolean resolvable = true;
-                for (Ingredient ingredient : ingredients) {
-                    if (ingredient.isEmpty()) continue;
-                    OptionalInt cheapest = cheapestKnownOption(ingredient, costs);
-                    if (cheapest.isEmpty()) {
-                        resolvable = false;
-                        break;
-                    }
-                    total += cheapest.getAsInt();
-                }
-                if (!resolvable) continue;
-
-                int perItem = Math.max(1, (int) Math.ceil(total / (double) result.getCount()));
-                costs.put(result.getItem(), perItem);
-                changed = true;
-                totalDerived++;
-            }
-        }
+        int pass;
+        do {
+            pass = 0;
+            int strict;
+            while ((strict = priceRecipes(recipes, registries, costs, false)) > 0) pass += strict;
+            // Recipes blocked only by unpriced modded ingredients are priced from the ingredients that are known.
+            pass += priceRecipes(recipes, registries, costs, true);
+            totalDerived += pass;
+        } while (pass > 0);
         return totalDerived;
+    }
+
+    /**
+     * Prices every still-unpriced recipe result whose ingredients allow it. In lenient mode,
+     * unpriced ingredients are ignored as long as at least one ingredient is priced.
+     * @return how many items were priced.
+     */
+    private static int priceRecipes(List<RecipeHolder<?>> recipes, HolderLookup.Provider registries,
+                                    Map<Item, Integer> costs, boolean lenient) {
+        int priced = 0;
+        for (RecipeHolder<?> holder : recipes) {
+            Recipe<?> recipe = holder.value();
+            ItemStack result = recipe.getResultItem(registries);
+            if (result.isEmpty() || costs.containsKey(result.getItem())) continue;
+
+            NonNullList<Ingredient> ingredients = recipe.getIngredients();
+            if (ingredients.isEmpty()) continue;
+
+            long total = 0;
+            int knownCount = 0;
+            boolean resolvable = true;
+            for (Ingredient ingredient : ingredients) {
+                if (ingredient.isEmpty()) continue;
+                OptionalInt cheapest = cheapestKnownOption(ingredient, costs);
+                if (cheapest.isPresent()) {
+                    total += cheapest.getAsInt();
+                    knownCount++;
+                } else if (!lenient) {
+                    resolvable = false;
+                    break;
+                }
+            }
+            if (!resolvable || knownCount == 0) continue;
+
+            int perItem = Math.max(1, (int) Math.ceil(total / (double) result.getCount()));
+            costs.put(result.getItem(), perItem);
+            priced++;
+        }
+        return priced;
     }
 
     private static OptionalInt cheapestKnownOption(Ingredient ingredient, Map<Item, Integer> costs) {
@@ -282,7 +300,7 @@ public final class ItemEnergyCosts {
                 .sorted()
                 .toList();
 
-        StringBuilder sb = new StringBuilder();
+        StringBuilder sb = new StringBuilder("algorithm-v2|");
         recipeIds.forEach(sb::append);
         sb.append('|');
         baseEntries.forEach(sb::append);

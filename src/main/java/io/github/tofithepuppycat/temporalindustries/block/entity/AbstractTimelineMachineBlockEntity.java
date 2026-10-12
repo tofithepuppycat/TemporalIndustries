@@ -538,14 +538,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         syncToClients();
     }
 
-    /** Deletes a named branch and the history unique to it. */
+    /** Deletes a commit and everything descended from it. */
     @Override
-    public boolean deleteBranch(String branchName) {
+    public boolean deleteCommit(long commitId) {
         TemporalRepository repo = getRepository();
         TemporalWorldData data = worldData();
         if (repo == null || data == null) return false;
 
-        boolean deleted = repo.deleteBranch(branchName);
+        boolean deleted = repo.deleteCommit(commitId);
         if (deleted) {
             data.setDirty();
             setChanged();

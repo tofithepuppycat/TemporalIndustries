@@ -29,7 +29,7 @@ import net.minecraft.util.FormattedCharSequence;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
+import io.github.tofithepuppycat.temporalindustries.client.ShortEnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 
@@ -291,9 +291,9 @@ public final class TimelineGraphWidget {
             mesh.diamond(x, y, radius, color);
             mesh.diamond(x, y, radius * 0.45F, core);
         } else {
-            mesh.circle(x, y, radius + 1.0F, NODE_OUTLINE_RGB, NODE_OUTLINE_RGB);
-            mesh.circle(x, y, radius, color, color);
-            mesh.circle(x, y, radius * 0.45F, core, core);
+            mesh.square(x, y, radius + 1.0F, NODE_OUTLINE_RGB);
+            mesh.square(x, y, radius, color);
+            mesh.square(x, y, radius * 0.45F, core);
         }
     }
 
@@ -374,6 +374,12 @@ public final class TimelineGraphWidget {
                         cx + c2 * outerRadius, cy + s2 * outerRadius, color,
                         cx + c2 * innerRadius, cy + s2 * innerRadius, color);
             }
+        }
+
+        /** Axis-aligned square spanning cx ± half, cy ± half. */
+        void square(float cx, float cy, float half, int color) {
+            tri(cx - half, cy - half, color, cx + half, cy - half, color, cx + half, cy + half, color);
+            tri(cx - half, cy - half, color, cx + half, cy + half, color, cx - half, cy + half, color);
         }
 
         void diamond(float cx, float cy, float radius, int color) {
@@ -654,30 +660,18 @@ public final class TimelineGraphWidget {
         Optional<JumpCostBreakdown> jumpCost = TimelineProjectionManager.getJumpCost(commit.id());
         if (jumpCost.isPresent()) {
             JumpCostBreakdown cost = jumpCost.get();
-            tooltip.add(labeled("Jump cost: ", EnergyDisplay.format(cost.total()) + " FE", ChatFormatting.YELLOW));
+            tooltip.add(labeled("Jump cost: ", ShortEnergyDisplay.format(cost.total()), ChatFormatting.YELLOW));
             if (detailed) {
-                tooltip.add(Component.literal("  ")
-                        .append(Component.literal(EnergyDisplay.format(cost.time())).withStyle(COST_TIME_COLOR))
-                        .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal(EnergyDisplay.format(cost.blocks())).withStyle(COST_BLOCKS_COLOR))
-                        .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal(EnergyDisplay.format(cost.entropy())).withStyle(COST_ENTROPY_COLOR)));
-                tooltip.add(Component.literal("  ")
-                        .append(Component.literal("Time").withStyle(COST_TIME_COLOR))
-                        .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("Blocks").withStyle(COST_BLOCKS_COLOR))
-                        .append(Component.literal(" + ").withStyle(ChatFormatting.GRAY))
-                        .append(Component.literal("Entropy").withStyle(COST_ENTROPY_COLOR)));
                 tooltip.add(formula("Time", COST_TIME_COLOR, String.format("%s x ln(1 + %.1f min) = %s",
-                        EnergyDisplay.format(Math.round(AbstractTimelineMachineBlockEntity.JUMP_TIME_FE_SCALE)),
-                        cost.minutes(), EnergyDisplay.format(cost.time()))));
-                tooltip.add(formula("Blocks", COST_BLOCKS_COLOR, String.format("sum of %d changed block costs = %s",
-                        cost.changedBlocks(), EnergyDisplay.format(cost.blocks()))));
+                        ShortEnergyDisplay.formatPlain(Math.round(AbstractTimelineMachineBlockEntity.JUMP_TIME_FE_SCALE)),
+                        cost.minutes(), ShortEnergyDisplay.format(cost.time()))));
+                tooltip.add(formula("Blocks", COST_BLOCKS_COLOR, String.format("sum(%d jump costs) = %s",
+                        cost.changedBlocks(), ShortEnergyDisplay.format(cost.blocks()))));
                 tooltip.add(formula("Entropy", COST_ENTROPY_COLOR,
                         String.format("%.2f x (e^(%.0f x %.2f) - 1) = %s",
                         AbstractTimelineMachineBlockEntity.JUMP_ENTROPIC_FE_SCALE,
                         AbstractTimelineMachineBlockEntity.JUMP_ENTROPIC_GROWTH, cost.chaos(),
-                        EnergyDisplay.format(cost.entropy()))));
+                        ShortEnergyDisplay.format(cost.entropy()))));
             }
         }
         if (detailed) {

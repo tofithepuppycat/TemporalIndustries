@@ -15,7 +15,7 @@ import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProj
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
-import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
@@ -69,9 +69,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
      */
     private static final int GRAPH_HEIGHT = 154;
 
-    private static final int ENERGY_BAR_X_OFFSET = 160;
+    private static final int ENERGY_BAR_X_OFFSET = 165;
     private static final int ENERGY_BAR_Y_OFFSET = 7;
-    private static final int ENERGY_BAR_WIDTH = 57;
+    private static final int ENERGY_BAR_WIDTH = 52;
     private static final int ENERGY_BAR_HEIGHT = 8;
 
     private static final int ENTROPY_BAR_X_OFFSET = 6;
@@ -103,8 +103,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private int showChangesY;
     private int jumpX;
     private int jumpY;
-    private int deleteBranchX;
-    private int deleteBranchY;
+    private int deleteCommitX;
+    private int deleteCommitY;
 
     public ChronovaultScreen(ChronovaultMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
@@ -131,10 +131,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 3 + ACTION_BUTTON_GAP * 2)) / 2;
         showChangesX = groupX;
         jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
-        deleteBranchX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        deleteCommitX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
-        deleteBranchY = showChangesY;
+        deleteCommitY = showChangesY;
 
         settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         settingsY = panelY() + SETTINGS_Y_OFFSET;
@@ -217,15 +217,15 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Deletes the branch whose tip is the selected node. */
-    private void deleteSelectedBranch() {
-        String branchName = TimelineProjectionManager.getSelectedBranchName();
-        if (branchName == null || !TimelineProjectionManager.isSelectedBranchDeletable()) {
+    /** Deletes the selected commit and everything descended from it. */
+    private void deleteSelectedCommit() {
+        if (!TimelineProjectionManager.isSelectedCommitDeletable()) {
             return;
         }
-        PacketDistributor.sendToServer(new TimelineMachineDeleteBranchPacket(menu.getBlockPos(), branchName));
+        PacketDistributor.sendToServer(new TimelineMachineDeleteCommitPacket(menu.getBlockPos(),
+                TimelineProjectionManager.getSelectedCommitId()));
         TimelineProjectionManager.clearSelectedCommit();
-        // Deleting a branch doesn't move the head, so the server's "nothing changed" skip would
+        // Deleting a commit doesn't move the head, so the server's "nothing changed" skip would
         // otherwise suppress a reply; force a full resync to pick up the removed commits.
         requestTimelineView(true);
     }
@@ -284,11 +284,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
 
-        // Hidden entirely until a deletable branch tip is selected.
-        if (TimelineProjectionManager.isSelectedBranchDeletable()) {
-            int deleteTint = isMouseOverDeleteBranchButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
-            IconButtonRenderer.renderBackground(guiGraphics, deleteBranchX, deleteBranchY, deleteTint);
-            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteBranchX, deleteBranchY);
+        // Hidden entirely until a deletable commit is selected.
+        if (TimelineProjectionManager.isSelectedCommitDeletable()) {
+            int deleteTint = isMouseOverDeleteCommitButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+            IconButtonRenderer.renderBackground(guiGraphics, deleteCommitX, deleteCommitY, deleteTint);
+            IconButtonRenderer.renderIcon(guiGraphics, ICON_TRASHCAN_TEXTURE, deleteCommitX, deleteCommitY);
         }
     }
 
@@ -302,10 +302,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
                 && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
     }
 
-    private boolean isMouseOverDeleteBranchButton(double mouseX, double mouseY) {
-        return TimelineProjectionManager.isSelectedBranchDeletable()
-                && mouseX >= deleteBranchX && mouseX <= deleteBranchX + ACTION_BUTTON_SIZE
-                && mouseY >= deleteBranchY && mouseY <= deleteBranchY + ACTION_BUTTON_SIZE;
+    private boolean isMouseOverDeleteCommitButton(double mouseX, double mouseY) {
+        return TimelineProjectionManager.isSelectedCommitDeletable()
+                && mouseX >= deleteCommitX && mouseX <= deleteCommitX + ACTION_BUTTON_SIZE
+                && mouseY >= deleteCommitY && mouseY <= deleteCommitY + ACTION_BUTTON_SIZE;
     }
 
     private boolean isMouseOverEnergyBar(int mouseX, int mouseY) {
@@ -446,15 +446,13 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
-        } else if (isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, deleteBranchTooltip(), mouseX, mouseY);
+        } else if (isMouseOverDeleteCommitButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, deleteCommitTooltip(), mouseX, mouseY);
         }
     }
 
-    /** Names the branch the button would delete, so it's obvious what's about to go. */
-    static Component deleteBranchTooltip() {
-        String branchName = TimelineProjectionManager.getSelectedBranchName();
-        return Component.translatable("gui.temporalindustries.chronovault.delete_branch_named", branchName);
+    static Component deleteCommitTooltip() {
+        return Component.translatable("gui.temporalindustries.chronovault.delete_commit");
     }
 
     /** Shared with {@link ChronosphereScreen}'s identical entropy bar tooltip. */
@@ -491,8 +489,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             return true;
         }
 
-        if (button == 0 && isMouseOverDeleteBranchButton(mouseX, mouseY)) {
-            deleteSelectedBranch();
+        if (button == 0 && isMouseOverDeleteCommitButton(mouseX, mouseY)) {
+            deleteSelectedCommit();
             return true;
         }
 
