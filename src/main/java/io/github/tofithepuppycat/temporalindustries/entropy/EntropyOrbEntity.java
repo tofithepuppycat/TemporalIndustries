@@ -27,9 +27,7 @@ import java.util.function.Predicate;
 
 /**
  * ORD/CHS orb, modeled on vanilla {@link net.minecraft.world.entity.ExperienceOrb}: floats, bobs,
- * merges with nearby orbs of the same {@link EntropyType}, and gets picked up on touch. Unlike an
- * xp orb, it's only attracted to (and picked up by) a player holding a matching
- * {@link EntropyReceptacle} in hand.
+ * merges with nearby orbs of the same {@link EntropyType}, and gets picked up on touch.
  */
 public class EntropyOrbEntity extends Entity {
     private static final int LIFETIME = 600;

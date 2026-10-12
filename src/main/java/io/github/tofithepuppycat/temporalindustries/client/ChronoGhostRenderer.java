@@ -37,10 +37,8 @@ import java.util.UUID;
 import java.util.concurrent.ConcurrentHashMap;
 
 /**
- * Draws a translucent "ghost" of whatever a Chrono Loop Projector is replaying, using the
- * recording owner's resolved skin. Purely client-side and visual: it only reads the block entity's
- * synced playback state and tint. A plain {@link PlayerModel} is drawn directly with a forced
- * translucent render type (rather than the normal player renderer) so tint/alpha apply reliably.
+ * Draws a translucent "ghost" of whatever a Chrono Loop Projector is replaying, using the recording
+ * owner's resolved skin.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class ChronoGhostRenderer {
@@ -160,8 +158,10 @@ public final class ChronoGhostRenderer {
         return type == PlayerSkin.Model.SLIM ? slimModel : wideModel;
     }
 
-    /** Builds a fake player from the recording's stored owner id/name so {@link RemotePlayer#getSkin()}
-     * can resolve it the normal vanilla way. */
+    /**
+     * Builds a fake player from the recording's stored owner id/name so {@link
+     * RemotePlayer#getSkin()} can resolve it the normal vanilla way.
+     */
     private static RemotePlayer fakeGhost(ClientLevel level, ChronoRecording recording) {
         if (ghostsLevel != level) {
             GHOSTS.clear();

@@ -10,8 +10,8 @@ import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.IItemDecorator;
 
 /**
- * Draws two durability-like bars over a {@link DualEntropyCellItem} in inventory slots: a white
- * one for ORD (order) and a {@code #3E2A49} one for CHS (chaos), stacked like a mekanism gauge.
+ * Draws two durability-like bars over a {@link DualEntropyCellItem} in inventory slots: a white one
+ * for ORD (order) and a {@code #3E2A49} one for CHS (chaos), stacked like a mekanism gauge.
  */
 public class EntropyContainerItemDecorator implements IItemDecorator {
     @Override

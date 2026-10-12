@@ -4,8 +4,10 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import org.jetbrains.annotations.Nullable;
 
-/** Client-side toggle for {@link EntropyCondenserRangeRenderer}: at most one Entropy Condenser can
- * have its absorb-range perimeter shown at a time. Purely visual, never synced to the server. */
+/**
+ * Client-side toggle for {@link EntropyCondenserRangeRenderer}: at most one Entropy Condenser can
+ * have its absorb-range perimeter shown at a time.
+ */
 public final class EntropyCondenserRangeClientState {
     @Nullable private static ResourceLocation dimension;
     @Nullable private static BlockPos pos;

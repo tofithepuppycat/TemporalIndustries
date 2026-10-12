@@ -27,13 +27,13 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Placeable {@link BlockItem} that doubles as a mob trap: right-click a living, non-player entity to
- * capture it into a {@link CapturedMob} data component (bucket-of-mob style), then place it to
+ * Placeable {@link BlockItem} that doubles as a mob trap: right-click a living, non-player entity
+ * to capture it into a {@link CapturedMob} data component (bucket-of-mob style), then place it to
  * passively generate ORD/CHS while occupied.
  */
 @SuppressWarnings("null")
 public class SchrodingerGeneratorItem extends BlockItem {
-    /** Entity types that can never be captured. Ships empty; extendable via datapack. */
+    /** Entity types that can never be captured. */
     public static final TagKey<EntityType<?>> CAPTURE_BLACKLIST = TagKey.create(Registries.ENTITY_TYPE,
             ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "schrodinger_generator_blacklist"));
 

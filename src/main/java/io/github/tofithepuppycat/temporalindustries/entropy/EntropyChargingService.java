@@ -18,7 +18,6 @@ import java.util.List;
 /**
  * Passively trickles liquid ORD out of any Order Cell / Dual Entropy Cell carried by a player into
  * chargeable items carried the same way (Temporal Glue durability, Temporal Anchor order tank).
- * Ticked once per {@link #CHARGE_INTERVAL_TICKS}.
  */
 public final class EntropyChargingService {
     public static final int CHARGE_INTERVAL_TICKS = 20;
@@ -50,8 +49,10 @@ public final class EntropyChargingService {
         if (curioAnchor != null) chargeTarget(curioAnchor, cells);
     }
 
-    /** Only the cells count as a source - the anchor is a receptacle too, but it is a charge target
-     * here, not a donor. */
+    /**
+     * Only the cells count as a source - the anchor is a receptacle too, but it is a charge target
+     * here, not a donor.
+     */
     private static void collectCell(ItemStack stack, List<ItemStack> cells) {
         boolean isCell = stack.getItem() instanceof EntropyCellItem || stack.getItem() instanceof DualEntropyCellItem;
         if (isCell && ((EntropyReceptacle) stack.getItem()).amount(stack, EntropyType.ORDER) > 0) {
@@ -94,8 +95,10 @@ public final class EntropyChargingService {
         ((EntropyReceptacle) stack.getItem()).fill(stack, EntropyType.ORDER, drained);
     }
 
-    /** Pulls up to millibuckets of liquid order out of cells, in order, mutating each cell's stored
-     * contents in place. Returns how much was actually drained. */
+    /**
+     * Pulls up to millibuckets of liquid order out of cells, in order, mutating each cell's stored
+     * contents in place.
+     */
     private static int drain(List<ItemStack> cells, int millibuckets) {
         int remaining = millibuckets;
         for (ItemStack cell : cells) {

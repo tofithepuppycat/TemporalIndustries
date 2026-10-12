@@ -12,8 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: wipes a timeline machine's tracked chunk(s) back to a blank history, leaving
- * the live world untouched. Shared by the Chronosphere and Chronovault screens. */
+/**
+ * Client -> server: wipes a timeline machine's tracked chunk(s) back to a blank history, leaving
+ * the live world untouched.
+ */
 public class TimelineMachineDeleteHistoryPacket implements CustomPacketPayload {
     public static final Type<TimelineMachineDeleteHistoryPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_delete_history"));
@@ -45,7 +47,7 @@ public class TimelineMachineDeleteHistoryPacket implements CustomPacketPayload {
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
             if (!(menu.getTimelineProvider() instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            machine.deleteAllHistory();
+            machine.deleteRepository();
 
             // Chronosphere's claim map/tracked-count footer reads from ChronosphereClientState, not
             // the synced block entity, so it needs this extra push; Chronovault doesn't.

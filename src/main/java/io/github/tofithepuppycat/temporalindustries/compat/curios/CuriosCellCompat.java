@@ -15,10 +15,7 @@ import top.theillusivec4.curios.api.type.capability.ICurio;
 import java.util.ArrayList;
 import java.util.List;
 
-/**
- * Isolates references to Curios' optional API for the "cell" curio slot. Callers must only reach
- * this class from behind a {@code ModList.get().isLoaded("curios")} check.
- */
+/** Isolates references to Curios' optional API for the "cell" curio slot. */
 public final class CuriosCellCompat {
     private CuriosCellCompat() {}
 
@@ -28,7 +25,10 @@ public final class CuriosCellCompat {
                 Registration.ORDER_CELL_ITEM.get(), Registration.CHAOS_CELL_ITEM.get(), Registration.DUAL_ENTROPY_CELL_ITEM.get());
     }
 
-    /** First cell equipped in the "cell" curio slot with spare capacity for the given entropy type, or null. */
+    /**
+     * First cell equipped in the "cell" curio slot with spare capacity for the given entropy type,
+     * or null.
+     */
     @Nullable
     public static ItemStack findCellInCurioSlot(Player player, EntropyType type) {
         return CuriosApi.getCuriosInventory(player)

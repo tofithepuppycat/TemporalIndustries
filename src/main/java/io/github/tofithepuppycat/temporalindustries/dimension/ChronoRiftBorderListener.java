@@ -13,9 +13,11 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/** Stops players from wandering out of the Chrono Rift's reconstructed terrain: every server tick,
+/**
+ * Stops players from wandering out of the Chrono Rift's reconstructed terrain: every server tick,
  * any player standing in an untracked chunk is snapped back to the last tracked-chunk position they
- * were seen at, the same way vanilla's world border pushes players back inward. */
+ * were seen at, the same way vanilla's world border pushes players back inward.
+ */
 public final class ChronoRiftBorderListener {
     private static final Map<UUID, Vec3> lastTrackedPos = new HashMap<>();
 

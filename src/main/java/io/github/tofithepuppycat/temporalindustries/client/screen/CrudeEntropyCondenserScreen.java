@@ -52,7 +52,10 @@ public class CrudeEntropyCondenserScreen extends AbstractContainerScreen<CrudeEn
                 menu.getChaosFluidAmount(), menu.getTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 
-    /** Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with the entropy color. */
+    /**
+     * Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with
+     * the entropy color.
+     */
     private void renderFluidBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
         guiGraphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xFF000000);
         if (capacity <= 0 || amount <= 0) return;

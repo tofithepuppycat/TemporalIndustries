@@ -30,7 +30,7 @@ import java.util.function.Supplier;
 
 /**
  * JEI plugin entry point, discovered via the {@link JeiPlugin} annotation; nothing here runs when
- * JEI isn't installed. Adds a "Show recipes" click area over the Entropy Manipulator's progress bar.
+ * JEI isn't installed.
  */
 @JeiPlugin
 public class TemporalIndustriesJeiPlugin implements IModPlugin {
@@ -70,7 +70,7 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
 
     /**
      * Groups non-fluid recipes into connected chains by shared item, walking each chain from a leaf
-     * end. Assumes every chain is a simple path (at most one chaos- and one order-typed edge per item).
+     * end.
      */
     private static List<EntropyManipulatorChain> buildChains(
             List<RecipeHolder<EntropyManipulatorRecipe>> recipes, net.minecraft.core.HolderLookup.Provider registries) {

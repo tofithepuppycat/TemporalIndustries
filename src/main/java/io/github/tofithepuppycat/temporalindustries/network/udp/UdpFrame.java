@@ -3,22 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.network.udp;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
-/**
- * Wire format for the temporal UDP bulk-transfer protocol.
- *
- * All multi-byte fields are big-endian. Frame layout:
- *
- *   HANDSHAKE_REQ  [type:1][playerUUID:16]
- *   HANDSHAKE_ACK  [type:1][sessionId:4][totalFragments:4][totalBytes:8]
- *   DATA_FRAG      [type:1][sessionId:4][fragIndex:4][totalFragments:4][payloadLen:2][payload:N]
- *   ACK            [type:1][sessionId:4][fragIndex:4]
- *   NACK           [type:1][sessionId:4][fragIndex:4]
- *   TRANSFER_DONE  [type:1][sessionId:4][crc32:4]
- *   DONE_ACK       [type:1][sessionId:4]
- *
- * Maximum UDP payload (safe MTU): 1400 bytes.
- * Maximum fragment data payload: MAX_FRAG_PAYLOAD bytes.
- */
+/** Wire format for the temporal UDP bulk-transfer protocol. */
 public final class UdpFrame {
     public static final byte TYPE_HANDSHAKE_REQ  = 1;
     public static final byte TYPE_HANDSHAKE_ACK  = 2;

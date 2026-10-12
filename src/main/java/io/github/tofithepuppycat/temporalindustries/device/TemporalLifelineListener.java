@@ -24,16 +24,16 @@ import java.util.UUID;
 
 /**
  * Nullifies the block damage of any explosion (mob, TNT, crystal, bed...) inside chunks claimed by
- * a repository that has a Temporal Lifeline attached. The destroyed-block list is emptied before
- * the explosion applies it, so those blocks stay exactly as they were: nothing to roll back, and
- * since nothing breaks, nothing drops either. A shockwave and beams from the
- * Lifeline show players what was saved. Blocks in unprotected chunks still blow up.
+ * a repository that has a Temporal Lifeline attached.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalLifelineListener {
     /** Beams drawn per explosion; more than this just turns into a solid wall of particles. */
     private static final int MAX_BEAMS = 24;
-    /** Every player in the dimension within this many blocks of the blast sees the effect, not just those tracking its chunk. */
+    /**
+     * Every player in the dimension within this many blocks of the blast sees the effect, not just
+     * those tracking its chunk.
+     */
     private static final double SHIELD_VISIBLE_RANGE = 32.0;
 
     private TemporalLifelineListener() {}

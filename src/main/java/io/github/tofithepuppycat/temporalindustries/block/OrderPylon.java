@@ -5,8 +5,10 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.world.level.block.BaseEntityBlock;
 
-/** Single-liquid variant of {@link EntropicPylon} that only routes Order - see
- * {@link io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity#acceptsFluid}. */
+/**
+ * Single-liquid variant of {@link EntropicPylon} that only routes Order - see {@link
+ * io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity#acceptsFluid}.
+ */
 public class OrderPylon extends EntropicPylon {
     private static final MapCodec<OrderPylon> CODEC = simpleCodec(OrderPylon::new);
 

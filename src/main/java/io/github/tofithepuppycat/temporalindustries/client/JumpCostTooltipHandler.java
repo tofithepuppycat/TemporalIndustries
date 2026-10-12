@@ -16,8 +16,10 @@ import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 
 import java.util.OptionalInt;
 
-/** Adds the base timeline jump cost to block item tooltips (inventory and JEI) while Entropy
- * Glasses are worn. */
+/**
+ * Adds the base timeline jump cost to block item tooltips (inventory and JEI) while Entropy Glasses
+ * are worn.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class JumpCostTooltipHandler {
     private JumpCostTooltipHandler() {}

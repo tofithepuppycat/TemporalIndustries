@@ -1,27 +1,29 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
+import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.network.LifelineShieldPacket;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
-import net.minecraft.core.particles.DustParticleOptions;
+import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.ClientTickEvent;
+import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
-/** Client-side reaction to {@link LifelineShieldPacket}: an Order-coloured shockwave ring expanding
- * from the blast, and a spark that travels from the Lifeline to each block it saved. Both play out
- * over several ticks, so active effects are kept here and advanced every client tick. Kept separate
- * from the packet class so that class doesn't need to reference client-only types. */
+/**
+ * Client-side reaction to {@link LifelineShieldPacket}: an Order-coloured shockwave ring expanding
+ * from the blast, and a spark that travels from the Lifeline to each block it saved.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class LifelineShieldClientHandler {
     private static final int SHOCKWAVE_TICKS = 14;
@@ -30,16 +32,28 @@ public final class LifelineShieldClientHandler {
     private static final int BEAM_LAUNCH_SPREAD_TICKS = 5;
     private static final double BEAM_SPACING = 0.3;
     private static final double RING_POINT_SPACING = 0.3;
-    /** Launch speeds that make a beam particle drift roughly a block back toward the Lifeline. */
-    private static final double DUST_DRIFT_SPEED = 0.3;
+    /** Launch speed that makes a beam head drift roughly a block back toward the Lifeline. */
     private static final double SPARK_DRIFT_SPEED = 0.07;
 
     private static final Vector3f ORDER_COLOR = colorOf(EntropyType.ORDER);
-    private static final DustParticleOptions DUST = new DustParticleOptions(ORDER_COLOR, 1.3F);
+    /**
+     * Built on first use rather than in a static initializer: this class is loaded when the event
+     * subscriber registers, which is before the particle type is bound.
+     */
+    @Nullable private static ColorParticleOption sparkOption;
 
     private static final List<Shield> ACTIVE = new ArrayList<>();
 
     private LifelineShieldClientHandler() {
+    }
+
+    /** The entropic pylon's transfer bolt spark, tinted Order. */
+    private static ColorParticleOption spark() {
+        if (sparkOption == null) {
+            sparkOption = ColorParticleOption.create(
+                    Registration.TRANSMIT_SPARK.get(), ORDER_COLOR.x, ORDER_COLOR.y, ORDER_COLOR.z);
+        }
+        return sparkOption;
     }
 
     private static final class BeamState {
@@ -126,19 +140,21 @@ public final class LifelineShieldClientHandler {
             double a = i * (2.0 * Math.PI / points);
             double cos = Math.cos(a) * r;
             double sin = Math.sin(a) * r;
-            shield.level.addParticle(DUST, c.x + cos, c.y, c.z + sin, 0.0, 0.0, 0.0);
+            shield.level.addParticle(spark(), c.x + cos, c.y, c.z + sin, 0.0, 0.0, 0.0);
             if (i % 3 == 0) {
                 shield.level.addParticle(ParticleTypes.END_ROD, c.x + cos, c.y, c.z + sin, 0.0, 0.0, 0.0);
             }
             if (i % 2 == 0) {
-                shield.level.addParticle(DUST, c.x + cos, c.y + sin, c.z, 0.0, 0.0, 0.0);
-                shield.level.addParticle(DUST, c.x, c.y + cos, c.z + sin, 0.0, 0.0, 0.0);
+                shield.level.addParticle(spark(), c.x + cos, c.y + sin, c.z, 0.0, 0.0, 0.0);
+                shield.level.addParticle(spark(), c.x, c.y + cos, c.z + sin, 0.0, 0.0, 0.0);
             }
         }
     }
 
-    /** Each beam is a bright head racing from the Lifeline to its block, leaving a trail of dust
-     * behind it, with a flash where it lands. */
+    /**
+     * Each beam is a bright head racing from the Lifeline to its block, leaving a trail of dust
+     * behind it, with a flash where it lands.
+     */
     private static void tickBeams(Shield shield) {
         for (BeamState beam : shield.beams) {
             int step = shield.age - beam.launchTick;
@@ -148,17 +164,14 @@ public final class LifelineShieldClientHandler {
             double t0 = Math.max(0, step - 1) / (double) BEAM_TRAVEL_TICKS;
             double t1 = step / (double) BEAM_TRAVEL_TICKS;
             Vec3 delta = beam.to.subtract(beam.from);
-            // Trail particles drift back toward the Lifeline. Dust scales its launch velocity down
-            // to a tenth, so it needs a much bigger nudge than the end rod for the same drift.
-            Vec3 back = delta.normalize().scale(-1.0);
-            Vec3 dustDrift = back.scale(DUST_DRIFT_SPEED);
-            Vec3 sparkDrift = back.scale(SPARK_DRIFT_SPEED);
+            // Only the head's end rod drifts back toward the Lifeline; the trail sparks are static.
+            Vec3 sparkDrift = delta.normalize().scale(-SPARK_DRIFT_SPEED);
             int samples = Math.max(1, (int) (delta.length() * (t1 - t0) / BEAM_SPACING));
 
             for (int i = 0; i <= samples; i++) {
                 double t = t0 + (t1 - t0) * (i / (double) samples);
                 Vec3 p = beam.from.add(delta.scale(t));
-                shield.level.addParticle(DUST, p.x, p.y, p.z, dustDrift.x, dustDrift.y, dustDrift.z);
+                shield.level.addParticle(spark(), p.x, p.y, p.z, 0.0, 0.0, 0.0);
             }
             Vec3 head = beam.from.add(delta.scale(t1));
             shield.level.addParticle(ParticleTypes.END_ROD, head.x, head.y, head.z, sparkDrift.x, sparkDrift.y, sparkDrift.z);

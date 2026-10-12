@@ -12,9 +12,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: jump a timeline-view machine (Chronovault or Chronosphere) to a specific
- * commit. The target time is read off the commit itself server-side, so the commit id is the only
- * thing that needs to travel. */
+/**
+ * Client -> server: jump a timeline-view machine (Chronovault or Chronosphere) to a specific
+ * commit.
+ */
 public class RollbackChunkPacket implements CustomPacketPayload {
     public static final Type<RollbackChunkPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "rollback_chunk"));

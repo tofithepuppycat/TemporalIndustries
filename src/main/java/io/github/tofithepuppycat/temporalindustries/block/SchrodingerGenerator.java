@@ -24,9 +24,10 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Early-game generator block whose only state is whether a mob is trapped inside (see
- * {@link SchrodingerGeneratorBlockEntity}). Emptying it via right-click or breaking releases the
- * mob back into the world rather than deleting it. */
+/**
+ * Early-game generator block whose only state is whether a mob is trapped inside (see {@link
+ * SchrodingerGeneratorBlockEntity}).
+ */
 @SuppressWarnings("null")
 public class SchrodingerGenerator extends BaseEntityBlock {
     public static final BooleanProperty OCCUPIED = BlockStateProperties.OCCUPIED;

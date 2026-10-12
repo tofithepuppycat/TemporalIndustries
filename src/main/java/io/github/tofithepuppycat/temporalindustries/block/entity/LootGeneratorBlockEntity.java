@@ -56,10 +56,8 @@ import java.util.List;
 
 /**
  * Spends liquid Chaos to roll a player-chosen loot table into its own chest-sized inventory, one
- * item at a time on a tick-driven progress bar: a fixed cost to start the roll, plus a further
- * cost per item placed. A luck slider (0-{@link #MAX_LUCK}) skews results at a Chaos surcharge. A
- * play/stop toggle starts/halts generation, and a repeat toggle picks whether one press produces
- * one roll or keeps rolling until Chaos runs out.
+ * item at a time on a tick-driven progress bar: a fixed cost to start the roll, plus a further cost
+ * per item placed.
  */
 @SuppressWarnings("null")
 public class LootGeneratorBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider, MachineFrameController {
@@ -151,8 +149,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return luck;
     }
 
-    /** Clamps to [0, {@link #MAX_LUCK}] rather than trusting the client's slider position, since the
-     * packet that calls this comes straight from the GUI. */
+    /**
+     * Clamps to [0, {@link #MAX_LUCK}] rather than trusting the client's slider position, since the
+     * packet that calls this comes straight from the GUI.
+     */
     public void setLuck(int luck) {
         this.luck = Math.clamp(luck, 0, MAX_LUCK);
         setChanged();
@@ -184,8 +184,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Presses "play": no-ops if already running, otherwise marks running and kicks off the first
-     * roll ({@link #processTick()} keeps retrying every tick if it can't start yet). */
+    /**
+     * Presses "play": no-ops if already running, otherwise marks running and kicks off the first
+     * roll ({@link #processTick()} keeps retrying every tick if it can't start yet).
+     */
     public void beginGeneration() {
         if (running) return;
         running = true;
@@ -194,7 +196,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         startRoll();
     }
 
-    /** Presses "stop": halts immediately, discarding any unfinished roll (its Chaos is not refunded). */
+    /**
+     * Presses "stop": halts immediately, discarding any unfinished roll (its Chaos is not
+     * refunded).
+     */
     public void stopGeneration() {
         if (!running && pendingRoll.isEmpty()) return;
         running = false;
@@ -208,13 +213,18 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return progress;
     }
 
-    /** Sampled items this table could plausibly produce, for the client's roll animation, not the actual queued results. */
+    /**
+     * Sampled items this table could plausibly produce, for the client's roll animation, not the
+     * actual queued results.
+     */
     public List<ItemStack> getPossibleItems() {
         return possibleItems;
     }
 
-    /** The item that will actually be placed when the current roll's progress bar fills, or empty
-     * if no roll is in progress. */
+    /**
+     * The item that will actually be placed when the current roll's progress bar fills, or empty if
+     * no roll is in progress.
+     */
     public ItemStack getNextRollItem() {
         return pendingRoll.isEmpty() ? ItemStack.EMPTY : pendingRoll.get(0);
     }
@@ -227,8 +237,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** Positions around this controller that still need a {@link io.github.tofithepuppycat.temporalindustries.block.MachineFrame}
-     * block. Also re-points any frame already present back at this controller. */
+    /**
+     * Positions around this controller that still need a {@link
+     * io.github.tofithepuppycat.temporalindustries.block.MachineFrame} block.
+     */
     public List<BlockPos> findMissing() {
         List<BlockPos> missing = new ArrayList<>();
         if (level == null) return missing;
@@ -242,8 +254,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return missing;
     }
 
-    /** Re-scans the frame positions and updates {@link #formed}, syncing to clients and pushing
-     * {@link LootGenerator#FORMED} into the block state if it changed. */
+    /**
+     * Re-scans the frame positions and updates {@link #formed}, syncing to clients and pushing
+     * {@link LootGenerator#FORMED} into the block state if it changed.
+     */
     public boolean checkStructure() {
         boolean wasFormed = formed;
         formed = findMissing().isEmpty();
@@ -264,8 +278,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return formed;
     }
 
-    /** Pushes {@link MachineFrame#CONNECTED} to every present frame position, so the connected
-     * texture only shows on frames confirmed part of this formed structure. */
+    /**
+     * Pushes {@link MachineFrame#CONNECTED} to every present frame position, so the connected
+     * texture only shows on frames confirmed part of this formed structure.
+     */
     private void updateFrameConnectivity(boolean connected) {
         Direction facing = getBlockState().getValue(LootGenerator.FACING);
         for (BlockPos pos : LootGeneratorStructure.framePositions(worldPosition, facing)) {
@@ -273,8 +289,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         }
     }
 
-    /** Order-colored outline traced along the edges of the whole formed structure's bounding box,
-     * fired once when it transitions from unformed to formed. */
+    /**
+     * Order-colored outline traced along the edges of the whole formed structure's bounding box,
+     * fired once when it transitions from unformed to formed.
+     */
     private void spawnFormedParticles(ServerLevel serverLevel) {
         Direction facing = getBlockState().getValue(LootGenerator.FACING);
         List<BlockPos> positions = new ArrayList<>(LootGeneratorStructure.framePositions(worldPosition, facing));
@@ -323,7 +341,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return lines;
     }
 
-    /** Sets the selected loot table id (or clears it) and re-validates against registered tables, so a typoed id is flagged. */
+    /**
+     * Sets the selected loot table id (or clears it) and re-validates against registered tables, so
+     * a typoed id is flagged.
+     */
     public void setSelectedLootTable(@Nullable ResourceLocation id) {
         this.selectedLootTable = id;
         this.lastSelectionValid = id != null && resolvesToRealTable(id);
@@ -331,9 +352,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Drains {@link #ROLL_COST} (plus luck surcharge) and rolls the selected loot table, queuing
-     * results to be placed one at a time by {@link #processTick()}. No-ops if a roll is already in
-     * progress, the selection is invalid, or there isn't enough Chaos to start one. */
+    /**
+     * Drains {@link #ROLL_COST} (plus luck surcharge) and rolls the selected loot table, queuing
+     * results to be placed one at a time by {@link #processTick()}.
+     */
     private void startRoll() {
         if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
 
@@ -360,8 +382,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
-    /** Re-rolls {@code table} a few extra times and dedupes the results into a small pool of items
-     * this table could plausibly produce, for the client to spin through during a roll. */
+    /**
+     * Re-rolls {@code table} a few extra times and dedupes the results into a small pool of items
+     * this table could plausibly produce, for the client to spin through during a roll.
+     */
     private static List<ItemStack> samplePossibleItems(LootTable table, LootParams params, List<ItemStack> firstRoll) {
         List<ItemStack> pool = new ArrayList<>();
         addDistinct(pool, firstRoll);
@@ -389,8 +413,10 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         return isChestLootTable(id) && level instanceof ServerLevel serverLevel && resolveLootTable(serverLevel, id) != LootTable.EMPTY;
     }
 
-    /** Restricts selectable tables to the {@code chests/} folder, so players can't roll a block's
-     * block-drop table for infinite free blocks. */
+    /**
+     * Restricts selectable tables to the {@code chests/} folder, so players can't roll a block's
+     * block-drop table for infinite free blocks.
+     */
     public static boolean isChestLootTable(ResourceLocation id) {
         return id.getPath().startsWith("chests/");
     }

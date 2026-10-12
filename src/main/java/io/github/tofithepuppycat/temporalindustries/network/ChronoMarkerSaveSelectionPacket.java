@@ -19,11 +19,10 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Client -> server: confirm the Portable Chrono Marker's area-select map, saving the player's
- * chosen chunk offsets onto the marker item as its custom shape. Never marks anything itself — only
- * a plain right-click does that. Offsets are relative to wherever the marker is next used, so a
- * saved shape is reusable anywhere. Re-validated server-side; nothing from the client is trusted
- * beyond "here are some chunk offsets". */
+/**
+ * Client -> server: confirm the Portable Chrono Marker's area-select map, saving the player's
+ * chosen chunk offsets onto the marker item as its custom shape.
+ */
 public class ChronoMarkerSaveSelectionPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerSaveSelectionPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_save_selection"));
@@ -78,7 +77,10 @@ public class ChronoMarkerSaveSelectionPacket implements CustomPacketPayload {
         });
     }
 
-    /** Whichever hand currently holds the Portable Chrono Marker (main hand preferred), or null if neither does. */
+    /**
+     * Whichever hand currently holds the Portable Chrono Marker (main hand preferred), or null if
+     * neither does.
+     */
     private static ItemStack holdingMarker(ServerPlayer sender) {
         for (InteractionHand hand : InteractionHand.values()) {
             ItemStack stack = sender.getItemInHand(hand);

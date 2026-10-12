@@ -7,7 +7,10 @@ import net.minecraft.world.item.TooltipFlag;
 
 import java.util.List;
 
-/** Curios headwear (no armor value) that lets the wearer see entropy info about the block they're looking at. */
+/**
+ * Curios headwear (no armor value) that lets the wearer see entropy info about the block they're
+ * looking at.
+ */
 public class EntropyGlassesItem extends Item {
     public EntropyGlassesItem(Properties properties) {
         super(properties);

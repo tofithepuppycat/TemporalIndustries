@@ -41,17 +41,18 @@ import static io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MO
 import static io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator.FACING;
 
 /**
- * Passive FE generator: reads the neighbors to the left and right of the block (relative to
- * FACING) as a hot source and a cold source. While both are present it credits FE every tick,
- * scaled by the {@link #TEMPERATURES} gap between them, and periodically emits ORD/CHS orbs
- * whose count scales the same way.
+ * Passive FE generator: reads the neighbors to the left and right of the block (relative to FACING)
+ * as a hot source and a cold source.
  */
 @SuppressWarnings("null")
 public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
     public static final TagKey<Block> HOT_SOURCES = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(MODID, "seebeck_hot_sources"));
     public static final TagKey<Block> COLD_SOURCES = TagKey.create(Registries.BLOCK, ResourceLocation.fromNamespaceAndPath(MODID, "seebeck_cold_sources"));
 
-    /** Relative "temperature" of each hot/cold source block, used to scale generator output by the gap between them. */
+    /**
+     * Relative "temperature" of each hot/cold source block, used to scale generator output by the
+     * gap between them.
+     */
     private static final Map<Block, Integer> TEMPERATURES = Map.ofEntries(
             Map.entry(Blocks.LAVA, 1000),
             Map.entry(Blocks.FIRE, 600),
@@ -104,9 +105,15 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
 
     private final GeneratorEnergyStorage energyStorage = new GeneratorEnergyStorage();
     private double entropyAccumulator = 0.0;
-    /** Whether both a hot and cold source were present as of the last tick, purely for the Entropy Glasses overlay. */
+    /**
+     * Whether both a hot and cold source were present as of the last tick, purely for the Entropy
+     * Glasses overlay.
+     */
     private boolean active = false;
-    /** Clamped [0, MAX_TEMP_DIFF] hot/cold temperature gap as of the last tick, purely for the Entropy Glasses overlay. */
+    /**
+     * Clamped [0, MAX_TEMP_DIFF] hot/cold temperature gap as of the last tick, purely for the
+     * Entropy Glasses overlay.
+     */
     private int tempDiff = 0;
 
     public SeebeckGeneratorBlockEntity(BlockPos pos, BlockState state) {
@@ -168,8 +175,10 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         }
     }
 
-    /** Fluid sources have no collision, so an orb spawned at their center can get stuck bobbing
-     * inside if embedded in terrain; spawning above the block avoids that. */
+    /**
+     * Fluid sources have no collision, so an orb spawned at their center can get stuck bobbing
+     * inside if embedded in terrain; spawning above the block avoids that.
+     */
     private static double orbSpawnY(BlockPos pos, BlockState state) {
         return pos.getY() + (state.getFluidState().isEmpty() ? 0.5 : 1.05);
     }
@@ -190,7 +199,10 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         return Math.clamp(hotTemp - coldTemp, 0, MAX_TEMP_DIFF);
     }
 
-    /** Config-defined hot sources beyond the {@link #HOT_SOURCES} tag, re-parsed only when the config list changes. */
+    /**
+     * Config-defined hot sources beyond the {@link #HOT_SOURCES} tag, re-parsed only when the
+     * config list changes.
+     */
     private static Map<Block, Integer> extraHotSources() {
         List<? extends String> raw = TemporalIndustriesConfig.INSTANCE.seebeckSources.extraHotSources.get();
         if (raw != cachedHotConfigRaw) {
@@ -200,7 +212,10 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         return cachedHotConfigMap;
     }
 
-    /** Config-defined cold sources beyond the {@link #COLD_SOURCES} tag, re-parsed only when the config list changes. */
+    /**
+     * Config-defined cold sources beyond the {@link #COLD_SOURCES} tag, re-parsed only when the
+     * config list changes.
+     */
     private static Map<Block, Integer> extraColdSources() {
         List<? extends String> raw = TemporalIndustriesConfig.INSTANCE.seebeckSources.extraColdSources.get();
         if (raw != cachedColdConfigRaw) {
@@ -210,7 +225,10 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
         return cachedColdConfigMap;
     }
 
-    /** Parses "block_id=temperature" config lines (see SeebeckSourceConfig) into a block-to-temperature map. */
+    /**
+     * Parses "block_id=temperature" config lines (see SeebeckSourceConfig) into a block-to-
+     * temperature map.
+     */
     private static Map<Block, Integer> parseSourceEntries(List<? extends String> rawLines) {
         Map<Block, Integer> result = new HashMap<>();
         for (String line : rawLines) {

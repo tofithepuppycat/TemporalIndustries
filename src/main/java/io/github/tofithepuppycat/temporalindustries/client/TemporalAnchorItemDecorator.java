@@ -7,8 +7,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.IItemDecorator;
 
-/** Draws a single white durability-like bar over a Temporal Anchor showing its banked order,
- * mirroring {@link EntropyContainerItemDecorator}'s bars. */
+/**
+ * Draws a single white durability-like bar over a Temporal Anchor showing its banked order,
+ * mirroring {@link EntropyContainerItemDecorator}'s bars.
+ */
 public class TemporalAnchorItemDecorator implements IItemDecorator {
     @Override
     public boolean render(GuiGraphics guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {

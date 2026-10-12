@@ -19,10 +19,10 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Client -> server: request the Overworld's dimension-wide trunk timeline for {@link
- * io.github.tofithepuppycat.temporalindustries.client.screen.ChronoLensScreen}. Sent once on open
- * and periodically thereafter, same pattern as {@link ChronoMarkerMapRequestPacket}. No arguments —
- * there's no block/menu to scope the request to, and the trunk is dimension-wide by nature. */
+/**
+ * Client -> server: request the Overworld's dimension-wide trunk timeline for {@link
+ * io.github.tofithepuppycat.temporalindustries.client.screen.ChronoLensScreen}.
+ */
 public class ChronoLensRequestPacket implements CustomPacketPayload {
     public static final Type<ChronoLensRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_lens_request"));
@@ -39,10 +39,8 @@ public class ChronoLensRequestPacket implements CustomPacketPayload {
             TemporalTimeline timeline = TemporalWorldData.get(sender.getServer()).getTimeline(Level.OVERWORLD.location());
             List<TemporalCommit> trunk = timeline == null ? List.of() : timeline.getTrunkCommits();
 
-            // The Chrono Lens still reads the old per-dimension timeline, but it shares the
-            // repository-shaped graph packet, so project its trunk into CommitNodes. The mapping is
-            // exact rather than lossy: the lens only ever sends a linear trunk whose edges are
-            // already real parent ids, which is precisely what a CommitNode carries.
+            // The Chrono Lens reads the per-dimension timeline but shares the repository-shaped
+            // graph packet, so project its trunk into CommitNodes.
             List<CommitNode> nodes = new ArrayList<>(trunk.size());
             for (TemporalCommit commit : trunk) {
                 nodes.add(new CommitNode(commit.getId(), commit.getParentId(), commit.getGameTime(),

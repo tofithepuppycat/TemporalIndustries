@@ -8,8 +8,10 @@ import net.minecraft.world.inventory.InventoryMenu;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.fluids.FluidType;
 
-/** Tiles a fluid's still texture, tinted with an entropy color, over a filled portion of a bar;
- * shared by every Order/Chaos tank bar in the mod, vertical or horizontal. */
+/**
+ * Tiles a fluid's still texture, tinted with an entropy color, over a filled portion of a bar;
+ * shared by every Order/Chaos tank bar in the mod, vertical or horizontal.
+ */
 final class FluidBarRenderer {
     private FluidBarRenderer() {}
 

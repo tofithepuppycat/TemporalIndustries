@@ -28,9 +28,8 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Consumes energy to endlessly replay whatever Echo Record is inserted, rendered client-side as
- * a translucent ghost (recolorable with dye). Interaction mirrors a jukebox: right-click with a
- * recorded Echo Record to insert it, empty-handed to take it back out.
+ * Consumes energy to endlessly replay whatever Echo Record is inserted, rendered client-side as a
+ * translucent ghost (recolorable with dye).
  */
 @SuppressWarnings("null")
 public class EchoProjector extends BaseEntityBlock {
@@ -82,7 +81,10 @@ public class EchoProjector extends BaseEntityBlock {
         return ItemInteractionResult.CONSUME;
     }
 
-    /** Right-clicking with a dye recolors the ghost render instead of inserting it, consuming one dye in survival. */
+    /**
+     * Right-clicking with a dye recolors the ghost render instead of inserting it, consuming one
+     * dye in survival.
+     */
     private ItemInteractionResult dyeGhost(DyeItem dye, Level level, BlockPos pos, Player player, ItemStack stack) {
         if (level.isClientSide) {
             return ItemInteractionResult.SUCCESS;

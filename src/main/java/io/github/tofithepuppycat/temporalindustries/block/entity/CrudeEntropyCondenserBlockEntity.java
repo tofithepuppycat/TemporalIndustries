@@ -39,7 +39,8 @@ import java.util.List;
 
 /**
  * Lower tier of {@link io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser}: drains
- * liquid Order/Chaos out of a cell in its single input slot into its own smaller tanks, no power involved.
+ * liquid Order/Chaos out of a cell in its single input slot into its own smaller tanks, no power
+ * involved.
  */
 @SuppressWarnings("null")
 public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
@@ -152,8 +153,10 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
         syncToClients();
     }
 
-    /** Moves up to {@link #DRAIN_PER_TICK} mB of {@code type} out of the cell and into its tank,
-     * capped by both the cell's contents and the tank's remaining space. Returns how much moved. */
+    /**
+     * Moves up to {@link #DRAIN_PER_TICK} mB of {@code type} out of the cell and into its tank,
+     * capped by both the cell's contents and the tank's remaining space.
+     */
     private int drainInto(EntropyReceptacle receptacle, ItemStack stack, EntropyType type) {
         FluidTank tank = type == EntropyType.ORDER ? orderTank : chaosTank;
         int spaceInTank = tank.getCapacity() - tank.getFluidAmount();

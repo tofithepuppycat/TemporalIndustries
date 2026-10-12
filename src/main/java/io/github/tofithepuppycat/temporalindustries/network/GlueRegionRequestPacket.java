@@ -10,8 +10,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: requests the glued-region list for the player's current dimension. No payload;
- * the server derives the dimension from the requesting player. */
+/** Client -> server: requests the glued-region list for the player's current dimension. */
 public class GlueRegionRequestPacket implements CustomPacketPayload {
     public static final Type<GlueRegionRequestPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "glue_region_request"));

@@ -12,8 +12,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: press the Loot Generator's stop icon, triggering
- * {@link LootGeneratorBlockEntity#stopGeneration()}. */
+/**
+ * Client -> server: press the Loot Generator's stop icon, triggering {@link
+ * LootGeneratorBlockEntity#stopGeneration()}.
+ */
 public class LootGeneratorStopPacket implements CustomPacketPayload {
     public static final Type<LootGeneratorStopPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "loot_generator_stop"));

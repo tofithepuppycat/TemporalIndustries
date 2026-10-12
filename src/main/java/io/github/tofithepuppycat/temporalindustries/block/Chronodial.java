@@ -24,10 +24,7 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/**
- * Single-block-tier time machine: marks the state of the block its front face points at.
- * Sneak-right-click sets the marker; a redstone pulse restores it for an energy cost.
- */
+/** Single-block-tier time machine: marks the state of the block its front face points at. */
 @SuppressWarnings("null")
 public class Chronodial extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.FACING;

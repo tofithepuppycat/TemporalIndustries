@@ -10,9 +10,7 @@ import net.minecraft.core.particles.ColorParticleOption;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.api.distmarker.OnlyIn;
 
-/** A short-lived, static spark used for the entropic pylon's transfer bolt. Unlike vanilla's
- * ENTITY_EFFECT, it has no gravity, physics, or inherited velocity, so a dense zigzag reads as a
- * static lightning bolt rather than a rising cloud. */
+/** A short-lived, static spark used for the entropic pylon's transfer bolt. */
 @OnlyIn(Dist.CLIENT)
 public class TransmitSparkParticle extends TextureSheetParticle {
     private final SpriteSet sprites;
@@ -41,7 +39,10 @@ public class TransmitSparkParticle extends TextureSheetParticle {
         this.setSpriteFromAge(this.sprites);
     }
 
-    /** {@link #setAlpha} is protected on {@link Particle}; this wrapper lets {@link Provider} call it. */
+    /**
+     * {@link #setAlpha} is protected on {@link Particle}; this wrapper lets {@link Provider} call
+     * it.
+     */
     private void applyAlpha(float alpha) {
         this.setAlpha(alpha);
     }

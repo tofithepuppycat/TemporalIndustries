@@ -14,8 +14,8 @@ import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Early/mid game CHAOS generator: feed it compostable items and it rots them down, spawning a
- * CHAOS orb sized by how compostable the item is ({@link ComposterBlock#getValue(ItemStack)}).
+ * Early/mid game CHAOS generator: feed it compostable items and it rots them down, spawning a CHAOS
+ * orb sized by how compostable the item is ({@link ComposterBlock#getValue(ItemStack)}).
  */
 public class DecayAcceleratorBlockEntity extends AbstractAcceleratorBlockEntity {
     private static final int MIN_CHAOS = 1;

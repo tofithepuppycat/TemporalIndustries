@@ -10,11 +10,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.UUID;
 
-/**
- * One node in a {@link TemporalRepository}'s commit tree. Each commit has a single parent (-1 for
- * the repository's root) and carries, per chunk it touches, either a full baseline or a delta (see
- * {@link ChunkEntry}) — chunks it doesn't touch simply aren't present in {@link #getChunkEntries()}.
- */
+/** One node in a {@link TemporalRepository}'s commit tree. */
 public final class RepoCommit {
     public static final long NO_PARENT = -1L;
 
@@ -38,7 +34,10 @@ public final class RepoCommit {
     @Nullable public UUID getAuthor() { return author; }
     public Map<Long, ChunkEntry> getChunkEntries() { return chunkEntries; }
 
-    /** Deterministic 7-hex-digit label derived from this commit's identity, styled after a git short hash. */
+    /**
+     * Deterministic 7-hex-digit label derived from this commit's identity, styled after a git short
+     * hash.
+     */
     public String getShortHash() {
         long h = id * 0x9E3779B97F4A7C15L;
         h ^= Long.rotateLeft(parentId * 0xC2B2AE3D27D4EB4FL + 1L, 17);

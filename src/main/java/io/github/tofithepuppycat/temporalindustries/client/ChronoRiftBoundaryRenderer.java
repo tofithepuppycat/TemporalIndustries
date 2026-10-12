@@ -16,9 +16,11 @@ import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.joml.Matrix4f;
 
-/** Renders a pulsing translucent wall along every edge where a tracked Chrono Rift chunk borders
- * an untracked one, so the boundary of "explorable" rift terrain is visible before a player walks
- * into the void — {@link ChronoRiftBorderListener} is what actually stops them. */
+/**
+ * Renders a pulsing translucent wall along every edge where a tracked Chrono Rift chunk borders an
+ * untracked one, so the boundary of "explorable" rift terrain is visible before a player walks into
+ * the void — {@link ChronoRiftBorderListener} is what actually stops them.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class ChronoRiftBoundaryRenderer {
     private static final int SCAN_RADIUS_CHUNKS = 10;

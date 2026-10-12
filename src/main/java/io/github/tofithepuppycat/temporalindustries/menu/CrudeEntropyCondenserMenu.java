@@ -15,8 +15,10 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Crude Entropy Condenser GUI: one Order/Chaos Cell slot plus both tanks'
- * fill/capacity. */
+/**
+ * Container menu for the Crude Entropy Condenser GUI: one Order/Chaos Cell slot plus both tanks'
+ * fill/capacity.
+ */
 @SuppressWarnings("null")
 public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
     private static final int CELL_SLOT_X = 80;

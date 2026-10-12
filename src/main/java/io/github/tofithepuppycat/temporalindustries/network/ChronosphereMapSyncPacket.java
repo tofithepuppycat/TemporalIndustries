@@ -15,8 +15,11 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server -> client: terrain thumbnails (see {@link io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler})
- * for every currently-loaded chunk in a Chronosphere's claimable area, for {@link ChunkThumbnailClientState}. */
+/**
+ * Server -> client: terrain thumbnails (see {@link
+ * io.github.tofithepuppycat.temporalindustries.chronomap.ChronoMapSampler}) for every currently-
+ * loaded chunk in a Chronosphere's claimable area, for {@link ChunkThumbnailClientState}.
+ */
 public class ChronosphereMapSyncPacket implements CustomPacketPayload {
     public static final Type<ChronosphereMapSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_map_sync"));

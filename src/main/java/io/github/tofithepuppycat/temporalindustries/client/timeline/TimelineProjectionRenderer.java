@@ -31,9 +31,10 @@ import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
-/** Renders the block-diff preview in-world: a small blinking decal on each face of a block that
- * will change once the player jumps to the currently selected time. Green = added, red = removed,
- * blue = changed. */
+/**
+ * Renders the block-diff preview in-world: a small blinking decal on each face of a block that will
+ * change once the player jumps to the currently selected time.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class TimelineProjectionRenderer {
     private static final float[] ADD_COLOR = {0.35F, 0.95F, 0.4F};
@@ -45,14 +46,20 @@ public class TimelineProjectionRenderer {
     private static final float BLINK_ALPHA_MAX = 0.85F;
     private static final long BLINK_PERIOD_MS = 900L;
 
-    /** Outer boundary of the previewed claim: a translucent wall on each chunk edge with no other previewed chunk behind it. */
+    /**
+     * Outer boundary of the previewed claim: a translucent wall on each chunk edge with no other
+     * previewed chunk behind it.
+     */
     private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
-    /** Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject. */
+    /**
+     * Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject.
+     */
     private static final float WALL_ALPHA_SCALE = 0.35F;
-    /** Depth-test disabled: a wall sitting exactly on a chunk edge is coplanar with whatever's
+    /**
+     * Depth-test disabled: a wall sitting exactly on a chunk edge is coplanar with whatever's
      * actually built up to that edge, and no fixed world-space offset reliably avoids z-fighting
-     * against it at every distance. Rendering the wall as an always-visible overlay (like a glowing
-     * force field, visible through terrain) sidesteps the depth comparison entirely instead. */
+     * against it at every distance.
+     */
     private static final RenderType WALL_RENDER_TYPE = RenderType.create(
             "temporalindustries_claim_wall",
             DefaultVertexFormat.POSITION_COLOR,
@@ -68,23 +75,10 @@ public class TimelineProjectionRenderer {
                     .setWriteMaskState(RenderStateShard.COLOR_WRITE)
                     .createCompositeState(false));
 
-    /** Ghost-block mode's render type: a copy of vanilla's {@link RenderType#entityTranslucent},
-     * not the chunk-batching {@link RenderType#translucent()}. The chunk shader lights itself
-     * entirely in the vertex stage via a {@code ChunkOffset} uniform and an {@code ivec2 UV2}
-     * lightmap sample tied to the compiled-chunk batching system — it isn't meant for one-off draws
-     * like this, and using it rendered every ghost near-black (only the atlas's edge-bleed pixels
-     * showed any color). {@link BlockRenderDispatcher#renderSingleBlock} itself falls back to the
-     * entity-translucent equivalent for exactly this reason when no render type is forced; this
-     * mirrors that, then adds {@link RenderStateShard#POLYGON_OFFSET_LAYERING} — the same shard
-     * vanilla's own block-breaking "crumbling" overlay uses to sit flush on an existing block's
-     * faces without z-fighting. A CHANGE entry's ghost occupies the exact same cube as the block
-     * already there, so without the bias the two flicker at equal depth; polygon offset nudges the
-     * ghost's depth slightly toward the camera at the hardware level, without moving its geometry.
-     *
-     * <p>Targets {@link RenderStateShard#MAIN_TARGET} rather than the dedicated translucent target
-     * vanilla terrain uses: that target gets composited back onto the main framebuffer at a fixed
-     * point earlier in the frame, and we render after that (at {@code AFTER_TRANSLUCENT_BLOCKS}), so
-     * anything written to it this late never gets composited. */
+    /**
+     * Ghost-block mode's render type: a copy of vanilla's {@link RenderType#entityTranslucent}, not
+     * the chunk-batching {@link RenderType#translucent()}.
+     */
     private static final RenderType GHOST_BLOCK_RENDER_TYPE = RenderType.create(
             "temporalindustries_ghost_block",
             DefaultVertexFormat.NEW_ENTITY,
@@ -169,18 +163,10 @@ public class TimelineProjectionRenderer {
     }
 
     /**
-     * Renders real, translucent block models instead of colored decals, capped to the
-     * {@link TimelineProjectionManager#GHOST_BLOCK_RENDER_LIMIT} positions nearest the camera —
-     * full block models cost far more to draw than the decals' flat quads, so previewing every
-     * affected position across a large claim would tank the framerate. Every model is forced onto
-     * the translucent render type (regardless of the block's own layer) so the blink alpha applies
-     * uniformly; a position being removed renders its current block with a red tint instead of the
-     * target air state, since there'd otherwise be nothing to show. Rendered at
-     * {@link LightTexture#FULL_BRIGHT} rather than the position's real world light, since the
-     * entity-translucent shader this uses applies its own directional diffuse shading on top of the
-     * lightmap sample (unlike real terrain, which bakes brightness into vertex color directly) —
-     * tying that to the actual local light level made ghosts in anything but full daylight look
-     * considerably dimmer than the real block they're previewing.
+     * Renders real, translucent block models instead of colored decals, capped to the {@link
+     * TimelineProjectionManager#GHOST_BLOCK_RENDER_LIMIT} positions nearest the camera — full block
+     * models cost far more to draw than the decals' flat quads, so previewing every affected
+     * position across a large claim would tank the framerate.
      */
     private static void renderGhostBlocks(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
                                            List<TimelineProjectionManager.ProjectionEntry> entries,
@@ -212,9 +198,11 @@ public class TimelineProjectionRenderer {
 
     private record RankedEntry(TimelineProjectionManager.ProjectionEntry entry, double distSqr) {}
 
-    /** The limit nearest entries to (cameraX, cameraY, cameraZ), via a bounded max-heap (farthest
+    /**
+     * The limit nearest entries to (cameraX, cameraY, cameraZ), via a bounded max-heap (farthest
      * kept entry at the top, evicted first) so the cost stays O(entries.size() * log(limit))
-     * instead of a full sort. */
+     * instead of a full sort.
+     */
     private static List<TimelineProjectionManager.ProjectionEntry> nearestEntries(
             List<TimelineProjectionManager.ProjectionEntry> entries, double cameraX, double cameraY, double cameraZ, int limit) {
         if (entries.size() <= limit) return entries;
@@ -243,9 +231,7 @@ public class TimelineProjectionRenderer {
 
     /**
      * Draws a wall along every chunk edge on the OUTER boundary of the previewed claim, skipping
-     * interior edges so a multi-chunk claim reads as one enclosure. There's only one shared commit
-     * graph per machine now, so there are no per-chunk tabs and no single chunk to single out —
-     * a one-chunk claim already gets a full box, since all four of its neighbours are unclaimed.
+     * interior edges so a multi-chunk claim reads as one enclosure.
      */
     private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer, Level level,
                                             double cameraX, double cameraY, double cameraZ, float alpha) {
@@ -288,7 +274,9 @@ public class TimelineProjectionRenderer {
         }
     }
 
-    /** Draws a small square decal centered on each of the block's 6 faces, just outside the surface. */
+    /**
+     * Draws a small square decal centered on each of the block's 6 faces, just outside the surface.
+     */
     private static void renderFaceMarkers(PoseStack poseStack, VertexConsumer buffer, double relX, double relY, double relZ,
                                           float r, float g, float b, float a) {
         Matrix4f matrix = poseStack.last().pose();

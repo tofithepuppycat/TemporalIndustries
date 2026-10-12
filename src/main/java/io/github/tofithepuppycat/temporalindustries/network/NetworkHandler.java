@@ -9,6 +9,11 @@ public class NetworkHandler {
     public static void register(final RegisterPayloadHandlersEvent event) {
         final PayloadRegistrar registrar = event.registrar(PROTOCOL_VERSION);
 
+        registrar.playToClient(
+                ItemCostSyncPacket.TYPE,
+                ItemCostSyncPacket.STREAM_CODEC,
+                ItemCostSyncPacket::handle);
+
         registrar.playToServer(
                 TimelinePreviewRequestPacket.TYPE,
                 TimelinePreviewRequestPacket.STREAM_CODEC,
@@ -53,6 +58,26 @@ public class NetworkHandler {
                 ChronosphereMapSyncPacket.TYPE,
                 ChronosphereMapSyncPacket.STREAM_CODEC,
                 ChronosphereMapSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereBindRepositoryPacket.TYPE,
+                ChronosphereBindRepositoryPacket.STREAM_CODEC,
+                ChronosphereBindRepositoryPacket::handle);
+
+        registrar.playToServer(
+                RepositorySuggestRequestPacket.TYPE,
+                RepositorySuggestRequestPacket.STREAM_CODEC,
+                RepositorySuggestRequestPacket::handle);
+
+        registrar.playToClient(
+                RepositorySuggestSyncPacket.TYPE,
+                RepositorySuggestSyncPacket.STREAM_CODEC,
+                RepositorySuggestSyncPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereUnbindRepositoryPacket.TYPE,
+                ChronosphereUnbindRepositoryPacket.STREAM_CODEC,
+                ChronosphereUnbindRepositoryPacket::handle);
 
         registrar.playToServer(
                 TimelineMachineDeleteHistoryPacket.TYPE,

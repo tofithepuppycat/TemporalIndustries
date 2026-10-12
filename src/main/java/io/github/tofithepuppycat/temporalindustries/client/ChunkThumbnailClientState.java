@@ -11,16 +11,20 @@ import org.jetbrains.annotations.Nullable;
 import java.util.HashMap;
 import java.util.Map;
 
-/** Client-side cache of terrain thumbnails for whichever chunk-selection map is currently open;
- * decodes packed vanilla map-color bytes into a {@link DynamicTexture} per chunk, lazily
- * re-uploaded only when that chunk's data changes. Keyed by a generic anchor chunk key so it's
- * shared between the Chronosphere's claim map and the Portable Chrono Marker's area-select map. */
+/**
+ * Client-side cache of terrain thumbnails for whichever chunk-selection map is currently open;
+ * decodes packed vanilla map-color bytes into a {@link DynamicTexture} per chunk, lazily re-
+ * uploaded only when that chunk's data changes.
+ */
 public final class ChunkThumbnailClientState {
     @Nullable
     private static Long activeAnchorKey;
     private static Map<Long, byte[]> serverThumbnails = new HashMap<>();
     private static final Map<Long, ResourceLocation> textureLocations = new HashMap<>();
-    /** chunkKey -> the exact byte[] instance last uploaded, so an unchanged payload never re-touches the GPU. */
+    /**
+     * chunkKey -> the exact byte[] instance last uploaded, so an unchanged payload never re-touches
+     * the GPU.
+     */
     private static final Map<Long, byte[]> uploadedThumbnails = new HashMap<>();
 
     private ChunkThumbnailClientState() {}
@@ -33,7 +37,9 @@ public final class ChunkThumbnailClientState {
         serverThumbnails = thumbnails;
     }
 
-    /** Releases every cached texture; call when the map overlay closes or the client disconnects. */
+    /**
+     * Releases every cached texture; call when the map overlay closes or the client disconnects.
+     */
     public static void clearAll() {
         Minecraft mc = Minecraft.getInstance();
         for (ResourceLocation location : textureLocations.values()) {
@@ -45,8 +51,10 @@ public final class ChunkThumbnailClientState {
         activeAnchorKey = null;
     }
 
-    /** The texture to blit for chunkKey, uploading/refreshing it lazily, or null if no terrain
-     * data has been received for that chunk yet. */
+    /**
+     * The texture to blit for chunkKey, uploading/refreshing it lazily, or null if no terrain data
+     * has been received for that chunk yet.
+     */
     @Nullable
     public static ResourceLocation getTexture(long chunkKey) {
         byte[] colors = serverThumbnails.get(chunkKey);

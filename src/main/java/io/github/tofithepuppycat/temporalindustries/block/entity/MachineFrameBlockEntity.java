@@ -11,10 +11,11 @@ import net.neoforged.neoforge.items.IItemHandler;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Remembers the controller position of whatever multiblock this frame is currently part of, so
+/**
+ * Remembers the controller position of whatever multiblock this frame is currently part of, so
  * clicks and item/fluid capability requests against the frame forward to that controller, letting
- * pipes/hoppers insert/extract from any face of the multiblock. Kept up to date by the controller
- * re-scanning its structure. */
+ * pipes/hoppers insert/extract from any face of the multiblock.
+ */
 public class MachineFrameBlockEntity extends BlockEntity {
     @Nullable
     private BlockPos controller;

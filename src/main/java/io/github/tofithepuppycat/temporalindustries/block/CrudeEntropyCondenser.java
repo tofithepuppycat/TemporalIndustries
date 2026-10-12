@@ -18,8 +18,10 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Lower, unpowered tier of {@link EntropyCondenser}: drains an Order/Chaos Cell in its input
- * slot into its own tanks instead of absorbing orbs directly. */
+/**
+ * Lower, unpowered tier of {@link EntropyCondenser}: drains an Order/Chaos Cell in its input slot
+ * into its own tanks instead of absorbing orbs directly.
+ */
 @SuppressWarnings("null")
 public class CrudeEntropyCondenser extends BaseEntityBlock {
     private static final MapCodec<CrudeEntropyCondenser> CODEC = simpleCodec(CrudeEntropyCondenser::new);

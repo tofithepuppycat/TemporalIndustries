@@ -14,11 +14,9 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 
 /**
- * Drives the Time Dilator's effect: every server tick, re-ticks each position
- * {@link io.github.tofithepuppycat.temporalindustries.item.TimeDilatorItem} has marked, on top of
- * the one tick it already gets normally. Covers both random-tickable blocks (crops, saplings,
- * ice...) and ticking block entities (furnaces, this mod's machines...) generically, rather than
- * special-casing either.
+ * Drives the Time Dilator's effect: every server tick, re-ticks each position {@link
+ * io.github.tofithepuppycat.temporalindustries.item.TimeDilatorItem} has marked, on top of the one
+ * tick it already gets normally.
  */
 public final class TimeDilationListener {
     private TimeDilationListener() {}

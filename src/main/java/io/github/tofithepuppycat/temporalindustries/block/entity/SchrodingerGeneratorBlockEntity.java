@@ -31,10 +31,7 @@ import java.util.List;
 
 /**
  * Early-game passive entropy generator: while it holds a captured mob, it periodically spawns a
- * small {@link EntropyOrbEntity}, ORD or CHS with equal chance. Landing on ORD also fires a pulse
- * of FE into {@link #energyStorage}. The mob itself is never simulated, only its type and custom
- * name are kept, and it's respawned by {@link #release()} so breaking an occupied generator never
- * silently deletes it.
+ * small {@link EntropyOrbEntity}, ORD or CHS with equal chance.
  */
 @SuppressWarnings("null")
 public class SchrodingerGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
@@ -96,7 +93,9 @@ public class SchrodingerGeneratorBlockEntity extends BlockEntity implements Entr
         syncToClients();
     }
 
-    /** Spawns the stored mob back into the world above this block and clears the capture, if any. */
+    /**
+     * Spawns the stored mob back into the world above this block and clears the capture, if any.
+     */
     public void release() {
         if (level == null || level.isClientSide || capturedTypeId == null) return;
 

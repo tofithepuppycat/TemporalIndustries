@@ -5,9 +5,10 @@ import java.util.zip.DataFormatException;
 import java.util.zip.Deflater;
 import java.util.zip.Inflater;
 
-/** Raw DEFLATE compression for packet payloads (timeline NBT/commit data is highly repetitive
- * and compresses well). No zlib/gzip header — just the compressed stream, since the length is
- * already tracked by the surrounding FriendlyByteBuf#writeByteArray. */
+/**
+ * Raw DEFLATE compression for packet payloads (timeline NBT/commit data is highly repetitive and
+ * compresses well).
+ */
 final class CompressionUtil {
     private CompressionUtil() {}
 
