@@ -130,6 +130,10 @@ public final class TimelineProjectionManager {
         return showChangesEnabled;
     }
 
+    public static void disableShowChanges() {
+        showChangesEnabled = false;
+    }
+
     public static void toggleShowChanges() {
         showChangesEnabled = !showChangesEnabled;
     }
@@ -184,22 +188,12 @@ public final class TimelineProjectionManager {
         return branchTips.containsValue(commitId);
     }
 
-    /** The branch whose tip is the selected commit, or null when the selection isn't a tip. */
-    public static String getSelectedBranchName() {
-        if (!hasSelection()) return null;
-        for (Map.Entry<String, Long> entry : branchTips.entrySet()) {
-            if (entry.getValue() == selectedCommitId) return entry.getKey();
-        }
-        return null;
-    }
-
     /**
-     * Whether the selected node is a deletable branch: it has to be a branch tip, and that tip must
-     * not sit on the current head's ancestry (which would mean it's the line the world currently
-     * reflects).
+     * Whether the selected commit is deletable: it must not sit on the current head's ancestry
+     * (head and root included), which is the line the world currently reflects.
      */
-    public static boolean isSelectedBranchDeletable() {
-        if (getSelectedBranchName() == null) return false;
+    public static boolean isSelectedCommitDeletable() {
+        if (!hasSelection()) return false;
 
         Map<Long, Long> parents = new HashMap<>();
         for (CommitNode c : commits) parents.put(c.id(), c.parentId());

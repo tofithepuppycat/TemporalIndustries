@@ -12,34 +12,34 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Client -> server: deletes a named branch (and the history unique to it) from a timeline machine's
- * repository, provided it isn't the branch currently checked out.
+ * Client -> server: deletes a commit (and everything descended from it) from a timeline machine's
+ * repository, provided it isn't on the current head's ancestry.
  */
-public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
-    public static final Type<TimelineMachineDeleteBranchPacket> TYPE =
-            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_delete_branch"));
+public class TimelineMachineDeleteCommitPacket implements CustomPacketPayload {
+    public static final Type<TimelineMachineDeleteCommitPacket> TYPE =
+            new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_delete_commit"));
 
-    public static final StreamCodec<RegistryFriendlyByteBuf, TimelineMachineDeleteBranchPacket> STREAM_CODEC =
-            StreamCodec.of(TimelineMachineDeleteBranchPacket::encode, TimelineMachineDeleteBranchPacket::decode);
+    public static final StreamCodec<RegistryFriendlyByteBuf, TimelineMachineDeleteCommitPacket> STREAM_CODEC =
+            StreamCodec.of(TimelineMachineDeleteCommitPacket::encode, TimelineMachineDeleteCommitPacket::decode);
 
     private final BlockPos machinePos;
-    private final String branchName;
+    private final long commitId;
 
-    public TimelineMachineDeleteBranchPacket(BlockPos machinePos, String branchName) {
+    public TimelineMachineDeleteCommitPacket(BlockPos machinePos, long commitId) {
         this.machinePos = machinePos;
-        this.branchName = branchName;
+        this.commitId = commitId;
     }
 
-    public static void encode(RegistryFriendlyByteBuf buf, TimelineMachineDeleteBranchPacket packet) {
+    public static void encode(RegistryFriendlyByteBuf buf, TimelineMachineDeleteCommitPacket packet) {
         buf.writeBlockPos(packet.machinePos);
-        buf.writeUtf(packet.branchName, 64);
+        buf.writeLong(packet.commitId);
     }
 
-    public static TimelineMachineDeleteBranchPacket decode(RegistryFriendlyByteBuf buf) {
-        return new TimelineMachineDeleteBranchPacket(buf.readBlockPos(), buf.readUtf(64));
+    public static TimelineMachineDeleteCommitPacket decode(RegistryFriendlyByteBuf buf) {
+        return new TimelineMachineDeleteCommitPacket(buf.readBlockPos(), buf.readLong());
     }
 
-    public static void handle(TimelineMachineDeleteBranchPacket packet, IPayloadContext context) {
+    public static void handle(TimelineMachineDeleteCommitPacket packet, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer sender)) {
             return;
         }
@@ -49,7 +49,7 @@ public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
             if (!(menu.getTimelineProvider() instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            machine.deleteBranch(packet.branchName);
+            machine.deleteCommit(packet.commitId);
         });
     }
 

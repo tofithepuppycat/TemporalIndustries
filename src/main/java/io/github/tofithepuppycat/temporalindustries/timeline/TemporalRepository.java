@@ -428,40 +428,52 @@ public final class TemporalRepository {
     }
 
 
-    /** Deletes branchName and the history unique to it. */
-    public boolean deleteBranch(String branchName) {
-        Long tipBoxed = branchTips.get(branchName);
-        if (tipBoxed == null) return false;
-        long tip = tipBoxed;
+    /**
+     * Deletes commitId and every commit descended from it. Refused for the root and for any commit
+     * on the head's ancestry (head included), since the world currently reflects that line.
+     */
+    public boolean deleteCommit(long commitId) {
+        RepoCommit target = commits.get(commitId);
+        if (target == null) return false;
 
-        // Walking up from the head rather than down from the tip: the tip being an ancestor of the
-        // head (or the head itself) is exactly what "currently checked out" means here.
         for (RepoCommit c : ancestryChain(headCommitId)) {
-            if (c.getId() == tip) return false;
+            if (c.getId() == commitId) return false;
         }
 
-        Set<Long> keep = new HashSet<>();
-        for (RepoCommit c : ancestryChain(headCommitId)) keep.add(c.getId());
-        for (Map.Entry<String, Long> entry : branchTips.entrySet()) {
-            if (entry.getKey().equals(branchName)) continue;
-            for (RepoCommit c : ancestryChain(entry.getValue())) keep.add(c.getId());
+        Map<Long, List<Long>> children = new HashMap<>();
+        for (RepoCommit c : commits.values()) {
+            children.computeIfAbsent(c.getParentId(), k -> new ArrayList<>()).add(c.getId());
+        }
+        Set<Long> subtree = new HashSet<>();
+        Deque<Long> stack = new ArrayDeque<>();
+        stack.push(commitId);
+        while (!stack.isEmpty()) {
+            long id = stack.pop();
+            if (!subtree.add(id)) continue;
+            for (long child : children.getOrDefault(id, List.of())) stack.push(child);
         }
 
-        long cur = tip;
-        while (cur != RepoCommit.NO_PARENT && cur != rootCommitId && !keep.contains(cur)) {
-            RepoCommit removed = commits.remove(cur);
-            if (removed == null) break;
-            long parentId = removed.getParentId();
-            Integer count = childCount.get(parentId);
-            if (count != null) {
-                if (count <= 1) childCount.remove(parentId);
-                else childCount.put(parentId, count - 1);
-            }
-            childCount.remove(cur);
-            cur = parentId;
+        long parentId = target.getParentId();
+        for (long id : subtree) {
+            commits.remove(id);
+            childCount.remove(id);
+        }
+        Integer count = childCount.get(parentId);
+        if (count != null) {
+            if (count <= 1) childCount.remove(parentId);
+            else childCount.put(parentId, count - 1);
         }
 
-        branchTips.remove(branchName);
+        // A branch left pointing into the deleted subtree is forgotten, except the checked-out one,
+        // which falls back to the deleted commit's parent.
+        Iterator<Map.Entry<String, Long>> it = branchTips.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<String, Long> entry = it.next();
+            if (!subtree.contains(entry.getValue())) continue;
+            if (entry.getKey().equals(currentBranchName)) entry.setValue(parentId);
+            else it.remove();
+        }
+
         rebuildChunkStates();
         return true;
     }

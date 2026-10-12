@@ -85,9 +85,9 @@ public class NetworkHandler {
                 TimelineMachineDeleteHistoryPacket::handle);
 
         registrar.playToServer(
-                TimelineMachineDeleteBranchPacket.TYPE,
-                TimelineMachineDeleteBranchPacket.STREAM_CODEC,
-                TimelineMachineDeleteBranchPacket::handle);
+                TimelineMachineDeleteCommitPacket.TYPE,
+                TimelineMachineDeleteCommitPacket.STREAM_CODEC,
+                TimelineMachineDeleteCommitPacket::handle);
 
         registrar.playToServer(
                 TimelineMachineCommitPacket.TYPE,
