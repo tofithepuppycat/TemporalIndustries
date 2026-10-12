@@ -15,9 +15,10 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Chronosphere GUI; exposes the block entity's energy/time state to
- * the client via {@link ContainerData}. Chunk-set state is synced separately (see
- * ChronosphereStateSyncPacket) since it's a variable-size set rather than a fixed set of ints. */
+/**
+ * Container menu for the Chronosphere GUI; exposes the block entity's energy/time state to the
+ * client via {@link ContainerData}.
+ */
 @SuppressWarnings("null")
 public class ChronosphereMenu extends AbstractContainerMenu implements TimelineViewMenu {
     private final ChronosphereBlockEntity blockEntity;

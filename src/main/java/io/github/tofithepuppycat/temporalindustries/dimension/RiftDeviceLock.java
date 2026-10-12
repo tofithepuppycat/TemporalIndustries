@@ -12,17 +12,18 @@ import net.minecraft.world.level.Level;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 
-/** Chronodial, Chronovault and Chronosphere all refuse to operate while inside the Chrono Rift
+/**
+ * Chronodial, Chronovault and Chronosphere all refuse to operate while inside the Chrono Rift
  * itself - letting a timeline machine run inside the rift it's built out of would let a player
- * rewrite the history the rift is replaying. */
+ * rewrite the history the rift is replaying.
+ */
 public final class RiftDeviceLock {
     private static final ResourceLocation PARADOX_AVERTED_ID =
             ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "paradox_averted");
 
     private RiftDeviceLock() {}
 
-    /** Call from a block's use handler once its {@code BlockEntity} lookup has succeeded. Returns
-     * {@code true} if the attempt was blocked (caller should stop and consume the interaction). */
+    /** Call from a block's use handler once its {@code BlockEntity} lookup has succeeded. */
     public static boolean blockIfInRift(Level level, Player player) {
         if (level.dimension() != ChronoRiftDimension.LEVEL_KEY) {
             return false;

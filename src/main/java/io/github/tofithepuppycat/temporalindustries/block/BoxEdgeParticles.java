@@ -5,7 +5,10 @@ import org.joml.Vector3f;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Points spaced along the 12 edges of an axis-aligned box, in world coordinates, for drawing a particle outline around a structure. */
+/**
+ * Points spaced along the 12 edges of an axis-aligned box, in world coordinates, for drawing a
+ * particle outline around a structure.
+ */
 public final class BoxEdgeParticles {
     private static final int[][] EDGES = {
             {0, 1}, {1, 5}, {5, 3}, {3, 0}, // bottom face

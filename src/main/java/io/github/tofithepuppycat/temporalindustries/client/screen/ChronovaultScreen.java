@@ -13,7 +13,6 @@ import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
-import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteBranchPacket;
@@ -27,8 +26,10 @@ import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
-/** GUI for the Chronovault block: renders its chunk's commit graph (via {@link TimelineGraphWidget})
- * and lets the player pick a point in time to jump to. */
+/**
+ * GUI for the Chronovault block: renders its chunk's commit graph (via {@link TimelineGraphWidget})
+ * and lets the player pick a point in time to jump to.
+ */
 @SuppressWarnings("null")
 public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> {
     private static final ResourceLocation INVENTORY_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/base.png");
@@ -39,8 +40,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int ICON_CONFIG_SIZE = 26;
     private static final int TEXTURE_WIDTH = 256;
     private static final int TEXTURE_HEIGHT = 256;
-    /** base.png's artwork sits inset this many pixels within the 256x256 canvas; layout constants
-     * below are measured from the artwork's edge via {@link #panelX()}/{@link #panelY()}. */
+    /**
+     * base.png's artwork sits inset this many pixels within the 256x256 canvas; layout constants
+     * below are measured from the artwork's edge via {@link #panelX()}/{@link #panelY()}.
+     */
     private static final int CONTENT_MARGIN = 16;
     private static final int CONTENT_SIZE = TEXTURE_WIDTH - 2 * CONTENT_MARGIN;
 
@@ -50,8 +53,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int COLOR_BORDER = 0xFF000000;
 
     // Settings tab: overlaps the panel's right edge, drawn BEFORE the panel background in render()
-    // so its edge tucks it in. (The auto-tracking tab that used to sit above it is gone — claimed
-    // chunks are always captured now, so there's nothing left to toggle.)
+    // so its edge tucks it in.
     private static final int TAB_ROW_SIZE = IconTabRenderer.SIZE;
     private static final int TAB_OVERLAP = 5;
     private static final int SETTINGS_Y_OFFSET = 40;
@@ -62,7 +64,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int GRAPH_X_OFFSET = 8;
     private static final int GRAPH_Y_OFFSET = 18;
     private static final int GRAPH_WIDTH = CONTENT_SIZE - 2 * GRAPH_X_OFFSET;
-    /** Sized to leave room below for the preview-time labels and button row within CONTENT_SIZE. */
+    /**
+     * Sized to leave room below for the preview-time labels and button row within CONTENT_SIZE.
+     */
     private static final int GRAPH_HEIGHT = 154;
 
     private static final int ENERGY_BAR_X_OFFSET = 160;
@@ -74,8 +78,6 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int ENTROPY_BAR_Y_OFFSET = 7;
     private static final int ENTROPY_BAR_WIDTH = 52;
     private static final int ENTROPY_BAR_HEIGHT = 8;
-    private static final int COLOR_ORDER = 0xFF000000 | EntropyType.ORDER.color();
-    private static final int COLOR_CHAOS = 0xFF000000 | EntropyType.CHAOS.color();
 
     private static final int PREVIEW_CURRENT_Y_OFFSET = 176;
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
@@ -89,7 +91,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     private int ticksSinceSync = 0;
     private boolean settingsOverlayOpen = false;
-    /** Whether the settings overlay is showing the "are you sure" step; reset when the overlay closes. */
+    /**
+     * Whether the settings overlay is showing the "are you sure" step; reset when the overlay
+     * closes.
+     */
     private boolean deleteHistoryConfirmPending = false;
 
     private int settingsX;
@@ -108,7 +113,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         inventoryLabelY = imageHeight + 100; // Push off-screen to hide inventory
     }
 
-    /** The visible top-left corner of base.png's artwork; layout offsets are measured from here. */
+    /**
+     * The visible top-left corner of base.png's artwork; layout offsets are measured from here.
+     */
     private int panelX() {
         return leftPos + CONTENT_MARGIN;
     }
@@ -138,8 +145,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         requestTimelineView(true);
     }
 
-    /** Requests the repository's commit graph plus the preview for the current selection. forceFull
-     * bypasses the server's "nothing changed" skip. */
+    /**
+     * Requests the repository's commit graph plus the preview for the current selection. forceFull
+     * bypasses the server's "nothing changed" skip.
+     */
     private void requestTimelineView(boolean forceFull) {
         long lastKnownHead = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getHeadCommitId();
         long lastKnownPreviewVersion = forceFull ? Long.MIN_VALUE : TimelineProjectionManager.getPreviewVersion();
@@ -171,7 +180,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         TimelineProjectionManager.toggleShowChanges();
     }
 
-    /** Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than Button widgets. */
+    /**
+     * Mirrors the button rects renderSettingsOverlay draws, since they're plain fills rather than
+     * Button widgets.
+     */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
         int buttonY = panelY() + 130;
 
@@ -205,9 +217,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Deletes the branch whose tip is the selected node. Selecting a branch *by its tip* keeps the
-     * existing one-click graph interaction: branch tips are the nodes carrying a name label, so the
-     * thing being deleted is the thing the player can see and point at. */
+    /** Deletes the branch whose tip is the selected node. */
     private void deleteSelectedBranch() {
         String branchName = TimelineProjectionManager.getSelectedBranchName();
         if (branchName == null || !TimelineProjectionManager.isSelectedBranchDeletable()) {
@@ -259,7 +269,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while nothing is selected. */
+    /**
+     * Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while
+     * nothing is selected.
+     */
     private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         boolean showChangesEnabled = TimelineProjectionManager.isShowChangesEnabled();
         int showChangesTint = showChangesEnabled ? 0xB0CC5555 : (isMouseOverShowChangesButton(mouseX, mouseY) ? 0x40000000 : 0);
@@ -308,20 +321,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         int entropy = menu.getEntropy();
         int max = menu.getEntropyMax();
 
-        guiGraphics.fill(barX, barY, barX + ENTROPY_BAR_WIDTH, barY + ENTROPY_BAR_HEIGHT, 0xFF000000);
-
-        int mid = barX + ENTROPY_BAR_WIDTH / 2;
-        int half = ENTROPY_BAR_WIDTH / 2 - 1;
         float balance = max > 0 ? (entropy - max / 2f) / (max / 2f) : 0f; // -1 (order) .. +1 (chaos)
-        int filled = Math.round(Math.abs(balance) * half);
-        if (filled > 0) {
-            if (balance >= 0) {
-                guiGraphics.fill(mid, barY + 1, mid + filled, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_CHAOS);
-            } else {
-                guiGraphics.fill(mid - filled, barY + 1, mid, barY + ENTROPY_BAR_HEIGHT - 1, COLOR_ORDER);
-            }
-        }
-        guiGraphics.fill(mid, barY, mid + 1, barY + ENTROPY_BAR_HEIGHT, 0xFF888888);
+        EntropyBalanceBar.render(guiGraphics, barX, barY, ENTROPY_BAR_WIDTH, ENTROPY_BAR_HEIGHT, balance);
     }
 
     private boolean isMouseOverEntropyBar(int mouseX, int mouseY) {
@@ -450,8 +451,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
-    /** Names the branch the button would delete, so it's obvious what's about to go. Only shown
-     * while the button is visible, i.e. a deletable branch tip is selected. */
+    /** Names the branch the button would delete, so it's obvious what's about to go. */
     static Component deleteBranchTooltip() {
         String branchName = TimelineProjectionManager.getSelectedBranchName();
         return Component.translatable("gui.temporalindustries.chronovault.delete_branch_named", branchName);

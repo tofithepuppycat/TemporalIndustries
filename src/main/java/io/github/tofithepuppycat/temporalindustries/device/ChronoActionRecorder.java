@@ -39,20 +39,14 @@ import java.util.UUID;
 import java.util.function.Consumer;
 
 /**
- * Watches a recording player's interactions and appends them to whichever Echo Record
- * ({@link EchoRecordItem}) is currently recording, regardless of what's in hand. Interactions are
- * captured as the player's raw input (right-click a block/item/entity, attack, break, mount...)
- * rather than their outcome, so the projector's fake player can repeat them through the same game
- * code and get the same result. Container transfers are the exception: they're inferred by
- * diffing the player's inventory across a container GUI open/close, since the fake player can't
- * operate a GUI.
- * <p>
- * Everything event-driven is queued and written at the end of the server tick, so a right-click
- * that turns out to have opened a container can be discarded (the transfer is what's recorded).
+ * Watches a recording player's interactions and appends them to whichever Echo Record ({@link
+ * EchoRecordItem}) is currently recording, regardless of what's in hand.
  */
 public final class ChronoActionRecorder {
-    /** Mirrors EchoRecordItem's own cap so an action can never reference a tick beyond what
-     * the recording could possibly retain. */
+    /**
+     * Mirrors EchoRecordItem's own cap so an action can never reference a tick beyond what the
+     * recording could possibly retain.
+     */
     private static final int MAX_FRAMES = 20 * 60;
 
     /** player UUID -> the container-capable block they most recently right-clicked. */
@@ -108,8 +102,10 @@ public final class ChronoActionRecorder {
         queue(player, event.getPos(), ChronoRecording.ActionType.USE_BLOCK, null, false, -1, use.toTag(), null);
     }
 
-    /** Right-clicking air (or a block that declined) with an item: throwing potions and ender pearls,
-     * eating, drawing a bow, casting a rod... */
+    /**
+     * Right-clicking air (or a block that declined) with an item: throwing potions and ender
+     * pearls, eating, drawing a bow, casting a rod...
+     */
     public static void onRightClickItem(PlayerInteractEvent.RightClickItem event) {
         ServerPlayer player = recordingPlayer(event.getEntity());
         ItemStack held = event.getItemStack();
@@ -151,8 +147,7 @@ public final class ChronoActionRecorder {
 
     /**
      * A left-click on an entity, with the weapon and its attack cooldown charge so replay can
-     * reproduce the damage by really attacking instead of applying a recorded number. Players are
-     * never recorded as targets; replay instead also hits any player standing where the swing lands.
+     * reproduce the damage by really attacking instead of applying a recorded number.
      */
     public static void onAttackEntity(AttackEntityEvent event) {
         ServerPlayer player = recordingPlayer(event.getEntity());
@@ -166,8 +161,7 @@ public final class ChronoActionRecorder {
                 target instanceof LivingEntity living && living.isBaby(), target.getId(), use.toTag(), null);
     }
 
-    /** Mounting a boat, minecart, horse, seat... however it happened. The right-click that caused it
-     * is dropped from the queue, since replaying the mount directly is what reproduces it. */
+    /** Mounting a boat, minecart, horse, seat... however it happened. */
     public static void onEntityMount(EntityMountEvent event) {
         ServerPlayer player = recordingPlayer(event.getEntityMounting());
         if (player == null || player.level().isClientSide) return;
@@ -293,7 +287,10 @@ public final class ChronoActionRecorder {
         });
     }
 
-    /** Appends one action to the player's recording, with {@code fill} adding its type-specific fields. */
+    /**
+     * Appends one action to the player's recording, with {@code fill} adding its type-specific
+     * fields.
+     */
     private static void recordAction(ServerPlayer player, BlockPos pos, ChronoRecording.ActionType type,
                                       long gameTime, Consumer<CompoundTag> fill) {
         ItemStack recorder = findRecordingRecorder(player);

@@ -17,9 +17,8 @@ import net.neoforged.fml.ModList;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * A full capture of a player's state (position, vitals, inventory) taken the moment a
- * Temporal Anchor is calibrated. {@link #applyTo(ServerPlayer)} restores every field,
- * discarding anything the player did after the checkpoint.
+ * A full capture of a player's state (position, vitals, inventory) taken the moment a Temporal
+ * Anchor is calibrated.
  */
 public class PlayerSnapshot {
     private final double x;
@@ -88,8 +87,7 @@ public class PlayerSnapshot {
                 player.level().getGameTime());
     }
 
-    /** @param restoreInventory whether to also overwrite the player's current inventory with the
-     * snapshot's — false for the Temporal Anchor's "keep inventory" rewind mode. */
+    /** @param restoreInventory whether to also overwrite the player's current inventory with the */
     public void applyTo(ServerPlayer player, boolean restoreInventory) {
         MinecraftServer server = player.getServer();
         ServerLevel targetLevel = null;
@@ -101,10 +99,10 @@ public class PlayerSnapshot {
         }
 
         player.teleportTo(targetLevel, x, y, z, yRot, xRot);
-        // Same-dimension teleportTo just repositions the connection; it doesn't clear fall
-        // state, so a void plunge's accumulated fall distance/velocity would otherwise slam
-        // into the checkpoint ground as lethal fall damage on the next tick, killing the
-        // player a second time.
+        // Same-dimension teleportTo just repositions the connection; it doesn't clear fall state,
+        // so a void plunge's accumulated fall distance/velocity would otherwise slam into the
+        // checkpoint ground as lethal fall damage on the next tick, killing the player a second
+        // time.
         player.setDeltaMovement(Vec3.ZERO);
         player.resetFallDistance();
         player.setHealth(health);

@@ -19,13 +19,7 @@ import net.minecraft.world.level.Level;
 
 import java.util.List;
 
-/**
- * Handheld tool for visiting the Overworld's past in the Chrono Rift. Right-clicking outside the
- * rift opens {@link io.github.tofithepuppycat.temporalindustries.client.screen.ChronoLensScreen} to
- * pick a moment; right-clicking while already inside the rift is a simple "return trip" back to
- * wherever the player stood before stepping in, using their stored {@link
- * PlayerTemporalState.ChronoRiftOrigin}.
- */
+/** Handheld tool for visiting the Overworld's past in the Chrono Rift. */
 public class ChronoscopeItem extends Item {
     public ChronoscopeItem(Properties properties) {
         super(properties);

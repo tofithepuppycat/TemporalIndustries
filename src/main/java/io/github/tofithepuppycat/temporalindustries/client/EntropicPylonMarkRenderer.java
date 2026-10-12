@@ -20,9 +20,10 @@ import org.joml.Matrix4f;
 
 import java.util.List;
 
-/** Renders {@link EntropicPylonItem}'s currently marked positions in-world while held: a red
- * outline for each input, blue for each output. Reads marks straight off the held stack's data
- * components, so there's no separate client-side cache to keep in sync. */
+/**
+ * Renders {@link EntropicPylonItem}'s currently marked positions in-world while held: a red outline
+ * for each input, blue for each output.
+ */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class EntropicPylonMarkRenderer {
     private static final float[] INPUT_COLOR = {1.0F, 0.25F, 0.25F};

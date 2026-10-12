@@ -11,8 +11,9 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: detaches a Chronosphere from its repository so a different one can be chosen.
- * The repository and its history are kept. */
+/**
+ * Client -> server: detaches a Chronosphere from its repository so a different one can be chosen.
+ */
 public class ChronosphereUnbindRepositoryPacket implements CustomPacketPayload {
     public static final Type<ChronosphereUnbindRepositoryPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_unbind_repository"));

@@ -10,16 +10,16 @@ import net.minecraft.world.level.material.MapColor;
 /**
  * Samples a chunk's surface into a small grid of packed vanilla map-color bytes (the same encoding
  * {@link MapColor#getPackedId} produces), used to paint a terrain thumbnail behind the
- * Chronosphere's chunk-claim map. A simplified, full-resolution port of {@code MapItem#update}'s
- * column-sampling loop rather than the real map-item rendering pipeline, which assumes a player is
- * physically holding a numbered map.
+ * Chronosphere's chunk-claim map.
  */
 public final class ChronoMapSampler {
     public static final int SIZE = 16;
 
     private ChronoMapSampler() {}
 
-    /** SIZE x SIZE grid of packed map-color bytes for chunkPos, row-major (index = z * SIZE + x). */
+    /**
+     * SIZE x SIZE grid of packed map-color bytes for chunkPos, row-major (index = z * SIZE + x).
+     */
     public static byte[] sampleChunk(ServerLevel level, ChunkPos chunkPos) {
         byte[] colors = new byte[SIZE * SIZE];
         int baseX = chunkPos.getMinBlockX();

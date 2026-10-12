@@ -27,13 +27,7 @@ import org.joml.Vector3f;
 
 import java.util.List;
 
-/**
- * Handheld action recorder. First right-click starts recording the wielder's movement
- * (position relative to the start point, look direction, crouch state) once per tick; a second
- * right-click stops and saves it onto the item itself, ready to be inserted into an Echo
- * Projector. Everything lives in the stack's {@link DataComponents#CUSTOM_DATA} — nothing is
- * stored server-side, so the recording travels with the item.
- */
+/** Handheld action recorder. */
 @SuppressWarnings("null")
 public class EchoRecordItem extends Item {
     /** 60 seconds at 20 ticks/second — keeps a saved recording's NBT bounded. */
@@ -100,8 +94,7 @@ public class EchoRecordItem extends Item {
         level.playSound(null, player.blockPosition(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 0.7F);
     }
 
-    /** Discards a saved-but-not-yet-inserted recording so the recorder can be reused. Only reachable
-     * via crouch right-click, so a normal right-click never destroys it by accident. */
+    /** Discards a saved-but-not-yet-inserted recording so the recorder can be reused. */
     private void clearRecording(ItemStack stack, CompoundTag data, Player player, Level level) {
         data.putBoolean("Saved", false);
         data.put("Frames", new ListTag());
@@ -150,8 +143,10 @@ public class EchoRecordItem extends Item {
     private static final DustParticleOptions START_MARKER_PARTICLE =
             new DustParticleOptions(new Vector3f(0.6F, 0.1F, 0.95F), 1.3F);
 
-    /** Marks the current recording's start point with particles while it's actively recording, as
-     * a visual reminder of where to return to so the loop closes cleanly. */
+    /**
+     * Marks the current recording's start point with particles while it's actively recording, as a
+     * visual reminder of where to return to so the loop closes cleanly.
+     */
     private void spawnStartMarker(CompoundTag data, ServerLevel serverLevel) {
         if (serverLevel.getGameTime() % 10 != 0) return;
 

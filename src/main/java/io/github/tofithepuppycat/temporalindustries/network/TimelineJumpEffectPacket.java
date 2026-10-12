@@ -9,11 +9,13 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Server -> client: a timeline machine (Chronosphere, Chronovault or Chronodial) just jumped to a
+/**
+ * Server -> client: a timeline machine (Chronosphere, Chronovault or Chronodial) just jumped to a
  * different commit at pos; spawns a swirling particle burst on everyone tracking that chunk.
  * intoFuture picks the chaos/order color and swirl direction to match {@link
  * io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity}'s
- * entropy shift. */
+ * entropy shift.
+ */
 public class TimelineJumpEffectPacket implements CustomPacketPayload {
     public static final Type<TimelineJumpEffectPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_jump_effect"));

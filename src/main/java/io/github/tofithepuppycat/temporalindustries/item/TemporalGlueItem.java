@@ -31,9 +31,7 @@ import java.util.Optional;
 
 /**
  * Handheld area-protection tool: right-click one corner, then another, to glue that cuboid region,
- * excluding it from timeline capture and rollback/jump overwrites entirely. Left-click while aiming
- * at a glued region deletes every region along the sight line. Regions are stored in
- * {@link TemporalWorldData}, not on the item; the item only holds a pending first corner.
+ * excluding it from timeline capture and rollback/jump overwrites entirely.
  */
 @SuppressWarnings("null")
 public class TemporalGlueItem extends Item {
@@ -77,8 +75,10 @@ public class TemporalGlueItem extends Item {
         return InteractionResult.SUCCESS;
     }
 
-    /** Left-click-with-glue handler: deletes every glued region along the player's line of sight
-     * out to block reach, or clears a pending first corner if nothing was hit. */
+    /**
+     * Left-click-with-glue handler: deletes every glued region along the player's line of sight out
+     * to block reach, or clears a pending first corner if nothing was hit.
+     */
     public static void deleteRegionsAlongSight(ServerLevel level, ServerPlayer player, ItemStack stack) {
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         Vec3 origin = player.getEyePosition();

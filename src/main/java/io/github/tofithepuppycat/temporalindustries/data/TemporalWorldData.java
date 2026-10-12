@@ -9,6 +9,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -26,9 +27,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Central server-side store: per-dimension timelines, per-player checkpoint state, tracked
- * chunks, glued regions, and pending deltas awaiting flush. Tracked chunks are rebuilt from
- * block entity onLoad() calls rather than persisted.
+ * Central server-side store: per-dimension timelines, per-player checkpoint state, tracked chunks,
+ * glued regions, and pending deltas awaiting flush.
  */
 @SuppressWarnings("null")
 public class TemporalWorldData extends SavedData {
@@ -39,25 +39,17 @@ public class TemporalWorldData extends SavedData {
     private final Map<ResourceLocation, TemporalTimeline> timelines = new HashMap<>();
     private final Map<UUID, PlayerTemporalState> playerStates = new HashMap<>();
 
-    // -------------------------------------------------------------------------
-    // Per-machine repositories (new model). Persisted and keyed by machine id, independent of
-    // dimension; a repository outlives its owning machine's destruction (orphaned, never deleted)
-    // so a future machine claiming the same chunks could in principle resume it.
     private final Map<UUID, TemporalRepository> repositories = new HashMap<>();
+    // Persisted: repository id -> the machine currently using it. Absent means orphaned.
+    private final Map<UUID, GlobalPos> repositoryOwners = new HashMap<>();
 
-    // Not persisted: rebuilt from block entity onLoad(). Which repository currently claims a given
-    // chunk -- a chunk may be claimed by at most one repository at a time. Claiming only marks a
-    // chunk for inclusion in that repository's next manual Commit; it never touches history, so
-    // releasing a claim never discards anything (see TemporalRepository#commit).
+    // Not persisted: rebuilt from block entity onLoad().
     private final Map<ResourceLocation, Map<Long, UUID>> chunkRepoOwner = new HashMap<>();
     // Reverse index of chunkRepoOwner: repository id -> the chunks (across its one dimension) it
     // currently claims. Not persisted, kept in sync by claimChunk/releaseChunk.
     private final Map<UUID, Set<Long>> repoClaimedChunks = new HashMap<>();
 
-    // Transient pending deltas awaiting a manual Commit, keyed by owning repository instead of
-    // dimension/chunk (contrast pendingBlockDeltas/pendingEntityDeltas below, used by the old
-    // per-dimension model). Never persisted: the new model has no periodic auto-flush, so an
-    // uncommitted change lost on restart is an accepted tradeoff of commits being manual-only.
+    // Transient pending deltas awaiting a manual Commit, keyed by owning repository.
     private final Map<UUID, Map<Long, Map<BlockPos, BlockChangeDelta>>> repoPendingBlockDeltas = new HashMap<>();
     private final Map<UUID, Map<Long, List<EntityDelta>>> repoPendingEntityDeltas = new HashMap<>();
 
@@ -70,8 +62,7 @@ public class TemporalWorldData extends SavedData {
     private int glueVersion = 0;
 
     // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> owners
-    // currently claiming that chunk needs tracking. Owner-scoped (not a plain boolean) so one
-    // owner releasing a chunk can't silently stop another owner's tracking of it.
+    // currently claiming that chunk needs tracking.
     private final Map<ResourceLocation, Map<Long, Set<Object>>> trackedChunkOwners = new HashMap<>();
 
     // Transient pending deltas flushed by TemporalChangeListener on server tick.
@@ -81,14 +72,9 @@ public class TemporalWorldData extends SavedData {
     // they happened in.
     private final Map<ResourceLocation, Map<Long, List<EntityDelta>>> pendingEntityDeltas = new HashMap<>();
 
-    // Not persisted: chunks a machine has claimed but hasn't been baselined yet. The actual
-    // (expensive) ChunkSnapshot capture is deferred until the next flush rather than happening the
-    // instant a chunk is claimed/toggled/loaded, so closing a claim GUI never itself does a full
-    // chunk scan.
+    // Not persisted: chunks a machine has claimed but hasn't been baselined yet.
     private final Map<ResourceLocation, Set<Long>> pendingClaimedChunks = new HashMap<>();
 
-    // -------------------------------------------------------------------------
-    // Chrono Rift session (not persisted: an empty rift always resets to "no active session")
 
     /** Sentinel meaning no session is currently open (the rift is empty). */
     public static final long NO_CHRONO_RIFT_SESSION = Long.MIN_VALUE;
@@ -96,34 +82,27 @@ public class TemporalWorldData extends SavedData {
     // Global chunk key -> the gameTime it was last filled at, so a new session (different time)
     // naturally invalidates stale chunks as players revisit them, with no bulk-reset step needed.
     private final Map<Long, Long> chronoRiftFilledChunks = new HashMap<>();
-    // Chunks ChronoRiftChunkListener has seen load but not yet filled. Filling writes real blocks
-    // and runs neighbor-shape "settle" updates, which can force-load bordering chunks — doing that
-    // synchronously from inside ChunkEvent.Load would re-enter the event and cascade outward
-    // (observed as a server hang), so loads only enqueue here; a server-tick handler drains it.
+    // Chunks ChronoRiftChunkListener has seen load but not yet filled.
     private final LinkedHashSet<Long> chronoRiftPendingFill = new LinkedHashSet<>();
-    // Chunks currently loaded in the rift dimension, maintained via ChunkEvent.Load/Unload. A chunk
-    // that stays loaded across an empty-rift session boundary never gets a fresh Load event, so it
-    // wouldn't otherwise notice its fill is stale for the new session's time; setChronoRiftActiveTime
-    // re-queues every entry here so already-loaded chunks still get corrected.
+    // Chunks currently loaded in the rift dimension, maintained via ChunkEvent.Load/Unload.
     private final Set<Long> chronoRiftLoadedChunks = new HashSet<>();
     // Chunks that resolved to real reconstructed history the last time they were filled (as opposed
-    // to being left void for lack of any commit at the requested moment). Drives the client-side rift
-    // boundary shader and the server-side movement border in ChronoRiftBorderListener.
+    // to being left void for lack of any commit at the requested moment).
     private final Set<Long> chronoRiftTrackedChunks = new HashSet<>();
 
     public long getChronoRiftActiveTime() {
         return chronoRiftActiveTime;
     }
 
-    /** Whether requestedTime may enter the rift right now: freely if it's empty, otherwise only if
-     * it matches whatever moment is already open there. */
+    /**
+     * Whether requestedTime may enter the rift right now: freely if it's empty, otherwise only if
+     * it matches whatever moment is already open there.
+     */
     public boolean canEnterChronoRift(ServerLevel riftLevel, long requestedTime) {
         return riftLevel.players().isEmpty() || requestedTime == chronoRiftActiveTime;
     }
 
-    /** Opens (or re-confirms) the rift session at requestedTime. Only meaningful to call when the
-     * rift was just found empty by {@link #canEnterChronoRift}. Re-queues every chunk still loaded
-     * from a previous session so it gets corrected even though it won't fire a fresh Load event. */
+    /** Opens (or re-confirms) the rift session at requestedTime. */
     public void setChronoRiftActiveTime(long requestedTime) {
         chronoRiftActiveTime = requestedTime;
         chronoRiftPendingFill.addAll(chronoRiftLoadedChunks);
@@ -169,20 +148,18 @@ public class TemporalWorldData extends SavedData {
         return new ChunkPos(key);
     }
 
-    // -------------------------------------------------------------------------
-    // Time Dilator acceleration (not persisted: the effect is meant to be temporary, so a restart
-    // simply ending it early is fine). dimension -> accelerated block pos -> ticks remaining.
     private final Map<ResourceLocation, Map<BlockPos, Integer>> acceleratedBlocks = new HashMap<>();
 
-    /** Marks pos as accelerated for durationTicks, extending rather than shortening any effect
-     * already running there. */
+    /**
+     * Marks pos as accelerated for durationTicks, extending rather than shortening any effect
+     * already running there.
+     */
     public void accelerateBlock(ResourceLocation dimension, BlockPos pos, int durationTicks) {
         acceleratedBlocks.computeIfAbsent(dimension, d -> new HashMap<>())
                 .merge(pos.immutable(), durationTicks, Math::max);
     }
 
-    /** Ticks every accelerated position in dimension down by one, forgetting any that expire.
-     * @return the positions that were active this tick, for the caller to re-tick. */
+    /** Ticks every accelerated position in dimension down by one, forgetting any that expire. */
     public Set<BlockPos> tickAcceleratedBlocks(ResourceLocation dimension) {
         Map<BlockPos, Integer> dimMap = acceleratedBlocks.get(dimension);
         if (dimMap == null || dimMap.isEmpty()) return Collections.emptySet();
@@ -199,15 +176,11 @@ public class TemporalWorldData extends SavedData {
         return active;
     }
 
-    // -------------------------------------------------------------------------
-    // Access
 
     public static TemporalWorldData get(MinecraftServer server) {
         return server.overworld().getDataStorage().computeIfAbsent(FACTORY, NAME);
     }
 
-    // -------------------------------------------------------------------------
-    // Timeline management
 
     public TemporalTimeline getOrCreateTimeline(ResourceLocation dimension) {
         return timelines.computeIfAbsent(dimension, d -> new TemporalTimeline());
@@ -218,11 +191,14 @@ public class TemporalWorldData extends SavedData {
         return timelines.get(dimension);
     }
 
-    // -------------------------------------------------------------------------
-    // Repository management (new per-machine model)
 
     public TemporalRepository getOrCreateRepository(UUID repoId, ResourceLocation dimension) {
-        return repositories.computeIfAbsent(repoId, id -> new TemporalRepository(dimension));
+        return repositories.computeIfAbsent(repoId, id -> {
+            TemporalRepository repo = new TemporalRepository(dimension);
+            repo.setName(defaultRepositoryName(id));
+            setDirty();
+            return repo;
+        });
     }
 
     @Nullable
@@ -230,13 +206,94 @@ public class TemporalWorldData extends SavedData {
         return repositories.get(repoId);
     }
 
-    // -------------------------------------------------------------------------
-    // Chunk claim ownership (new per-machine model)
+    public static final int MAX_REPOSITORY_NAME_LENGTH = 32;
+
+    /** Name given to a repository nobody has named, derived from its id so it never collides. */
+    private static String defaultRepositoryName(UUID repoId) {
+        return "repository-" + repoId.toString().substring(0, 8);
+    }
+
+    /**
+     * A name as entered by a player, stripped of surrounding whitespace; null if it's empty or too
+     * long.
+     */
+    @Nullable
+    public static String normalizeRepositoryName(String raw) {
+        String name = raw.trim();
+        if (name.isEmpty() || name.length() > MAX_REPOSITORY_NAME_LENGTH) return null;
+        return name;
+    }
+
+    /** The repository named name (ignoring case), or null if there isn't one. */
+    @Nullable
+    public UUID findRepositoryByName(String name) {
+        for (Map.Entry<UUID, TemporalRepository> entry : repositories.entrySet()) {
+            if (entry.getValue().getName().equalsIgnoreCase(name)) return entry.getKey();
+        }
+        return null;
+    }
+
+    /**
+     * Names of the unowned repositories in dimension that contain query (ignoring case), those
+     * starting with it first, then alphabetically; at most limit of them.
+     */
+    public List<String> suggestAvailableRepositoryNames(String query, ResourceLocation dimension, int limit) {
+        String needle = query.trim().toLowerCase(Locale.ROOT);
+        if (needle.isEmpty()) return List.of();
+        List<String> matches = new ArrayList<>();
+        for (Map.Entry<UUID, TemporalRepository> entry : repositories.entrySet()) {
+            TemporalRepository repo = entry.getValue();
+            if (repositoryOwners.containsKey(entry.getKey()) || !repo.getDimension().equals(dimension)) continue;
+            if (repo.getName().toLowerCase(Locale.ROOT).contains(needle)) matches.add(repo.getName());
+        }
+        matches.sort(Comparator
+                .comparing((String name) -> !name.toLowerCase(Locale.ROOT).startsWith(needle))
+                .thenComparing(String.CASE_INSENSITIVE_ORDER));
+        return matches.size() > limit ? new ArrayList<>(matches.subList(0, limit)) : matches;
+    }
+
+    /** Creates a fresh, empty repository called name. */
+    public UUID createRepository(String name, ResourceLocation dimension) {
+        UUID id = UUID.randomUUID();
+        TemporalRepository repo = new TemporalRepository(dimension);
+        repo.setName(name);
+        repositories.put(id, repo);
+        setDirty();
+        return id;
+    }
+
+    /** Records the machine currently using repoId. */
+    public void setRepositoryOwner(UUID repoId, GlobalPos machine) {
+        if (machine.equals(repositoryOwners.put(repoId, machine))) return;
+        setDirty();
+    }
+
+    /** Marks repoId as orphaned: its machine is gone, so it can be bound again by name. */
+    public void clearRepositoryOwner(UUID repoId) {
+        if (repositoryOwners.remove(repoId) != null) setDirty();
+    }
+
+    /**
+     * Permanently removes repoId, its history, its owner record, its chunk claims and any
+     * uncommitted changes recorded for it.
+     */
+    public void deleteRepository(UUID repoId) {
+        releaseAllClaimedChunks(repoId);
+        repoPendingBlockDeltas.remove(repoId);
+        repoPendingEntityDeltas.remove(repoId);
+        repositoryOwners.remove(repoId);
+        repositories.remove(repoId);
+        setDirty();
+    }
+
+    public boolean hasRepositoryOwner(UUID repoId) {
+        return repositoryOwners.containsKey(repoId);
+    }
+
 
     public enum ClaimResult { CLAIMED, ALREADY_CLAIMED_BY_SELF, ALREADY_CLAIMED_ELSEWHERE }
 
-    /** Claims chunkPos for repoId, failing if another repository already claims it. Idempotent for
-     * the same repoId. */
+    /** Claims chunkPos for repoId, failing if another repository already claims it. */
     public ClaimResult claimChunk(ResourceLocation dimension, ChunkPos chunkPos, UUID repoId) {
         Map<Long, UUID> dimChunks = chunkRepoOwner.computeIfAbsent(dimension, d -> new HashMap<>());
         UUID existing = dimChunks.get(chunkPos.toLong());
@@ -248,8 +305,7 @@ public class TemporalWorldData extends SavedData {
         return ClaimResult.CLAIMED;
     }
 
-    /** Releases repoId's claim on chunkPos, if it holds one. No-op otherwise. The repository's
-     * commit history for this chunk is untouched -- claiming only governs future Commits. */
+    /** Releases repoId's claim on chunkPos, if it holds one. */
     public void releaseChunk(ResourceLocation dimension, ChunkPos chunkPos, UUID repoId) {
         Map<Long, UUID> dimChunks = chunkRepoOwner.get(dimension);
         if (dimChunks == null) return;
@@ -266,9 +322,10 @@ public class TemporalWorldData extends SavedData {
         }
     }
 
-    /** Releases every chunk repoId currently claims, across every dimension -- e.g. when its
-     * machine is destroyed. The repository itself (and its history) is untouched and stays
-     * reachable via {@link #getRepository}. */
+    /**
+     * Releases every chunk repoId currently claims, across every dimension -- e.g. when its machine
+     * is destroyed.
+     */
     public void releaseAllClaimedChunks(UUID repoId) {
         Set<Long> claimed = repoClaimedChunks.remove(repoId);
         if (claimed == null) return;
@@ -292,10 +349,6 @@ public class TemporalWorldData extends SavedData {
         return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Pending delta buffering (new per-machine model), keyed by owning repository rather than
-    // dimension/chunk -- mirrors recordTrackedBlockChange/recordEntityDelta below, routed via
-    // getClaimingRepo once a change's chunk is known to belong to a repository.
 
     public void recordRepoBlockChange(UUID repoId, ChunkPos chunkPos, BlockChangeDelta delta) {
         Map<BlockPos, BlockChangeDelta> chunkMap = repoPendingBlockDeltas
@@ -329,10 +382,10 @@ public class TemporalWorldData extends SavedData {
                 .add(delta);
     }
 
-    /** Bundles repoId's pending changes into one new commit, including a baseline for any
-     * currently-claimed chunk that doesn't have history yet. Player-triggered only -- the new
-     * model has no periodic auto-flush.
-     * @return the new commit, or null if there was nothing to commit */
+    /**
+     * Bundles repoId's pending changes into one new commit, including a baseline for any currently-
+     * claimed chunk that doesn't have history yet.
+     */
     @Nullable
     public RepoCommit commitRepository(MinecraftServer server, UUID repoId, long gameTime, @Nullable UUID author) {
         TemporalRepository repo = repositories.get(repoId);
@@ -358,18 +411,17 @@ public class TemporalWorldData extends SavedData {
         return result;
     }
 
-    // -------------------------------------------------------------------------
-    // Chunk tracking
 
-    /** Queues chunkPos for a baseline snapshot (if it doesn't already have history) at the next
-     * flush, instead of capturing a {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot}
-     * immediately. Cheap — no world access happens until the flush actually drains this. */
+    /**
+     * Queues chunkPos for a baseline snapshot (if it doesn't already have history) at the next
+     * flush, instead of capturing a {@link
+     * io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot} immediately.
+     */
     public void markChunkPending(ResourceLocation dimension, ChunkPos pos) {
         pendingClaimedChunks.computeIfAbsent(dimension, d -> new HashSet<>()).add(pos.toLong());
     }
 
-    /** Releases owner's claim on chunkPos. The chunk stays tracked if any other owner still claims
-     * it — only the last owner letting go actually stops tracking. */
+    /** Releases owner's claim on chunkPos. */
     public void untrackChunk(ResourceLocation dimension, ChunkPos pos, Object owner) {
         Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
         if (dimChunks == null) return;
@@ -385,8 +437,6 @@ public class TemporalWorldData extends SavedData {
         return dimChunks != null && dimChunks.containsKey(pos.toLong());
     }
 
-    // -------------------------------------------------------------------------
-    // Glued regions
 
     public void addGluedRegion(ResourceLocation dimension, BoundingBox region) {
         gluedRegions.computeIfAbsent(dimension, d -> new ArrayList<>()).add(region);
@@ -394,8 +444,9 @@ public class TemporalWorldData extends SavedData {
         setDirty();
     }
 
-    /** Removes every glued region whose bounding box the segment from origin to end passes through.
-     * @return how many were removed. */
+    /**
+     * Removes every glued region whose bounding box the segment from origin to end passes through.
+     */
     public int removeGluedRegionsAlongRay(ResourceLocation dimension, Vec3 origin, Vec3 end) {
         List<BoundingBox> regions = gluedRegions.get(dimension);
         if (regions == null) return 0;
@@ -434,8 +485,6 @@ public class TemporalWorldData extends SavedData {
         return glueVersion;
     }
 
-    // -------------------------------------------------------------------------
-    // Player states
 
     public PlayerTemporalState getOrCreatePlayerState(UUID playerId) {
         return playerStates.computeIfAbsent(playerId, PlayerTemporalState::new);
@@ -446,13 +495,11 @@ public class TemporalWorldData extends SavedData {
         return playerStates.get(playerId);
     }
 
-    // -------------------------------------------------------------------------
-    // Pending delta buffering
 
     /**
      * Records a block change for a tracked chunk, merging with any pending change at the same
-     * position (keeping the original previousState) and dropping the entry if the net effect is
-     * a no-op.
+     * position (keeping the original previousState) and dropping the entry if the net effect is a
+     * no-op.
      */
     public void recordTrackedBlockChange(ResourceLocation dimension, ChunkPos chunkPos, BlockChangeDelta delta) {
         Map<BlockPos, BlockChangeDelta> chunkMap = pendingBlockDeltas
@@ -488,11 +535,7 @@ public class TemporalWorldData extends SavedData {
 
     /**
      * Drains every chunk queued by {@link #markChunkPending}, giving chunks that don't already have
-     * history a baseline snapshot. All baselines queued for the same dimension in this flush (e.g.
-     * a whole rectangle/freehand claim) land as a single {@link TemporalTimeline#addSnapshot} commit
-     * on the branch currently checked out, instead of one commit per chunk. Called at the start of
-     * every flush so a claimed-but-not-yet-committed chunk's expensive capture happens here instead
-     * of at claim time.
+     * history a baseline snapshot.
      */
     private void drainPendingClaims(MinecraftServer server) {
         if (pendingClaimedChunks.isEmpty()) return;
@@ -522,16 +565,12 @@ public class TemporalWorldData extends SavedData {
     /**
      * Flushes all pending deltas into commits on the relevant timelines, first draining any chunks
      * queued by {@link #markChunkPending} into baseline snapshots.
-     *
-     * @return true if any commits were created
      */
     public boolean flushPendingDeltas(MinecraftServer server, long gameTime) {
         return flushPendingDeltas(server, gameTime, false);
     }
 
-    /** @param playerMarked whether this flush was explicitly requested by a player (e.g. a
-     * Chronosphere's "Commit" button) rather than the automatic periodic flush, flagging the
-     * resulting DELTA so the graph can render it like a Portable ChronoMarker save. */
+    /** @param playerMarked whether this flush was explicitly requested by a player (e.g. a */
     public boolean flushPendingDeltas(MinecraftServer server, long gameTime, boolean playerMarked) {
         drainPendingClaims(server);
         if (pendingBlockDeltas.isEmpty() && pendingEntityDeltas.isEmpty()) return false;
@@ -575,15 +614,14 @@ public class TemporalWorldData extends SavedData {
         return true;
     }
 
-    /** On-demand version of {@link #flushPendingDeltas}, for a player-triggered "Commit" action
-     * (e.g. the Chronosphere GUI) instead of waiting for the next automatic flush tick. Always
-     * flags the resulting commit {@code playerMarked}, same as a Portable ChronoMarker save. */
+    /**
+     * On-demand version of {@link #flushPendingDeltas}, for a player-triggered "Commit" action
+     * (e.g. the Chronosphere GUI) instead of waiting for the next automatic flush tick.
+     */
     public boolean commitNow(MinecraftServer server, long gameTime) {
         return flushPendingDeltas(server, gameTime, true);
     }
 
-    // -------------------------------------------------------------------------
-    // Persistence
 
     public static TemporalWorldData load(CompoundTag tag, HolderLookup.Provider registries) {
         TemporalWorldData data = new TemporalWorldData();
@@ -605,7 +643,19 @@ public class TemporalWorldData extends SavedData {
         for (int i = 0; i < repoList.size(); i++) {
             CompoundTag repoTag = repoList.getCompound(i);
             UUID id = repoTag.getUUID("Id");
-            data.repositories.put(id, TemporalRepository.fromTag(repoTag.getCompound("Repository")));
+            TemporalRepository repo = TemporalRepository.fromTag(repoTag.getCompound("Repository"));
+            if (repo.getName().isEmpty()) repo.setName(defaultRepositoryName(id));
+            data.repositories.put(id, repo);
+        }
+
+        ListTag ownerList = tag.getList("RepositoryOwners", Tag.TAG_COMPOUND);
+        for (int i = 0; i < ownerList.size(); i++) {
+            CompoundTag ownerTag = ownerList.getCompound(i);
+            ResourceLocation dim = ResourceLocation.tryParse(ownerTag.getString("Dimension"));
+            if (dim == null) continue;
+            data.repositoryOwners.put(ownerTag.getUUID("Id"), GlobalPos.of(
+                    net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION, dim),
+                    BlockPos.of(ownerTag.getLong("Pos"))));
         }
 
         ListTag glueList = tag.getList("GluedRegions", Tag.TAG_COMPOUND);
@@ -647,6 +697,16 @@ public class TemporalWorldData extends SavedData {
             repoList.add(repoTag);
         }
         tag.put("Repositories", repoList);
+
+        ListTag ownerList = new ListTag();
+        for (Map.Entry<UUID, GlobalPos> entry : repositoryOwners.entrySet()) {
+            CompoundTag ownerTag = new CompoundTag();
+            ownerTag.putUUID("Id", entry.getKey());
+            ownerTag.putString("Dimension", entry.getValue().dimension().location().toString());
+            ownerTag.putLong("Pos", entry.getValue().pos().asLong());
+            ownerList.add(ownerTag);
+        }
+        tag.put("RepositoryOwners", ownerList);
 
         ListTag glueList = new ListTag();
         for (Map.Entry<ResourceLocation, List<BoundingBox>> entry : gluedRegions.entrySet()) {

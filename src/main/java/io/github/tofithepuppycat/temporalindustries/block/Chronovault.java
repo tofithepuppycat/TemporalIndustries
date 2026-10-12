@@ -61,8 +61,10 @@ public class Chronovault extends BaseEntityBlock {
         return RenderShape.MODEL;
     }
 
-    /** Refuses to survive on a chunk already tracked by another machine, since a chunk's
-     * timeline is only meaningful relative to a single Chronovault. */
+    /**
+     * Refuses to survive on a chunk already tracked by another machine, since a chunk's timeline is
+     * only meaningful relative to a single Chronovault.
+     */
     @Override
     public boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader level, @NotNull BlockPos pos) {
         if (level instanceof ServerLevel serverLevel) {
@@ -92,6 +94,15 @@ public class Chronovault extends BaseEntityBlock {
         }
 
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    protected void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
+                             @NotNull BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && level.getBlockEntity(pos) instanceof ChronovaultBlockEntity chronovault) {
+            chronovault.orphanRepository();
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
     }
 
     @Nullable

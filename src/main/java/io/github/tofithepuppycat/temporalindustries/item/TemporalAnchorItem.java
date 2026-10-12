@@ -27,12 +27,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/**
- * Trigger device for the player temporal anchor system. Checkpoint/world-change state lives
- * server-side in TemporalWorldData.PlayerTemporalState, keyed by player UUID; the stack only holds
- * its charged Order amount and rewind mode as data components. Right-clicking calibrates the
- * player's checkpoint; dying with enough Order banked spends it to rewind.
- */
+/** Trigger device for the player temporal anchor system. */
 @SuppressWarnings("null")
 public class TemporalAnchorItem extends Item implements EntropyReceptacle {
     /** Anchor tank size, in mB of liquid Order. */
@@ -107,8 +102,10 @@ public class TemporalAnchorItem extends Item implements EntropyReceptacle {
         return drained;
     }
 
-    /** First Temporal Anchor stack (inventory, offhand, or Curios slot) with enough Order to pay for
-     * its own mode's cost, or null if none qualifies. */
+    /**
+     * First Temporal Anchor stack (inventory, offhand, or Curios slot) with enough Order to pay for
+     * its own mode's cost, or null if none qualifies.
+     */
     @Nullable
     public static ItemStack findChargedAnchor(Player player) {
         for (ItemStack stack : player.getInventory().items) {

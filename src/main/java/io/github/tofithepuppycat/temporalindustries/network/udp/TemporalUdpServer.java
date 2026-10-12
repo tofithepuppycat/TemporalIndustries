@@ -19,11 +19,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.zip.Deflater;
 
-/**
- * UDP server for bulk temporal data transfers. Starts/stops with the Minecraft server, listening on
- * (Minecraft port + 1). Call {@link #send} from any thread to ZLIB-compress and fragment a payload
- * out to a player. No current caller yet (global rollback trigger is unimplemented).
- */
+/** UDP server for bulk temporal data transfers. */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class TemporalUdpServer {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -79,7 +75,10 @@ public final class TemporalUdpServer {
         }
     }
 
-    /** Compresses and sends payload to the given player; requires the client to have already handshaked. */
+    /**
+     * Compresses and sends payload to the given player; requires the client to have already
+     * handshaked.
+     */
     public static void send(UUID playerUUID, byte[] rawPayload) {
         if (INSTANCE == null) return;
         INSTANCE.sendInternal(playerUUID, rawPayload);

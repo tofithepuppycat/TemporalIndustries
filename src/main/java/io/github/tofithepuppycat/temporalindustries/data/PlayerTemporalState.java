@@ -17,9 +17,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Server-side temporal state for one player: their checkpoint snapshot and every
- * block change recorded since calibration. Stored in TemporalWorldData keyed by
- * player UUID — no state lives on the item itself.
+ * Server-side temporal state for one player: their checkpoint snapshot and every block change
+ * recorded since calibration.
  */
 @SuppressWarnings("null")
 public class PlayerTemporalState {
@@ -28,9 +27,11 @@ public class PlayerTemporalState {
     private final List<PlayerBlockChange> changes = new ArrayList<>();
     @Nullable private ChronoRiftOrigin chronoRiftOrigin;
 
-    /** Where a player stood right before stepping into the Chrono Rift, so the Chronoscope's
-     * return trip can put them back without touching health/inventory/xp (unlike the heavier
-     * {@link PlayerSnapshot}, which a rift round-trip has no reason to rewind). */
+    /**
+     * Where a player stood right before stepping into the Chrono Rift, so the Chronoscope's return
+     * trip can put them back without touching health/inventory/xp (unlike the heavier {@link
+     * PlayerSnapshot}, which a rift round-trip has no reason to rewind).
+     */
     public record ChronoRiftOrigin(ResourceLocation dimension, double x, double y, double z, float yRot, float xRot) {
         public CompoundTag toTag() {
             CompoundTag tag = new CompoundTag();
@@ -100,10 +101,8 @@ public class PlayerTemporalState {
     }
 
     /**
-     * Restores every tracked block to its state at the last checkpoint, using the earliest
-     * recorded change per position, then clears the change list.
-     *
-     * @return number of distinct block positions reverted
+     * Restores every tracked block to its state at the last checkpoint, using the earliest recorded
+     * change per position, then clears the change list.
      */
     public int revertWorldChanges(MinecraftServer server) {
         Map<ResourceLocation, Map<BlockPos, BlockChangeDelta>> earliestByDim = new LinkedHashMap<>();

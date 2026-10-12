@@ -31,9 +31,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 
-/** Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
+/**
+ * Textured GUI for the Loot Generator: a loot table text field (tinted to show server-validated
  * state) with a vertical Chaos tank bar alongside it, a luck slider, a roll-progress bar, and
- * play/stop and single/repeat icon buttons next to the cosmetic roll-preview slot. */
+ * play/stop and single/repeat icon buttons next to the cosmetic roll-preview slot.
+ */
 @SuppressWarnings("null")
 public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -173,9 +175,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}) fed into the loot
-     * roll's luck parameter, at a Chaos surcharge that scales with the setting. Only sends a packet
-     * when the discrete luck level actually changes. */
+    /**
+     * Drags to pick a luck level (0-{@link LootGeneratorBlockEntity#MAX_LUCK}) fed into the loot
+     * roll's luck parameter, at a Chaos surcharge that scales with the setting.
+     */
     private class LuckSlider extends AbstractSliderButton {
         LuckSlider(int x, int y, int width, int height, int initialLuck) {
             super(x, y, width, height, Component.empty(), initialLuck / (double) LootGeneratorBlockEntity.MAX_LUCK);
@@ -200,7 +203,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
             PacketDistributor.sendToServer(new LootGeneratorSetLuckPacket(menu.getBlockPos(), luck));
         }
 
-        /** Pulls the slider's handle to match a server value without re-sending it via {@link #applyValue}. */
+        /**
+         * Pulls the slider's handle to match a server value without re-sending it via {@link
+         * #applyValue}.
+         */
         void syncFromServer(int luck) {
             if (luck == lastSentLuck) return;
             lastSentLuck = luck;
@@ -215,8 +221,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         suggestionScrollOffset = 0;
     }
 
-    /** Loot table ids matching {@code text}, ranked prefix-matches-first, capped to
-     * {@link #MAX_SUGGESTIONS}. */
+    /**
+     * Loot table ids matching {@code text}, ranked prefix-matches-first, capped to {@link
+     * #MAX_SUGGESTIONS}.
+     */
     private List<String> matchingSuggestions(String text) {
         String needle = text.trim().toLowerCase(java.util.Locale.ROOT);
         if (needle.isEmpty()) return List.of();
@@ -243,7 +251,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         return result;
     }
 
-    /** Tab/Shift+Tab: cycles the field's text through matches for the text present before cycling started. */
+    /**
+     * Tab/Shift+Tab: cycles the field's text through matches for the text present before cycling
+     * started.
+     */
     private boolean tabComplete(boolean reverse) {
         if (tabCycleBase == null) tabCycleBase = lootTableField.getValue();
 
@@ -273,7 +284,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         PacketDistributor.sendToServer(new LootGeneratorSetTablePacket(menu.getBlockPos(), text));
     }
 
-    /** Play/stop icon: starts generation (single roll or repeating chain) if idle, otherwise halts it. */
+    /**
+     * Play/stop icon: starts generation (single roll or repeating chain) if idle, otherwise halts
+     * it.
+     */
     private void togglePlayStop() {
         if (menu.isRunning()) {
             PacketDistributor.sendToServer(new LootGeneratorStopPacket(menu.getBlockPos()));
@@ -283,7 +297,10 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** Single/repeat icon: flips the mode for the next generation; doesn't start or stop anything itself. */
+    /**
+     * Single/repeat icon: flips the mode for the next generation; doesn't start or stop anything
+     * itself.
+     */
     private void toggleRepeatMode() {
         PacketDistributor.sendToServer(new LootGeneratorToggleRepeatPacket(menu.getBlockPos()));
     }
@@ -323,7 +340,9 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         renderRollAnimation(guiGraphics);
     }
 
-    /** Play/stop and single/repeat icon buttons, drawn as icon buttons rather than vanilla Buttons. */
+    /**
+     * Play/stop and single/repeat icon buttons, drawn as icon buttons rather than vanilla Buttons.
+     */
     private void renderControlIcons(GuiGraphics guiGraphics) {
         int playX = leftPos + PLAY_ICON_X;
         int modeX = leftPos + MODE_ICON_X;
@@ -358,8 +377,11 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         guiGraphics.fill(x + 1, y + 1, x + 1 + filled, y + PROGRESS_BAR_HEIGHT - 1, 0xFF55FF55);
     }
 
-    /** While a roll is in progress, spins the icon through the possible-items sample, slowing down
-     * past the halfway mark and locking onto the actual item for the last {@link #ROLL_LOCK_TICKS} ticks. */
+    /**
+     * While a roll is in progress, spins the icon through the possible-items sample, slowing down
+     * past the halfway mark and locking onto the actual item for the last {@link #ROLL_LOCK_TICKS}
+     * ticks.
+     */
     private void renderRollAnimation(GuiGraphics guiGraphics) {
         ItemStack display = currentRollDisplayStack();
         if (display.isEmpty()) return;
@@ -369,7 +391,9 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         guiGraphics.renderItem(display, x, y);
     }
 
-    /** Empty if no roll is in progress; otherwise the stack the animation should show this frame. */
+    /**
+     * Empty if no roll is in progress; otherwise the stack the animation should show this frame.
+     */
     private ItemStack currentRollDisplayStack() {
         ItemStack next = menu.getNextRollItem();
         if (next.isEmpty()) return ItemStack.EMPTY;
@@ -444,14 +468,16 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         }
     }
 
-    /** Clamps {@link #suggestionScrollOffset} so its window of {@link #VISIBLE_SUGGESTIONS} rows stays within {@code matchCount}. */
+    /**
+     * Clamps {@link #suggestionScrollOffset} so its window of {@link #VISIBLE_SUGGESTIONS} rows
+     * stays within {@code matchCount}.
+     */
     private void clampSuggestionScroll(int matchCount) {
         int maxOffset = Math.max(0, matchCount - VISIBLE_SUGGESTIONS);
         suggestionScrollOffset = Math.max(0, Math.min(suggestionScrollOffset, maxOffset));
     }
 
-    /** Dropdown of matching loot table ids under the search field while it holds partial text.
-     * Centered under the field/panel, and scrollable when there are more matches than fit. */
+    /** Dropdown of matching loot table ids under the search field while it holds partial text. */
     private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         if (!lootTableField.isFocused()) return;
         List<String> matches = matchingSuggestions(lootTableField.getValue());

@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
+import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
@@ -11,26 +12,13 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.OptionalLong;
+import java.util.Optional;
 import java.util.Set;
 
 /**
  * Client-side view of the active machine's repository: caches the last commit graph fetched from
  * the server, tracks the player's selected commit, and holds the server-resolved ghost preview for
  * {@link TimelineProjectionRenderer}.
- *
- * <h2>Why the preview is resolved server-side</h2>
- * The old model shipped raw commit deltas and re-walked them here, which left a standing bug: a
- * jump crossing a re-baseline boundary needs a full chunk snapshot the client never receives, so
- * the preview under-reported changes. The new model instead has the server call
- * {@code TemporalRepository.previewJumpTargetStates} — literally the same resolve-and-diff path
- * the real jump uses, including glue filtering — and sync the finished
- * {@code BlockPos -> target BlockState} map. The preview therefore cannot diverge from what a jump
- * would actually write, and no {@code ChunkSnapshot} ever has to cross the network.
- *
- * <p>Classifying each entry as ADD/REMOVE/CHANGE still happens locally, every frame, against the
- * live world: that way the ghost reacts immediately as the player edits blocks, instead of waiting
- * for the next poll.
  */
 @SuppressWarnings("null")
 public final class TimelineProjectionManager {
@@ -66,25 +54,32 @@ public final class TimelineProjectionManager {
     private static long headCommitId = -1L;
     private static long selectedCommitId = -1L;
     /** commitId -> energy cost of jumping there from the current head, as last reported. */
-    private static Map<Long, Long> jumpCosts = new HashMap<>();
-    /** Server-resolved target state of every block a jump to selectedCommitId would touch,
-     * already glue-filtered. Empty unless the server has a preview for the current selection. */
+    private static Map<Long, JumpCostBreakdown> jumpCosts = new HashMap<>();
+    /**
+     * Server-resolved target state of every block a jump to selectedCommitId would touch, already
+     * glue-filtered.
+     */
     private static Map<BlockPos, BlockState> previewTargetStates = new HashMap<>();
-    /** Every chunk the machine has claimed, used to outline the claim's outer boundary in-world. */
+    /**
+     * Every chunk the machine has claimed, used to outline the claim's outer boundary in-world.
+     */
     private static List<ChunkPos> previewChunks = new ArrayList<>();
-    /** Last-synced previewVersion fingerprint, echoed back so the server can skip replying when nothing changed. */
+    /**
+     * Last-synced previewVersion fingerprint, echoed back so the server can skip replying when
+     * nothing changed.
+     */
     private static long previewVersion = Long.MIN_VALUE;
     /** Whether the in-world block-diff preview is toggled on via the "Show Changes" button. */
     private static boolean showChangesEnabled = false;
-    /** Whether "Show Changes" renders actual translucent block models instead of colored decal
-     * markers. A standing display preference, not per-machine state, so it survives
-     * {@link #clearAll()} the same way a game setting would. */
+    /**
+     * Whether "Show Changes" renders actual translucent block models instead of colored decal
+     * markers.
+     */
     private static boolean ghostBlockModeEnabled = false;
-    /** Hard cap on how many actual block models the ghost-block preview mode will render per
-     * frame. Unlike the decal markers (cheap quads), full block models are expensive enough that
-     * rendering every affected position — potentially tens of thousands across a multi-chunk
-     * claim — would tank the client's framerate. */
-    public static final int GHOST_BLOCK_RENDER_LIMIT = 300;
+    /**
+     * Hard cap on how many actual block models the ghost-block preview mode will render per frame.
+     */
+    public static final int GHOST_BLOCK_RENDER_LIMIT = 800;
 
     private TimelineProjectionManager() {}
 
@@ -92,8 +87,10 @@ public final class TimelineProjectionManager {
         activeMachinePos = machinePos;
     }
 
-    /** The machine the ghost preview is currently tracking, or null if none; used by
-     * {@link TimelineProjectionPoller} to keep polling after the machine's GUI has closed. */
+    /**
+     * The machine the ghost preview is currently tracking, or null if none; used by {@link
+     * TimelineProjectionPoller} to keep polling after the machine's GUI has closed.
+     */
     public static BlockPos getActiveMachinePos() {
         return activeMachinePos;
     }
@@ -104,8 +101,7 @@ public final class TimelineProjectionManager {
         }
     }
 
-    /** Unconditionally drops all client-side state. Used when the BlockPos itself stops being
-     * meaningful, e.g. leaving a world, so a stale activeMachinePos can't match new coordinates. */
+    /** Unconditionally drops all client-side state. */
     public static void clearAll() {
         activeMachinePos = null;
         commits = new ArrayList<>();
@@ -148,12 +144,11 @@ public final class TimelineProjectionManager {
         return activeMachinePos != null && hasSelection() && showChangesEnabled;
     }
 
-    /** Refreshes the commit graph, branch refs and ghost preview from a fresh server snapshot.
-     * Does not touch the current selection. */
+    /** Refreshes the commit graph, branch refs and ghost preview from a fresh server snapshot. */
     public static void updateFromServer(BlockPos machinePos, long placed, long current,
                                         List<CommitNode> serverCommits, Map<String, Long> serverBranchTips,
                                         String serverCurrentBranch, long serverHeadCommitId,
-                                        Map<Long, Long> serverJumpCosts,
+                                        Map<Long, JumpCostBreakdown> serverJumpCosts,
                                         Map<BlockPos, BlockState> serverPreviewTargetStates,
                                         List<ChunkPos> serverPreviewChunks, long serverPreviewVersion) {
         activeMachinePos = machinePos;
@@ -176,8 +171,7 @@ public final class TimelineProjectionManager {
         return null;
     }
 
-    /** Selects exactly commitId. The previously synced preview no longer describes this selection,
-     * so it's dropped until the next poll brings one for the new target. */
+    /** Selects exactly commitId. */
     public static void setSelectedCommit(long commitId) {
         CommitNode commit = findCommit(commitId);
         if (commit == null) return;
@@ -200,10 +194,9 @@ public final class TimelineProjectionManager {
     }
 
     /**
-     * Whether the selected node is a deletable branch: it has to be a branch tip, and that tip
-     * must not sit on the current head's ancestry (which would mean it's the line the world
-     * currently reflects). Mirrors {@code TemporalRepository#deleteBranch}'s own refusal check so
-     * the button's enabled state matches what the server will actually allow.
+     * Whether the selected node is a deletable branch: it has to be a branch tip, and that tip must
+     * not sit on the current head's ancestry (which would mean it's the line the world currently
+     * reflects).
      */
     public static boolean isSelectedBranchDeletable() {
         if (getSelectedBranchName() == null) return false;
@@ -228,9 +221,8 @@ public final class TimelineProjectionManager {
     public static long getHeadCommitId() { return headCommitId; }
     public static long getPreviewVersion() { return previewVersion; }
     /** Energy cost of jumping to commitId from the current head, or empty if unknown. */
-    public static OptionalLong getJumpCost(long commitId) {
-        Long cost = jumpCosts.get(commitId);
-        return cost == null ? OptionalLong.empty() : OptionalLong.of(cost);
+    public static Optional<JumpCostBreakdown> getJumpCost(long commitId) {
+        return Optional.ofNullable(jumpCosts.get(commitId));
     }
     public static long getPlacedGameTime() { return placedGameTime; }
     public static long getCurrentGameTime() { return currentGameTime; }
@@ -241,14 +233,15 @@ public final class TimelineProjectionManager {
         selectedGameTime = clampSelected(selectedGameTime);
     }
 
-    /** Every chunk the active preview covers, used to outline the claim's outer boundary in-world
-     * while "Show Changes" is on, even where no individual block happens to be changing. */
+    /**
+     * Every chunk the active preview covers, used to outline the claim's outer boundary in-world
+     * while "Show Changes" is on, even where no individual block happens to be changing.
+     */
     public static List<ChunkPos> getPreviewChunks() {
         return previewChunks;
     }
 
-    /** Diffs the server's resolved target states against the live world right now. Recomputed per
-     * frame so the ghost tracks the player's own edits without waiting for a poll. */
+    /** Diffs the server's resolved target states against the live world right now. */
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 

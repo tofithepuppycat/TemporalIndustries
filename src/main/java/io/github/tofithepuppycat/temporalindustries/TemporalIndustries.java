@@ -10,7 +10,10 @@ import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftBorderLi
 import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftChunkListener;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
+import io.github.tofithepuppycat.temporalindustries.network.ItemCostSyncPacket;
 import io.github.tofithepuppycat.temporalindustries.network.NetworkHandler;
+import net.neoforged.neoforge.event.OnDatapackSyncEvent;
+import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.bus.api.IEventBus;
 import net.neoforged.fml.ModContainer;
 import net.neoforged.fml.ModList;
@@ -42,6 +45,10 @@ public class TemporalIndustries
 
         NeoForge.EVENT_BUS.addListener((AddReloadListenerEvent event) -> event.addListener(new EnergyCostReloadListener()));
         NeoForge.EVENT_BUS.addListener((ServerStartingEvent event) -> ItemEnergyCosts.compute(event.getServer()));
+
+        NeoForge.EVENT_BUS.addListener((OnDatapackSyncEvent event) ->
+                event.getRelevantPlayers().forEach(player ->
+                        PacketDistributor.sendToPlayer(player, ItemCostSyncPacket.fromResolved())));
 
         // LOWEST so interactions another mod already cancelled (claims, protection) never get recorded.
         NeoForge.EVENT_BUS.addListener(EventPriority.LOWEST, ChronoActionRecorder::onBlockBreak);

@@ -12,10 +12,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Server -> client: a batch of block positions that were just rewritten by a timeline jump, so
- * the client can flash each one instead of letting the rewrite pop in silently. Sent per affected
- * chunk (see {@link io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity#applyTimelineView})
- * so only players actually tracking that chunk receive it. */
+/**
+ * Server -> client: a batch of block positions that were just rewritten by a timeline jump, so the
+ * client can flash each one instead of letting the rewrite pop in silently.
+ */
 public class TimelineBlockChangeFlashPacket implements CustomPacketPayload {
     public static final Type<TimelineBlockChangeFlashPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_block_change_flash"));

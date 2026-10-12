@@ -19,8 +19,10 @@ import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
-/** Textured GUI for the Entropy Condenser: an FE energy bar, two vertical entropy tank bars
- * (Order/Chaos), a Cell input slot, a button cycling the absorb range, and the player inventory. */
+/**
+ * Textured GUI for the Entropy Condenser: an FE energy bar, two vertical entropy tank bars
+ * (Order/Chaos), a Cell input slot, a button cycling the absorb range, and the player inventory.
+ */
 @SuppressWarnings("null")
 public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyCondenserMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -56,7 +58,7 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
     }
 
     private void cycleRange() {
-        int next = menu.getRange() + 1;
+        int next = menu.getRange() + 2;
         if (next > EntropyCondenserBlockEntity.MAX_RANGE) next = EntropyCondenserBlockEntity.MIN_RANGE;
         PacketDistributor.sendToServer(new EntropyCondenserSetRangePacket(menu.getBlockPos(), next));
     }
@@ -87,7 +89,9 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
         renderRangeIcons(guiGraphics);
     }
 
-    /** Range-cycle and show/hide-range controls, drawn as icon buttons rather than vanilla Buttons. */
+    /**
+     * Range-cycle and show/hide-range controls, drawn as icon buttons rather than vanilla Buttons.
+     */
     private void renderRangeIcons(GuiGraphics guiGraphics) {
         int rangeX = leftPos + RANGE_ICON_X;
         int showRangeX = leftPos + SHOW_RANGE_ICON_X;

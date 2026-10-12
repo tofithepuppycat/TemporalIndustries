@@ -17,17 +17,14 @@ import java.lang.invoke.MethodType;
 import java.util.UUID;
 
 /**
- * The server-side stand-in an Echo Projector uses to replay a recording's interactions the way
- * the original player performed them. It's a {@link FakePlayer} (never added to the world, so
- * mobs ignore it and it isn't saved) with two differences: it can ride vehicles, and it's driven
- * by {@link #tickEcho()} instead of NeoForge's no-op {@code tick()}, which would otherwise also
- * make it vacuum up nearby item entities.
+ * The server-side stand-in an Echo Projector uses to replay a recording's interactions the way the
+ * original player performed them.
  */
 public class EchoPlayer extends FakePlayer {
-    /** {@code FakePlayer.startRiding} unconditionally refuses; this reaches the vanilla
-     * {@code Entity} implementation directly, skipping ServerPlayer's and FakePlayer's overrides.
-     * Needs a lookup inside Entity itself: an invokespecial from here would resolve against
-     * FakePlayer, the direct superclass. */
+    /**
+     * {@code FakePlayer.startRiding} unconditionally refuses; this reaches the vanilla {@code
+     * Entity} implementation directly, skipping ServerPlayer's and FakePlayer's overrides.
+     */
     private static final MethodHandle ENTITY_START_RIDING;
 
     static {
@@ -67,8 +64,10 @@ public class EchoPlayer extends FakePlayer {
         }
     }
 
-    /** Just the parts of a player tick an interaction actually depends on: item cooldowns, the
-     * attack cooldown charge, and progress of an in-use item (eating, drawing a bow). */
+    /**
+     * Just the parts of a player tick an interaction actually depends on: item cooldowns, the
+     * attack cooldown charge, and progress of an in-use item (eating, drawing a bow).
+     */
     public void tickEcho() {
         tickCount++;
         fallDistance = 0F;
@@ -85,8 +84,10 @@ public class EchoPlayer extends FakePlayer {
         }
     }
 
-    /** Swaps the main-hand item's attribute modifiers (attack damage, attack speed...) in for the
-     * previous one's. Vanilla does this in the entity tick, which this player doesn't run. */
+    /**
+     * Swaps the main-hand item's attribute modifiers (attack damage, attack speed...) in for the
+     * previous one's.
+     */
     public void refreshEquipment() {
         ItemStack now = getMainHandItem();
         if (ItemStack.matches(now, appliedMainHand)) return;
@@ -106,8 +107,7 @@ public class EchoPlayer extends FakePlayer {
         appliedMainHand = now.copy();
     }
 
-    /** Sets the attack cooldown so the next hit lands with this fraction of full strength. Call
-     * after the weapon is in hand, since the cooldown length depends on it. */
+    /** Sets the attack cooldown so the next hit lands with this fraction of full strength. */
     public void setAttackStrength(float strength) {
         int delay = (int) Math.ceil(getCurrentItemAttackStrengthDelay());
         attackStrengthTicker = Math.max(0, (int) Math.ceil(strength * delay - 0.5F));

@@ -15,8 +15,11 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Entropy Condenser GUI: energy stored/capacity plus both tanks'
- * fill/capacity, a Cell input slot, and an output slot the tanks slowly fill an inserted Cell back out of. */
+/**
+ * Container menu for the Entropy Condenser GUI: energy stored/capacity plus both tanks'
+ * fill/capacity, a Cell input slot, and an output slot the tanks slowly fill an inserted Cell back
+ * out of.
+ */
 @SuppressWarnings("null")
 public class EntropyCondenserMenu extends AbstractContainerMenu {
     private static final int CELL_SLOT_X = 80;

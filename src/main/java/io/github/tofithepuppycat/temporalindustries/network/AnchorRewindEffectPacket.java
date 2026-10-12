@@ -9,10 +9,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Server -> client notification broadcast to everyone tracking a player when their Temporal
- * Anchor rewinds them on death. Replaces vanilla's totem-of-undying entity event (id 35) so the
- * particle color and the item shown in the activation animation can be Temporal Anchor themed
- * instead of hardcoded to the totem.
+ * Server -> client notification broadcast to everyone tracking a player when their Temporal Anchor
+ * rewinds them on death.
  */
 public class AnchorRewindEffectPacket implements CustomPacketPayload {
     public static final Type<AnchorRewindEffectPacket> TYPE =

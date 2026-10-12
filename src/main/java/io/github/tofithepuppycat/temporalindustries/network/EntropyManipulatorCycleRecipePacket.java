@@ -12,9 +12,11 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: press the Entropy Manipulator's recipe-select icon, advancing
- * {@link EntropyManipulatorBlockEntity#cyclePreferredRecipe()} to the next matching output for the
- * current input item. */
+/**
+ * Client -> server: press the Entropy Manipulator's recipe-select icon, advancing {@link
+ * EntropyManipulatorBlockEntity#cyclePreferredRecipe()} to the next matching output for the current
+ * input item.
+ */
 public class EntropyManipulatorCycleRecipePacket implements CustomPacketPayload {
     public static final Type<EntropyManipulatorCycleRecipePacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_manipulator_cycle_recipe"));

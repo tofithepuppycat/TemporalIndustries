@@ -79,6 +79,7 @@ import net.minecraft.sounds.SoundEvent;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.JukeboxSong;
 import net.minecraft.world.item.Rarity;
 import net.minecraft.world.item.crafting.RecipeSerializer;
@@ -126,8 +127,10 @@ public class Registration {
     public static final DeferredRegister<SoundEvent> SOUND_EVENTS = DeferredRegister.create(Registries.SOUND_EVENT, MODID);
     public static final DeferredRegister<ParticleType<?>> PARTICLE_TYPES = DeferredRegister.create(Registries.PARTICLE_TYPE, MODID);
 
-    /** Static, colorable spark for the entropic pylon's transfer bolt; needs its own type since
-     * vanilla's {@code ENTITY_EFFECT} drifts upward. */
+    /**
+     * Static, colorable spark for the entropic pylon's transfer bolt; needs its own type since
+     * vanilla's {@code ENTITY_EFFECT} drifts upward.
+     */
     public static final DeferredHolder<ParticleType<?>, ParticleType<ColorParticleOption>> TRANSMIT_SPARK =
             PARTICLE_TYPES.register("transmit_spark", () -> new ParticleType<ColorParticleOption>(false) {
                 @Override
@@ -493,6 +496,15 @@ public class Registration {
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);
                         output.accept(CHAOS_CELL_ITEM);
+                        ItemStack fullDual = new ItemStack(DUAL_ENTROPY_CELL_ITEM.get());
+                        fullDual.set(ENTROPY_CONTENTS.get(), new EntropyContents(EntropyContents.CAPACITY, EntropyContents.CAPACITY));
+                        output.accept(fullDual);
+                        ItemStack fullOrder = new ItemStack(ORDER_CELL_ITEM.get());
+                        fullOrder.set(BOTTLE_CONTENTS.get(), new BottleContents(BottleContents.CAPACITY));
+                        output.accept(fullOrder);
+                        ItemStack fullChaos = new ItemStack(CHAOS_CELL_ITEM.get());
+                        fullChaos.set(BOTTLE_CONTENTS.get(), new BottleContents(BottleContents.CAPACITY));
+                        output.accept(fullChaos);
                         output.accept(ORDER_BUCKET_ITEM);
                         output.accept(CHAOS_BUCKET_ITEM);
                     })

@@ -16,9 +16,8 @@ import net.minecraft.world.item.context.UseOnContext;
 import java.util.List;
 
 /**
- * Holds liquid ORD (order) and CHS (chaos) condensed out of entropy orbs it catches, up to
- * {@link EntropyContents#CAPACITY} mB of each. Right-clicking a machine pours a dose of either
- * fluid into it (see {@link CellTransfer}).
+ * Holds liquid ORD (order) and CHS (chaos) condensed out of entropy orbs it catches, up to {@link
+ * EntropyContents#CAPACITY} mB of each.
  */
 @SuppressWarnings("null")
 public class DualEntropyCellItem extends Item implements EntropyReceptacle {

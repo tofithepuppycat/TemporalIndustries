@@ -21,8 +21,6 @@ import java.util.List;
 /**
  * Standalone (non-container) screen for the Chronoscope: browses the Overworld's dimension-wide
  * trunk timeline via {@link TimelineGraphWidget} and lets the player pick a moment to travel to.
- * Opened directly via {@link #open} since there's no block/menu backing this item's action, same
- * pattern as {@link ChronoMarkerMapScreen}.
  */
 @SuppressWarnings("null")
 public class ChronoLensScreen extends Screen {
@@ -59,7 +57,9 @@ public class ChronoLensScreen extends Screen {
         super(Component.translatable("gui.temporalindustries.chrono_lens.title"));
     }
 
-    /** Opens this screen client-side only — call from inside a {@code level.isClientSide} branch. */
+    /**
+     * Opens this screen client-side only — call from inside a {@code level.isClientSide} branch.
+     */
     public static void open() {
         Minecraft.getInstance().setScreen(new ChronoLensScreen());
     }

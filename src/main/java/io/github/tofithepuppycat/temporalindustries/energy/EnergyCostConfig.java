@@ -4,11 +4,7 @@ import net.neoforged.neoforge.common.ModConfigSpec;
 
 import java.util.List;
 
-/**
- * Modpack-editable energy cost overrides. A section of the shared
- * {@link io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesConfig} common config,
- * so it gets the usual TOML comments, validation and hot-reload for free. Read by {@link ItemEnergyCosts}.
- */
+/** Modpack-editable energy cost overrides. */
 public final class EnergyCostConfig {
     public final ModConfigSpec.ConfigValue<List<? extends String>> itemCosts;
     public final ModConfigSpec.ConfigValue<List<? extends String>> tagCosts;

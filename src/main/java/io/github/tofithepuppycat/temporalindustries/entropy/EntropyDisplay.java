@@ -9,9 +9,10 @@ import net.minecraft.network.chat.TextColor;
 import java.util.Locale;
 import java.util.Map;
 
-/** Formatting for the two entropy scales shown to players: liquid amounts in mB (cells, the anchor,
- * machine tanks) and the machine order/chaos balance. Also the shared palette for tooltip text -
- * other classes should reuse these colors rather than picking their own. */
+/**
+ * Formatting for the two entropy scales shown to players: liquid amounts in mB (cells, the anchor,
+ * machine tanks) and the machine order/chaos balance.
+ */
 public final class EntropyDisplay {
     public static final TextColor ORDER_COLOR = TextColor.fromRgb(0xcfa0f3);
     public static final TextColor CHAOS_COLOR = TextColor.fromRgb(0x68f6ff);
@@ -25,15 +26,18 @@ public final class EntropyDisplay {
 
     private EntropyDisplay() {}
 
-    /** Machine order/chaos balance (Chronovault, Chronosphere, Chronodial) uses a wider 0-10000
-     * scale, shown with two decimals - e.g. a raw amount of 5000 reads as "50.00". Unrelated to the
-     * mB amounts {@link #formatFluid(int)} handles. */
+    /**
+     * Machine order/chaos balance (Chronovault, Chronosphere, Chronodial) uses a wider 0-10000
+     * scale, shown with two decimals - e.g. a raw amount of 5000 reads as "50.00".
+     */
     public static String formatBalance(int raw) {
         return String.format(Locale.ROOT, "%.2f", raw / 100.0);
     }
 
-    /** Liquid Order/Chaos amounts (cells, the anchor, machine tanks) are plain mB and are shown as
-     * such, group-separated - e.g. 5000 reads as "5,000". */
+    /**
+     * Liquid Order/Chaos amounts (cells, the anchor, machine tanks) are plain mB and are shown as
+     * such, group-separated - e.g. 5000 reads as "5,000".
+     */
     public static String formatFluid(int millibuckets) {
         return String.format(Locale.ROOT, "%,d", millibuckets);
     }
@@ -45,10 +49,10 @@ public final class EntropyDisplay {
         return Component.literal(text).setStyle(Style.EMPTY.withColor(color));
     }
 
-    /** Rebuilds {@code text} as a component, recoloring any "ORD" / "CHS" / "FE" tokens with their
-     * shared colors and everything else with {@code baseColor}. Embedding raw §-format codes
-     * directly in the lang file doesn't render correctly in every tooltip context, so callers
-     * that mix these tokens into flavor text should route through this instead. */
+    /**
+     * Rebuilds {@code text} as a component, recoloring any "ORD" / "CHS" / "FE" tokens with their
+     * shared colors and everything else with {@code baseColor}.
+     */
     public static MutableComponent colorTokens(String text, ChatFormatting baseColor) {
         MutableComponent result = Component.empty();
         int i = 0;
@@ -75,8 +79,10 @@ public final class EntropyDisplay {
         return result;
     }
 
-    /** Finds the next occurrence of {@code token} at or after {@code from} that isn't part of a
-     * larger word, so short tokens like "FE" don't match inside unrelated text. */
+    /**
+     * Finds the next occurrence of {@code token} at or after {@code from} that isn't part of a
+     * larger word, so short tokens like "FE" don't match inside unrelated text.
+     */
     private static int nextWordBoundaryMatch(String text, String token, int from) {
         int idx = text.indexOf(token, from);
         while (idx != -1) {

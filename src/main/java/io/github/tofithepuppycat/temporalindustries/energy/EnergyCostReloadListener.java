@@ -16,9 +16,7 @@ import java.util.Map;
 
 /**
  * Reads {@code data/<namespace>/energy_costs/*.json} files (an "items" and a "tags" object mapping
- * ids to cost). Only raw ids are parsed here; resolving tag membership requires the tag registry
- * to be fully loaded, which isn't guaranteed during a reload listener's apply() phase, so that
- * happens later in {@link ItemEnergyCosts#compute}.
+ * ids to cost).
  */
 public class EnergyCostReloadListener extends SimpleJsonResourceReloadListener {
     private static final Logger LOGGER = LogUtils.getLogger();

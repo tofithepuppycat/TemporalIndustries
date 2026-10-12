@@ -85,8 +85,10 @@ public class ClientModEvents {
                 EntropyGlassesOverlay.INSTANCE);
     }
 
-    /** Drops the timeline/map client caches on logout, so stale data from the previous world
-     * can't coincidentally match a machine position in the next one joined. */
+    /**
+     * Drops the timeline/map client caches on logout, so stale data from the previous world can't
+     * coincidentally match a machine position in the next one joined.
+     */
     @SubscribeEvent
     public static void onLoggingOut(ClientPlayerNetworkEvent.LoggingOut event) {
         TimelineProjectionManager.clearAll();

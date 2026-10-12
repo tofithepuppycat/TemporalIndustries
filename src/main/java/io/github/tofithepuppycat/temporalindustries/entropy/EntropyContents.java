@@ -6,8 +6,10 @@ import io.netty.buffer.ByteBuf;
 import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 
-/** How many mB of liquid ORD and CHS a Dual Entropy Cell is holding, stored as a data component on
- * the stack. */
+/**
+ * How many mB of liquid ORD and CHS a Dual Entropy Cell is holding, stored as a data component on
+ * the stack.
+ */
 public record EntropyContents(int order, int chaos) {
     public static final EntropyContents EMPTY = new EntropyContents(0, 0);
     public static final int CAPACITY = 10_000;

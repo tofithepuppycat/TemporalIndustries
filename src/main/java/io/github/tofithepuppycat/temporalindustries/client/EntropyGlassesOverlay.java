@@ -25,8 +25,10 @@ import net.neoforged.fml.ModList;
 import java.util.ArrayList;
 import java.util.List;
 
-/** Draws the looked-at block's entropy info to the right of the crosshair while Entropy Glasses
- * are worn. Sneaking also draws the equipped cells' Order/Chaos fill levels to the left. */
+/**
+ * Draws the looked-at block's entropy info to the right of the crosshair while Entropy Glasses are
+ * worn.
+ */
 public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
     public static final EntropyGlassesOverlay INSTANCE = new EntropyGlassesOverlay();
 
@@ -70,15 +72,13 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         Component balanceText = hasBalance
                 ? entropyBalanceText(provider.getEntropyBalance(), provider.getEntropyBalanceMax())
                 : null;
-        Component rateText = hasBalance ? entropyRateText(provider.getEntropyRatePerSecond()) : null;
 
         int contentWidth = BAR_WIDTH;
         for (Component line : lines) contentWidth = Math.max(contentWidth, font.width(line));
         if (balanceText != null) contentWidth = Math.max(contentWidth, font.width(balanceText));
-        if (rateText != null) contentWidth = Math.max(contentWidth, font.width(rateText));
 
         int contentHeight = lines.size() * (font.lineHeight + LINE_GAP);
-        if (hasBalance) contentHeight += BAR_HEIGHT + 3 + 2 * (font.lineHeight + LINE_GAP);
+        if (hasBalance) contentHeight += BAR_HEIGHT + 3 + font.lineHeight + LINE_GAP;
         contentHeight -= LINE_GAP;
 
         int left = guiGraphics.guiWidth() / 2 + CROSSHAIR_GAP;
@@ -98,8 +98,7 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
             renderEntropyBar(guiGraphics, left, y, entropy, max);
             y += BAR_HEIGHT + 3;
 
-            y = drawLine(guiGraphics, font, balanceText, left, y);
-            drawLine(guiGraphics, font, rateText, left, y);
+            drawLine(guiGraphics, font, balanceText, left, y);
         }
     }
 
@@ -107,7 +106,9 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         return ModList.get().isLoaded("curios") && CuriosCompat.isWearingEntropyGlasses(player);
     }
 
-    /** Panel of equipped cells' Order/Chaos fill levels, drawn left of the crosshair while sneaking. */
+    /**
+     * Panel of equipped cells' Order/Chaos fill levels, drawn left of the crosshair while sneaking.
+     */
     private static void renderCellStatus(GuiGraphics guiGraphics, Font font, Player player) {
         if (!ModList.get().isLoaded("curios")) return;
 
@@ -152,8 +153,10 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         return y + font.lineHeight + LINE_GAP;
     }
 
-    /** Bidirectional order<->chaos balance bar: fills from the center tick outward, white toward
-     * order (below the midpoint) and dark purple toward chaos (above it). */
+    /**
+     * Bidirectional order<->chaos balance bar: fills from the center tick outward, white toward
+     * order (below the midpoint) and dark purple toward chaos (above it).
+     */
     private static void renderEntropyBar(GuiGraphics guiGraphics, int barX, int barY, int entropy, int max) {
         guiGraphics.fill(barX, barY, barX + BAR_WIDTH, barY + BAR_HEIGHT, 0xFF000000);
 
@@ -176,11 +179,5 @@ public final class EntropyGlassesOverlay implements LayeredDraw.Layer {
         String sign = offset >= 0 ? "+" : "";
         String display = sign + EntropyDisplay.formatBalance(offset);
         return Component.translatable("gui.temporalindustries.entropy.value", display);
-    }
-
-    private static Component entropyRateText(float ratePerSecond) {
-        String sign = ratePerSecond > 0 ? "+" : "";
-        String value = sign + String.format(java.util.Locale.ROOT, "%.1f", ratePerSecond);
-        return Component.translatable("gui.temporalindustries.entropy.rate", value);
     }
 }

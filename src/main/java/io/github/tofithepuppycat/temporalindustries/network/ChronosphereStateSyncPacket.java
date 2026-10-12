@@ -14,9 +14,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Server -> client: a Chronosphere's current claimed/blocked chunk sets, for
- * {@link ChronosphereClientState}. Jump-cost preview is handled separately by the reused Time
- * Machine timeline packets. */
+/**
+ * Server -> client: a Chronosphere's current claimed/blocked chunk sets, for {@link
+ * ChronosphereClientState}.
+ */
 public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     public static final Type<ChronosphereStateSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_state_sync"));
@@ -27,8 +28,7 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final BlockPos machinePos;
     private final List<Long> selectedChunkKeys;
     private final List<Long> blockedChunkKeys;
-    /** How many of selectedChunkKeys this machine's repository actually holds the claim on. Equal
-     * to the claimed count in the normal case; lower only if another machine got in first. */
+    /** How many of selectedChunkKeys this machine's repository actually holds the claim on. */
     private final int capturedCount;
     /** The named branch currently checked out for this machine's repository. */
     private final String currentBranch;

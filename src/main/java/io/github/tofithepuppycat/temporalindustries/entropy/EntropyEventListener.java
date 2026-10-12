@@ -44,8 +44,10 @@ public final class EntropyEventListener {
     private static final int HOSTILE_MOB_DEATH_CHAOS = 1;
     private static final int PASSIVE_MOB_DEATH_ORDER = 1;
 
-    /** Outputs of vanilla furnace recipes that "simplify" a material, identified by the smelted
-     * result alone since each is unique to one vanilla smelting recipe. */
+    /**
+     * Outputs of vanilla furnace recipes that "simplify" a material, identified by the smelted
+     * result alone since each is unique to one vanilla smelting recipe.
+     */
     private static final Set<Item> SIMPLIFICATION_RESULTS = Set.of(
             Items.STONE, Items.SMOOTH_STONE, Items.GLASS, Items.BRICK,
             Items.SMOOTH_SANDSTONE, Items.SMOOTH_RED_SANDSTONE, Items.SMOOTH_QUARTZ, Items.DEEPSLATE);

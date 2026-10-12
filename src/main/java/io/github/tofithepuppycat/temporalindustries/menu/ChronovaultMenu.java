@@ -15,8 +15,10 @@ import net.minecraft.world.inventory.SimpleContainerData;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
-/** Container menu for the Chronovault GUI; exposes the block entity's energy/time state to
- * the client via {@link ContainerData}. */
+/**
+ * Container menu for the Chronovault GUI; exposes the block entity's energy/time state to the
+ * client via {@link ContainerData}.
+ */
 @SuppressWarnings("null")
 public class ChronovaultMenu extends AbstractContainerMenu implements TimelineViewMenu {
     private final ChronovaultBlockEntity blockEntity;

@@ -42,8 +42,7 @@ import java.util.List;
  * Block entity for the Chrono Loop Projector: holds one Chrono Record and, while it has a saved
  * recording and enough stored energy, endlessly replays it: the ghost is rendered client-side,
  * while a server-side fake player ({@link ChronoActionReplayer}) repeats the recorded interactions
- * using items from this block's own inventory. Playback position derives from a synced {@code loopEpoch} rather than a per-tick
- * counter, so nothing needs re-syncing except on start/stop/pause.
+ * using items from this block's own inventory.
  */
 @SuppressWarnings("null")
 public class ChronoProjectorBlockEntity extends BlockEntity implements Container, EntropyInfoProvider {
@@ -71,16 +70,17 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     private final ProjectorEnergyStorage energyStorage = new ProjectorEnergyStorage();
 
-    /** Holds whatever the loop's BREAK actions harvest and whatever items the fake player needs to
-     * use (blocks to place, tools, food, potions...). Implements
-     * {@link Container} directly so vanilla hoppers can push/pull (they look for a Container, not
-     * a capability); {@link #inventory} wraps the same list as an IItemHandler for modded pipes. */
+    /**
+     * Holds whatever the loop's BREAK actions harvest and whatever items the fake player needs to
+     * use (blocks to place, tools, food, potions...).
+     */
     private final NonNullList<ItemStack> items = NonNullList.withSize(INVENTORY_SIZE, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
-    /** ARGB tint for this projector's ghost render; recolorable via dye (RGB only, alpha fixed for
-     * translucency). Channels are lightened toward white before use since the render multiplies
-     * this directly onto the skin texture rather than overlaying it, which would otherwise mostly darken it. */
+    /**
+     * ARGB tint for this projector's ghost render; recolorable via dye (RGB only, alpha fixed for
+     * translucency).
+     */
     private static final int GHOST_ALPHA = 150;
     public static final int DEFAULT_GHOST_COLOR = ghostTint(70, 235, 255);
 
@@ -101,8 +101,7 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
     private int pausedTick = 0;
     /** Not persisted: on reload, playback resumes from wherever loopEpoch/gameTime puts it. */
     private int lastExecutedTick = -1;
-    /** The server-side fake player that performs the recording's interactions. Not persisted:
-     * rebuilt on demand, and dropped whenever the loop is torn down. */
+    /** The server-side fake player that performs the recording's interactions. */
     @Nullable private ChronoActionReplayer replayer = null;
 
     public ChronoProjectorBlockEntity(BlockPos pos, BlockState state) {
@@ -121,7 +120,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return ghostColor;
     }
 
-    /** Recolors this projector's ghost render from a dye's RGB, lightened the same way as {@link #DEFAULT_GHOST_COLOR}. */
+    /**
+     * Recolors this projector's ghost render from a dye's RGB, lightened the same way as {@link
+     * #DEFAULT_GHOST_COLOR}.
+     */
     public void setGhostTint(int rgb) {
         ghostColor = ghostTint(FastColor.ARGB32.red(rgb), FastColor.ARGB32.green(rgb), FastColor.ARGB32.blue(rgb));
         setChanged();
@@ -204,9 +206,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Actions replay at the recording's own absolute coordinates, not relative to the projector,
-     * which may sit far from the plot it's replaying. Interactions are performed by a fake player
-     * standing wherever the original player was at this point of the loop. */
+    /**
+     * Actions replay at the recording's own absolute coordinates, not relative to the projector,
+     * which may sit far from the plot it's replaying.
+     */
     private void executeActions(ServerLevel level, ChronoRecording recording, int tick) {
         ResourceLocation recordingDimension = recording.getDimension();
         if (recordingDimension != null && !recordingDimension.equals(level.dimension().location())) {
@@ -246,8 +249,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Hands `count` of `itemId` from this projector's own inventory to whatever container sits at
-     * pos. Silently skips this cycle if the projector doesn't have any of that item. */
+    /**
+     * Hands `count` of `itemId` from this projector's own inventory to whatever container sits at
+     * pos.
+     */
     private void executeInsert(ServerLevel level, BlockPos pos, @Nullable ResourceLocation itemId, int count) {
         if (itemId == null || count <= 0) return;
         IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
@@ -266,7 +271,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Takes up to `count` of `itemId` out of whatever container sits at pos into this projector's own inventory. */
+    /**
+     * Takes up to `count` of `itemId` out of whatever container sits at pos into this projector's
+     * own inventory.
+     */
     private void executeExtract(ServerLevel level, BlockPos pos, @Nullable ResourceLocation itemId, int count) {
         if (itemId == null || count <= 0) return;
         IItemHandler target = level.getCapability(Capabilities.ItemHandler.BLOCK, pos, null);
@@ -288,7 +296,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         }
     }
 
-    /** Removes up to `max` of `item` from the internal inventory, returning how many were actually removed. */
+    /**
+     * Removes up to `max` of `item` from the internal inventory, returning how many were actually
+     * removed.
+     */
     private int extractUpToMatching(Item item, int max) {
         int remaining = max;
         for (int slot = 0; slot < inventory.getSlots() && remaining > 0; slot++) {
@@ -331,8 +342,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         return cachedRecording;
     }
 
-    /** Whether the loop is running or paused (out of energy), plus the recording's average and
-     * peak per-tick energy cost so a player can judge whether their power supply can sustain it. */
+    /**
+     * Whether the loop is running or paused (out of energy), plus the recording's average and peak
+     * per-tick energy cost so a player can judge whether their power supply can sustain it.
+     */
     @Override
     public List<Component> getEntropyTooltip() {
         if (cachedRecording == null) {
@@ -350,7 +363,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
         );
     }
 
-    /** Fractional position within the loop at gameTime + partialTick, or negative if nothing to play back. */
+    /**
+     * Fractional position within the loop at gameTime + partialTick, or negative if nothing to play
+     * back.
+     */
     public double computePlaybackProgress(long gameTime, float partialTick) {
         if (!active || cachedRecording == null) return -1.0;
         int frameCount = cachedRecording.frameCount();

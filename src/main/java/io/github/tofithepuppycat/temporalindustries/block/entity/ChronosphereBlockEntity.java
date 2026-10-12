@@ -4,6 +4,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -29,14 +30,18 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Objects;
 import java.util.Set;
+import java.util.UUID;
 
 /**
  * Block entity for the Chronosphere: the player claims up to an 11x11 chunk area (centred on and
- * always including the home chunk), and a single jump moves every claimed chunk to the same
- * target time, paid from one shared energy pool.
+ * always including the home chunk), and a single jump moves every claimed chunk to the same target
+ * time, paid from one shared energy pool.
  */
 public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
-    /** Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. an 11x11 box. */
+    /**
+     * Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. an 11x11
+     * box.
+     */
     public static final int MAX_RADIUS = 5;
     /** Home chunk plus up to this many additional chunks = 121 chunks, a full 11x11 box. */
     public static final int MAX_ADDITIONAL_CHUNKS = (MAX_RADIUS * 2 + 1) * (MAX_RADIUS * 2 + 1) - 1;
@@ -46,6 +51,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
     public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
 
+    public enum BindResult { CREATED, ADOPTED, IN_USE, WRONG_DIMENSION, INVALID_NAME, ALREADY_BOUND, UNAVAILABLE }
+
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
 
@@ -53,9 +60,47 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
     }
 
-    /** Re-asserts this machine's claim on its home + additional chunks. Claiming is idempotent and
-     * cheap; the actual baseline {@link io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot}
-     * capture happens lazily inside the repository's first commit touching each chunk, never here. */
+    /** A freshly placed Chronosphere has no repository until a player names one. */
+    @Override
+    protected boolean mintsRepositoryOnDemand() {
+        return false;
+    }
+
+    /**
+     * Binds this Chronosphere to the repository called rawName, creating an empty one if no such
+     * repository exists yet.
+     */
+    public BindResult bindToRepositoryNamed(String rawName) {
+        if (!(level instanceof ServerLevel) || level.getServer() == null) return BindResult.UNAVAILABLE;
+        if (isRepositoryBound()) return BindResult.ALREADY_BOUND;
+
+        String name = TemporalWorldData.normalizeRepositoryName(rawName);
+        if (name == null) return BindResult.INVALID_NAME;
+
+        TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        UUID existingId = data.findRepositoryByName(name);
+        if (existingId == null) {
+            UUID created = data.createRepository(name, level.dimension().location());
+            placedGameTime = level.getGameTime();
+            selectedGameTime = placedGameTime;
+            bindRepository(created, name);
+            return BindResult.CREATED;
+        }
+
+        TemporalRepository existing = data.getRepository(existingId);
+        if (existing == null) return BindResult.UNAVAILABLE;
+        if (data.hasRepositoryOwner(existingId)) return BindResult.IN_USE;
+        if (!existing.getDimension().equals(level.dimension().location())) return BindResult.WRONG_DIMENSION;
+
+        // The adopted history predates this block, so its selectable window starts at its root.
+        RepoCommit root = existing.getCommit(existing.getRootCommitId());
+        placedGameTime = root != null ? root.getGameTime() : level.getGameTime();
+        selectedGameTime = level.getGameTime();
+        bindRepository(existingId, existing.getName());
+        return BindResult.ADOPTED;
+    }
+
+    /** Re-asserts this machine's claim on its home + additional chunks. */
     @Override
     public void onLoad() {
         super.onLoad();
@@ -69,7 +114,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronosphereBlockEntity be) {
-        if (level.isClientSide) return;
+        if (level.isClientSide || !be.isRepositoryBound()) return;
         be.commonTick(level);
     }
 
@@ -82,12 +127,17 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return isWithinRadius(pos.x - home.x, pos.z - home.z);
     }
 
-    /** The claimable area's outline: a full square box, so every cell of the map grid is claimable
-     * (the Portable Chrono Marker's area-select map keeps the inscribed {@code CIRCLE} instead). */
+    /**
+     * The claimable area's outline: a full square box, so every cell of the map grid is claimable
+     * (the Portable Chrono Marker's area-select map keeps the inscribed {@code CIRCLE} instead).
+     */
     public static final ChunkArea.Shape CLAIM_SHAPE = ChunkArea.Shape.SQUARE;
 
-    /** Whether a chunk offset (dx, dz) from the home chunk falls within the claimable box; shared
-     * with the client screen and network handlers so shape, hit-testing, and server rule always agree. */
+    /**
+     * Whether a chunk offset (dx, dz) from the home chunk falls within the claimable box; shared
+     * with the client screen and network handlers so shape, hit-testing, and server rule always
+     * agree.
+     */
     public static boolean isWithinRadius(int dx, int dz) {
         return CLAIM_SHAPE.contains(MAX_RADIUS, dx, dz);
     }
@@ -105,10 +155,10 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return additionalChunks;
     }
 
-    /** Claims or releases pos for this machine's repository. Releasing leaves the repository's
-     * recorded history for that chunk intact — claiming only governs future capture. */
+    /** Claims or releases pos for this machine's repository. */
     public ToggleResult toggleChunk(ChunkPos pos, boolean add) {
-        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
+        UUID repoId = getRepositoryId();
+        if (repoId == null || !(level instanceof ServerLevel serverLevel) || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
 
         ChunkPos home = getHomeChunkPos();
         if (pos.equals(home)) return ToggleResult.IS_HOME;
@@ -122,7 +172,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
 
-            if (worldData.claimChunk(dimension, pos, getRepositoryId())
+            if (worldData.claimChunk(dimension, pos, repoId)
                     == TemporalWorldData.ClaimResult.ALREADY_CLAIMED_ELSEWHERE) {
                 return ToggleResult.ALREADY_CLAIMED_ELSEWHERE;
             }
@@ -135,7 +185,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
             return ToggleResult.ADDED;
         } else {
             if (!additionalChunks.remove(key)) return ToggleResult.NOT_SELECTED;
-            worldData.releaseChunk(dimension, pos, getRepositoryId());
+            worldData.releaseChunk(dimension, pos, repoId);
             worldData.setDirty();
             setChanged();
             return ToggleResult.REMOVED;

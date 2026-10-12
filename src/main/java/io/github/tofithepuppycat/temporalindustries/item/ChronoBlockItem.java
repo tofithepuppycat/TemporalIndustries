@@ -6,9 +6,11 @@ import net.minecraft.network.chat.Style;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.Block;
 
-/** {@link DescribedBlockItem} for the "Chrono-" prefixed machines (Chronovault, Chronodial,
+/**
+ * {@link DescribedBlockItem} for the "Chrono-" prefixed machines (Chronovault, Chronodial,
  * Chronosphere), tinting their display name the shared Order purple so they read as one family in
- * tooltips/inventory. */
+ * tooltips/inventory.
+ */
 public class ChronoBlockItem extends DescribedBlockItem {
 
     public ChronoBlockItem(Block block, Properties properties) {

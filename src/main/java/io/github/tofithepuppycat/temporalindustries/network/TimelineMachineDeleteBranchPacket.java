@@ -11,10 +11,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: deletes a named branch (and the history unique to it) from a timeline
- * machine's repository, provided it isn't the branch currently checked out. Branches are named
- * refs into one commit tree now, so this carries a name rather than a commit id. Shared by the
- * Chronosphere and Chronovault screens. */
+/**
+ * Client -> server: deletes a named branch (and the history unique to it) from a timeline machine's
+ * repository, provided it isn't the branch currently checked out.
+ */
 public class TimelineMachineDeleteBranchPacket implements CustomPacketPayload {
     public static final Type<TimelineMachineDeleteBranchPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_machine_delete_branch"));

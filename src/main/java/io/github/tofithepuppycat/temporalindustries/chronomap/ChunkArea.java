@@ -1,8 +1,9 @@
 package io.github.tofithepuppycat.temporalindustries.chronomap;
 
-/** Shared chunk-area math: which (dx, dz) chunk offsets from an anchor chunk fall within a given
- * radius, under either a circular or square {@link Shape}. Keeps claim bounds, the selection grid,
- * and terrain sampling all agreeing on the same shape. */
+/**
+ * Shared chunk-area math: which (dx, dz) chunk offsets from an anchor chunk fall within a given
+ * radius, under either a circular or square {@link Shape}.
+ */
 public final class ChunkArea {
     private ChunkArea() {}
 

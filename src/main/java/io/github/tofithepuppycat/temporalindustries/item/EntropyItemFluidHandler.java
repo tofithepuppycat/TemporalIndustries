@@ -13,9 +13,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Exposes an {@link EntropyReceptacle} stack (cells, Temporal Anchor) as a fluid container, one tank
- * per accepted entropy type, so pipes/tanks/other mods' fluid machinery can fill and drain it like
- * any liquid item. Purely a view over the stack's data components.
+ * Exposes an {@link EntropyReceptacle} stack (cells, Temporal Anchor) as a fluid container, one
+ * tank per accepted entropy type, so pipes/tanks/other mods' fluid machinery can fill and drain it
+ * like any liquid item.
  */
 @SuppressWarnings("null")
 public class EntropyItemFluidHandler implements IFluidHandlerItem {

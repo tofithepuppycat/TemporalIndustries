@@ -37,9 +37,7 @@ import java.util.List;
 
 /**
  * Block entity for the Chronodial: a single manually-set marker on the block it faces, which can
- * later be restored. Self-contained; unlike the Time Machine it never touches TemporalWorldData.
- * Restoring is always a jump into the past, so it always adds a flat amount of entropy rather
- * than shifting either direction, and refuses outright rather than overflowing the chaos tank.
+ * later be restored.
  */
 @SuppressWarnings("null")
 public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoProvider {
@@ -136,7 +134,9 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     };
     private final MachineFluidHandler fluidHandler = new MachineFluidHandler();
 
-    /** Named so jumpToMarker() can reach consumeInternal() directly, bypassing the maxExtract cap. */
+    /**
+     * Named so jumpToMarker() can reach consumeInternal() directly, bypassing the maxExtract cap.
+     */
     private final class MachineEnergyStorage extends EnergyStorage {
         MachineEnergyStorage() {
             super(ENERGY_CAPACITY, ENERGY_TRANSFER, ENERGY_TRANSFER);
@@ -197,8 +197,10 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     @Override public int getEntropyBalance() { return getEntropy(); }
     @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
 
-    /** Reports the marked block (and whether it carries block-entity data), plus the FE and
-     * entropy cost of restoring it right now — visible only while wearing Entropy Glasses. */
+    /**
+     * Reports the marked block (and whether it carries block-entity data), plus the FE and entropy
+     * cost of restoring it right now — visible only while wearing Entropy Glasses.
+     */
     @Override
     public List<Component> getEntropyTooltip() {
         List<Component> lines = new ArrayList<>();
@@ -250,8 +252,10 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         syncToClients();
     }
 
-    /** Restores the target block to its marked state, paying the jump's energy cost first and
-     * refusing outright if restoring would overflow the chaos tank. */
+    /**
+     * Restores the target block to its marked state, paying the jump's energy cost first and
+     * refusing outright if restoring would overflow the chaos tank.
+     */
     public JumpResult jumpToMarker() {
         if (level == null || level.isClientSide || markerState == null) return JumpResult.NO_MARKER;
 

@@ -8,7 +8,10 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.client.IItemDecorator;
 
-/** Draws the same durability-like bar as {@link EntropyContainerItemDecorator}, but a single one for the single-type Order/Chaos Cell. */
+/**
+ * Draws the same durability-like bar as {@link EntropyContainerItemDecorator}, but a single one for
+ * the single-type Order/Chaos Cell.
+ */
 public class EntropyCellItemDecorator implements IItemDecorator {
     private final EntropyType type;
 

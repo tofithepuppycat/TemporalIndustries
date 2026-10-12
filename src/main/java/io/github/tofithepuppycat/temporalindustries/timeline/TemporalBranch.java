@@ -11,9 +11,7 @@ import java.util.Map;
 
 /**
  * A named, git-like ref into a {@link TemporalTimeline}'s commit graph: for every chunk it covers,
- * the commit that chunk should resolve to when this branch is checked out. Advanced automatically
- * by {@link TemporalTimeline} as new commits land while this branch is the one checked out, the
- * same way a real git branch pointer moves forward with each commit.
+ * the commit that chunk should resolve to when this branch is checked out.
  */
 public final class TemporalBranch {
     private final String name;

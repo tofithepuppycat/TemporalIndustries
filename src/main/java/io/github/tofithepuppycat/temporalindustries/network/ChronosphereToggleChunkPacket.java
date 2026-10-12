@@ -18,10 +18,11 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
-/** Client -> server: apply a batch of chunk claims/releases in a Chronosphere's 11x11 map, sent
- * once the player closes the map overlay (or the whole GUI) rather than per cell, so a rectangle
- * or freehand drag across many chunks produces one request instead of one per chunk. Removals are
- * applied before additions so freed slots count toward the same batch's limit check. */
+/**
+ * Client -> server: apply a batch of chunk claims/releases in a Chronosphere's 11x11 map, sent once
+ * the player closes the map overlay (or the whole GUI) rather than per cell, so a rectangle or
+ * freehand drag across many chunks produces one request instead of one per chunk.
+ */
 public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
     public static final Type<ChronosphereToggleChunkPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_toggle_chunk"));

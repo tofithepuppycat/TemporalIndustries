@@ -20,10 +20,10 @@ import org.jetbrains.annotations.Nullable;
 import java.util.List;
 import java.util.Objects;
 
-/** Block entity for the Chronovault: holds per-machine energy/time state and owns a
- * {@link TemporalRepository} covering its own single chunk. The repository-backed timeline view is
- * entirely inherited from {@link AbstractTimelineMachineBlockEntity}; the only thing this class
- * decides is which chunk it claims. */
+/**
+ * Block entity for the Chronovault: holds per-machine energy/time state and owns a {@link
+ * TemporalRepository} covering its own single chunk.
+ */
 public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     private static final int ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000;

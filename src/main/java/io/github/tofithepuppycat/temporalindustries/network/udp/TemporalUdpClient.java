@@ -20,10 +20,7 @@ import java.util.concurrent.ConcurrentHashMap;
 import java.util.function.Consumer;
 import java.util.zip.Inflater;
 
-/**
- * UDP client for receiving bulk temporal data from the server. Sends a HANDSHAKE_REQ once connected,
- * listens for DATA_FRAGs, and hands the reassembled/inflated payload to a registered handler.
- */
+/** UDP client for receiving bulk temporal data from the server. */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public final class TemporalUdpClient {
     private static final Logger LOGGER = LogManager.getLogger();
@@ -46,7 +43,10 @@ public final class TemporalUdpClient {
         INSTANCE = new TemporalUdpClient();
     }
 
-    /** Connects to the server's UDP endpoint; call after the server communicates its UDP port via TCP. */
+    /**
+     * Connects to the server's UDP endpoint; call after the server communicates its UDP port via
+     * TCP.
+     */
     public static void connect(String serverHost, int udpPort) {
         if (INSTANCE == null) return;
         INSTANCE.connectInternal(serverHost, udpPort);

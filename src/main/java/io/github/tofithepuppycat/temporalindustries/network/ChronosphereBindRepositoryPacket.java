@@ -13,8 +13,10 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: names the repository an unbound Chronosphere should use, creating it if no
- * repository by that name exists. */
+/**
+ * Client -> server: names the repository an unbound Chronosphere should use, creating it if no
+ * repository by that name exists.
+ */
 public class ChronosphereBindRepositoryPacket implements CustomPacketPayload {
     public static final Type<ChronosphereBindRepositoryPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_bind_repository"));

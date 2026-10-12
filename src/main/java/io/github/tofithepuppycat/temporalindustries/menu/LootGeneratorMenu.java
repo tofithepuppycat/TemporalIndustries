@@ -18,9 +18,10 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 
-/** Container menu for the Loot Generator GUI: Chaos tank fill/capacity, roll progress, and a
- * 27-slot inventory. The selected loot table id and validity flag are read straight off the block
- * entity, since strings don't fit in {@code ContainerData}'s int slots. */
+/**
+ * Container menu for the Loot Generator GUI: Chaos tank fill/capacity, roll progress, and a 27-slot
+ * inventory.
+ */
 @SuppressWarnings("null")
 public class LootGeneratorMenu extends AbstractContainerMenu {
     private static final int SLOT_COUNT = 27;
@@ -133,7 +134,9 @@ public class LootGeneratorMenu extends AbstractContainerMenu {
         return blockEntity.isSelectionValid();
     }
 
-    /** Items this table could plausibly produce, sampled server-side when the current roll started. */
+    /**
+     * Items this table could plausibly produce, sampled server-side when the current roll started.
+     */
     public List<ItemStack> getPossibleItems() {
         return blockEntity.getPossibleItems();
     }

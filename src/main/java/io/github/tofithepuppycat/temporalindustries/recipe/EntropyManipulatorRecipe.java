@@ -32,8 +32,7 @@ import java.util.Optional;
 /**
  * A single step of the Entropy Manipulator's transmutation chains: consumes an item or fluid input
  * plus Order/Chaos entropy over time to produce either a fixed result item or a random draw from a
- * result tag. Exactly one of input_item/input_fluid, and exactly one of result/result_tag, must be
- * present in the JSON.
+ * result tag.
  */
 public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe.Input> {
     private final EntropyType entropyType;
@@ -129,7 +128,10 @@ public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe
         return true;
     }
 
-    /** Every item this recipe could produce: just {@code result}, or every item in {@code result_tag}. */
+    /**
+     * Every item this recipe could produce: just {@code result}, or every item in {@code
+     * result_tag}.
+     */
     public List<ItemStack> possibleResults(HolderLookup.Provider registries) {
         if (result != null) return List.of(result);
         return registries.lookupOrThrow(Registries.ITEM).get(resultTag)
@@ -137,7 +139,10 @@ public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe
                 .orElse(List.of());
     }
 
-    /** A representative output for display/base-{@link Recipe} purposes; use {@link #rollResult} to actually craft. */
+    /**
+     * A representative output for display/base-{@link Recipe} purposes; use {@link #rollResult} to
+     * actually craft.
+     */
     @Override
     public ItemStack getResultItem(HolderLookup.Provider registries) {
         if (result != null) return result;
@@ -145,7 +150,10 @@ public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe
         return possible.isEmpty() ? ItemStack.EMPTY : possible.get(0);
     }
 
-    /** Picks the actual output of a completed craft: the fixed item, or a random draw from {@code result_tag}. */
+    /**
+     * Picks the actual output of a completed craft: the fixed item, or a random draw from {@code
+     * result_tag}.
+     */
     public ItemStack rollResult(HolderLookup.Provider registries, RandomSource random) {
         if (result != null) return result.copy();
         List<ItemStack> possible = possibleResults(registries);
@@ -162,7 +170,10 @@ public class EntropyManipulatorRecipe implements Recipe<EntropyManipulatorRecipe
         return Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get();
     }
 
-    /** The input item slot's stack plus the liquid tank's current fluid; a recipe only ever reads one. */
+    /**
+     * The input item slot's stack plus the liquid tank's current fluid; a recipe only ever reads
+     * one.
+     */
     public record Input(ItemStack item, FluidStack fluid) implements RecipeInput {
         @Override
         public ItemStack getItem(int index) {

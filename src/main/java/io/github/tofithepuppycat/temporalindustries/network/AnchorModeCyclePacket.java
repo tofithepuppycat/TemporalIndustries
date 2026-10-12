@@ -11,8 +11,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: scroll-wheel mode cycle for the Temporal Anchor, sent while the player is
- * sneaking and holding it (see the client-side input handler). */
+/**
+ * Client -> server: scroll-wheel mode cycle for the Temporal Anchor, sent while the player is
+ * sneaking and holding it (see the client-side input handler).
+ */
 public class AnchorModeCyclePacket implements CustomPacketPayload {
     public static final Type<AnchorModeCyclePacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "anchor_mode_cycle"));

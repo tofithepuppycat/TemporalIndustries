@@ -43,9 +43,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Multi-chunk-tier time machine: can claim up to an 11x11 area of chunks around itself
- * (see {@link ChronosphereBlockEntity}), all moved together by one jump from a shared energy pool.
- * FACING is purely visual (like a furnace) and has no bearing on chunk claiming/jumping.
+ * Multi-chunk-tier time machine: can claim up to an 11x11 area of chunks around itself (see {@link
+ * ChronosphereBlockEntity}), all moved together by one jump from a shared energy pool.
  */
 @SuppressWarnings("null")
 public class Chronosphere extends BaseEntityBlock {
@@ -99,8 +98,10 @@ public class Chronosphere extends BaseEntityBlock {
         return super.canSurvive(state, level, pos);
     }
 
-    /** Right-clicking with a Portable Chrono Marker copies this Chronosphere's claimed chunk
-     * layout onto the marker (as offsets from the home chunk) instead of opening the menu. */
+    /**
+     * Right-clicking with a Portable Chrono Marker copies this Chronosphere's claimed chunk layout
+     * onto the marker (as offsets from the home chunk) instead of opening the menu.
+     */
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState state, @NotNull Level level,
                                                @NotNull BlockPos pos, @NotNull Player player,
@@ -151,6 +152,15 @@ public class Chronosphere extends BaseEntityBlock {
         }
 
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    protected void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
+                             @NotNull BlockState newState, boolean isMoving) {
+        if (!state.is(newState.getBlock()) && level.getBlockEntity(pos) instanceof ChronosphereBlockEntity chronosphere) {
+            chronosphere.orphanRepository();
+        }
+        super.onRemove(state, level, pos, newState, isMoving);
     }
 
     @Nullable

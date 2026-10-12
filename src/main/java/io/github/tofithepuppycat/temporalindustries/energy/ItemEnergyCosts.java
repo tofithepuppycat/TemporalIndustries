@@ -44,8 +44,7 @@ import java.util.OptionalInt;
  * Holds the resolved energy cost of every known item and computes it by layering: datapack base
  * costs (per item or tag), modpack config overrides, recipe-derived costs cascading through
  * crafting chains for anything still unpriced, and finally a flat default for any remaining block
- * item. The result is expensive to compute (every recipe scanned, possibly in several passes) so
- * it's cached to disk per-world and only recomputed when the recipe set or base costs change.
+ * item.
  */
 public final class ItemEnergyCosts {
     private static final Logger LOGGER = LogUtils.getLogger();
@@ -65,6 +64,15 @@ public final class ItemEnergyCosts {
 
     public static OptionalInt getCost(ItemStack stack) {
         return stack.isEmpty() ? OptionalInt.empty() : getCost(stack.getItem());
+    }
+
+    public static Map<Item, Integer> snapshot() {
+        return resolved;
+    }
+
+    /** Installs costs received from the server so client-side tooltips can show them. */
+    public static void setResolved(Map<Item, Integer> costs) {
+        resolved = Map.copyOf(costs);
     }
 
     // Raw datapack entries (populated by EnergyCostReloadListener)
@@ -112,8 +120,7 @@ public final class ItemEnergyCosts {
         return costs;
     }
 
-    /** Prices any block item still without a cost after base costs and recipe propagation.
-     * @return how many items were priced this way. */
+    /** Prices any block item still without a cost after base costs and recipe propagation. */
     private static int applyDefaultBlockCost(Map<Item, Integer> costs, int defaultBlockCost) {
         int defaulted = 0;
         for (Item item : BuiltInRegistries.ITEM) {
@@ -125,8 +132,10 @@ public final class ItemEnergyCosts {
         return defaulted;
     }
 
-    /** Applies tags first, then explicit items, so an explicit item always wins over a
-     * tag-derived default within a single source. */
+    /**
+     * Applies tags first, then explicit items, so an explicit item always wins over a tag-derived
+     * default within a single source.
+     */
     private static void applyEntries(Map<Item, Integer> costs, List<RawEntry> entries) {
         for (RawEntry entry : entries) {
             if (entry instanceof TagEntry tagEntry) {
@@ -144,8 +153,10 @@ public final class ItemEnergyCosts {
         }
     }
 
-    /** Parses the {@code items}/{@code tags} objects shared by both the datapack files and the
-     * modpack config file into raw entries. Tag ids may optionally be prefixed with '#'. */
+    /**
+     * Parses the {@code items}/{@code tags} objects shared by both the datapack files and the
+     * modpack config file into raw entries.
+     */
     static List<RawEntry> parseEntries(JsonObject root) {
         List<RawEntry> entries = new ArrayList<>();
         if (root.has("items") && root.get("items").isJsonObject()) {
@@ -198,8 +209,10 @@ public final class ItemEnergyCosts {
         }
     }
 
-    /** Iteratively assigns a cost to any priceable item whose recipe ingredients are already
-     * priced, until a full pass makes no further progress. @return how many items were priced. */
+    /**
+     * Iteratively assigns a cost to any priceable item whose recipe ingredients are already priced,
+     * until a full pass makes no further progress. @return how many items were priced.
+     */
     private static int propagateThroughRecipes(MinecraftServer server, Map<Item, Integer> costs) {
         HolderLookup.Provider registries = server.registryAccess();
         List<RecipeHolder<?>> recipes = server.getRecipeManager().getRecipes().stream()

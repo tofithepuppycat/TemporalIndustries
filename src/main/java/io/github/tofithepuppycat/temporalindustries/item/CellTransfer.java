@@ -27,10 +27,8 @@ import java.util.List;
 /**
  * The hand-held half of the liquid entropy plumbing: right-clicking a machine with a cell pours a
  * fixed dose of its liquid Order/Chaos into whatever {@link IFluidHandler} the machine exposes, and
- * sneak+scrolling picks how big that dose is (see
- * {@link io.github.tofithepuppycat.temporalindustries.network.CellTransferAmountPacket}).
- * Cells hook this up through {@code onItemUseFirst} so a pour beats the machine's own GUI-opening
- * right-click, while an empty cell (or a full machine) falls through and opens the GUI as usual.
+ * sneak+scrolling picks how big that dose is (see {@link
+ * io.github.tofithepuppycat.temporalindustries.network.CellTransferAmountPacket}).
  */
 @SuppressWarnings("null")
 public final class CellTransfer {
@@ -50,18 +48,16 @@ public final class CellTransfer {
         return STEPS[stepIndex(stack)];
     }
 
-    /** Moves the selected dose delta places up/down the {@link #STEPS} ladder, clamped at both ends.
-     * Returns the newly selected dose in mB. */
+    /**
+     * Moves the selected dose delta places up/down the {@link #STEPS} ladder, clamped at both ends.
+     */
     public static int cycle(ItemStack stack, int delta) {
         int index = Math.max(0, Math.min(STEPS.length - 1, stepIndex(stack) + delta));
         stack.set(Registration.CELL_TRANSFER_STEP.get(), new BottleContents(index));
         return STEPS[index];
     }
 
-    /** Pours one dose into the clicked block's fluid handler. Single-type cells always pour their
-     * own type; dual cells pour ORD, or CHS while sneaking, with no fallback to the other type.
-     * Returns PASS when there is nothing to pour or nowhere to pour it, so the click falls through
-     * to the block. */
+    /** Pours one dose into the clicked block's fluid handler. */
     public static InteractionResult pourInto(UseOnContext context) {
         ItemStack stack = context.getItemInHand();
         Level level = context.getLevel();

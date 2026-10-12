@@ -2,8 +2,11 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import net.minecraft.client.gui.GuiGraphics;
 
-/** Order/Chaos balance gauge shared by the machine menus: fills from the center tick outward,
- * colored by the gradients in {@code temporalindustries.aseprite} (purple for Order, cyan for Chaos). */
+/**
+ * Order/Chaos balance gauge shared by the machine menus: fills from the center tick outward,
+ * colored by the gradients in {@code temporalindustries.aseprite} (purple for Order, cyan for
+ * Chaos).
+ */
 final class EntropyBalanceBar {
     private static final int[] ORDER_GRADIENT = {
             0x6f4fab, 0x8d6acc, 0xb38ef3, 0xcfa0f3, 0xfecbe6};

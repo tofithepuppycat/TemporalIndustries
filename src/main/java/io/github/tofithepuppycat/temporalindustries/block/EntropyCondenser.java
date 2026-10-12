@@ -26,9 +26,10 @@ import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
-/** Machine block that absorbs entropy orbs in a configurable cuboid range in front of its face;
- * see {@link EntropyCondenserBlockEntity}. {@link #FACING} determines which face is "front", the
- * same way {@link SeebeckGenerator}'s does. */
+/**
+ * Machine block that absorbs entropy orbs in a configurable cuboid range in front of its face; see
+ * {@link EntropyCondenserBlockEntity}.
+ */
 @SuppressWarnings("null")
 public class EntropyCondenser extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;

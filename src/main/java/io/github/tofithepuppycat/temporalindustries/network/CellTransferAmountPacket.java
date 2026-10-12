@@ -14,8 +14,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
-/** Client -> server: scroll-wheel change of how much liquid entropy one right-click pours out of a
- * cell, sent while the player is sneaking and holding it (see the client-side input handler). */
+/**
+ * Client -> server: scroll-wheel change of how much liquid entropy one right-click pours out of a
+ * cell, sent while the player is sneaking and holding it (see the client-side input handler).
+ */
 public class CellTransferAmountPacket implements CustomPacketPayload {
     public static final Type<CellTransferAmountPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "cell_transfer_amount"));

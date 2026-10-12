@@ -25,9 +25,10 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Client -> server: the Chronoscope's "Travel" button, requesting entry into the Chrono Rift at
- * the selected moment. Refused if the rift already has occupants anchored to a different moment
- * (see {@link TemporalWorldData#canEnterChronoRift}). */
+/**
+ * Client -> server: the Chronoscope's "Travel" button, requesting entry into the Chrono Rift at the
+ * selected moment.
+ */
 public class ChronoLensTravelPacket implements CustomPacketPayload {
     public static final Type<ChronoLensTravelPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_lens_travel"));
@@ -35,8 +36,10 @@ public class ChronoLensTravelPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ChronoLensTravelPacket> STREAM_CODEC =
             StreamCodec.of(ChronoLensTravelPacket::encode, ChronoLensTravelPacket::decode);
 
-    /** Radius (in chunks) synchronously filled around the landing point before teleporting, so the
-     * player never lands in unfilled void. Further exploration fills lazily via ChronoRiftChunkListener. */
+    /**
+     * Radius (in chunks) synchronously filled around the landing point before teleporting, so the
+     * player never lands in unfilled void.
+     */
     private static final int PREFILL_RADIUS_CHUNKS = 1;
 
     private final long selectedGameTime;
@@ -82,10 +85,11 @@ public class ChronoLensTravelPacket implements CustomPacketPayload {
 
             ChunkPos destChunk = new ChunkPos(sender.blockPosition());
             Map<Long, Boolean> trackedSnapshot = new LinkedHashMap<>();
-            // Every chunk in the prefill radius is written before any of them is settled: settling a
-            // chunk fires neighbor-shape/destroy checks that can reach into a sibling chunk still in
-            // this same loop, and that sibling looks like unfilled void until its own turn comes up —
-            // wrongly destroying supported blocks (e.g. crops) right at the boundary between them.
+            // Every chunk in the prefill radius is written before any of them is settled: settling
+            // a chunk fires neighbor-shape/destroy checks that can reach into a sibling chunk still
+            // in this same loop, and that sibling looks like unfilled void until its own turn comes
+            // up — wrongly destroying supported blocks (e.g. crops) right at the boundary between
+            // them.
             List<BlockPos> deferredSettle = new ArrayList<>();
             for (int dx = -PREFILL_RADIUS_CHUNKS; dx <= PREFILL_RADIUS_CHUNKS; dx++) {
                 for (int dz = -PREFILL_RADIUS_CHUNKS; dz <= PREFILL_RADIUS_CHUNKS; dz++) {

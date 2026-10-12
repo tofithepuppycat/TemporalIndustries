@@ -25,9 +25,11 @@ import net.neoforged.neoforge.fluids.FluidType;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
-/** Textured GUI for the Entropy Manipulator: two vertical entropy tank bars (Chaos/Order), a
+/**
+ * Textured GUI for the Entropy Manipulator: two vertical entropy tank bars (Chaos/Order), a
  * material liquid tank drawn underneath the background texture's transparent window, an
- * input/output slot pair, and a Chaos/Order progress bar icon over the gear baked into the texture. */
+ * input/output slot pair, and a Chaos/Order progress bar icon over the gear baked into the texture.
+ */
 @SuppressWarnings("null")
 public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyManipulatorMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
@@ -51,15 +53,19 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
     private static final int LIQUID_WIDTH = 9;
     private static final int LIQUID_HEIGHT = 48;
 
-    /** Public so the JEI integration (see client/jei) can place its "Show Recipes" click area over
-     * the same region as the progress bar icon. */
+    /**
+     * Public so the JEI integration (see client/jei) can place its "Show Recipes" click area over
+     * the same region as the progress bar icon.
+     */
     public static final int PROGRESS_X = 74;
     public static final int PROGRESS_Y = 26;
     public static final int PROGRESS_WIDTH = 34;
     public static final int PROGRESS_HEIGHT = 34;
 
-    /** Shown below the output slot only when the input has more than one matching recipe (e.g.
-     * Order+sand can yield glass, sandstone, or gravel); click it to cycle the chosen output. */
+    /**
+     * Shown below the output slot only when the input has more than one matching recipe (e.g.
+     * Order+sand can yield glass, sandstone, or gravel); click it to cycle the chosen output.
+     */
     private static final int RECIPE_SELECT_X = 116;
     private static final int RECIPE_SELECT_Y = 58;
     private static final int RECIPE_SELECT_SIZE = 16;
@@ -87,8 +93,10 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         renderRecipeSelect(guiGraphics);
     }
 
-    /** Draws the currently-selected output item as a ghost icon below the output slot when the
-     * input is ambiguous, so the player can see (and click to cycle) what will be produced. */
+    /**
+     * Draws the currently-selected output item as a ghost icon below the output slot when the input
+     * is ambiguous, so the player can see (and click to cycle) what will be produced.
+     */
     private void renderRecipeSelect(GuiGraphics guiGraphics) {
         if (menu.getRecipeOptionCount() <= 1) return;
         int itemId = menu.getSelectedRecipeOutputId();
@@ -102,7 +110,10 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         guiGraphics.renderItem(new ItemStack(item), x, y);
     }
 
-    /** Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with the entropy color. */
+    /**
+     * Tiles the fluid's still texture bottom-up over the filled portion of the tank, tinted with
+     * the entropy color.
+     */
     private void renderEntropyBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity, FluidType fluidType, int tintColor) {
         if (capacity <= 0 || amount <= 0) return;
         int filled = Math.max(1, Math.round((amount / (float) capacity) * BAR_HEIGHT));
@@ -127,7 +138,10 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         guiGraphics.disableScissor();
     }
 
-    /** Renders the material liquid tank, tinted with the fluid's own natural color rather than a fixed entropy tint. */
+    /**
+     * Renders the material liquid tank, tinted with the fluid's own natural color rather than a
+     * fixed entropy tint.
+     */
     private void renderLiquidTank(GuiGraphics guiGraphics) {
         int amount = menu.getLiquidFluidAmount();
         int capacity = menu.getLiquidTankCapacity();
@@ -161,7 +175,10 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         guiGraphics.disableScissor();
     }
 
-    /** Draws the Chaos or Order progress bar icon over the gear, growing left-to-right with progress. */
+    /**
+     * Draws the Chaos or Order progress bar icon over the gear, growing left-to-right with
+     * progress.
+     */
     private void renderProgress(GuiGraphics guiGraphics) {
         int code = menu.getActiveTypeCode();
         if (code == 0) return;

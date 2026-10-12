@@ -13,8 +13,10 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
-/** Server -> client: terrain thumbnails for the Portable Chrono Marker's area-select map, keyed by
- * a generic anchor chunk key rather than a machine's BlockPos. Payload is deflated on the wire. */
+/**
+ * Server -> client: terrain thumbnails for the Portable Chrono Marker's area-select map, keyed by a
+ * generic anchor chunk key rather than a machine's BlockPos.
+ */
 public class ChronoMarkerMapSyncPacket implements CustomPacketPayload {
     public static final Type<ChronoMarkerMapSyncPacket> TYPE =
             new Type<>(ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_marker_map_sync"));

@@ -10,9 +10,7 @@ import java.util.List;
 
 /**
  * One chunk's contribution to a {@link RepoCommit}: either a FULL baseline ({@link ChunkSnapshot})
- * or a DELTA (only what changed since that chunk's previous entry). A single commit can mix both
- * kinds across its chunks — each chunk's own history decides which one it needs independently of
- * its neighbors (see {@link TemporalRepository}).
+ * or a DELTA (only what changed since that chunk's previous entry).
  */
 public final class ChunkEntry {
     public enum Type { FULL, DELTA }

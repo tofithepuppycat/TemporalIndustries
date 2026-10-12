@@ -21,8 +21,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-/** Client -> server: poll for a machine's repository graph, plus the resolved ghost-preview diff
- * for whichever commit the player currently has selected. */
+/**
+ * Client -> server: poll for a machine's repository graph, plus the resolved ghost-preview diff for
+ * whichever commit the player currently has selected.
+ */
 @SuppressWarnings("null")
 public class TimelinePreviewRequestPacket implements CustomPacketPayload {
     public static final Type<TimelinePreviewRequestPacket> TYPE =
@@ -31,18 +33,17 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, TimelinePreviewRequestPacket> STREAM_CODEC =
             StreamCodec.of(TimelinePreviewRequestPacket::encode, TimelinePreviewRequestPacket::decode);
 
-    /** Hard ceiling on synced preview entries. A jump restoring a freshly baselined 121-chunk claim
-     * could otherwise resolve to millions of positions; past this the ghost is simply truncated
-     * rather than risking an unbounded packet. */
+    /** Hard ceiling on synced preview entries. */
     private static final int MAX_PREVIEW_ENTRIES = 60_000;
 
     private final BlockPos machinePos;
     private final long lastKnownHeadCommitId;
-    /** The client's last-known preview fingerprint, covering everything the ghost preview depends
-     * on (selection and glue state) that headCommitId alone wouldn't catch. */
+    /**
+     * The client's last-known preview fingerprint, covering everything the ghost preview depends on
+     * (selection and glue state) that headCommitId alone wouldn't catch.
+     */
     private final long lastKnownPreviewVersion;
-    /** The commit the player has selected, or -1 for none. The server resolves the ghost preview
-     * against this, since the selection lives client-side. */
+    /** The commit the player has selected, or -1 for none. */
     private final long selectedCommitId;
 
     public TimelinePreviewRequestPacket(BlockPos machinePos, long lastKnownHeadCommitId, long lastKnownPreviewVersion) {
@@ -68,9 +69,7 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         return new TimelinePreviewRequestPacket(buf.readBlockPos(), buf.readLong(), buf.readLong(), buf.readLong());
     }
 
-    /** Max distance (blocks) the sender may be from machinePos. Generous rather than a tight
-     * interaction range, since the ghost preview keeps refreshing while the player walks away
-     * from the GUI. */
+    /** Max distance (blocks) the sender may be from machinePos. */
     private static final double MAX_RANGE_BLOCKS = 256.0D;
 
     public static void handle(TimelinePreviewRequestPacket packet, IPayloadContext context) {
@@ -104,28 +103,37 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
                     machine.getCurrentNamedBranch(),
                     headCommitId,
                     machine.getJumpCosts(packet.selectedCommitId),
-                    resolvePreview(machine, packet.selectedCommitId, sender.level()),
+                    resolvePreview(machine, packet.selectedCommitId, sender),
                     machine.getClaimedChunks(),
                     previewVersion));
         });
     }
 
     /**
-     * Flattens the repository's resolved target states for selectedCommitId into the
-     * {@code BlockPos -> target state} map the client renders, dropping glued positions (a jump
-     * skips those entirely) and positions already matching the world. Filtering against the world
-     * here, before the {@link #MAX_PREVIEW_ENTRIES} cap, matters because a resolved chunk's state
-     * covers every position in the chunk (changed or not) — without this, a single affected chunk
-     * can exhaust the whole cap on positions that wouldn't even change, starving every other
-     * affected chunk (e.g. one on the other side of a cross-branch diff) of any entries at all.
+     * Flattens the repository's resolved target states for selectedCommitId into the {@code
+     * BlockPos -> target state} map the client renders, dropping glued positions (a jump skips
+     * those entirely) and positions already matching the world.
      */
     private static Map<BlockPos, BlockState> resolvePreview(TimelineViewProvider machine, long selectedCommitId,
-                                                              net.minecraft.world.level.Level level) {
+                                                              ServerPlayer viewer) {
         if (selectedCommitId < 0) return Map.of();
+        net.minecraft.world.level.Level level = viewer.level();
+
+        // Resolving a chunk copies all of its block states, so on a huge claim resolve nearest-
+        // first and stop the moment the entry cap is hit, rather than resolving every affected
+        // chunk up front.
+        ChunkPos center = viewer.chunkPosition();
+        List<ChunkPos> chunks = new ArrayList<>(machine.previewAffectedChunks(selectedCommitId));
+        chunks.sort(java.util.Comparator.comparingLong(c -> {
+            long dx = c.x - center.x, dz = c.z - center.z;
+            return dx * dx + dz * dz;
+        }));
 
         Map<BlockPos, BlockState> out = new HashMap<>();
-        for (Map<BlockPos, BlockState> chunkStates : machine.previewJumpTargetStates(selectedCommitId).values()) {
-            for (Map.Entry<BlockPos, BlockState> entry : chunkStates.entrySet()) {
+        for (ChunkPos chunk : chunks) {
+            if (out.size() >= MAX_PREVIEW_ENTRIES) break;
+            if (!level.hasChunk(chunk.x, chunk.z)) continue;
+            for (Map.Entry<BlockPos, BlockState> entry : machine.previewChunkTargetStates(selectedCommitId, chunk).entrySet()) {
                 if (machine.isGluedPos(entry.getKey())) continue;
                 if (level.getBlockState(entry.getKey()).equals(entry.getValue())) continue;
                 if (out.size() >= MAX_PREVIEW_ENTRIES) return out;
@@ -135,8 +143,10 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         return out;
     }
 
-    /** Combines the repository head with the player's selection and the world's glue-state version,
-     * so changes invisible to headCommitId alone still invalidate the client's cache. */
+    /**
+     * Combines the repository head with the player's selection and the world's glue-state version,
+     * so changes invisible to headCommitId alone still invalidate the client's cache.
+     */
     private static long computePreviewVersion(ServerPlayer sender, TimelineViewProvider machine, long selectedCommitId) {
         long combined = machine.getHeadCommitId();
         combined = combined * 1_000_003L + selectedCommitId;

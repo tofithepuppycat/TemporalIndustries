@@ -21,7 +21,7 @@ import java.util.Map;
 /**
  * Paints one Chrono Rift chunk with the Overworld's reconstructed history at a chosen moment —
  * whatever commit each chunk's own timeline had at, or before, that gameTime — or leaves it void
- * (left "untracked") where no such commit exists. Server-only.
+ * (left "untracked") where no such commit exists.
  */
 public final class ChronoRiftFiller {
     private ChronoRiftFiller() {}
@@ -31,11 +31,14 @@ public final class ChronoRiftFiller {
         fillChunk(server, riftLevel, pos, targetGameTime, null);
     }
 
-    /** Same as {@link #fillChunk(MinecraftServer, ServerLevel, ChunkPos, long)}, but when
-     * deferredSettle is non-null this chunk's neighbor-shape settle pass is collected into it instead
-     * of running immediately — for a caller filling several chunks together (e.g. the rift's prefill
-     * radius) to settle them all only once every chunk in the batch has real blocks in place, so a
-     * chunk's settle pass never runs while a sibling in the same batch is still void. */
+    /**
+     * Same as {@link #fillChunk(MinecraftServer, ServerLevel, ChunkPos, long)}, but when
+     * deferredSettle is non-null this chunk's neighbor-shape settle pass is collected into it
+     * instead of running immediately — for a caller filling several chunks together (e.g. the
+     * rift's prefill radius) to settle them all only once every chunk in the batch has real blocks
+     * in place, so a chunk's settle pass never runs while a sibling in the same batch is still
+     * void.
+     */
     public static void fillChunk(MinecraftServer server, ServerLevel riftLevel, ChunkPos pos, long targetGameTime, @Nullable List<BlockPos> deferredSettle) {
         TemporalWorldData data = TemporalWorldData.get(server);
         Long filledAt = data.getChronoRiftChunkFilledTime(pos);
@@ -46,13 +49,14 @@ public final class ChronoRiftFiller {
         boolean tracked = overworldTimeline != null && floorCommitId != -1L;
 
         if (tracked) {
-            // fromCommitId = -1 tells applyChunkAtTime the rift's blank chunk has no live lineage of
-            // its own, so it replays the *entire* chain from the chunk's nearest SNAPSHOT ancestor
-            // forward, fully painting the chunk from nothing rather than diffing against live state.
+            // fromCommitId = -1 tells applyChunkAtTime the rift's blank chunk has no live lineage
+            // of its own, so it replays the *entire* chain from the chunk's nearest SNAPSHOT
+            // ancestor forward, fully painting the chunk from nothing rather than diffing against
+            // live state.
             overworldTimeline.applyChunkAtTime(pos, targetGameTime, -1L, riftLevel, floorCommitId, p -> false, deferredSettle);
         } else if (data.isChronoRiftChunkTracked(pos)) {
             // This chunk was painted for a previous session's time but has no history at the newly
-            // selected time — clear it back to void, or the old session's blocks would linger forever.
+            // selected time — clear it back to void.
             clearChunkToVoid(riftLevel, pos, deferredSettle);
         }
 
@@ -64,8 +68,10 @@ public final class ChronoRiftFiller {
                 new ChronoRiftChunkTrackedSyncPacket(Map.of(pos.toLong(), tracked)));
     }
 
-    /** Resets every non-air block in pos back to air, skipping empty sections outright so a chunk
-     * that was never painted (the common case) costs nothing beyond the section scan. */
+    /**
+     * Resets every non-air block in pos back to air, skipping empty sections outright so a chunk
+     * that was never painted (the common case) costs nothing beyond the section scan.
+     */
     private static void clearChunkToVoid(ServerLevel level, ChunkPos pos, @Nullable List<BlockPos> deferredSettle) {
         LevelChunk chunk = level.getChunk(pos.x, pos.z);
         LevelChunkSection[] sections = chunk.getSections();

@@ -36,19 +36,14 @@ import java.util.UUID;
 
 /**
  * Replays a recording's player interactions through an {@link EchoPlayer}, so they behave exactly
- * as if the original player did them: block use (placing, stripping, buttons...),
- * item use (throwing potions, drawing bows, eating), entity use (breeding, milking, leashing),
- * attacks, breaking and riding. Every protection/claim mod sees the usual
- * events too.
- * <p>
- * Items come from the projector's own inventory, never from thin air: before each action the
- * recorded stack is pulled out of it into the fake player's hand, and afterwards everything the
- * fake player ends up holding (including results like a filled bucket) goes back in, with any
- * overflow dropped. The one exception is attack/break tools, which are phantom copies so a loop
- * doesn't wear out or need to stock the original weapon.
+ * as if the original player did them: block use (placing, stripping, buttons...), item use
+ * (throwing potions, drawing bows, eating), entity use (breeding, milking, leashing), attacks,
+ * breaking and riding.
  */
 public final class ChronoActionReplayer {
-    /** How far a replayed action may find its target from where it was recorded: entities wander. */
+    /**
+     * How far a replayed action may find its target from where it was recorded: entities wander.
+     */
     private static final double ENTITY_SEARCH_RADIUS = 2.5;
     private static final double VEHICLE_SEARCH_RADIUS = 3.0;
 
@@ -56,7 +51,10 @@ public final class ChronoActionReplayer {
     private final IItemHandler inventory;
     private final EchoPlayer actor;
 
-    /** Entities already claimed by an ATTACK this tick, so two recorded hits can't resolve onto the same mob. */
+    /**
+     * Entities already claimed by an ATTACK this tick, so two recorded hits can't resolve onto the
+     * same mob.
+     */
     private final Set<Integer> attackedThisTick = new HashSet<>();
 
     public ChronoActionReplayer(ServerLevel level, IItemHandler inventory, BlockPos home, ChronoRecording recording) {
@@ -70,7 +68,10 @@ public final class ChronoActionReplayer {
                 recording.getOwnerId());
     }
 
-    /** Puts the fake player where the original player was at this point of the loop and advances it one tick. */
+    /**
+     * Puts the fake player where the original player was at this point of the loop and advances it
+     * one tick.
+     */
     public void beginTick(ChronoRecording recording, int tick) {
         attackedThisTick.clear();
 
@@ -93,12 +94,17 @@ public final class ChronoActionReplayer {
         actor.tickEcho();
     }
 
-    /** Takes back whatever the fake player is holding, unless it's still mid-use (drawing a bow, eating). */
+    /**
+     * Takes back whatever the fake player is holding, unless it's still mid-use (drawing a bow,
+     * eating).
+     */
     public void endTick() {
         if (!actor.isUsingItem()) reclaim();
     }
 
-    /** The loop wrapped or playback stopped: drop any ongoing state so the next pass starts clean. */
+    /**
+     * The loop wrapped or playback stopped: drop any ongoing state so the next pass starts clean.
+     */
     public void reset() {
         actor.stopRiding();
         actor.stopUsingItem();
@@ -125,7 +131,10 @@ public final class ChronoActionReplayer {
         }
     }
 
-    /** Breaks the block with a phantom copy of the recorded tool and collects its drops into the projector. */
+    /**
+     * Breaks the block with a phantom copy of the recorded tool and collects its drops into the
+     * projector.
+     */
     private void breakBlock(BlockPos pos, @Nullable ResourceLocation toolId) {
         BlockState state = level.getBlockState(pos);
         if (state.isAir() || state.getDestroySpeed(level, pos) < 0F) return;
@@ -221,8 +230,10 @@ public final class ChronoActionReplayer {
         actor.startRiding(vehicle);
     }
 
-    /** Empties the fake player's hands back into the projector, then equips the stack the recorded
-     * player was holding. Null (nothing equipped) if the projector doesn't have it. */
+    /**
+     * Empties the fake player's hands back into the projector, then equips the stack the recorded
+     * player was holding.
+     */
     @Nullable
     private ItemStack equipRecorded(InteractionHand hand, ChronoRecording.Interaction use) {
         if (actor.isUsingItem()) actor.stopUsingItem();
@@ -234,8 +245,10 @@ public final class ChronoActionReplayer {
         return held;
     }
 
-    /** Empties the fake player's hands back into the projector and equips {@code stack} (a phantom,
-     * or something just taken from the projector) in {@code hand}. */
+    /**
+     * Empties the fake player's hands back into the projector and equips {@code stack} (a phantom,
+     * or something just taken from the projector) in {@code hand}.
+     */
     private void prepare(InteractionHand hand, ItemStack stack, boolean sneaking) {
         if (actor.isUsingItem()) actor.stopUsingItem();
         reclaim();
@@ -254,7 +267,9 @@ public final class ChronoActionReplayer {
         actor.refreshEquipment();
     }
 
-    /** Moves everything the fake player holds back into the projector, dropping what doesn't fit. */
+    /**
+     * Moves everything the fake player holds back into the projector, dropping what doesn't fit.
+     */
     private void reclaim() {
         Inventory held = actor.getInventory();
         boolean changed = false;
@@ -274,8 +289,7 @@ public final class ChronoActionReplayer {
         if (changed) actor.refreshEquipment();
     }
 
-    /** The recorded held stack, pulled out of the projector's inventory. Empty if the player was
-     * empty-handed; null if the projector has no matching stack, in which case the action is skipped. */
+    /** The recorded held stack, pulled out of the projector's inventory. */
     @Nullable
     private ItemStack takeHeld(ChronoRecording.Interaction use) {
         ItemStack wanted = parse(use.heldStack());
@@ -295,7 +309,10 @@ public final class ChronoActionReplayer {
         return tag == null ? ItemStack.EMPTY : ItemStack.parseOptional(level.registryAccess(), tag);
     }
 
-    /** Same item and components, ignoring wear: a worn axe stands in for the same axe at recording time. */
+    /**
+     * Same item and components, ignoring wear: a worn axe stands in for the same axe at recording
+     * time.
+     */
     private static boolean matches(ItemStack have, ItemStack wanted) {
         if (!have.is(wanted.getItem())) return false;
 
@@ -321,7 +338,7 @@ public final class ChronoActionReplayer {
                 .orElse(null);
     }
 
-    /** Nearest entity of {@code typeId} around {@code pos}. {@code baby} (if non-null) must match for living entities. */
+    /** Nearest entity of {@code typeId} around {@code pos}. */
     @Nullable
     private Entity findEntity(BlockPos pos, @Nullable ResourceLocation typeId, double radius, @Nullable Boolean baby,
                                boolean excludeAttacked) {
