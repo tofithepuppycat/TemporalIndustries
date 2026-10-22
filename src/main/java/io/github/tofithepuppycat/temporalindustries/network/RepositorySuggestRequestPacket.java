@@ -1,9 +1,9 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -16,7 +16,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import java.util.List;
 
 /**
- * Client -> server: asks which existing repositories an unbound Chronosphere could adopt whose
+ * Client -> server: asks which existing repositories an unbound Chronosphere or Chronovault could adopt whose
  * names match the text typed so far.
  */
 public class RepositorySuggestRequestPacket implements CustomPacketPayload {
@@ -51,9 +51,9 @@ public class RepositorySuggestRequestPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof ChronosphereMenu menu)) return;
+            if (!(sender.containerMenu instanceof TimelineViewMenu menu)) return;
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
-            if (!(sender.level().getBlockEntity(packet.machinePos) instanceof ChronosphereBlockEntity machine)) return;
+            if (!(sender.level().getBlockEntity(packet.machinePos) instanceof AbstractTimelineMachineBlockEntity machine)) return;
             if (machine.isRepositoryBound()) return;
 
             TemporalWorldData data = TemporalWorldData.get(sender.server);

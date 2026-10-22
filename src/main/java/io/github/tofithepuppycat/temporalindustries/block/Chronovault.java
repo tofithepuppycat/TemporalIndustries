@@ -4,21 +4,28 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.dimension.RiftDeviceLock;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import net.minecraft.server.level.ServerLevel;
+import net.minecraft.network.chat.Component;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.sounds.SoundEvents;
+import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.ItemInteractionResult;
 import net.minecraft.world.entity.player.Player;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.context.BlockPlaceContext;
-import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.LevelReader;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.RenderShape;
+import net.minecraft.world.level.block.Rotation;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityTicker;
 import net.minecraft.world.level.block.entity.BlockEntityType;
@@ -57,23 +64,40 @@ public class Chronovault extends BaseEntityBlock {
     }
 
     @Override
+    public BlockState rotate(BlockState state, Rotation rotation) {
+        return state.setValue(FACING, rotation.rotate(state.getValue(FACING)));
+    }
+
+    @Override
+    public BlockState mirror(BlockState state, Mirror mirror) {
+        return state.rotate(mirror.getRotation(state.getValue(FACING)));
+    }
+
+    @Override
     public RenderShape getRenderShape(@NotNull BlockState blockState) {
         return RenderShape.MODEL;
     }
 
-    /**
-     * Refuses to survive on a chunk already tracked by another machine, since a chunk's timeline is
-     * only meaningful relative to a single Chronovault.
-     */
+    /** Right-clicking with a Chrono Remote Control links it to this Chronovault instead of opening the menu. */
     @Override
-    public boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader level, @NotNull BlockPos pos) {
-        if (level instanceof ServerLevel serverLevel) {
-            TemporalWorldData data = TemporalWorldData.get(serverLevel.getServer());
-            if (data.isTracked(serverLevel.dimension().location(), new ChunkPos(pos))) {
-                return false;
-            }
+    protected ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState state, @NotNull Level level,
+                                               @NotNull BlockPos pos, @NotNull Player player,
+                                               @NotNull InteractionHand hand,
+                                               @NotNull BlockHitResult hitResult) {
+        if (!(stack.getItem() instanceof ChronoRemoteControlItem)) {
+            return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
-        return super.canSurvive(state, level, pos);
+        if (RiftDeviceLock.blockIfInRift(level, player)) {
+            return ItemInteractionResult.FAIL;
+        }
+        if (level.isClientSide) {
+            return ItemInteractionResult.SUCCESS;
+        }
+
+        ChronoRemoteControlItem.link(stack, GlobalPos.of(level.dimension(), pos));
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_remote_control.link_set"), true);
+        level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.4F);
+        return ItemInteractionResult.SUCCESS;
     }
 
     @Override
@@ -94,6 +118,15 @@ public class Chronovault extends BaseEntityBlock {
         }
 
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    public @NotNull ItemStack getCloneItemStack(@NotNull LevelReader level, @NotNull BlockPos pos, @NotNull BlockState state) {
+        ItemStack stack = super.getCloneItemStack(level, pos, state);
+        if (level.getBlockEntity(pos) instanceof ChronovaultBlockEntity machine) {
+            stack.applyComponents(machine.collectComponents());
+        }
+        return stack;
     }
 
     @Override

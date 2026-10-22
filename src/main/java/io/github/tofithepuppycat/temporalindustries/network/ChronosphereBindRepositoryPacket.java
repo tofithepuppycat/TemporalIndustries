@@ -1,9 +1,9 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
-import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.TimelineViewMenu;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.chat.Component;
@@ -14,7 +14,7 @@ import net.minecraft.server.level.ServerPlayer;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
 /**
- * Client -> server: names the repository an unbound Chronosphere should use, creating it if no
+ * Client -> server: names the repository an unbound Chronosphere or Chronovault should use, creating it if no
  * repository by that name exists.
  */
 public class ChronosphereBindRepositoryPacket implements CustomPacketPayload {
@@ -47,11 +47,11 @@ public class ChronosphereBindRepositoryPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (!(sender.containerMenu instanceof ChronosphereMenu menu)) return;
+            if (!(sender.containerMenu instanceof TimelineViewMenu menu)) return;
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
-            if (!(sender.level().getBlockEntity(packet.machinePos) instanceof ChronosphereBlockEntity machine)) return;
+            if (!(sender.level().getBlockEntity(packet.machinePos) instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            ChronosphereBlockEntity.BindResult result = machine.bindToRepositoryNamed(packet.name);
+            AbstractTimelineMachineBlockEntity.BindResult result = machine.bindToRepositoryNamed(packet.name);
             String messageKey = switch (result) {
                 case IN_USE -> "gui.temporalindustries.chronosphere.bind_in_use";
                 case WRONG_DIMENSION -> "gui.temporalindustries.chronosphere.bind_wrong_dimension";

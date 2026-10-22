@@ -31,7 +31,7 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
     }
 
     public ChronosphereMenu(int id, Inventory playerInventory, BlockPos blockPos) {
-        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(16));
+        this(id, playerInventory, getBlockEntity(playerInventory, blockPos), ContainerLevelAccess.create(playerInventory.player.level(), blockPos), new SimpleContainerData(18));
     }
 
     public ChronosphereMenu(int id, Inventory playerInventory, ChronosphereBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
@@ -41,7 +41,7 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 16);
+        checkContainerDataCount(data, 18);
         addDataSlots(data);
     }
 
@@ -60,7 +60,8 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return stillValid(access, player, Registration.CHRONOSPHERE_BLOCK.get());
+        return stillValid(access, player, Registration.CHRONOSPHERE_BLOCK.get())
+                || stillValid(access, player, Registration.CREATIVE_CHRONOSPHERE_BLOCK.get());
     }
 
     public int getEnergyStored() {
@@ -101,6 +102,15 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
 
     public int getChaosFluidAmount() {
         return data.get(14);
+    }
+
+    public boolean isCharging() {
+        return data.get(16) != 0;
+    }
+
+    /** Charge progress in thousandths. */
+    public int getChargeProgressPermille() {
+        return data.get(17);
     }
 
     public int getEntropyTankCapacity() {

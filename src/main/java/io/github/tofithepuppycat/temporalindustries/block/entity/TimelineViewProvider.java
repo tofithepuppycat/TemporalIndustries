@@ -18,9 +18,10 @@ import java.util.Map;
 public interface TimelineViewProvider {
     /**
      * Outcome of a {@link #jump(long)}: SUCCESS covers an actual jump or a no-op;
-     * INSUFFICIENT_ENERGY lets callers show a chat message instead of silently doing nothing.
+     * CHARGING means the stored energy could not cover the cost, so the machine is collecting it and
+     * will jump on its own once it has enough.
      */
-    enum JumpResult { SUCCESS, INSUFFICIENT_ENERGY }
+    enum JumpResult { SUCCESS, CHARGING }
 
     /** Every commit in this machine's repository. */
     List<RepoCommit> getRepositoryCommits();

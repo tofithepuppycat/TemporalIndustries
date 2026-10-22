@@ -6,7 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.config.TemporalIndustriesCon
 import io.github.tofithepuppycat.temporalindustries.device.ChronoActionRecorder;
 import io.github.tofithepuppycat.temporalindustries.device.EchoKillListener;
 import io.github.tofithepuppycat.temporalindustries.device.TimeDilationListener;
-import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftBorderListener;
+import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftVoidWalkListener;
 import io.github.tofithepuppycat.temporalindustries.dimension.ChronoRiftChunkListener;
 import io.github.tofithepuppycat.temporalindustries.energy.EnergyCostReloadListener;
 import io.github.tofithepuppycat.temporalindustries.energy.ItemEnergyCosts;
@@ -69,8 +69,9 @@ public class TemporalIndustries
         NeoForge.EVENT_BUS.addListener(ChronoRiftChunkListener::onChunkUnload);
         NeoForge.EVENT_BUS.addListener(ChronoRiftChunkListener::onServerTick);
 
-        NeoForge.EVENT_BUS.addListener(ChronoRiftBorderListener::onServerTick);
-        NeoForge.EVENT_BUS.addListener(ChronoRiftBorderListener::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(ChronoRiftVoidWalkListener::onServerTick);
+        NeoForge.EVENT_BUS.addListener(ChronoRiftVoidWalkListener::onPlayerLoggedOut);
+        NeoForge.EVENT_BUS.addListener(ChronoRiftVoidWalkListener::onLivingFall);
 
         NeoForge.EVENT_BUS.addListener(TimeDilationListener::onServerTick);
     }

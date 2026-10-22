@@ -20,8 +20,8 @@ import java.util.Map;
 
 /**
  * Paints one Chrono Rift chunk with the Overworld's reconstructed history at a chosen moment —
- * whatever commit each chunk's own timeline had at, or before, that gameTime — or leaves it void
- * (left "untracked") where no such commit exists.
+ * the latest repository commit, across every repository, that recorded the chunk at or before that
+ * gameTime — or leaves it void (left "untracked") where no such commit exists.
  */
 public final class ChronoRiftFiller {
     private ChronoRiftFiller() {}
@@ -44,21 +44,24 @@ public final class ChronoRiftFiller {
         Long filledAt = data.getChronoRiftChunkFilledTime(pos);
         if (filledAt != null && filledAt == targetGameTime) return;
 
-        TemporalTimeline overworldTimeline = data.getTimeline(Level.OVERWORLD.location());
-        long floorCommitId = overworldTimeline == null ? -1L : overworldTimeline.resolveFloorCommit(pos, targetGameTime);
-        boolean tracked = overworldTimeline != null && floorCommitId != -1L;
-
-        if (tracked) {
-            // fromCommitId = -1 tells applyChunkAtTime the rift's blank chunk has no live lineage
-            // of its own, so it replays the *entire* chain from the chunk's nearest SNAPSHOT
-            // ancestor forward, fully painting the chunk from nothing rather than diffing against
-            // live state.
-            overworldTimeline.applyChunkAtTime(pos, targetGameTime, -1L, riftLevel, floorCommitId, p -> false, deferredSettle);
-        } else if (data.isChronoRiftChunkTracked(pos)) {
-            // This chunk was painted for a previous session's time but has no history at the newly
-            // selected time — clear it back to void.
-            clearChunkToVoid(riftLevel, pos, deferredSettle);
+        TemporalRepository sourceRepo = null;
+        RepoCommit source = null;
+        for (TemporalRepository repo : data.getRepositoriesIn(Level.OVERWORLD.location())) {
+            RepoCommit candidate = repo.latestCommitTouching(pos, targetGameTime);
+            if (candidate == null) continue;
+            if (source == null || candidate.getGameTime() > source.getGameTime()
+                    || (candidate.getGameTime() == source.getGameTime() && candidate.getId() > source.getId())) {
+                sourceRepo = repo;
+                source = candidate;
+            }
         }
+
+        // A chunk painted for an earlier moment is wiped first so nothing from it survives into the
+        // new one.
+        List<BlockPos> settle = deferredSettle != null ? deferredSettle : new ArrayList<>();
+        if (data.isChronoRiftChunkTracked(pos)) clearChunkToVoid(riftLevel, pos, settle);
+        boolean tracked = source != null && sourceRepo.paintChunkAt(source.getId(), pos, riftLevel, settle);
+        if (deferredSettle == null) TemporalRepository.settleBlocks(riftLevel, settle);
 
         data.markChronoRiftChunkFilled(pos, targetGameTime);
         data.markChronoRiftChunkTracked(pos, tracked);
@@ -72,7 +75,7 @@ public final class ChronoRiftFiller {
      * Resets every non-air block in pos back to air, skipping empty sections outright so a chunk
      * that was never painted (the common case) costs nothing beyond the section scan.
      */
-    private static void clearChunkToVoid(ServerLevel level, ChunkPos pos, @Nullable List<BlockPos> deferredSettle) {
+    private static void clearChunkToVoid(ServerLevel level, ChunkPos pos, List<BlockPos> settle) {
         LevelChunk chunk = level.getChunk(pos.x, pos.z);
         LevelChunkSection[] sections = chunk.getSections();
         int minSectionY = level.getMinSection();
@@ -96,10 +99,6 @@ public final class ChronoRiftFiller {
             }
         }
 
-        if (deferredSettle != null) {
-            deferredSettle.addAll(changed);
-        } else {
-            TemporalTimeline.settleBlocks(level, changed);
-        }
+        settle.addAll(changed);
     }
 }

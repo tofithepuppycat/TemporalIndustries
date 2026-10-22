@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.dimension;
 
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.timeline.ChronoRiftFiller;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.core.BlockPos;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -63,6 +63,6 @@ public final class ChronoRiftChunkListener {
             if (pos == null) break;
             ChronoRiftFiller.fillChunk(server, riftLevel, pos, activeTime, deferredSettle);
         }
-        TemporalTimeline.settleBlocks(riftLevel, deferredSettle);
+        TemporalRepository.settleBlocks(riftLevel, deferredSettle);
     }
 }
