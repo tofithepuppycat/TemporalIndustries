@@ -21,15 +21,21 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * Block entity for the Chronovault: holds per-machine energy/time state and owns a {@link
+ * Block entity for the Chronovault: holds per-machine energy/time state and binds to a {@link
  * TemporalRepository} covering its own single chunk.
  */
 public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     private static final int ENERGY_CAPACITY = 100_000;
-    private static final int ENERGY_TRANSFER  = 1_000;
+    private static final int ENERGY_TRANSFER  = 1_000_000_000;
 
     public ChronovaultBlockEntity(BlockPos blockPos, BlockState blockState) {
         super(Registration.CHRONOVAULT_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
+    }
+
+    /** A freshly placed Chronovault has no repository until a player names one. */
+    @Override
+    protected boolean mintsRepositoryOnDemand() {
+        return false;
     }
 
     private ChunkPos getChunkPos() {
@@ -68,7 +74,7 @@ public class ChronovaultBlockEntity extends AbstractTimelineMachineBlockEntity {
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, ChronovaultBlockEntity be) {
-        if (level.isClientSide) return;
+        if (level.isClientSide || !be.isRepositoryBound()) return;
         be.commonTick(level);
     }
 

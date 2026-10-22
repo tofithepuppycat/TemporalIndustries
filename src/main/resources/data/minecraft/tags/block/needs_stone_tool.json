@@ -1,0 +1,22 @@
+{
+  "values": [
+    "temporalindustries:chronovault",
+    "temporalindustries:echo_projector",
+    "temporalindustries:chronodial",
+    "temporalindustries:chronosphere",
+    "temporalindustries:creative_chronosphere",
+    "temporalindustries:temporal_lifeline",
+    "temporalindustries:schrodinger_generator",
+    "temporalindustries:seebeck_generator",
+    "temporalindustries:entropy_condenser",
+    "temporalindustries:crude_entropy_condenser",
+    "temporalindustries:decay_accelerator",
+    "temporalindustries:despawn_accelerator",
+    "temporalindustries:entropy_manipulator",
+    "temporalindustries:loot_generator",
+    "temporalindustries:machine_frame",
+    "temporalindustries:entropic_pylon",
+    "temporalindustries:chaos_pylon",
+    "temporalindustries:order_pylon"
+  ]
+}

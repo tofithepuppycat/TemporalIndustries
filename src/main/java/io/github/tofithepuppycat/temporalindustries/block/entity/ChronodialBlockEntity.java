@@ -48,7 +48,7 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
     private static final double ENTROPY_COST_SCALE = 1.0;
-    private static final int JUMP_ENTROPY_SHIFT = 2000; // large flat shift — a full marker restore, not a partial view
+    private static final long JUMP_FE_PER_ENTROPY_UNIT = 10; // jump FE cost that moves the balance one unit toward chaos
 
     public enum JumpResult { SUCCESS, ALREADY_AT_MARKER, NO_MARKER, INSUFFICIENT_ENERGY, ENTROPY_MAXED }
 
@@ -193,6 +193,17 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         return 1.0 + ENTROPY_COST_SCALE * distance;
     }
 
+    /** FE needed to restore the marked block right now. */
+    private long jumpCost() {
+        if (markerState == null) return 0L;
+        return Math.round(ItemEnergyCosts.getCost(markerState.getBlock()).orElse(0) * jumpCostMultiplier());
+    }
+
+    /** Chaos units a restore costing the given FE moves the balance by. */
+    private static int entropyShiftFor(long feCost) {
+        return (int) Math.min(ENTROPY_MAX, feCost / JUMP_FE_PER_ENTROPY_UNIT);
+    }
+
     @Override public boolean hasEntropyBalance() { return true; }
     @Override public int getEntropyBalance() { return getEntropy(); }
     @Override public int getEntropyBalanceMax() { return ENTROPY_MAX; }
@@ -218,9 +229,9 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
             lines.add(Component.translatable("block.temporalindustries.chronodial.glasses_has_data").withStyle(ChatFormatting.GRAY));
         }
 
-        long feCost = Math.round(ItemEnergyCosts.getCost(markerState.getBlock()).orElse(0) * jumpCostMultiplier());
+        long feCost = jumpCost();
         lines.add(EntropyDisplay.colorTokens(Component.translatable("block.temporalindustries.chronodial.glasses_fe_cost", feCost).getString(), ChatFormatting.YELLOW));
-        lines.add(Component.translatable("block.temporalindustries.chronodial.glasses_entropy_cost", EntropyDisplay.formatBalance(JUMP_ENTROPY_SHIFT))
+        lines.add(Component.translatable("block.temporalindustries.chronodial.glasses_entropy_cost", EntropyDisplay.formatBalance(entropyShiftFor(feCost)))
                 .withStyle(ChatFormatting.LIGHT_PURPLE));
         return lines;
     }
@@ -262,9 +273,10 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
         BlockPos targetPos = getTargetPos();
         if (level.getBlockState(targetPos).equals(markerState)) return JumpResult.ALREADY_AT_MARKER;
 
-        if (chaosTank.getFluidAmount() + JUMP_ENTROPY_SHIFT > ENTROPY_MAX) return JumpResult.ENTROPY_MAXED;
+        long cost = jumpCost();
+        int entropyShift = entropyShiftFor(cost);
+        if (chaosTank.getFluidAmount() + entropyShift > ENTROPY_MAX) return JumpResult.ENTROPY_MAXED;
 
-        long cost = Math.round(ItemEnergyCosts.getCost(markerState.getBlock()).orElse(0) * jumpCostMultiplier());
         if (cost > energyStorage.getEnergyStored()) return JumpResult.INSUFFICIENT_ENERGY;
 
         energyStorage.consumeInternal((int) Math.min(cost, Integer.MAX_VALUE));
@@ -280,8 +292,10 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
             be.setChanged();
         }
 
-        chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), JUMP_ENTROPY_SHIFT), IFluidHandler.FluidAction.EXECUTE);
-        orderTank.drain(JUMP_ENTROPY_SHIFT, IFluidHandler.FluidAction.EXECUTE);
+        if (entropyShift > 0) {
+            chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), entropyShift), IFluidHandler.FluidAction.EXECUTE);
+            orderTank.drain(entropyShift, IFluidHandler.FluidAction.EXECUTE);
+        }
         setChanged();
         syncToClients();
 

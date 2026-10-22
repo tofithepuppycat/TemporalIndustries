@@ -51,7 +51,10 @@ public class SchrodingerGeneratorItem extends BlockItem {
         if (level.isClientSide) return InteractionResult.SUCCESS;
 
         ResourceLocation typeId = BuiltInRegistries.ENTITY_TYPE.getKey(target.getType());
-        stack.set(Registration.CAPTURED_MOB.get(), new CapturedMob(typeId, Optional.ofNullable(target.getCustomName())));
+        // Creative mode hands this method a copy of the held stack, so the component goes on the real one.
+        ItemStack held = player.getItemInHand(hand);
+        ItemStack capturing = held.is(this) ? held : stack;
+        capturing.set(Registration.CAPTURED_MOB.get(), new CapturedMob(typeId, Optional.ofNullable(target.getCustomName())));
         target.discard();
 
         level.playSound(null, player.blockPosition(), SoundEvents.PORTAL_TRAVEL, SoundSource.PLAYERS, 1.0F, 1.4F);

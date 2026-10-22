@@ -35,9 +35,11 @@ import java.security.NoSuchAlgorithmException;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.OptionalInt;
 
 /**
@@ -219,14 +221,21 @@ public final class ItemEnergyCosts {
                 .sorted(Comparator.comparing(holder -> holder.id().toString()))
                 .toList();
 
+        Set<Item> craftable = new HashSet<>();
+        for (RecipeHolder<?> holder : recipes) craftable.add(holder.value().getResultItem(registries).getItem());
+
         int totalDerived = 0;
         int pass;
         do {
             pass = 0;
             int strict;
-            while ((strict = priceRecipes(recipes, registries, costs, false)) > 0) pass += strict;
+            while ((strict = priceRecipes(recipes, registries, costs, false, craftable)) > 0) pass += strict;
             // Recipes blocked only by unpriced modded ingredients are priced from the ingredients that are known.
-            pass += priceRecipes(recipes, registries, costs, true);
+            // Ingredients that are themselves craftable are waited for, so a crafted ingredient's cost is
+            // never dropped just because its own recipe sorts later; they are skipped only once nothing else can progress.
+            int lenient = priceRecipes(recipes, registries, costs, true, craftable);
+            if (lenient == 0) lenient = priceLeastBlockedRecipe(recipes, registries, costs, craftable);
+            pass += lenient;
             totalDerived += pass;
         } while (pass > 0);
         return totalDerived;
@@ -234,11 +243,12 @@ public final class ItemEnergyCosts {
 
     /**
      * Prices every still-unpriced recipe result whose ingredients allow it. In lenient mode,
-     * unpriced ingredients are ignored as long as at least one ingredient is priced.
+     * unpriced ingredients are ignored as long as at least one ingredient is priced; when
+     * deferToCraftable is non-null, a recipe with an unpriced ingredient in that set is skipped.
      * @return how many items were priced.
      */
     private static int priceRecipes(List<RecipeHolder<?>> recipes, HolderLookup.Provider registries,
-                                    Map<Item, Integer> costs, boolean lenient) {
+                                    Map<Item, Integer> costs, boolean lenient, Set<Item> deferToCraftable) {
         int priced = 0;
         for (RecipeHolder<?> holder : recipes) {
             Recipe<?> recipe = holder.value();
@@ -257,7 +267,7 @@ public final class ItemEnergyCosts {
                 if (cheapest.isPresent()) {
                     total += cheapest.getAsInt();
                     knownCount++;
-                } else if (!lenient) {
+                } else if (!lenient || (deferToCraftable != null && hasCraftableOption(ingredient, deferToCraftable))) {
                     resolvable = false;
                     break;
                 }
@@ -269,6 +279,53 @@ public final class ItemEnergyCosts {
             priced++;
         }
         return priced;
+    }
+
+    /**
+     * Breaks a pricing deadlock by pricing a single recipe, leniently: the one with the fewest
+     * unpriced craftable ingredients, so dependencies are priced before the recipes that use them.
+     * @return how many items were priced.
+     */
+    private static int priceLeastBlockedRecipe(List<RecipeHolder<?>> recipes, HolderLookup.Provider registries,
+                                               Map<Item, Integer> costs, Set<Item> craftable) {
+        Recipe<?> best = null;
+        ItemStack bestResult = null;
+        int bestBlocked = Integer.MAX_VALUE;
+        long bestTotal = 0;
+        for (RecipeHolder<?> holder : recipes) {
+            Recipe<?> recipe = holder.value();
+            ItemStack result = recipe.getResultItem(registries);
+            if (result.isEmpty() || costs.containsKey(result.getItem())) continue;
+
+            long total = 0;
+            int knownCount = 0;
+            int blocked = 0;
+            for (Ingredient ingredient : recipe.getIngredients()) {
+                if (ingredient.isEmpty()) continue;
+                OptionalInt cheapest = cheapestKnownOption(ingredient, costs);
+                if (cheapest.isPresent()) {
+                    total += cheapest.getAsInt();
+                    knownCount++;
+                } else if (hasCraftableOption(ingredient, craftable)) {
+                    blocked++;
+                }
+            }
+            if (knownCount == 0 || blocked >= bestBlocked) continue;
+            best = recipe;
+            bestResult = result;
+            bestBlocked = blocked;
+            bestTotal = total;
+        }
+        if (best == null) return 0;
+        costs.put(bestResult.getItem(), Math.max(1, (int) Math.ceil(bestTotal / (double) bestResult.getCount())));
+        return 1;
+    }
+
+    private static boolean hasCraftableOption(Ingredient ingredient, Set<Item> craftable) {
+        for (ItemStack option : ingredient.getItems()) {
+            if (craftable.contains(option.getItem())) return true;
+        }
+        return false;
     }
 
     private static OptionalInt cheapestKnownOption(Ingredient ingredient, Map<Item, Integer> costs) {
@@ -300,7 +357,7 @@ public final class ItemEnergyCosts {
                 .sorted()
                 .toList();
 
-        StringBuilder sb = new StringBuilder("algorithm-v2|");
+        StringBuilder sb = new StringBuilder("algorithm-v4|");
         recipeIds.forEach(sb::append);
         sb.append('|');
         baseEntries.forEach(sb::append);

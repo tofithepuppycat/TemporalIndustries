@@ -5,9 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
-import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
@@ -20,7 +18,6 @@ import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
 import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.world.level.block.state.properties.BooleanProperty;
-import net.minecraft.world.phys.BlockHitResult;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -65,19 +62,6 @@ public class SchrodingerGenerator extends BaseEntityBlock {
             blockEntity.capture(captured.entityTypeId(), captured.customName().orElse(null));
             level.setBlock(pos, state.setValue(OCCUPIED, true), 3);
         }
-    }
-
-    @Override
-    protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
-                                                @NotNull Player player, @NotNull BlockHitResult hitResult) {
-        if (level.isClientSide) return InteractionResult.SUCCESS;
-        if (!state.getValue(OCCUPIED)) return InteractionResult.PASS;
-
-        if (level.getBlockEntity(pos) instanceof SchrodingerGeneratorBlockEntity blockEntity) {
-            blockEntity.release();
-            level.setBlock(pos, state.setValue(OCCUPIED, false), 3);
-        }
-        return InteractionResult.CONSUME;
     }
 
     @Override

@@ -47,7 +47,7 @@ import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyItemFluidHandler;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
-import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
@@ -61,13 +61,16 @@ import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.recipe.EntropyManipulatorRecipe;
+import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
 import net.minecraft.ChatFormatting;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.core.component.DataComponentType;
 import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.ParticleType;
 import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.network.codec.ByteBufCodecs;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.MobCategory;
@@ -167,8 +170,8 @@ public class Registration {
             () -> new EchoRecordItem(new Item.Properties().stacksTo(1).rarity(ECHO_RARITY.getValue())
                     .jukeboxPlayable(ECHO_RECORD_SONG)));
 
-    public static final DeferredItem<Item> PORTABLE_CHRONO_MARKER_ITEM = ITEMS.register("portable_chrono_marker",
-            () -> new PortableChronoMarkerItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
+    public static final DeferredItem<Item> CHRONO_REMOTE_CONTROL_ITEM = ITEMS.register("chrono_remote_control",
+            () -> new ChronoRemoteControlItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
             () -> new TemporalGlueItem(new Item.Properties().durability(20)));
@@ -197,7 +200,13 @@ public class Registration {
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
             () -> new ChronoBlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
-    public static final DeferredBlock<TemporalLifeline> TEMPORAL_LIFELINE_BLOCK = BLOCKS.register("temporal_lifeline",
+    public static final DeferredBlock<Chronosphere> CREATIVE_CHRONOSPHERE_BLOCK = BLOCKS.register("creative_chronosphere",
+            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).lightLevel(state -> 5)));
+
+    public static final DeferredItem<Item> CREATIVE_CHRONOSPHERE_ITEM = ITEMS.register("creative_chronosphere",
+            () -> new ChronoBlockItem(CREATIVE_CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+
+    public static final DeferredBlock<TemporalLifeline> TEMPORAL_LIFELINE_BLOCK =BLOCKS.register("temporal_lifeline",
             () -> new TemporalLifeline(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 1200.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 7)));
 
     public static final DeferredItem<Item> TEMPORAL_LIFELINE_ITEM = ITEMS.register("temporal_lifeline",
@@ -233,6 +242,14 @@ public class Registration {
     public static final DeferredItem<Item> CHAOS_CELL_ITEM = ITEMS.register("chaos_cell",
             () -> new EntropyCellItem(EntropyType.CHAOS, new Item.Properties().stacksTo(1)));
 
+    /** The moment a Chronoscope visits on right-click: a game time, or -1 for the End of Time. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> CHRONOSCOPE_TIME = DATA_COMPONENTS.registerComponentType(
+            "chronoscope_time", builder -> builder.persistent(Codec.LONG).networkSynchronized(ByteBufCodecs.VAR_LONG));
+
+    /** The Chronosphere a Chrono Remote Control operates. */
+    public static final DeferredHolder<DataComponentType<?>, DataComponentType<GlobalPos>> LINKED_CHRONOSPHERE = DATA_COMPONENTS.registerComponentType(
+            "linked_chronosphere", builder -> builder.persistent(GlobalPos.CODEC).networkSynchronized(GlobalPos.STREAM_CODEC));
+
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<CapturedMob>> CAPTURED_MOB = DATA_COMPONENTS.registerComponentType(
             "captured_mob", builder -> builder.persistent(CapturedMob.CODEC).networkSynchronized(CapturedMob.STREAM_CODEC));
 
@@ -241,7 +258,7 @@ public class Registration {
                     .sized(0.5F, 0.5F).clientTrackingRange(6).updateInterval(20).fireImmune().build("entropy_orb"));
 
     public static final DeferredBlock<SchrodingerGenerator> SCHRODINGER_GENERATOR_BLOCK = BLOCKS.register("schrodinger_generator",
-            () -> new SchrodingerGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD)));
+            () -> new SchrodingerGenerator(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).strength(2.0F, 4.0F).sound(SoundType.WOOD).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> SCHRODINGER_GENERATOR_ITEM = ITEMS.register("schrodinger_generator",
             () -> new SchrodingerGeneratorItem(SCHRODINGER_GENERATOR_BLOCK.get(), new Item.Properties().stacksTo(1)));
@@ -317,7 +334,7 @@ public class Registration {
     // --- Decay Accelerator: early/mid game CHAOS generator, feed it compostable items ---
 
     public static final DeferredBlock<DecayAccelerator> DECAY_ACCELERATOR_BLOCK = BLOCKS.register("decay_accelerator",
-            () -> new DecayAccelerator(BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(2.5F, 3.5F).sound(SoundType.WOOD)));
+            () -> new DecayAccelerator(BlockBehaviour.Properties.of().mapColor(MapColor.DIRT).strength(2.5F, 3.5F).sound(SoundType.WOOD).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> DECAY_ACCELERATOR_ITEM = ITEMS.register("decay_accelerator",
             () -> new DescribedBlockItem(DECAY_ACCELERATOR_BLOCK.get(), new Item.Properties()));
@@ -391,7 +408,7 @@ public class Registration {
             () -> BlockEntityType.Builder.of(TemporalLifelineBlockEntity::new, TEMPORAL_LIFELINE_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOSPHERE_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronosphere",
-            () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOSPHERE_BLOCK.get()).build(null));
+            () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOSPHERE_BLOCK.get(), CREATIVE_CHRONOSPHERE_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<SchrodingerGeneratorBlockEntity>> SCHRODINGER_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("schrodinger_generator",
             () -> BlockEntityType.Builder.of(SchrodingerGeneratorBlockEntity::new, SCHRODINGER_GENERATOR_BLOCK.get()).build(null));
@@ -472,6 +489,7 @@ public class Registration {
                         output.accept(CHRONODIAL_ITEM);
                         output.accept(CHRONOVAULT_ITEM);
                         output.accept(CHRONOSPHERE_ITEM);
+                        output.accept(CREATIVE_CHRONOSPHERE_ITEM);
                         output.accept(TEMPORAL_LIFELINE_ITEM);
                         output.accept(ECHO_PROJECTOR_ITEM);
                         output.accept(SCHRODINGER_GENERATOR_ITEM);
@@ -488,7 +506,7 @@ public class Registration {
                         output.accept(ORDER_PYLON_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
-                        output.accept(PORTABLE_CHRONO_MARKER_ITEM);
+                        output.accept(CHRONO_REMOTE_CONTROL_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
                         output.accept(TIME_DILATOR_ITEM);
                         output.accept(CHRONOSCOPE_ITEM);
