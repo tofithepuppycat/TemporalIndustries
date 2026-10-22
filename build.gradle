@@ -194,6 +194,10 @@ dependencies {
     // runClient. Not compiled against and not published as a dependency.
     localRuntime "maven.modrinth:jade:${jade_version}"
 
+    // Effortless Building, for the dev/test environment only: build-tool mod for testing placement
+    // and large edits against the timeline. Not compiled against and not published as a dependency.
+    localRuntime "maven.modrinth:effortless-building:${effortless_building_version}"
+
     // Example mod dependency using a mod jar from ./libs with a flat dir repository
     // This maps to ./libs/coolmod-${mc_version}-${coolmod_version}.jar
     // The group id is ignored when searching -- in this case, it is "blank"
