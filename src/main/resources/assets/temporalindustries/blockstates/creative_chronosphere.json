@@ -1,0 +1,8 @@
+{
+  "variants": {
+    "facing=north": { "model": "temporalindustries:block/chronosphere" },
+    "facing=east": { "model": "temporalindustries:block/chronosphere", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/chronosphere", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/chronosphere", "y": 270 }
+  }
+}

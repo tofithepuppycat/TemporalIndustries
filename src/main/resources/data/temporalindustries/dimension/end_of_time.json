@@ -1,0 +1,10 @@
+{
+  "type": "temporalindustries:end_of_time",
+  "generator": {
+    "type": "minecraft:flat",
+    "settings": {
+      "layers": [],
+      "biome": "minecraft:the_void"
+    }
+  }
+}
