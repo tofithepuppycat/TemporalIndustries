@@ -22,6 +22,8 @@ import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGrap
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereBindRepositoryPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetChargeContainersPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetSaveEntitiesPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereUnbindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RepositorySuggestRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteCommitPacket;
@@ -106,6 +108,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     /** Native width of menu_button_small.png (the wide Jump button). */
     private static final int JUMP_BUTTON_WIDTH = 64;
     private static final int JUMP_TEXT_PADDING = 5;
+    private static final int CHARGE_BAR_HEIGHT = 4;
+    private static final int CHARGE_BAR_GAP = 1;
+    private static final int CHARGE_BAR_OVERHANG = 2;
     private static final ResourceLocation MENU_BUTTON_SMALL_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/menu_button_small.png");
 
@@ -132,11 +137,21 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 40;
     private static final int GHOST_TOGGLE_HINT_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + IconButtonRenderer.SIZE + 4;
     private static final int SECTION_DIVIDER_Y_OFFSET = 100;
-    private static final int CHANGE_REPOSITORY_BUTTON_Y_OFFSET = 108;
-    private static final int DANGER_DIVIDER_Y_OFFSET = 134;
-    private static final int DELETE_HISTORY_HINT_Y_OFFSET = 140;
-    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = 186;
+    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = 106;
+    private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = 132;
+    private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + IconButtonRenderer.SIZE + 4;
+    private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 30;
+    private static final int SAVE_ENTITIES_DIVIDER_Y_OFFSET = CHARGE_CONTAINERS_HINT_Y_OFFSET + CHARGE_CONTAINERS_HINT_HEIGHT + 2;
+    private static final int CHANGE_REPOSITORY_BUTTON_Y_OFFSET = SAVE_ENTITIES_DIVIDER_Y_OFFSET + 4;
+    private static final int DANGER_DIVIDER_Y_OFFSET = CHANGE_REPOSITORY_BUTTON_Y_OFFSET + 26;
+    private static final int DELETE_HISTORY_HINT_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 4;
+    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 42;
+    private static final int SETTINGS_CONTENT_HEIGHT = DELETE_HISTORY_BUTTON_Y_OFFSET + DELETE_BUTTON_HEIGHT + 6;
+    /** The rows scroll beneath the fixed title, within this band of the panel. */
+    private static final int SETTINGS_VIEWPORT_TOP = SETTINGS_TITLE_DIVIDER_Y_OFFSET + 2;
+    private static final int SETTINGS_VIEWPORT_HEIGHT = CONTENT_SIZE - 6 - SETTINGS_VIEWPORT_TOP;
     private static final int COLOR_DIVIDER = 0x30000000;
+    private static final int COLOR_WARNING = 0xFFB06A00;
 
     /**
      * 15px cells rather than the grid's 32px default, to fit the title and footer lines inside
@@ -183,6 +198,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int ticksSinceMapSync = 0;
     private boolean mapOverlayOpen = false;
     private boolean settingsOverlayOpen = false;
+    private final SettingsScroll settingsScroll = new SettingsScroll();
     /**
      * Whether the settings overlay is showing the "are you sure" step; reset when the overlay
      * closes.
@@ -536,11 +552,29 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
      * Button widgets.
      */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
-        int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
+        if (!isMouseOverRect(mouseX, mouseY, panelX(), panelY() + SETTINGS_VIEWPORT_TOP,
+                CONTENT_SIZE, SETTINGS_VIEWPORT_HEIGHT)) {
+            return;
+        }
+        int buttonY = settingsRowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
 
         if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), ghostToggleButtonY(),
                 IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
             TimelineProjectionManager.toggleGhostBlockMode();
+            return;
+        }
+
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), saveEntitiesButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
+            PacketDistributor.sendToServer(new ChronosphereSetSaveEntitiesPacket(menu.getBlockPos(),
+                    !menu.getBlockEntity().isSaveEntities()));
+            return;
+        }
+
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), chargeContainersButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
+            PacketDistributor.sendToServer(new ChronosphereSetChargeContainersPacket(menu.getBlockPos(),
+                    !menu.getBlockEntity().isChargeContainers()));
             return;
         }
 
@@ -573,7 +607,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private int changeRepositoryButtonY() {
-        return panelY() + CHANGE_REPOSITORY_BUTTON_Y_OFFSET;
+        return settingsRowY(CHANGE_REPOSITORY_BUTTON_Y_OFFSET);
+    }
+
+    /** A settings row's screen y: its offset within the scrolled content, less the current scroll. */
+    private int settingsRowY(int contentOffset) {
+        return panelY() + contentOffset - settingsScroll.offset();
     }
 
     /** Detaches from the current repository and shows the name-entry panel again. */
@@ -589,8 +628,14 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!TimelineProjectionManager.hasSelection()) {
             return;
         }
-        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(),
-                TimelineProjectionManager.getSelectedCommitId()));
+        long commitId = TimelineProjectionManager.getSelectedCommitId();
+        boolean willCharge = TimelineProjectionManager.getJumpCost(commitId)
+                .map(cost -> cost.total() > menu.getEnergyStored())
+                .orElse(false);
+        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), commitId));
+        if (willCharge) {
+            return;
+        }
         TimelineProjectionManager.clearSelectedCommit();
         TimelineProjectionManager.disableShowChanges();
         if (minecraft != null && minecraft.player != null) {
@@ -651,6 +696,17 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         IconButtonRenderer.renderBackground(guiGraphics, showChangesX, showChangesY, showChangesTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_EYE_TEXTURE, showChangesX, showChangesY);
 
+        if (menu.isCharging()) {
+            int barY = jumpY - CHARGE_BAR_HEIGHT - CHARGE_BAR_GAP;
+            int barLeft = jumpX - CHARGE_BAR_OVERHANG;
+            int barWidth = JUMP_BUTTON_WIDTH + 2 * CHARGE_BAR_OVERHANG;
+            guiGraphics.fill(barLeft, barY, barLeft + barWidth, barY + CHARGE_BAR_HEIGHT, 0xFF000000);
+            int filled = Math.round(menu.getChargeProgressPermille() / 1000.0F * (barWidth - 2));
+            if (filled > 0) {
+                guiGraphics.fill(barLeft + 1, barY + 1, barLeft + 1 + filled, barY + CHARGE_BAR_HEIGHT - 1, 0xFF3BFB98);
+            }
+        }
+
         boolean jumpActive = TimelineProjectionManager.hasSelection();
         int jumpTint = !jumpActive ? 0x80000000 : (isMouseOverJumpButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
         guiGraphics.blit(MENU_BUTTON_SMALL_TEXTURE, jumpX, jumpY, JUMP_BUTTON_WIDTH, ACTION_BUTTON_SIZE,
@@ -658,7 +714,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (jumpTint != 0) {
             guiGraphics.fill(jumpX, jumpY, jumpX + JUMP_BUTTON_WIDTH, jumpY + ACTION_BUTTON_SIZE, jumpTint);
         }
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.jump"),
+        guiGraphics.drawString(font, Component.translatable(menu.isCharging()
+                        ? "gui.temporalindustries.timeline_view.charging_button"
+                        : "gui.temporalindustries.chronovault.jump"),
                 jumpX + JUMP_TEXT_PADDING, jumpY + (ACTION_BUTTON_SIZE - font.lineHeight) / 2 + 1, TEXT_PRIMARY, false);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX + JUMP_BUTTON_WIDTH - ACTION_BUTTON_SIZE, jumpY);
 
@@ -784,6 +842,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 panelX() + CONTENT_SIZE / 2, panelY() + SETTINGS_TITLE_Y_OFFSET, TEXT_PRIMARY);
         drawDivider(guiGraphics, panelY() + SETTINGS_TITLE_DIVIDER_Y_OFFSET);
 
+        settingsScroll.update(SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
+        guiGraphics.enableScissor(panelX(), panelY() + SETTINGS_VIEWPORT_TOP,
+                panelX() + CONTENT_SIZE, panelY() + SETTINGS_VIEWPORT_TOP + SETTINGS_VIEWPORT_HEIGHT);
+        renderSettingsRows(guiGraphics, mouseX, mouseY, textX, textWidth);
+        guiGraphics.disableScissor();
+        settingsScroll.renderBar(guiGraphics, panelX() + CONTENT_SIZE - SETTINGS_INSET / 2,
+                panelY() + SETTINGS_VIEWPORT_TOP, SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
+    }
+
+    private void renderSettingsRows(GuiGraphics guiGraphics, int mouseX, int mouseY, int textX, int textWidth) {
         boolean ghostEnabled = TimelineProjectionManager.isGhostBlockModeEnabled();
         // Label on the left, two-layer icon toggle (background + true/false icon) on the right.
         int ghostRowX = textX;
@@ -798,9 +866,33 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 ghostButtonX, ghostButtonY);
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_hint",
                         TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT),
-                textX, panelY() + GHOST_TOGGLE_HINT_Y_OFFSET, textWidth, TEXT_MUTED);
+                textX, settingsRowY(GHOST_TOGGLE_HINT_Y_OFFSET), textWidth, TEXT_MUTED);
 
-        drawDivider(guiGraphics, panelY() + SECTION_DIVIDER_Y_OFFSET);
+        drawDivider(guiGraphics, settingsRowY(SECTION_DIVIDER_Y_OFFSET));
+
+        int entitiesButtonY = saveEntitiesButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronosphere.save_entities_label"),
+                textX, entitiesButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int entitiesTint = isMouseOverRect(mouseX, mouseY, ghostButtonX, entitiesButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, ghostButtonX, entitiesButtonY, entitiesTint);
+        IconButtonRenderer.renderIcon(guiGraphics,
+                menu.getBlockEntity().isSaveEntities() ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                ghostButtonX, entitiesButtonY);
+
+        int containersButtonY = chargeContainersButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_label"),
+                textX, containersButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int containersTint = isMouseOverRect(mouseX, mouseY, ghostButtonX, containersButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, ghostButtonX, containersButtonY, containersTint);
+        IconButtonRenderer.renderIcon(guiGraphics,
+                menu.getBlockEntity().isChargeContainers() ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                ghostButtonX, containersButtonY);
+        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_hint"),
+                textX, settingsRowY(CHARGE_CONTAINERS_HINT_Y_OFFSET), textWidth, COLOR_WARNING);
+
+        drawDivider(guiGraphics, settingsRowY(SAVE_ENTITIES_DIVIDER_Y_OFFSET));
 
         drawOverlayButton(guiGraphics, changeRepositoryButtonX(), changeRepositoryButtonY(),
                 DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
@@ -808,13 +900,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 0xFF3A5A8A, isMouseOverRect(mouseX, mouseY, changeRepositoryButtonX(), changeRepositoryButtonY(),
                         DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
 
-        drawDivider(guiGraphics, panelY() + DANGER_DIVIDER_Y_OFFSET);
+        drawDivider(guiGraphics, settingsRowY(DANGER_DIVIDER_Y_OFFSET));
 
-        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
-                textX, panelY() + DELETE_HISTORY_HINT_Y_OFFSET, textWidth, TEXT_MUTED);
+        if (!deleteHistoryConfirmPending) {
+            drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
+                    textX, settingsRowY(DELETE_HISTORY_HINT_Y_OFFSET), textWidth, TEXT_MUTED);
+        }
 
         int buttonX = panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
-        int buttonY = panelY() + DELETE_HISTORY_BUTTON_Y_OFFSET;
+        int buttonY = settingsRowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
 
         if (deleteHistoryConfirmPending) {
             drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
@@ -845,7 +939,15 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     }
 
     private int ghostToggleButtonY() {
-        return panelY() + GHOST_TOGGLE_ROW_Y_OFFSET;
+        return settingsRowY(GHOST_TOGGLE_ROW_Y_OFFSET);
+    }
+
+    private int saveEntitiesButtonY() {
+        return settingsRowY(SAVE_ENTITIES_ROW_Y_OFFSET);
+    }
+
+    private int chargeContainersButtonY() {
+        return settingsRowY(CHARGE_CONTAINERS_ROW_Y_OFFSET);
     }
 
     private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
@@ -1078,7 +1180,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.translatable(menu.isCharging()
+                    ? "gui.temporalindustries.timeline_view.charging_button"
+                    : "gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
         } else if (isMouseOverCommitButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.commit_tooltip"), mouseX, mouseY);
         } else if (isMouseOverDeleteCommitButton(mouseX, mouseY)) {
@@ -1126,6 +1230,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             }
             mapOverlayOpen = !mapOverlayOpen;
             settingsOverlayOpen = false;
+            settingsScroll.reset();
             deleteHistoryConfirmPending = false;
             mapDragActive = false;
             mapDragTouchedChunks.clear();
@@ -1144,6 +1249,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 flushPendingChunkToggles();
             }
             settingsOverlayOpen = !settingsOverlayOpen;
+            settingsScroll.reset();
             mapOverlayOpen = false;
             deleteHistoryConfirmPending = false;
             return true;
@@ -1298,6 +1404,10 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         }
         if (mapOverlayOpen) {
             adjustMapZoom(scrollY, mouseX, mouseY);
+            return true;
+        }
+        if (settingsOverlayOpen) {
+            settingsScroll.scroll(scrollY, SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
             return true;
         }
         if (graphWidget.mouseScrolled(mouseX, mouseY, scrollY, panelX() + GRAPH_X_OFFSET, graphTop(), GRAPH_WIDTH, graphHeight())) {

@@ -11,5 +11,5 @@
     "C": { "item": "minecraft:clock" },
     "A": { "item": "minecraft:amethyst_shard" }
   },
-  "result": { "id": "temporalindustries:portable_chrono_marker", "count": 1 }
+  "result": { "id": "temporalindustries:chrono_remote_control", "count": 1 }
 }

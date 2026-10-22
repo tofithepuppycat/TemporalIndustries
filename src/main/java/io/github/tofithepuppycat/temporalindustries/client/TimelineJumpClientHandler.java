@@ -35,24 +35,6 @@ public final class TimelineJumpClientHandler {
 
         Vector3f color = intoFuture ? FUTURE_COLOR : PAST_COLOR;
         DustParticleOptions dust = new DustParticleOptions(color, 1.2F);
-        float spin = intoFuture ? 1.0F : -1.0F;
-
-        // Rising double helix: the "temporal corridor" opening up around the machine.
-        int helixSteps = 48;
-        for (int i = 0; i < helixSteps; i++) {
-            double t = i / (double) helixSteps;
-            double angle = spin * t * Math.PI * 6.0;
-            double radius = 0.9 - t * 0.6;
-            double height = t * 2.2;
-
-            double x1 = cx + Math.cos(angle) * radius;
-            double z1 = cz + Math.sin(angle) * radius;
-            level.addParticle(dust, x1, cy + height, z1, 0.0, 0.015, 0.0);
-
-            double x2 = cx + Math.cos(angle + Math.PI) * radius;
-            double z2 = cz + Math.sin(angle + Math.PI) * radius;
-            level.addParticle(ParticleTypes.END_ROD, x2, cy + height, z2, 0.0, 0.01, 0.0);
-        }
 
         // Expanding shockwave ring at the base.
         int ringSteps = 28;

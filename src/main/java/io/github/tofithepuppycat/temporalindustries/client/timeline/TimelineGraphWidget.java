@@ -219,7 +219,7 @@ public final class TimelineGraphWidget {
         if (selected != null) {
             float radius = selectedRadius(selected.shapeRadius);
             drawNode(nodes, selected, radius, 0xFFFFFFFF, selected.commit.id() == headCommitId, pulse);
-            nodes.ring(selected.x, selected.y, radius + 2.5F, radius + 3.5F, 0xCCFFFFFF);
+            nodes.squareFrame(selected.x, selected.y, radius + 2.5F, radius + 3.5F, 0xCCFFFFFF);
         }
         nodes.draw();
         endRawDraw();
@@ -271,7 +271,7 @@ public final class TimelineGraphWidget {
     }
 
     /**
-     * Soft glow, dark outline, then the lane-colored body with a lighter core, so nodes read
+     * Dark outline, then the lane-colored body with a lighter core, so nodes read
      * against any lane color.
      */
     private static void drawNode(Mesh mesh, RenderedCommit rc, float radius, int color, boolean head, double pulse) {
@@ -279,11 +279,9 @@ public final class TimelineGraphWidget {
         float y = rc.y;
 
         if (head) {
-            float haloRadius = radius + 4.0F + (float) pulse * 2.0F;
-            mesh.circle(x, y, haloRadius + 3.0F, withAlpha(HEAD_HALO_RGB, 0x50), withAlpha(HEAD_HALO_RGB, 0x00));
-            mesh.ring(x, y, haloRadius - 0.5F, haloRadius + 0.5F, withAlpha(HEAD_HALO_RGB, 0x90 + (int) (pulse * 0x6F)));
+            float haloRadius = radius + 2.0F + (float) pulse * 1.0F;
+            mesh.squareFrame(x, y, haloRadius - 0.5F, haloRadius + 0.5F, withAlpha(HEAD_HALO_RGB, 0x90 + (int) (pulse * 0x6F)));
         }
-        mesh.circle(x, y, radius + 4.0F, withAlpha(color, 0x38), withAlpha(color, 0x00));
 
         int core = lighten(color, 0.55F);
         if (rc.commit.authored()) {
@@ -344,35 +342,16 @@ public final class TimelineGraphWidget {
             if (data != null) BufferUploader.drawWithShader(data);
         }
 
-        private static int segmentsFor(float radius) {
-            return Math.max(12, Math.min(40, (int) (radius * 3.0F) + 8));
-        }
-
-        /** Radial-gradient disc: centerColor fading to edgeColor. */
-        void circle(float cx, float cy, float radius, int centerColor, int edgeColor) {
-            int n = segmentsFor(radius);
-            for (int i = 0; i < n; i++) {
-                double a1 = 2.0D * Math.PI * i / n;
-                double a2 = 2.0D * Math.PI * (i + 1) / n;
-                tri(cx, cy, centerColor,
-                        cx + (float) Math.cos(a1) * radius, cy + (float) Math.sin(a1) * radius, edgeColor,
-                        cx + (float) Math.cos(a2) * radius, cy + (float) Math.sin(a2) * radius, edgeColor);
-            }
-        }
-
-        void ring(float cx, float cy, float innerRadius, float outerRadius, int color) {
-            int n = segmentsFor(outerRadius);
-            for (int i = 0; i < n; i++) {
-                double a1 = 2.0D * Math.PI * i / n;
-                double a2 = 2.0D * Math.PI * (i + 1) / n;
-                float c1 = (float) Math.cos(a1), s1 = (float) Math.sin(a1);
-                float c2 = (float) Math.cos(a2), s2 = (float) Math.sin(a2);
-                tri(cx + c1 * innerRadius, cy + s1 * innerRadius, color,
-                        cx + c1 * outerRadius, cy + s1 * outerRadius, color,
-                        cx + c2 * outerRadius, cy + s2 * outerRadius, color);
-                tri(cx + c1 * innerRadius, cy + s1 * innerRadius, color,
-                        cx + c2 * outerRadius, cy + s2 * outerRadius, color,
-                        cx + c2 * innerRadius, cy + s2 * innerRadius, color);
+        /** Square outline between the inner and outer half-extents. */
+        void squareFrame(float cx, float cy, float innerHalf, float outerHalf, int color) {
+            float[] ox = {-outerHalf, outerHalf, outerHalf, -outerHalf};
+            float[] oy = {-outerHalf, -outerHalf, outerHalf, outerHalf};
+            float[] ix = {-innerHalf, innerHalf, innerHalf, -innerHalf};
+            float[] iy = {-innerHalf, -innerHalf, innerHalf, innerHalf};
+            for (int i = 0; i < 4; i++) {
+                int j = (i + 1) % 4;
+                tri(cx + ix[i], cy + iy[i], color, cx + ox[i], cy + oy[i], color, cx + ox[j], cy + oy[j], color);
+                tri(cx + ix[i], cy + iy[i], color, cx + ox[j], cy + oy[j], color, cx + ix[j], cy + iy[j], color);
             }
         }
 
@@ -401,26 +380,22 @@ public final class TimelineGraphWidget {
         }
 
         /**
-         * An S-curve between two nodes (smoothstep in y along x) over a faint wider glow stroke.
+         * An S-curve between two nodes (smoothstep in y along x).
          */
         void curve(float x1, float y1, float x2, float y2, float halfWidth, int c1, int c2) {
             int n = y1 == y2 ? 1 : Math.max(4, Math.min(28, (int) (Math.max(Math.abs(x2 - x1), Math.abs(y2 - y1)) / 4.0F)));
-            for (int pass = 0; pass < 2; pass++) {
-                float w = pass == 0 ? halfWidth * 2.6F : halfWidth;
-                int alpha = pass == 0 ? 0x28 : 0xE6;
-                float px = x1;
-                float py = y1;
-                for (int i = 1; i <= n; i++) {
-                    float t = (float) i / n;
-                    float eased = t * t * (3.0F - 2.0F * t);
-                    float cx = x1 + (x2 - x1) * t;
-                    float cy = y1 + (y2 - y1) * eased;
-                    segment(px, py, cx, cy, w,
-                            withAlpha(mix(c1, c2, (float) (i - 1) / n), alpha),
-                            withAlpha(mix(c1, c2, t), alpha));
-                    px = cx;
-                    py = cy;
-                }
+            float px = x1;
+            float py = y1;
+            for (int i = 1; i <= n; i++) {
+                float t = (float) i / n;
+                float eased = t * t * (3.0F - 2.0F * t);
+                float cx = x1 + (x2 - x1) * t;
+                float cy = y1 + (y2 - y1) * eased;
+                segment(px, py, cx, cy, halfWidth,
+                        withAlpha(mix(c1, c2, (float) (i - 1) / n), 0xE6),
+                        withAlpha(mix(c1, c2, t), 0xE6));
+                px = cx;
+                py = cy;
             }
         }
     }
@@ -667,6 +642,16 @@ public final class TimelineGraphWidget {
                         cost.minutes(), ShortEnergyDisplay.format(cost.time()))));
                 tooltip.add(formula("Blocks", COST_BLOCKS_COLOR, String.format("sum(%d jump costs) = %s",
                         cost.changedBlocks(), ShortEnergyDisplay.format(cost.blocks()))));
+                if (cost.savesEntities()) {
+                    tooltip.add(formula("Entities", COST_ENTITIES_COLOR, String.format("%s x %s health (%d entities) = %s",
+                            ShortEnergyDisplay.formatPlain(Math.round(AbstractTimelineMachineBlockEntity.JUMP_ENTITY_FE_PER_HEALTH)),
+                            ShortEnergyDisplay.formatPlain(Math.round(cost.entityHealth())),
+                            cost.changedEntities(), ShortEnergyDisplay.format(cost.entities()))));
+                }
+                if (cost.chargesContainers()) {
+                    tooltip.add(formula("Containers", COST_CONTAINERS_COLOR, String.format("%.2f new item slots = %s",
+                            cost.containerSlots(), ShortEnergyDisplay.format(cost.containers()))));
+                }
                 tooltip.add(formula("Entropy", COST_ENTROPY_COLOR,
                         String.format("%.2f x (e^(%.0f x %.2f) - 1) = %s",
                         AbstractTimelineMachineBlockEntity.JUMP_ENTROPIC_FE_SCALE,
@@ -684,6 +669,8 @@ public final class TimelineGraphWidget {
 
     private static final ChatFormatting COST_TIME_COLOR = ChatFormatting.AQUA;
     private static final ChatFormatting COST_BLOCKS_COLOR = ChatFormatting.GREEN;
+    private static final ChatFormatting COST_ENTITIES_COLOR = ChatFormatting.GOLD;
+    private static final ChatFormatting COST_CONTAINERS_COLOR = ChatFormatting.YELLOW;
     private static final ChatFormatting COST_ENTROPY_COLOR = ChatFormatting.LIGHT_PURPLE;
 
     private static Component labeled(String label, String value, ChatFormatting valueColor) {

@@ -4,7 +4,6 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.chronomap.ChunkArea;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
-import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -21,6 +20,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
@@ -47,57 +47,29 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     public static final int MAX_ADDITIONAL_CHUNKS = (MAX_RADIUS * 2 + 1) * (MAX_RADIUS * 2 + 1) - 1;
 
     private static final int ENERGY_CAPACITY = 500_000;
-    private static final int ENERGY_TRANSFER  = 5_000;
+    private static final int ENERGY_TRANSFER  = 1_000_000_000;
+    private static final int CREATIVE_ENERGY_CAPACITY = Integer.MAX_VALUE;
 
     public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
-
-    public enum BindResult { CREATED, ADOPTED, IN_USE, WRONG_DIMENSION, INVALID_NAME, ALREADY_BOUND, UNAVAILABLE }
 
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
 
     public ChronosphereBlockEntity(BlockPos blockPos, BlockState blockState) {
-        super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState, ENERGY_CAPACITY, ENERGY_TRANSFER);
+        super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState,
+                blockState.is(Registration.CREATIVE_CHRONOSPHERE_BLOCK.get()) ? CREATIVE_ENERGY_CAPACITY : ENERGY_CAPACITY,
+                ENERGY_TRANSFER);
+    }
+
+    @Override
+    protected boolean isCreative() {
+        return getBlockState().is(Registration.CREATIVE_CHRONOSPHERE_BLOCK.get());
     }
 
     /** A freshly placed Chronosphere has no repository until a player names one. */
     @Override
     protected boolean mintsRepositoryOnDemand() {
         return false;
-    }
-
-    /**
-     * Binds this Chronosphere to the repository called rawName, creating an empty one if no such
-     * repository exists yet.
-     */
-    public BindResult bindToRepositoryNamed(String rawName) {
-        if (!(level instanceof ServerLevel) || level.getServer() == null) return BindResult.UNAVAILABLE;
-        if (isRepositoryBound()) return BindResult.ALREADY_BOUND;
-
-        String name = TemporalWorldData.normalizeRepositoryName(rawName);
-        if (name == null) return BindResult.INVALID_NAME;
-
-        TemporalWorldData data = TemporalWorldData.get(level.getServer());
-        UUID existingId = data.findRepositoryByName(name);
-        if (existingId == null) {
-            UUID created = data.createRepository(name, level.dimension().location());
-            placedGameTime = level.getGameTime();
-            selectedGameTime = placedGameTime;
-            bindRepository(created, name);
-            return BindResult.CREATED;
-        }
-
-        TemporalRepository existing = data.getRepository(existingId);
-        if (existing == null) return BindResult.UNAVAILABLE;
-        if (data.hasRepositoryOwner(existingId)) return BindResult.IN_USE;
-        if (!existing.getDimension().equals(level.dimension().location())) return BindResult.WRONG_DIMENSION;
-
-        // The adopted history predates this block, so its selectable window starts at its root.
-        RepoCommit root = existing.getCommit(existing.getRootCommitId());
-        placedGameTime = root != null ? root.getGameTime() : level.getGameTime();
-        selectedGameTime = level.getGameTime();
-        bindRepository(existingId, existing.getName());
-        return BindResult.ADOPTED;
     }
 
     /** Re-asserts this machine's claim on its home + additional chunks. */

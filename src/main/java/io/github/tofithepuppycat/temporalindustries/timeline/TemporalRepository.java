@@ -8,6 +8,8 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
@@ -121,7 +123,7 @@ public final class TemporalRepository {
             ChunkSnapshot snapshot = ChunkSnapshot.capture(level, new ChunkPos(chunkKey));
 
             ResolvedChunkState head = firstCommit || !state.hasBaseline || deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN
-                    ? ResolvedChunkState.EMPTY : resolveChunkStateAt(headCommitId, chunkKey);
+                    ? ResolvedChunkState.EMPTY : resolveChunkStateAt(headCommitId, chunkKey, false);
             if (head.states().isEmpty()) {
                 entries.put(chunkKey, ChunkEntry.full(snapshot));
                 state.hasBaseline = true;
@@ -281,7 +283,7 @@ public final class TemporalRepository {
      * that point up to commitId (latest write wins, same as a full/delta commit's natural git-like
      * history).
      */
-    private ResolvedChunkState resolveChunkStateAt(long commitId, long chunkKey) {
+    private ResolvedChunkState resolveChunkStateAt(long commitId, long chunkKey, boolean includeEntities) {
         List<RepoCommit> chain = ancestryChain(commitId);
         int fullIndex = -1;
         for (int i = chain.size() - 1; i >= 0; i--) {
@@ -316,10 +318,12 @@ public final class TemporalRepository {
                     states.put(change.getPos(), change.getNewState());
                     beTags.put(change.getPos(), change.getNewBlockEntityTag());
                 }
-                for (EntityDelta change : e.getEntityChanges()) {
-                    switch (change.getType()) {
-                        case SPAWNED, MODIFIED -> entityTags.put(change.getEntityId(), change.getStateAfter());
-                        case REMOVED -> entityTags.put(change.getEntityId(), null);
+                if (includeEntities) {
+                    for (EntityDelta change : e.getEntityChanges()) {
+                        switch (change.getType()) {
+                            case SPAWNED, MODIFIED -> entityTags.put(change.getEntityId(), change.peekStateAfter());
+                            case REMOVED -> entityTags.put(change.getEntityId(), null);
+                        }
                     }
                 }
             }
@@ -332,8 +336,7 @@ public final class TemporalRepository {
      * only positions some commit on the path between the two touched, mapped to their value at
      * toCommitId.
      */
-    private ResolvedChunkState resolveJumpDiff(long fromCommitId, long toCommitId, long chunkKey) {
-        long lca = findLowestCommonAncestor(fromCommitId, toCommitId);
+    private ResolvedChunkState resolveJumpDiff(long fromCommitId, long toCommitId, long lca, long chunkKey, boolean includeEntities) {
         Map<BlockPos, BlockState> states = new HashMap<>();
         Map<BlockPos, CompoundTag> beTags = new HashMap<>();
         Map<UUID, CompoundTag> entityTags = new HashMap<>();
@@ -342,17 +345,19 @@ public final class TemporalRepository {
         long cur = fromCommitId;
         while (cur != lca && cur != RepoCommit.NO_PARENT) {
             RepoCommit c = commits.get(cur);
-            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey);
+            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey, includeEntities);
             ChunkEntry e = c.getChunkEntries().get(chunkKey);
             if (e != null) {
-                if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey);
+                if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey, includeEntities);
                 for (BlockChangeDelta change : e.getBlockChanges()) {
                     states.put(change.getPos(), change.getPreviousState());
                     beTags.put(change.getPos(), change.getPreviousBlockEntityTag());
                 }
-                for (EntityDelta change : e.getEntityChanges()) {
-                    entityTags.put(change.getEntityId(),
-                            change.getType() == EntityDelta.Type.SPAWNED ? null : change.getStateBefore());
+                if (includeEntities) {
+                    for (EntityDelta change : e.getEntityChanges()) {
+                        entityTags.put(change.getEntityId(),
+                                change.getType() == EntityDelta.Type.SPAWNED ? null : change.peekStateBefore());
+                    }
                 }
             }
             cur = c.getParentId();
@@ -363,21 +368,23 @@ public final class TemporalRepository {
         cur = toCommitId;
         while (cur != lca && cur != RepoCommit.NO_PARENT) {
             RepoCommit c = commits.get(cur);
-            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey);
+            if (c == null) return resolveChunkStateAt(toCommitId, chunkKey, includeEntities);
             forward.addFirst(c);
             cur = c.getParentId();
         }
         for (RepoCommit c : forward) {
             ChunkEntry e = c.getChunkEntries().get(chunkKey);
             if (e == null) continue;
-            if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey);
+            if (e.getType() == ChunkEntry.Type.FULL) return resolveChunkStateAt(toCommitId, chunkKey, includeEntities);
             for (BlockChangeDelta change : e.getBlockChanges()) {
                 states.put(change.getPos(), change.getNewState());
                 beTags.put(change.getPos(), change.getNewBlockEntityTag());
             }
-            for (EntityDelta change : e.getEntityChanges()) {
-                entityTags.put(change.getEntityId(),
-                        change.getType() == EntityDelta.Type.REMOVED ? null : change.getStateAfter());
+            if (includeEntities) {
+                for (EntityDelta change : e.getEntityChanges()) {
+                    entityTags.put(change.getEntityId(),
+                            change.getType() == EntityDelta.Type.REMOVED ? null : change.peekStateAfter());
+                }
             }
         }
         return new ResolvedChunkState(states, beTags, entityTags);
@@ -424,7 +431,8 @@ public final class TemporalRepository {
 
     /** One chunk's resolved target block states; see {@link #previewJumpTargetStates}. */
     public Map<BlockPos, BlockState> previewChunkTargetStates(long targetCommitId, ChunkPos chunk) {
-        return resolveJumpDiff(headCommitId, targetCommitId, chunk.toLong()).states();
+        return resolveJumpDiff(headCommitId, targetCommitId, findLowestCommonAncestor(headCommitId, targetCommitId),
+                chunk.toLong(), false).states();
     }
 
 
@@ -522,24 +530,99 @@ public final class TemporalRepository {
 
 
     /**
+     * The commit one step forward from the head: the head's child on the current branch's line if
+     * it has one, otherwise its most recent child; {@link RepoCommit#NO_PARENT} if the head has
+     * no children.
+     */
+    public long nextCommitAfterHead() {
+        Set<Long> branchLine = new HashSet<>();
+        Long tip = currentBranchName == null ? null : branchTips.get(currentBranchName);
+        if (tip != null) {
+            for (RepoCommit c : ancestryChain(tip)) branchLine.add(c.getId());
+        }
+
+        RepoCommit best = null;
+        for (RepoCommit c : commits.values()) {
+            if (c.getParentId() != headCommitId) continue;
+            boolean better = best == null;
+            if (!better) {
+                boolean onLine = branchLine.contains(c.getId());
+                boolean bestOnLine = branchLine.contains(best.getId());
+                better = onLine != bestOnLine ? onLine : c.getId() > best.getId();
+            }
+            if (better) best = c;
+        }
+        return best == null ? RepoCommit.NO_PARENT : best.getId();
+    }
+
+    /**
+     * The tip of the current branch, or the commit with the latest gameTime if no branch is
+     * checked out; {@link RepoCommit#NO_PARENT} for an empty repository.
+     */
+    public long latestCommitId() {
+        Long tip = currentBranchName == null ? null : branchTips.get(currentBranchName);
+        if (tip != null) return tip;
+
+        RepoCommit latest = null;
+        for (RepoCommit c : commits.values()) {
+            if (latest == null || c.getGameTime() > latest.getGameTime()
+                    || (c.getGameTime() == latest.getGameTime() && c.getId() > latest.getId())) {
+                latest = c;
+            }
+        }
+        return latest == null ? RepoCommit.NO_PARENT : latest.getId();
+    }
+
+    /**
+     * The latest commit (highest gameTime at or before targetGameTime, newest id on a tie) that
+     * recorded an entry for pos, or null if there is none.
+     */
+    @Nullable
+    public RepoCommit latestCommitTouching(ChunkPos pos, long targetGameTime) {
+        long key = pos.toLong();
+        RepoCommit best = null;
+        for (RepoCommit c : commits.values()) {
+            if (c.getGameTime() > targetGameTime || !c.getChunkEntries().containsKey(key)) continue;
+            if (best == null || c.getGameTime() > best.getGameTime()
+                    || (c.getGameTime() == best.getGameTime() && c.getId() > best.getId())) {
+                best = c;
+            }
+        }
+        return best;
+    }
+
+    /**
+     * Writes pos's block state as of commitId into level, without moving the head. Returns false,
+     * writing nothing, when the chunk has no recorded state at that commit.
+     */
+    public boolean paintChunkAt(long commitId, ChunkPos pos, ServerLevel level, List<BlockPos> deferredSettle) {
+        ResolvedChunkState state = resolveChunkStateAt(commitId, pos.toLong(), false);
+        if (state == ResolvedChunkState.EMPTY) return false;
+        applyBlockStates(state.states(), state.blockEntityTags(), level, p -> false, deferredSettle);
+        return true;
+    }
+
+    /**
      * Moves the head to targetCommitId and updates every in-world chunk affected by the move (see
      * {@link #chunksAffectedByJump}); chunks the move doesn't touch are left as rendered.
      */
-    public List<BlockPos> jumpTo(long targetCommitId, ServerLevel level, Predicate<BlockPos> isGlued) {
+    public List<BlockPos> jumpTo(long targetCommitId, ServerLevel level, Predicate<BlockPos> isGlued,
+                                 boolean restoreEntities) {
         if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return List.of();
 
+        long lca = findLowestCommonAncestor(headCommitId, targetCommitId);
         Set<Long> affectedChunks = chunksAffectedByJump(headCommitId, targetCommitId);
         List<BlockPos> deferredSettle = new ArrayList<>();
         Map<UUID, net.minecraft.nbt.CompoundTag> desiredEntities = new HashMap<>();
 
         for (long chunkKey : affectedChunks) {
-            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, chunkKey);
+            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, lca, chunkKey, restoreEntities);
             applyBlockStates(desired.states(), desired.blockEntityTags(), level, isGlued, deferredSettle);
             desiredEntities.putAll(desired.entityTags());
         }
 
         settleBlocks(level, deferredSettle);
-        applyEntityStates(desiredEntities, level);
+        if (restoreEntities) applyEntityStates(desiredEntities, level);
 
         headCommitId = targetCommitId;
         currentBranchName = null;
@@ -547,6 +630,34 @@ public final class TemporalRepository {
             if (entry.getValue() == targetCommitId) { currentBranchName = entry.getKey(); break; }
         }
         return deferredSettle;
+    }
+
+    /** How many entities a jump rewrites and their combined health. */
+    public record EntityJumpStats(int count, double health) {}
+
+    /**
+     * The entities a jump to targetCommitId would restore, remove or revert, with the health each
+     * would have afterwards (or, for a removal, that the live entity has now).
+     */
+    public EntityJumpStats computeEntityJumpStats(long targetCommitId, ServerLevel level) {
+        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return new EntityJumpStats(0, 0.0);
+
+        Map<UUID, net.minecraft.nbt.CompoundTag> desiredEntities = new HashMap<>();
+        long lca = findLowestCommonAncestor(headCommitId, targetCommitId);
+        for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
+            desiredEntities.putAll(resolveJumpDiff(headCommitId, targetCommitId, lca, chunkKey, true).entityTags());
+        }
+
+        double health = 0.0;
+        for (Map.Entry<UUID, net.minecraft.nbt.CompoundTag> entry : desiredEntities.entrySet()) {
+            net.minecraft.nbt.CompoundTag tag = entry.getValue();
+            if (tag != null) {
+                health += tag.getFloat("Health");
+            } else if (level.getEntity(entry.getKey()) instanceof LivingEntity living) {
+                health += living.getHealth();
+            }
+        }
+        return new EntityJumpStats(desiredEntities.size(), health);
     }
 
     /**
@@ -567,9 +678,10 @@ public final class TemporalRepository {
         if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return 0L;
 
         long total = 0L;
+        long lca = findLowestCommonAncestor(headCommitId, targetCommitId);
         for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
             if (loadedChunksOnly && !level.hasChunk(ChunkPos.getX(chunkKey), ChunkPos.getZ(chunkKey))) continue;
-            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, chunkKey);
+            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, lca, chunkKey, false);
             for (Map.Entry<BlockPos, BlockState> entry : desired.states().entrySet()) {
                 if (isGlued.test(entry.getKey())) continue;
                 if (!level.getBlockState(entry.getKey()).equals(entry.getValue())) {
@@ -578,6 +690,51 @@ public final class TemporalRepository {
             }
         }
         return total;
+    }
+
+    /** The container-contents cost of a jump and the number of stack slots it was charged for. */
+    public record ContainerJumpStats(long cost, double slots) {
+        public static final ContainerJumpStats NONE = new ContainerJumpStats(0L, 0.0);
+    }
+
+    /**
+     * The cost of the items a jump to targetCommitId would add to the world's containers: per item
+     * type, the net gain across every affected container (items merely moved between containers
+     * cost nothing), charged as stack slots (count / max stack size) times costFn for the item.
+     * Loaded-only mode skips unloaded chunks instead of force-loading them.
+     */
+    public ContainerJumpStats computeContainerJumpStats(long targetCommitId, ServerLevel level, ToLongFunction<Item> costFn,
+                                                        Predicate<BlockPos> isGlued, boolean loadedChunksOnly) {
+        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return ContainerJumpStats.NONE;
+
+        Map<Item, Long> net = new HashMap<>();
+        long lca = findLowestCommonAncestor(headCommitId, targetCommitId);
+        for (long chunkKey : chunksAffectedByJump(headCommitId, targetCommitId)) {
+            int chunkX = ChunkPos.getX(chunkKey);
+            int chunkZ = ChunkPos.getZ(chunkKey);
+            if (loadedChunksOnly && !level.hasChunk(chunkX, chunkZ)) continue;
+
+            ResolvedChunkState desired = resolveJumpDiff(headCommitId, targetCommitId, lca, chunkKey, false);
+            for (Map.Entry<BlockPos, CompoundTag> entry : desired.blockEntityTags().entrySet()) {
+                if (entry.getValue() == null || isGlued.test(entry.getKey())) continue;
+                ContainerContents.tally(entry.getValue(), net, 1);
+            }
+            for (Map.Entry<BlockPos, BlockEntity> entry : level.getChunk(chunkX, chunkZ).getBlockEntities().entrySet()) {
+                BlockPos pos = entry.getKey();
+                if (!desired.states().containsKey(pos) || isGlued.test(pos)) continue;
+                ContainerContents.tally(entry.getValue().saveWithoutMetadata(level.registryAccess()), net, -1);
+            }
+        }
+
+        double slots = 0.0;
+        double cost = 0.0;
+        for (Map.Entry<Item, Long> entry : net.entrySet()) {
+            if (entry.getValue() <= 0L) continue;
+            double itemSlots = entry.getValue() / (double) Math.max(1, entry.getKey().getDefaultMaxStackSize());
+            slots += itemSlots;
+            cost += itemSlots * costFn.applyAsLong(entry.getKey());
+        }
+        return new ContainerJumpStats(Math.round(cost), slots);
     }
 
     /**
@@ -611,7 +768,7 @@ public final class TemporalRepository {
         }
     }
 
-    private static void settleBlocks(ServerLevel level, List<BlockPos> changed) {
+    public static void settleBlocks(ServerLevel level, List<BlockPos> changed) {
         for (BlockPos pos : changed) {
             BlockState state = level.getBlockState(pos);
             state.updateNeighbourShapes(level, pos, Block.UPDATE_CLIENTS);
@@ -625,7 +782,7 @@ public final class TemporalRepository {
             net.minecraft.nbt.CompoundTag desiredTag = entry.getValue();
             if (existing != null) existing.discard();
             if (desiredTag != null) {
-                Entity restored = EntityType.loadEntityRecursive(desiredTag, level, Function.identity());
+                Entity restored = EntityType.loadEntityRecursive(desiredTag.copy(), level, Function.identity());
                 if (restored != null) level.addFreshEntity(restored);
             }
         }

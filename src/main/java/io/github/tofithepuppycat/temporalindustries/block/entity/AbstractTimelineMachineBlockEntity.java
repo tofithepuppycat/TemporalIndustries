@@ -13,6 +13,8 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -23,6 +25,8 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.inventory.ContainerData;
+import net.minecraft.world.item.Item;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
@@ -65,12 +69,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     private static final long JUMP_FE_PER_ENTROPY_UNIT = 10; // jump FE cost that moves the balance one unit toward chaos
     public static final double JUMP_TIME_FE_SCALE = 250.0; // FE per natural-log unit of minutes between now and the target commit
     private static final double TICKS_PER_MINUTE = 1200.0;
-    public static final double JUMP_ENTROPIC_GROWTH = 20.0; // steepness of the exponential curve; higher keeps low chaos cheaper for longer
+    public static final double JUMP_ENTROPIC_GROWTH = 8.0; // steepness of the exponential curve; higher keeps low chaos cheaper for longer
+    public static final long JUMP_ENTROPIC_MAX_FE = 5_000_000L;
     /**
-     * Coefficient of the entropic curve, chosen so full chaos costs exactly Integer.MAX_VALUE; zero
+     * Coefficient of the entropic curve, chosen so full chaos costs exactly JUMP_ENTROPIC_MAX_FE; zero
      * at full order.
      */
-    public static final double JUMP_ENTROPIC_FE_SCALE = Integer.MAX_VALUE / Math.expm1(JUMP_ENTROPIC_GROWTH);
+    public static final double JUMP_ENTROPIC_FE_SCALE = JUMP_ENTROPIC_MAX_FE / Math.expm1(JUMP_ENTROPIC_GROWTH);
+    public static final double JUMP_ENTITY_FE_PER_HEALTH = 100.0; // FE per health point of every entity a jump restores or removes
     private static final int CAPTURE_BASE_FE_PER_TICK = 1;
     private static final double CAPTURE_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
 
@@ -197,10 +203,33 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             energy = (int) Math.max(0, energy - amount);
             setChanged();
         }
+
+        void addInternal(long amount) {
+            if (amount <= 0) return;
+            energy = (int) Math.min(capacity, energy + amount);
+            setChanged();
+        }
+
+        void fillInternal() {
+            if (energy >= capacity) return;
+            energy = capacity;
+            setChanged();
+        }
     }
 
     private final MachineEnergyStorage energyStorage;
     private final ContainerData data;
+
+    /**
+     * A jump whose cost exceeds the energy stored is paid in instalments: every tick the pool is
+     * moved into {@link #charged} until {@link #chargeCost} is covered, then the jump runs.
+     */
+    private boolean saveEntities = false;
+    private boolean chargeContainers = true;
+    private boolean charging;
+    private long chargeTarget;
+    private long chargeCost;
+    private long charged;
 
     protected AbstractTimelineMachineBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state,
                                                   int energyCapacity, int energyTransfer) {
@@ -227,11 +256,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                     case 13 -> orderTank.getFluidAmount();
                     case 14 -> chaosTank.getFluidAmount();
                     case 15 -> ENTROPY_MAX;
+                    case 16 -> charging ? 1 : 0;
+                    case 17 -> chargeProgressPermille();
                     default -> 0;
                 };
             }
             @Override public void set(int index, int value) {}
-            @Override public int getCount() { return 16; }
+            @Override public int getCount() { return 18; }
         };
     }
 
@@ -332,7 +363,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     private long entropicCost() {
         double chaos = getEntropy() / (double) ENTROPY_MAX;
-        return Math.min(Integer.MAX_VALUE, Math.round(JUMP_ENTROPIC_FE_SCALE * Math.expm1(JUMP_ENTROPIC_GROWTH * chaos)));
+        return Math.min(JUMP_ENTROPIC_MAX_FE, Math.round(JUMP_ENTROPIC_FE_SCALE * Math.expm1(JUMP_ENTROPIC_GROWTH * chaos)));
     }
 
     /** Every chunk a jump on this machine moves together, home/primary chunk first. */
@@ -500,7 +531,44 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     public boolean isGluedPos(BlockPos pos) {
         TemporalWorldData data = worldData();
+        if (pos.equals(worldPosition)) return true;
         return data != null && level != null && data.isGlued(level.dimension().location(), pos);
+    }
+
+    public enum BindResult { CREATED, ADOPTED, IN_USE, WRONG_DIMENSION, INVALID_NAME, ALREADY_BOUND, UNAVAILABLE }
+
+    /**
+     * Binds this machine to the repository called rawName, creating an empty one if no such
+     * repository exists yet.
+     */
+    public BindResult bindToRepositoryNamed(String rawName) {
+        if (!(level instanceof ServerLevel) || level.getServer() == null) return BindResult.UNAVAILABLE;
+        if (isRepositoryBound()) return BindResult.ALREADY_BOUND;
+
+        String name = TemporalWorldData.normalizeRepositoryName(rawName);
+        if (name == null) return BindResult.INVALID_NAME;
+
+        TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        UUID existingId = data.findRepositoryByName(name);
+        if (existingId == null) {
+            UUID created = data.createRepository(name, level.dimension().location());
+            placedGameTime = level.getGameTime();
+            selectedGameTime = placedGameTime;
+            bindRepository(created, name);
+            return BindResult.CREATED;
+        }
+
+        TemporalRepository existing = data.getRepository(existingId);
+        if (existing == null) return BindResult.UNAVAILABLE;
+        if (data.hasRepositoryOwner(existingId)) return BindResult.IN_USE;
+        if (!existing.getDimension().equals(level.dimension().location())) return BindResult.WRONG_DIMENSION;
+
+        // The adopted history predates this block, so its selectable window starts at its root.
+        RepoCommit root = existing.getCommit(existing.getRootCommitId());
+        placedGameTime = root != null ? root.getGameTime() : level.getGameTime();
+        selectedGameTime = level.getGameTime();
+        bindRepository(existingId, existing.getName());
+        return BindResult.ADOPTED;
     }
 
     /**
@@ -568,7 +636,58 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             setChanged();
         }
 
+        tickCharging();
         drainCaptureEnergy();
+    }
+
+    public boolean isCharging() {
+        return charging;
+    }
+
+    private int chargeProgressPermille() {
+        if (!charging || chargeCost <= 0) return 0;
+        return (int) Math.min(1000L, charged * 1000L / chargeCost);
+    }
+
+    private void beginCharging(long targetCommitId, long cost) {
+        cancelCharging();
+        charging = true;
+        chargeTarget = targetCommitId;
+        chargeCost = cost;
+        charged = 0L;
+        setChanged();
+    }
+
+    /** Stops charging and returns whatever was already collected to the energy pool. */
+    private void cancelCharging() {
+        if (!charging) return;
+        energyStorage.addInternal(charged);
+        charging = false;
+        charged = 0L;
+        setChanged();
+    }
+
+    private void tickCharging() {
+        if (!charging) return;
+        TemporalRepository repo = getRepository();
+        RepoCommit target = repo == null ? null : repo.getCommit(chargeTarget);
+        if (target == null) {
+            cancelCharging();
+            return;
+        }
+
+        long take = Math.min(chargeCost - charged, energyStorage.getEnergyStored());
+        if (take > 0) {
+            energyStorage.consumeInternal(take);
+            charged += take;
+            setChanged();
+        }
+        if (charged < chargeCost) return;
+
+        long paid = chargeCost;
+        charging = false;
+        charged = 0L;
+        performJump(repo, target, chargeTarget, paid);
     }
 
     /**
@@ -576,6 +695,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      * balance.
      */
     private void drainCaptureEnergy() {
+        if (isCreative()) {
+            energyStorage.fillInternal();
+            return;
+        }
         double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
         int feThisTick = (int) Math.round(CAPTURE_BASE_FE_PER_TICK + CAPTURE_ENTROPY_SCALE * distance);
         energyStorage.consumeInternal(Math.min(feThisTick, energyStorage.getEnergyStored()));
@@ -636,11 +759,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      * of every changed block, and the entropic cost.
      */
     public JumpCostBreakdown computeJumpCostBreakdown(long targetCommitId) {
-        JumpCostBreakdown free = new JumpCostBreakdown(0L, 0L, 0L, 0.0, 0L, 0.0);
+        JumpCostBreakdown free = new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0.0, 0.0,
+                savesEntities(), chargesContainers());
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return free;
         TemporalRepository repo = getRepository();
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
-        if (target == null || targetCommitId == repo.getHeadCommitId()) return free;
+        if (target == null || targetCommitId == repo.getHeadCommitId() || isCreative()) return free;
 
         // Estimate only: unloaded chunks are skipped so a GUI poll can't force-load the claim.
         AtomicLong changedBlocks = new AtomicLong();
@@ -649,47 +773,119 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             return costOf(state);
         }, gluePredicate(), true);
         double minutes = Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
-        return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), blocks, entropicCost(),
-                minutes, changedBlocks.get(), getEntropy() / (double) ENTROPY_MAX);
+        TemporalRepository.EntityJumpStats entityStats = savesEntities()
+                ? repo.computeEntityJumpStats(targetCommitId, serverLevel)
+                : new TemporalRepository.EntityJumpStats(0, 0.0);
+        TemporalRepository.ContainerJumpStats containerStats = chargesContainers()
+                ? repo.computeContainerJumpStats(targetCommitId, serverLevel, AbstractTimelineMachineBlockEntity::itemCostOf,
+                        gluePredicate(), true)
+                : TemporalRepository.ContainerJumpStats.NONE;
+        return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), blocks,
+                entityCost(entityStats), containerStats.cost(), entropicCost(), minutes, changedBlocks.get(),
+                entityStats.count(), entityStats.health(), containerStats.slots(),
+                getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
+    }
+
+    /** Creative machines jump for free, never lose energy, and never shift entropy. */
+    protected boolean isCreative() {
+        return false;
+    }
+
+    /** Whether jumps on this machine also restore the entities recorded in the target commit. */
+    protected boolean savesEntities() {
+        return saveEntities;
+    }
+
+    public boolean isSaveEntities() {
+        return saveEntities;
+    }
+
+    public void setSaveEntities(boolean value) {
+        if (saveEntities == value) return;
+        saveEntities = value;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** Whether jumps on this machine also charge for the container contents they add to the world. */
+    protected boolean chargesContainers() {
+        return chargeContainers;
+    }
+
+    public boolean isChargeContainers() {
+        return chargeContainers;
+    }
+
+    public void setChargeContainers(boolean value) {
+        if (chargeContainers == value) return;
+        chargeContainers = value;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    private static long entityCost(TemporalRepository.EntityJumpStats stats) {
+        return Math.round(stats.health() * JUMP_ENTITY_FE_PER_HEALTH);
     }
 
     private Predicate<BlockPos> gluePredicate() {
         TemporalWorldData data = worldData();
-        if (data == null || level == null) return pos -> false;
+        if (data == null || level == null) return worldPosition::equals;
         ResourceLocation dimension = level.dimension().location();
-        return pos -> data.isGlued(dimension, pos);
+        BlockPos machinePos = worldPosition;
+        return pos -> pos.equals(machinePos) || data.isGlued(dimension, pos);
     }
 
     /**
      * Moves the repository's head to targetCommitId and writes the result to the live world, paying
-     * the jump cost from the energy pool first; returns INSUFFICIENT_ENERGY without acting if
-     * underfunded.
+     * the jump cost from the energy pool first; if the pool cannot cover it, starts charging and
+     * returns CHARGING, and the jump runs once enough energy has been collected.
      */
     public JumpResult applyTimelineView(long targetCommitId) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
 
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        if (charging && chargeTarget == targetCommitId) return JumpResult.CHARGING;
+
         TemporalRepository repo = getRepository();
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
         if (target == null) return JumpResult.SUCCESS;
 
         Predicate<BlockPos> isGlued = gluePredicate();
+        boolean restoreEntities = savesEntities();
         long totalCost = 0L;
-        if (targetCommitId != repo.getHeadCommitId()) {
+        if (targetCommitId != repo.getHeadCommitId() && !isCreative()) {
             totalCost = timeDistanceCost(target, serverLevel.getGameTime())
                     + repo.computeJumpCost(targetCommitId, serverLevel, AbstractTimelineMachineBlockEntity::costOf, isGlued)
+                    + (restoreEntities ? entityCost(repo.computeEntityJumpStats(targetCommitId, serverLevel)) : 0L)
+                    + (chargesContainers() ? repo.computeContainerJumpStats(targetCommitId, serverLevel,
+                            AbstractTimelineMachineBlockEntity::itemCostOf, isGlued, false).cost() : 0L)
                     + entropicCost();
         }
 
         if (totalCost > energyStorage.getEnergyStored()) {
-            serverLevel.playSound(null, worldPosition, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);
-            return JumpResult.INSUFFICIENT_ENERGY;
+            beginCharging(targetCommitId, totalCost);
+            serverLevel.playSound(null, worldPosition, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0F, 1.0F);
+            return JumpResult.CHARGING;
         }
+        cancelCharging();
         energyStorage.consumeInternal(totalCost);
+        performJump(repo, target, targetCommitId, totalCost);
+        return JumpResult.SUCCESS;
+    }
+
+    /** Writes the jump to the live world once its cost has been paid. */
+    private void performJump(TemporalRepository repo, RepoCommit target, long targetCommitId, long totalCost) {
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        Predicate<BlockPos> isGlued = gluePredicate();
+        boolean restoreEntities = savesEntities();
 
         // jumpTo already defers neighbour settling until every affected chunk has been written, so
         // a settle pass can't see a sibling chunk in its pre-jump state across a chunk boundary.
-        List<BlockPos> changedPositions = repo.jumpTo(targetCommitId, serverLevel, isGlued);
+        List<BlockPos> changedPositions = repo.jumpTo(targetCommitId, serverLevel, isGlued, restoreEntities);
         worldData.setDirty();
 
         long previousSelectedGameTime = selectedGameTime;
@@ -704,7 +900,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
                 new TimelineJumpEffectPacket(worldPosition, intoFuture));
         broadcastBlockChangeFlashes(serverLevel, changedPositions, intoFuture);
-        return JumpResult.SUCCESS;
     }
 
     /**
@@ -738,6 +933,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return ItemEnergyCosts.getCost(state.getBlock()).orElse(0);
     }
 
+    protected static long itemCostOf(Item item) {
+        return ItemEnergyCosts.getCost(item).orElse(0);
+    }
+
     @Override
     public long getPlacedGameTime()   { return placedGameTime; }
     @Override
@@ -747,14 +946,39 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     protected void saveAdditional(@NotNull CompoundTag tag, @NotNull HolderLookup.Provider registries) {
         super.saveAdditional(tag, registries);
-        tag.put("Energy", energyStorage.serializeNBT(registries));
+        saveCarriedState(tag, registries);
         tag.putLong("PlacedGameTime",   placedGameTime);
         tag.putLong("SelectedGameTime", selectedGameTime);
-        tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
-        tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         if (repositoryId != null) tag.putUUID("RepositoryId", repositoryId);
         tag.putString("RepositoryName", repositoryName);
+        tag.putBoolean("Charging", charging);
+        tag.putLong("ChargeTarget", chargeTarget);
+        tag.putLong("ChargeCost", chargeCost);
+        tag.putLong("Charged", charged);
         writeHeadCommit(tag);
+    }
+
+    /** The state that stays with a machine when it is picked up and placed again. */
+    protected void saveCarriedState(CompoundTag tag, HolderLookup.Provider registries) {
+        tag.put("Energy", energyStorage.serializeNBT(registries));
+        tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.putBoolean("SaveEntities", saveEntities);
+        tag.putBoolean("ChargeContainers", chargeContainers);
+    }
+
+    /**
+     * Carries energy, entropy and settings onto the dropped item; the repository stays behind,
+     * since it is tied to this position.
+     */
+    @Override
+    protected void collectImplicitComponents(@NotNull DataComponentMap.Builder components) {
+        super.collectImplicitComponents(components);
+        if (level == null) return;
+        CompoundTag data = new CompoundTag();
+        saveCarriedState(data, level.registryAccess());
+        BlockEntity.addEntityType(data, getType());
+        components.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
     }
 
     /**
@@ -778,6 +1002,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("Energy"))           energyStorage.deserializeNBT(registries, tag.get("Energy"));
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
+        saveEntities = tag.getBoolean("SaveEntities");
+        chargeContainers = !tag.contains("ChargeContainers") || tag.getBoolean("ChargeContainers");
+        charging = tag.getBoolean("Charging");
+        chargeTarget = tag.getLong("ChargeTarget");
+        chargeCost = tag.getLong("ChargeCost");
+        charged = tag.getLong("Charged");
 
         if (tag.contains("OrderTank") && tag.contains("ChaosTank")) {
             orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));

@@ -37,6 +37,14 @@ public final class EntityDelta {
         return stateAfter == null ? null : stateAfter.copy();
     }
 
+    /** The recorded tag itself, uncopied: callers must treat it as read-only. */
+    @Nullable
+    CompoundTag peekStateBefore() { return stateBefore; }
+
+    /** The recorded tag itself, uncopied: callers must treat it as read-only. */
+    @Nullable
+    CompoundTag peekStateAfter() { return stateAfter; }
+
     public CompoundTag toTag() {
         CompoundTag tag = new CompoundTag();
         tag.putUUID("EntityId", entityId);

@@ -2,12 +2,9 @@ package io.github.tofithepuppycat.temporalindustries.data;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkDelta;
-import io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
-import io.github.tofithepuppycat.temporalindustries.timeline.TemporalTimeline;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
@@ -27,8 +24,8 @@ import org.jetbrains.annotations.Nullable;
 import java.util.*;
 
 /**
- * Central server-side store: per-dimension timelines, per-player checkpoint state, tracked chunks,
- * glued regions, and pending deltas awaiting flush.
+ * Central server-side store: repositories, per-player checkpoint state, glued regions, and the
+ * Chrono Rift session.
  */
 @SuppressWarnings("null")
 public class TemporalWorldData extends SavedData {
@@ -36,7 +33,6 @@ public class TemporalWorldData extends SavedData {
     private static final SavedData.Factory<TemporalWorldData> FACTORY =
             new SavedData.Factory<>(TemporalWorldData::new, TemporalWorldData::load);
 
-    private final Map<ResourceLocation, TemporalTimeline> timelines = new HashMap<>();
     private final Map<UUID, PlayerTemporalState> playerStates = new HashMap<>();
 
     private final Map<UUID, TemporalRepository> repositories = new HashMap<>();
@@ -60,21 +56,6 @@ public class TemporalWorldData extends SavedData {
     // Not persisted: bumped on every glue/unglue so the "Show Changes" preview can cheaply
     // notice glue changes and re-fetch instead of ghosting stale blocks.
     private int glueVersion = 0;
-
-    // Not persisted: rebuilt when block entities load. dimension -> chunkPos.toLong() -> owners
-    // currently claiming that chunk needs tracking.
-    private final Map<ResourceLocation, Map<Long, Set<Object>>> trackedChunkOwners = new HashMap<>();
-
-    // Transient pending deltas flushed by TemporalChangeListener on server tick.
-    // Outer key: dimension. Inner key: chunkPos.toLong(). Value: latest merged delta per BlockPos.
-    private final Map<ResourceLocation, Map<Long, Map<BlockPos, BlockChangeDelta>>> pendingBlockDeltas = new HashMap<>();
-    // Same dimension/chunk keying as pendingBlockDeltas, scoping entity spawns/deaths to the chunk
-    // they happened in.
-    private final Map<ResourceLocation, Map<Long, List<EntityDelta>>> pendingEntityDeltas = new HashMap<>();
-
-    // Not persisted: chunks a machine has claimed but hasn't been baselined yet.
-    private final Map<ResourceLocation, Set<Long>> pendingClaimedChunks = new HashMap<>();
-
 
     /** Sentinel meaning no session is currently open (the rift is empty). */
     public static final long NO_CHRONO_RIFT_SESSION = Long.MIN_VALUE;
@@ -182,13 +163,13 @@ public class TemporalWorldData extends SavedData {
     }
 
 
-    public TemporalTimeline getOrCreateTimeline(ResourceLocation dimension) {
-        return timelines.computeIfAbsent(dimension, d -> new TemporalTimeline());
-    }
-
-    @Nullable
-    public TemporalTimeline getTimeline(ResourceLocation dimension) {
-        return timelines.get(dimension);
+    /** Every repository recording history for dimension. */
+    public List<TemporalRepository> getRepositoriesIn(ResourceLocation dimension) {
+        List<TemporalRepository> result = new ArrayList<>();
+        for (TemporalRepository repo : repositories.values()) {
+            if (repo.getDimension().equals(dimension)) result.add(repo);
+        }
+        return result;
     }
 
 
@@ -412,32 +393,6 @@ public class TemporalWorldData extends SavedData {
     }
 
 
-    /**
-     * Queues chunkPos for a baseline snapshot (if it doesn't already have history) at the next
-     * flush, instead of capturing a {@link
-     * io.github.tofithepuppycat.temporalindustries.timeline.ChunkSnapshot} immediately.
-     */
-    public void markChunkPending(ResourceLocation dimension, ChunkPos pos) {
-        pendingClaimedChunks.computeIfAbsent(dimension, d -> new HashSet<>()).add(pos.toLong());
-    }
-
-    /** Releases owner's claim on chunkPos. */
-    public void untrackChunk(ResourceLocation dimension, ChunkPos pos, Object owner) {
-        Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
-        if (dimChunks == null) return;
-        Set<Object> owners = dimChunks.get(pos.toLong());
-        if (owners == null) return;
-        owners.remove(owner);
-        if (owners.isEmpty()) dimChunks.remove(pos.toLong());
-        if (dimChunks.isEmpty()) trackedChunkOwners.remove(dimension);
-    }
-
-    public boolean isTracked(ResourceLocation dimension, ChunkPos pos) {
-        Map<Long, Set<Object>> dimChunks = trackedChunkOwners.get(dimension);
-        return dimChunks != null && dimChunks.containsKey(pos.toLong());
-    }
-
-
     public void addGluedRegion(ResourceLocation dimension, BoundingBox region) {
         gluedRegions.computeIfAbsent(dimension, d -> new ArrayList<>()).add(region);
         glueVersion++;
@@ -496,142 +451,8 @@ public class TemporalWorldData extends SavedData {
     }
 
 
-    /**
-     * Records a block change for a tracked chunk, merging with any pending change at the same
-     * position (keeping the original previousState) and dropping the entry if the net effect is a
-     * no-op.
-     */
-    public void recordTrackedBlockChange(ResourceLocation dimension, ChunkPos chunkPos, BlockChangeDelta delta) {
-        Map<BlockPos, BlockChangeDelta> chunkMap = pendingBlockDeltas
-                .computeIfAbsent(dimension, d -> new HashMap<>())
-                .computeIfAbsent(chunkPos.toLong(), c -> new LinkedHashMap<>());
-
-        BlockChangeDelta existing = chunkMap.get(delta.getPos());
-        if (existing != null) {
-            BlockChangeDelta merged = new BlockChangeDelta(
-                    delta.getPos(),
-                    existing.getPreviousState(),
-                    delta.getNewState(),
-                    existing.getPreviousBlockEntityTag(),
-                    delta.getNewBlockEntityTag());
-            boolean isNoOp = merged.getPreviousState().equals(merged.getNewState())
-                    && Objects.equals(merged.getPreviousBlockEntityTag(), merged.getNewBlockEntityTag());
-            if (isNoOp) {
-                chunkMap.remove(delta.getPos());
-            } else {
-                chunkMap.put(delta.getPos(), merged);
-            }
-        } else {
-            chunkMap.put(delta.getPos(), delta);
-        }
-    }
-
-    public void recordEntityDelta(ResourceLocation dimension, ChunkPos chunkPos, EntityDelta delta) {
-        pendingEntityDeltas
-                .computeIfAbsent(dimension, d -> new HashMap<>())
-                .computeIfAbsent(chunkPos.toLong(), c -> new ArrayList<>())
-                .add(delta);
-    }
-
-    /**
-     * Drains every chunk queued by {@link #markChunkPending}, giving chunks that don't already have
-     * history a baseline snapshot.
-     */
-    private void drainPendingClaims(MinecraftServer server) {
-        if (pendingClaimedChunks.isEmpty()) return;
-
-        for (Map.Entry<ResourceLocation, Set<Long>> entry : pendingClaimedChunks.entrySet()) {
-            ResourceLocation dimension = entry.getKey();
-            ServerLevel level = server.getLevel(net.minecraft.resources.ResourceKey.create(
-                    net.minecraft.core.registries.Registries.DIMENSION, dimension));
-            if (level == null) continue;
-
-            TemporalTimeline timeline = getOrCreateTimeline(dimension);
-            List<ChunkSnapshot> baselines = new ArrayList<>();
-            for (long chunkKey : entry.getValue()) {
-                ChunkPos chunkPos = new ChunkPos(chunkKey);
-                if (timeline.getCommitsForChunk(chunkPos).isEmpty()) {
-                    baselines.add(ChunkSnapshot.capture(level, chunkPos));
-                }
-            }
-            if (!baselines.isEmpty()) {
-                timeline.addSnapshot(level.getGameTime(), baselines);
-                setDirty();
-            }
-        }
-        pendingClaimedChunks.clear();
-    }
-
-    /**
-     * Flushes all pending deltas into commits on the relevant timelines, first draining any chunks
-     * queued by {@link #markChunkPending} into baseline snapshots.
-     */
-    public boolean flushPendingDeltas(MinecraftServer server, long gameTime) {
-        return flushPendingDeltas(server, gameTime, false);
-    }
-
-    /** @param playerMarked whether this flush was explicitly requested by a player (e.g. a */
-    public boolean flushPendingDeltas(MinecraftServer server, long gameTime, boolean playerMarked) {
-        drainPendingClaims(server);
-        if (pendingBlockDeltas.isEmpty() && pendingEntityDeltas.isEmpty()) return false;
-
-        Set<ResourceLocation> allDims = new HashSet<>(pendingBlockDeltas.keySet());
-        allDims.addAll(pendingEntityDeltas.keySet());
-
-        for (ResourceLocation dimension : allDims) {
-            TemporalTimeline timeline = getOrCreateTimeline(dimension);
-
-            Map<Long, Map<BlockPos, BlockChangeDelta>> dimBlockPending = pendingBlockDeltas.get(dimension);
-            Map<Long, List<EntityDelta>> dimEntityPending = pendingEntityDeltas.get(dimension);
-
-            Set<Long> allChunks = new HashSet<>();
-            if (dimBlockPending != null) allChunks.addAll(dimBlockPending.keySet());
-            if (dimEntityPending != null) allChunks.addAll(dimEntityPending.keySet());
-
-            List<ChunkDelta> chunkDeltas = new ArrayList<>();
-            for (long chunkKey : allChunks) {
-                Map<BlockPos, BlockChangeDelta> blockChanges = dimBlockPending != null
-                        ? dimBlockPending.getOrDefault(chunkKey, Collections.emptyMap())
-                        : Collections.emptyMap();
-                List<EntityDelta> entityChanges = dimEntityPending != null
-                        ? dimEntityPending.getOrDefault(chunkKey, Collections.emptyList())
-                        : Collections.emptyList();
-                if (blockChanges.isEmpty() && entityChanges.isEmpty()) continue;
-
-                ChunkPos chunkPos = new ChunkPos(chunkKey);
-                chunkDeltas.add(new ChunkDelta(dimension, chunkPos,
-                        new ArrayList<>(blockChanges.values()), entityChanges));
-            }
-
-            if (!chunkDeltas.isEmpty()) {
-                timeline.addDelta(gameTime, chunkDeltas, playerMarked);
-            }
-        }
-
-        pendingBlockDeltas.clear();
-        pendingEntityDeltas.clear();
-        setDirty();
-        return true;
-    }
-
-    /**
-     * On-demand version of {@link #flushPendingDeltas}, for a player-triggered "Commit" action
-     * (e.g. the Chronosphere GUI) instead of waiting for the next automatic flush tick.
-     */
-    public boolean commitNow(MinecraftServer server, long gameTime) {
-        return flushPendingDeltas(server, gameTime, true);
-    }
-
-
     public static TemporalWorldData load(CompoundTag tag, HolderLookup.Provider registries) {
         TemporalWorldData data = new TemporalWorldData();
-
-        ListTag timelineList = tag.getList("Timelines", Tag.TAG_COMPOUND);
-        for (int i = 0; i < timelineList.size(); i++) {
-            CompoundTag tTag = timelineList.getCompound(i);
-            ResourceLocation dim = ResourceLocation.tryParse(tTag.getString("Dimension"));
-            data.timelines.put(dim, TemporalTimeline.fromTag(tTag.getCompound("Timeline")));
-        }
 
         ListTag playerList = tag.getList("Players", Tag.TAG_COMPOUND);
         for (int i = 0; i < playerList.size(); i++) {
@@ -668,21 +489,11 @@ public class TemporalWorldData extends SavedData {
             data.gluedRegions.computeIfAbsent(dim, d -> new ArrayList<>()).add(region);
         }
 
-        // trackedChunks rebuilt from block entity onLoad() — not persisted.
         return data;
     }
 
     @Override
     public CompoundTag save(CompoundTag tag, HolderLookup.Provider registries) {
-        ListTag timelineList = new ListTag();
-        for (Map.Entry<ResourceLocation, TemporalTimeline> entry : timelines.entrySet()) {
-            CompoundTag tTag = new CompoundTag();
-            tTag.putString("Dimension", entry.getKey().toString());
-            tTag.put("Timeline", entry.getValue().toTag());
-            timelineList.add(tTag);
-        }
-        tag.put("Timelines", timelineList);
-
         ListTag playerList = new ListTag();
         for (PlayerTemporalState state : playerStates.values()) {
             if (state.isArmed() || state.getChronoRiftOrigin() != null) playerList.add(state.toTag());

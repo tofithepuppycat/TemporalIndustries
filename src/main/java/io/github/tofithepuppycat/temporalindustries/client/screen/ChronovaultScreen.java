@@ -3,22 +3,32 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 import java.util.List;
 
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 import com.mojang.blaze3d.systems.RenderSystem;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
 import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
+import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereBindRepositoryPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetChargeContainersPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetSaveEntitiesPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereUnbindRepositoryPacket;
+import io.github.tofithepuppycat.temporalindustries.network.RepositorySuggestRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RollbackChunkPacket;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelinePreviewRequestPacket;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -36,6 +46,10 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final ResourceLocation ICON_CONFIG_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_config.png");
     private static final ResourceLocation ICON_EYE_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_eye.png");
     private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_jump.png");
+    private static final ResourceLocation ICON_PUSH_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_push.png");
+    private static final ResourceLocation ICON_TRUE_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_true.png");
+    private static final ResourceLocation ICON_FALSE_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_false.png");
+    private static final ResourceLocation MENU_BUTTON_SMALL_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/menu_button_small.png");
     private static final ResourceLocation ICON_TRASHCAN_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/icon_trashcan.png");
     private static final int ICON_CONFIG_SIZE = 26;
     private static final int TEXTURE_WIDTH = 256;
@@ -50,6 +64,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     // base.png is a light panel, so text/UI accents are tuned for a light background.
     private static final int TEXT_PRIMARY = 0xFF2B2B2B;
     private static final int TEXT_SECONDARY = 0xFF5A5A5A;
+    private static final int TEXT_MUTED = 0xFF7A7A7A;
     private static final int COLOR_BORDER = 0xFF000000;
 
     // Settings tab: overlaps the panel's right edge, drawn BEFORE the panel background in render()
@@ -60,6 +75,30 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int CONFIRM_BUTTON_WIDTH = 66;
+
+    // Settings overlay layout: a title, then a "display" section and a "danger" section split by
+    // dividers. Rows share one left/right inset.
+    private static final int SETTINGS_INSET = 20;
+    private static final int SETTINGS_TITLE_Y_OFFSET = 14;
+    private static final int SETTINGS_TITLE_DIVIDER_Y_OFFSET = 28;
+    private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 40;
+    private static final int GHOST_TOGGLE_HINT_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + IconButtonRenderer.SIZE + 4;
+    private static final int SECTION_DIVIDER_Y_OFFSET = 100;
+    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = 106;
+    private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = 132;
+    private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + IconButtonRenderer.SIZE + 4;
+    private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 30;
+    private static final int SAVE_ENTITIES_DIVIDER_Y_OFFSET = CHARGE_CONTAINERS_HINT_Y_OFFSET + CHARGE_CONTAINERS_HINT_HEIGHT + 2;
+    private static final int CHANGE_REPOSITORY_BUTTON_Y_OFFSET = SAVE_ENTITIES_DIVIDER_Y_OFFSET + 4;
+    private static final int DANGER_DIVIDER_Y_OFFSET = CHANGE_REPOSITORY_BUTTON_Y_OFFSET + 26;
+    private static final int DELETE_HISTORY_HINT_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 4;
+    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 42;
+    private static final int SETTINGS_CONTENT_HEIGHT = DELETE_HISTORY_BUTTON_Y_OFFSET + DELETE_BUTTON_HEIGHT + 6;
+    /** The rows scroll beneath the fixed title, within this band of the panel. */
+    private static final int SETTINGS_VIEWPORT_TOP = SETTINGS_TITLE_DIVIDER_Y_OFFSET + 2;
+    private static final int SETTINGS_VIEWPORT_HEIGHT = CONTENT_SIZE - 6 - SETTINGS_VIEWPORT_TOP;
+    private static final int COLOR_DIVIDER = 0x30000000;
+    private static final int COLOR_WARNING = 0xFFB06A00;
 
     private static final int GRAPH_X_OFFSET = 8;
     private static final int GRAPH_Y_OFFSET = 18;
@@ -83,14 +122,36 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private static final int PREVIEW_DIFF_Y_OFFSET = 186;
     private static final int BUTTON_ROW_Y_OFFSET = 200;
     private static final int ACTION_BUTTON_SIZE = IconButtonRenderer.SIZE;
-    private static final int ACTION_BUTTON_GAP = 6;
+    private static final int ACTION_BUTTON_GAP = 2;
+    /** Native width of menu_button_small.png (the wide Jump button). */
+    private static final int JUMP_BUTTON_WIDTH = 64;
+    private static final int JUMP_TEXT_PADDING = 5;
+    private static final int CHARGE_BAR_HEIGHT = 4;
+    private static final int CHARGE_BAR_GAP = 1;
+    private static final int CHARGE_BAR_OVERHANG = 2;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
+    // Name-entry panel shown while the Chronovault has no repository.
+    private static final int BIND_TITLE_Y_OFFSET = 56;
+    private static final int BIND_HINT_Y_OFFSET = 72;
+    private static final int BIND_BOX_Y_OFFSET = 112;
+    private static final int BIND_BOX_WIDTH = 160;
+    private static final int BIND_BOX_HEIGHT = 20;
+    private static final int BIND_BUTTON_Y_OFFSET = 142;
+    private static final int BIND_BUTTON_WIDTH = 100;
+    private static final int SUGGEST_ROW_HEIGHT = 12;
+
     private final TimelineGraphWidget graphWidget = new TimelineGraphWidget();
+
+    private EditBox nameBox;
+    private boolean boundLastTick = false;
+    /** The keyboard-highlighted repository suggestion, or -1 for none. */
+    private int suggestionIndex = -1;
 
     private int ticksSinceSync = 0;
     private boolean settingsOverlayOpen = false;
+    private final SettingsScroll settingsScroll = new SettingsScroll();
     /**
      * Whether the settings overlay is showing the "are you sure" step; reset when the overlay
      * closes.
@@ -103,6 +164,8 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private int showChangesY;
     private int jumpX;
     private int jumpY;
+    private int commitX;
+    private int commitY;
     private int deleteCommitX;
     private int deleteCommitY;
 
@@ -128,12 +191,17 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     protected void init() {
         super.init();
 
-        int groupX = panelX() + (CONTENT_SIZE - (ACTION_BUTTON_SIZE * 3 + ACTION_BUTTON_GAP * 2)) / 2;
-        showChangesX = groupX;
-        jumpX = groupX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
-        deleteCommitX = jumpX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        // Show Changes in the left corner with Commit right beside it, Delete Commit in the right
+        // corner, and the wide Jump button centered.
+        int rowLeft = panelX() + GRAPH_X_OFFSET;
+        int rowRight = panelX() + CONTENT_SIZE - GRAPH_X_OFFSET - ACTION_BUTTON_SIZE;
+        showChangesX = rowLeft;
+        commitX = rowLeft + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        deleteCommitX = rowRight;
+        jumpX = panelX() + (CONTENT_SIZE - JUMP_BUTTON_WIDTH) / 2;
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
+        commitY = showChangesY;
         deleteCommitY = showChangesY;
 
         settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
@@ -141,8 +209,168 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
         graphWidget.init(menu.getBlockPos());
-        // Force a full response regardless of any cache from a previously viewed machine.
-        requestTimelineView(true);
+        ChronosphereClientState.setActiveMachine(menu.getBlockPos());
+
+        String previousName = nameBox == null ? "" : nameBox.getValue();
+        nameBox = new EditBox(font, panelX() + (CONTENT_SIZE - BIND_BOX_WIDTH) / 2, panelY() + BIND_BOX_Y_OFFSET,
+                BIND_BOX_WIDTH, BIND_BOX_HEIGHT, Component.translatable("gui.temporalindustries.chronosphere.bind_box"));
+        nameBox.setMaxLength(TemporalWorldData.MAX_REPOSITORY_NAME_LENGTH);
+        nameBox.setHint(Component.translatable("gui.temporalindustries.chronosphere.bind_box"));
+        nameBox.setValue(previousName);
+        nameBox.setResponder(this::onNameChanged);
+        addRenderableWidget(nameBox);
+        setInitialFocus(nameBox);
+
+        // Fetches the timeline once the Chronovault is bound: now if it already is, otherwise
+        // when containerTick sees the binding arrive.
+        boundLastTick = false;
+        refreshBoundState();
+    }
+
+    /** Whether this Chronovault has a repository yet, per the client's synced block entity. */
+    private boolean isBound() {
+        return menu.getBlockEntity().isRepositoryBound();
+    }
+
+    private void refreshBoundState() {
+        boolean bound = isBound();
+        if (!bound && boundLastTick) {
+            // Suggestions cached while this block was unbound earlier may name a repository that
+            // has since been deleted, so start the selection screen from a clean slate.
+            ChronosphereClientState.clearSuggestions();
+            nameBox.setValue("");
+        }
+        if (!bound) {
+            settingsOverlayOpen = false;
+            deleteHistoryConfirmPending = false;
+        }
+        nameBox.visible = !bound;
+        nameBox.active = !bound;
+        if (bound && !boundLastTick) {
+            // Force a full response regardless of any cache from a previously viewed machine.
+            requestTimelineView(true);
+        }
+        boundLastTick = bound;
+    }
+
+    private void onNameChanged(String text) {
+        suggestionIndex = -1;
+        if (isBound()) return;
+        if (text.trim().isEmpty()) {
+            ChronosphereClientState.clearSuggestions();
+            return;
+        }
+        PacketDistributor.sendToServer(new RepositorySuggestRequestPacket(menu.getBlockPos(), text));
+    }
+
+    /**
+     * The server's suggestions for exactly what is currently typed, minus a lone suggestion that is
+     * just the typed name again.
+     */
+    private List<String> visibleSuggestions() {
+        if (isBound() || !ChronosphereClientState.getSuggestionQuery().equals(nameBox.getValue())) return List.of();
+        List<String> names = ChronosphereClientState.getSuggestions();
+        if (names.size() == 1 && names.get(0).equalsIgnoreCase(nameBox.getValue().trim())) return List.of();
+        return names;
+    }
+
+    private int suggestionRowY(int row) {
+        return nameBox.getY() + BIND_BOX_HEIGHT + row * SUGGEST_ROW_HEIGHT;
+    }
+
+    private int suggestionRowAt(double mouseX, double mouseY) {
+        List<String> names = visibleSuggestions();
+        for (int row = 0; row < names.size(); row++) {
+            if (isMouseOverRect(mouseX, mouseY, nameBox.getX(), suggestionRowY(row), BIND_BOX_WIDTH, SUGGEST_ROW_HEIGHT)) return row;
+        }
+        return -1;
+    }
+
+    private void acceptSuggestion(int row) {
+        List<String> names = visibleSuggestions();
+        if (row < 0 || row >= names.size()) return;
+        nameBox.setValue(names.get(row));
+        nameBox.setFocused(true);
+    }
+
+    private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        List<String> names = visibleSuggestions();
+        if (names.isEmpty()) return;
+
+        int hoveredRow = suggestionRowAt(mouseX, mouseY);
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().translate(0, 0, 200);
+        int x = nameBox.getX();
+        guiGraphics.fill(x - 1, suggestionRowY(0), x + BIND_BOX_WIDTH + 1, suggestionRowY(names.size()) + 1, COLOR_BORDER);
+        for (int row = 0; row < names.size(); row++) {
+            int y = suggestionRowY(row);
+            boolean highlighted = row == hoveredRow || row == suggestionIndex;
+            guiGraphics.fill(x, y, x + BIND_BOX_WIDTH, y + SUGGEST_ROW_HEIGHT, highlighted ? 0xFF3A3A5A : 0xFF202020);
+            guiGraphics.drawString(font, names.get(row), x + 3, y + (SUGGEST_ROW_HEIGHT - font.lineHeight) / 2 + 1,
+                    highlighted ? 0xFFFFFFFF : 0xFFAAAAAA, false);
+        }
+        guiGraphics.pose().popPose();
+    }
+
+    private void submitBind() {
+        String name = nameBox.getValue().trim();
+        if (name.isEmpty()) return;
+        PacketDistributor.sendToServer(new ChronosphereBindRepositoryPacket(menu.getBlockPos(), name));
+    }
+
+    private int bindButtonX() {
+        return panelX() + (CONTENT_SIZE - BIND_BUTTON_WIDTH) / 2;
+    }
+
+    private int bindButtonY() {
+        return panelY() + BIND_BUTTON_Y_OFFSET;
+    }
+
+    private void renderBindPanel(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.bind_title"),
+                panelX() + CONTENT_SIZE / 2, panelY() + BIND_TITLE_Y_OFFSET, TEXT_PRIMARY);
+        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.bind_hint"),
+                panelX() + SETTINGS_INSET, panelY() + BIND_HINT_Y_OFFSET, CONTENT_SIZE - 2 * SETTINGS_INSET, TEXT_MUTED);
+
+        boolean canSubmit = !nameBox.getValue().trim().isEmpty();
+        int baseColor = canSubmit ? 0xFF3A6A3A : 0xFF555555;
+        boolean hovered = canSubmit && isMouseOverRect(mouseX, mouseY, bindButtonX(), bindButtonY(), BIND_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT);
+        drawOverlayButton(guiGraphics, bindButtonX(), bindButtonY(), BIND_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                Component.translatable("gui.temporalindustries.chronosphere.bind_button"), baseColor, hovered);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (!isBound()) {
+            int suggestionCount = visibleSuggestions().size();
+            if (suggestionCount > 0) {
+                if (keyCode == GLFW.GLFW_KEY_DOWN) {
+                    suggestionIndex = (suggestionIndex + 1) % suggestionCount;
+                    return true;
+                }
+                if (keyCode == GLFW.GLFW_KEY_UP) {
+                    suggestionIndex = (suggestionIndex <= 0 ? suggestionCount : suggestionIndex) - 1;
+                    return true;
+                }
+                if (keyCode == GLFW.GLFW_KEY_TAB) {
+                    acceptSuggestion(Math.max(suggestionIndex, 0));
+                    return true;
+                }
+            }
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                if (suggestionIndex >= 0 && suggestionIndex < suggestionCount) {
+                    acceptSuggestion(suggestionIndex);
+                } else {
+                    submitBind();
+                }
+                return true;
+            }
+            // Typing 'e' (the inventory key) must edit the name rather than close the screen.
+            if (keyCode != GLFW.GLFW_KEY_ESCAPE && (nameBox.keyPressed(keyCode, scanCode, modifiers) || nameBox.canConsumeInput())) {
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     /**
@@ -168,6 +396,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         super.containerTick();
         TimelineProjectionManager.setCurrentGameTime(getCurrentGameTime());
 
+        refreshBoundState();
+        if (!boundLastTick) return;
+
         // Periodically re-fetch commits; the server skips the full reply when the head hasn't moved.
         ticksSinceSync++;
         if (ticksSinceSync >= SYNC_INTERVAL_TICKS) {
@@ -185,7 +416,37 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
      * Button widgets.
      */
     private void handleSettingsOverlayClick(double mouseX, double mouseY) {
-        int buttonY = panelY() + 130;
+        if (!isMouseOverRect(mouseX, mouseY, panelX(), panelY() + SETTINGS_VIEWPORT_TOP,
+                CONTENT_SIZE, SETTINGS_VIEWPORT_HEIGHT)) {
+            return;
+        }
+        int buttonY = settingsRowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
+
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), ghostToggleButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
+            TimelineProjectionManager.toggleGhostBlockMode();
+            return;
+        }
+
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), saveEntitiesButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
+            PacketDistributor.sendToServer(new ChronosphereSetSaveEntitiesPacket(menu.getBlockPos(),
+                    !menu.getBlockEntity().isSaveEntities()));
+            return;
+        }
+
+        if (isMouseOverRect(mouseX, mouseY, ghostToggleButtonX(), chargeContainersButtonY(),
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE)) {
+            PacketDistributor.sendToServer(new ChronosphereSetChargeContainersPacket(menu.getBlockPos(),
+                    !menu.getBlockEntity().isChargeContainers()));
+            return;
+        }
+
+        if (isMouseOverRect(mouseX, mouseY, changeRepositoryButtonX(), changeRepositoryButtonY(),
+                DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+            changeRepository();
+            return;
+        }
 
         if (deleteHistoryConfirmPending) {
             int confirmX = panelX() + (CONTENT_SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
@@ -205,13 +466,41 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         }
     }
 
+    private int changeRepositoryButtonX() {
+        return panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
+    }
+
+    private int changeRepositoryButtonY() {
+        return settingsRowY(CHANGE_REPOSITORY_BUTTON_Y_OFFSET);
+    }
+
+    /** A settings row's screen y: its offset within the scrolled content, less the current scroll. */
+    private int settingsRowY(int contentOffset) {
+        return panelY() + contentOffset - settingsScroll.offset();
+    }
+
+    /** Detaches from the current repository and shows the name-entry panel again. */
+    private void changeRepository() {
+        PacketDistributor.sendToServer(new ChronosphereUnbindRepositoryPacket(menu.getBlockPos()));
+        settingsOverlayOpen = false;
+        deleteHistoryConfirmPending = false;
+        TimelineProjectionManager.clearSelectedCommit();
+    }
+
     private void jumpAndClose() {
         if (!TimelineProjectionManager.hasSelection()) {
             return;
         }
-        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(),
-                TimelineProjectionManager.getSelectedCommitId()));
+        long commitId = TimelineProjectionManager.getSelectedCommitId();
+        boolean willCharge = TimelineProjectionManager.getJumpCost(commitId)
+                .map(cost -> cost.total() > menu.getEnergyStored())
+                .orElse(false);
+        PacketDistributor.sendToServer(new RollbackChunkPacket(menu.getBlockPos(), commitId));
+        if (willCharge) {
+            return;
+        }
         TimelineProjectionManager.clearSelectedCommit();
+        TimelineProjectionManager.disableShowChanges();
         if (minecraft != null && minecraft.player != null) {
             minecraft.player.closeContainer();
         }
@@ -248,7 +537,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         RenderSystem.setShaderTexture(0, INVENTORY_TEXTURE);
         guiGraphics.blit(INVENTORY_TEXTURE, leftPos, topPos, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
-        graphWidget.render(guiGraphics, font, panelX() + GRAPH_X_OFFSET, panelY() + GRAPH_Y_OFFSET, GRAPH_WIDTH, GRAPH_HEIGHT);
+        if (isBound()) {
+            graphWidget.render(guiGraphics, font, panelX() + GRAPH_X_OFFSET, panelY() + GRAPH_Y_OFFSET, GRAPH_WIDTH, GRAPH_HEIGHT);
+        }
 
         int energyStored = menu.getEnergyStored();
         int energyCapacity = menu.getEnergyCapacity();
@@ -264,13 +555,18 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
         renderEntropyBar(guiGraphics);
 
+        if (!isBound()) {
+            renderBindPanel(guiGraphics, mouseX, mouseY);
+            return;
+        }
+
         if (!settingsOverlayOpen) {
             renderActionButtons(guiGraphics, mouseX, mouseY);
         }
     }
 
     /**
-     * Show Changes / Jump: icon buttons; Show Changes tints on while active, Jump dims while
+     * Show Changes / Jump / Commit: icon buttons; Show Changes tints on while active, Jump dims while
      * nothing is selected.
      */
     private void renderActionButtons(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -279,10 +575,33 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         IconButtonRenderer.renderBackground(guiGraphics, showChangesX, showChangesY, showChangesTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_EYE_TEXTURE, showChangesX, showChangesY);
 
+        if (menu.isCharging()) {
+            int barY = jumpY - CHARGE_BAR_HEIGHT - CHARGE_BAR_GAP;
+            int barLeft = jumpX - CHARGE_BAR_OVERHANG;
+            int barWidth = JUMP_BUTTON_WIDTH + 2 * CHARGE_BAR_OVERHANG;
+            guiGraphics.fill(barLeft, barY, barLeft + barWidth, barY + CHARGE_BAR_HEIGHT, 0xFF000000);
+            int filled = Math.round(menu.getChargeProgressPermille() / 1000.0F * (barWidth - 2));
+            if (filled > 0) {
+                guiGraphics.fill(barLeft + 1, barY + 1, barLeft + 1 + filled, barY + CHARGE_BAR_HEIGHT - 1, 0xFF3BFB98);
+            }
+        }
+
         boolean jumpActive = TimelineProjectionManager.hasSelection();
         int jumpTint = !jumpActive ? 0x80000000 : (isMouseOverJumpButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
-        IconButtonRenderer.renderBackground(guiGraphics, jumpX, jumpY, jumpTint);
-        IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX, jumpY);
+        guiGraphics.blit(MENU_BUTTON_SMALL_TEXTURE, jumpX, jumpY, JUMP_BUTTON_WIDTH, ACTION_BUTTON_SIZE,
+                0.0F, 0.0F, JUMP_BUTTON_WIDTH, ACTION_BUTTON_SIZE, JUMP_BUTTON_WIDTH, ACTION_BUTTON_SIZE);
+        if (jumpTint != 0) {
+            guiGraphics.fill(jumpX, jumpY, jumpX + JUMP_BUTTON_WIDTH, jumpY + ACTION_BUTTON_SIZE, jumpTint);
+        }
+        guiGraphics.drawString(font, Component.translatable(menu.isCharging()
+                        ? "gui.temporalindustries.timeline_view.charging_button"
+                        : "gui.temporalindustries.chronovault.jump"),
+                jumpX + JUMP_TEXT_PADDING, jumpY + (ACTION_BUTTON_SIZE - font.lineHeight) / 2 + 1, TEXT_PRIMARY, false);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_JUMP_TEXTURE, jumpX + JUMP_BUTTON_WIDTH - ACTION_BUTTON_SIZE, jumpY);
+
+        int commitTint = isMouseOverCommitButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, commitX, commitY, commitTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ICON_PUSH_TEXTURE, commitX, commitY);
 
         // Hidden entirely until a deletable commit is selected.
         if (TimelineProjectionManager.isSelectedCommitDeletable()) {
@@ -298,8 +617,13 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     }
 
     private boolean isMouseOverJumpButton(double mouseX, double mouseY) {
-        return mouseX >= jumpX && mouseX <= jumpX + ACTION_BUTTON_SIZE
+        return mouseX >= jumpX && mouseX <= jumpX + JUMP_BUTTON_WIDTH
                 && mouseY >= jumpY && mouseY <= jumpY + ACTION_BUTTON_SIZE;
+    }
+
+    private boolean isMouseOverCommitButton(double mouseX, double mouseY) {
+        return mouseX >= commitX && mouseX <= commitX + ACTION_BUTTON_SIZE
+                && mouseY >= commitY && mouseY <= commitY + ACTION_BUTTON_SIZE;
     }
 
     private boolean isMouseOverDeleteCommitButton(double mouseX, double mouseY) {
@@ -347,14 +671,78 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     private void renderSettingsOverlay(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         guiGraphics.blit(INVENTORY_TEXTURE, leftPos, topPos, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
-        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.settings_title"),
-                panelX() + CONTENT_SIZE / 2, panelY() + 16, TEXT_PRIMARY);
+        int textX = panelX() + SETTINGS_INSET;
+        int textWidth = CONTENT_SIZE - 2 * SETTINGS_INSET;
 
-        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
-                panelX() + 20, panelY() + 60, CONTENT_SIZE - 40, TEXT_SECONDARY);
+        drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.settings_title"),
+                panelX() + CONTENT_SIZE / 2, panelY() + SETTINGS_TITLE_Y_OFFSET, TEXT_PRIMARY);
+        drawDivider(guiGraphics, panelY() + SETTINGS_TITLE_DIVIDER_Y_OFFSET);
+
+        settingsScroll.update(SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
+        guiGraphics.enableScissor(panelX(), panelY() + SETTINGS_VIEWPORT_TOP,
+                panelX() + CONTENT_SIZE, panelY() + SETTINGS_VIEWPORT_TOP + SETTINGS_VIEWPORT_HEIGHT);
+        renderSettingsRows(guiGraphics, mouseX, mouseY, textX, textWidth);
+        guiGraphics.disableScissor();
+        settingsScroll.renderBar(guiGraphics, panelX() + CONTENT_SIZE - SETTINGS_INSET / 2,
+                panelY() + SETTINGS_VIEWPORT_TOP, SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
+    }
+
+    private void renderSettingsRows(GuiGraphics guiGraphics, int mouseX, int mouseY, int textX, int textWidth) {
+        boolean ghostEnabled = TimelineProjectionManager.isGhostBlockModeEnabled();
+        int toggleX = ghostToggleButtonX();
+        int ghostButtonY = ghostToggleButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_label"),
+                textX, ghostButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int ghostTint = isMouseOverRect(mouseX, mouseY, toggleX, ghostButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, toggleX, ghostButtonY, ghostTint);
+        IconButtonRenderer.renderIcon(guiGraphics, ghostEnabled ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                toggleX, ghostButtonY);
+        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.ghost_preview_hint",
+                        TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT),
+                textX, settingsRowY(GHOST_TOGGLE_HINT_Y_OFFSET), textWidth, TEXT_MUTED);
+
+        drawDivider(guiGraphics, settingsRowY(SECTION_DIVIDER_Y_OFFSET));
+
+        int entitiesButtonY = saveEntitiesButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronosphere.save_entities_label"),
+                textX, entitiesButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int entitiesTint = isMouseOverRect(mouseX, mouseY, toggleX, entitiesButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, toggleX, entitiesButtonY, entitiesTint);
+        IconButtonRenderer.renderIcon(guiGraphics,
+                menu.getBlockEntity().isSaveEntities() ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                toggleX, entitiesButtonY);
+
+        int containersButtonY = chargeContainersButtonY();
+        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_label"),
+                textX, containersButtonY + (IconButtonRenderer.SIZE - 8) / 2, TEXT_PRIMARY, false);
+        int containersTint = isMouseOverRect(mouseX, mouseY, toggleX, containersButtonY,
+                IconButtonRenderer.SIZE, IconButtonRenderer.SIZE) ? 0x40000000 : 0;
+        IconButtonRenderer.renderBackground(guiGraphics, toggleX, containersButtonY, containersTint);
+        IconButtonRenderer.renderIcon(guiGraphics,
+                menu.getBlockEntity().isChargeContainers() ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE,
+                toggleX, containersButtonY);
+        drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_hint"),
+                textX, settingsRowY(CHARGE_CONTAINERS_HINT_Y_OFFSET), textWidth, COLOR_WARNING);
+
+        drawDivider(guiGraphics, settingsRowY(SAVE_ENTITIES_DIVIDER_Y_OFFSET));
+
+        drawOverlayButton(guiGraphics, changeRepositoryButtonX(), changeRepositoryButtonY(),
+                DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
+                Component.translatable("gui.temporalindustries.chronosphere.change_repository_button"),
+                0xFF3A5A8A, isMouseOverRect(mouseX, mouseY, changeRepositoryButtonX(), changeRepositoryButtonY(),
+                        DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
+
+        drawDivider(guiGraphics, settingsRowY(DANGER_DIVIDER_Y_OFFSET));
+
+        if (!deleteHistoryConfirmPending) {
+            drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
+                    textX, settingsRowY(DELETE_HISTORY_HINT_Y_OFFSET), textWidth, TEXT_MUTED);
+        }
 
         int buttonX = panelX() + (CONTENT_SIZE - DELETE_BUTTON_WIDTH) / 2;
-        int buttonY = panelY() + 130;
+        int buttonY = settingsRowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
 
         if (deleteHistoryConfirmPending) {
             drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
@@ -373,6 +761,26 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
                     Component.translatable("gui.temporalindustries.timeline_machine.delete_history_button"),
                     0xFF8A3A3A, isMouseOverRect(mouseX, mouseY, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
         }
+    }
+
+    private void drawDivider(GuiGraphics guiGraphics, int y) {
+        guiGraphics.fill(panelX() + SETTINGS_INSET, y, panelX() + CONTENT_SIZE - SETTINGS_INSET, y + 1, COLOR_DIVIDER);
+    }
+
+    private int ghostToggleButtonX() {
+        return panelX() + CONTENT_SIZE - SETTINGS_INSET - IconButtonRenderer.SIZE;
+    }
+
+    private int ghostToggleButtonY() {
+        return settingsRowY(GHOST_TOGGLE_ROW_Y_OFFSET);
+    }
+
+    private int saveEntitiesButtonY() {
+        return settingsRowY(SAVE_ENTITIES_ROW_Y_OFFSET);
+    }
+
+    private int chargeContainersButtonY() {
+        return settingsRowY(CHARGE_CONTAINERS_ROW_Y_OFFSET);
     }
 
     private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
@@ -407,6 +815,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     }
 
     private void renderTabs(GuiGraphics guiGraphics, int mouseX, int mouseY) {
+        if (!isBound()) return;
         renderSettingsTab(guiGraphics, mouseX, mouseY);
     }
 
@@ -422,6 +831,16 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         renderLabels(guiGraphics, mouseX, mouseY);
         for (var widget : renderables) {
             widget.render(guiGraphics, mouseX, mouseY, partialTick);
+        }
+
+        if (!isBound()) {
+            renderSuggestions(guiGraphics, mouseX, mouseY);
+            if (isMouseOverEnergyBar(mouseX, mouseY)) {
+                guiGraphics.renderTooltip(font, Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/" + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE"), mouseX, mouseY);
+            } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
+                guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+            }
+            return;
         }
 
         if (settingsOverlayOpen) {
@@ -445,7 +864,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
         } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, Component.translatable(menu.isCharging()
+                    ? "gui.temporalindustries.timeline_view.charging_button"
+                    : "gui.temporalindustries.chronovault.jump"), mouseX, mouseY);
+        } else if (isMouseOverCommitButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.commit_tooltip"), mouseX, mouseY);
         } else if (isMouseOverDeleteCommitButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, deleteCommitTooltip(), mouseX, mouseY);
         }
@@ -465,8 +888,23 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
+        if (!isBound()) {
+            int suggestionRow = button == 0 ? suggestionRowAt(mouseX, mouseY) : -1;
+            if (suggestionRow >= 0) {
+                acceptSuggestion(suggestionRow);
+                return true;
+            }
+            if (button == 0 && !nameBox.getValue().trim().isEmpty()
+                    && isMouseOverRect(mouseX, mouseY, bindButtonX(), bindButtonY(), BIND_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
+                submitBind();
+                return true;
+            }
+            return super.mouseClicked(mouseX, mouseY, button);
+        }
+
         if (button == 0 && isMouseOverSettingsTab(mouseX, mouseY)) {
             settingsOverlayOpen = !settingsOverlayOpen;
+            settingsScroll.reset();
             deleteHistoryConfirmPending = false;
             return true;
         }
@@ -489,6 +927,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
             return true;
         }
 
+        if (button == 0 && isMouseOverCommitButton(mouseX, mouseY)) {
+            PacketDistributor.sendToServer(new TimelineMachineCommitPacket(menu.getBlockPos()));
+            return true;
+        }
+
         if (button == 0 && isMouseOverDeleteCommitButton(mouseX, mouseY)) {
             deleteSelectedCommit();
             return true;
@@ -505,6 +948,9 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     @Override
     public boolean mouseDragged(double mouseX, double mouseY, int button, double dragX, double dragY) {
+        if (!isBound()) {
+            return super.mouseDragged(mouseX, mouseY, button, dragX, dragY);
+        }
         if (settingsOverlayOpen) {
             return true;
         }
@@ -524,7 +970,11 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
 
     @Override
     public boolean mouseScrolled(double mouseX, double mouseY, double scrollX, double scrollY) {
+        if (!isBound()) {
+            return super.mouseScrolled(mouseX, mouseY, scrollX, scrollY);
+        }
         if (settingsOverlayOpen) {
+            settingsScroll.scroll(scrollY, SETTINGS_CONTENT_HEIGHT, SETTINGS_VIEWPORT_HEIGHT);
             return true;
         }
         if (graphWidget.mouseScrolled(mouseX, mouseY, scrollY, panelX() + GRAPH_X_OFFSET, panelY() + GRAPH_Y_OFFSET, GRAPH_WIDTH, GRAPH_HEIGHT)) {
@@ -537,6 +987,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         // Coordinates here must be absolute, since render() skips AbstractContainerScreen's translate.
         drawCenteredNoShadow(guiGraphics, Component.translatable("block.temporalindustries.chronovault"), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
+        if (!isBound()) return;
 
         long now = TimelineProjectionManager.getCurrentGameTime();
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chronovault.preview_current", formatGameDayTime(now)), panelX() + 8, panelY() + PREVIEW_CURRENT_Y_OFFSET, TEXT_PRIMARY, false);

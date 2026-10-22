@@ -5,13 +5,12 @@ import org.jetbrains.annotations.Nullable;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.dimension.RiftDeviceLock;
-import io.github.tofithepuppycat.temporalindustries.item.PortableChronoMarkerItem;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
-import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
@@ -87,27 +86,13 @@ public class Chronosphere extends BaseEntityBlock {
         return RenderShape.MODEL;
     }
 
-    @Override
-    public boolean canSurvive(@NotNull BlockState state, @NotNull LevelReader level, @NotNull BlockPos pos) {
-        if (level instanceof ServerLevel serverLevel) {
-            TemporalWorldData data = TemporalWorldData.get(serverLevel.getServer());
-            if (data.isTracked(serverLevel.dimension().location(), new ChunkPos(pos))) {
-                return false;
-            }
-        }
-        return super.canSurvive(state, level, pos);
-    }
-
-    /**
-     * Right-clicking with a Portable Chrono Marker copies this Chronosphere's claimed chunk layout
-     * onto the marker (as offsets from the home chunk) instead of opening the menu.
-     */
+    /** Right-clicking with a Chrono Remote Control links it to this Chronosphere instead of opening the menu. */
     @Override
     protected ItemInteractionResult useItemOn(ItemStack stack, @NotNull BlockState state, @NotNull Level level,
                                                @NotNull BlockPos pos, @NotNull Player player,
                                                @NotNull InteractionHand hand,
                                                @NotNull BlockHitResult hitResult) {
-        if (!(stack.getItem() instanceof PortableChronoMarkerItem)) {
+        if (!(stack.getItem() instanceof ChronoRemoteControlItem)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
         if (RiftDeviceLock.blockIfInRift(level, player)) {
@@ -119,17 +104,13 @@ public class Chronosphere extends BaseEntityBlock {
         if (!(level.getBlockEntity(pos) instanceof ChronosphereBlockEntity chronosphere)) {
             return ItemInteractionResult.PASS_TO_DEFAULT_BLOCK_INTERACTION;
         }
-
-        ChunkPos home = chronosphere.getHomeChunkPos();
-        List<PortableChronoMarkerItem.ChunkOffset> offsets = new ArrayList<>();
-        offsets.add(new PortableChronoMarkerItem.ChunkOffset(0, 0));
-        for (long key : chronosphere.getAdditionalChunkKeys()) {
-            ChunkPos chunk = new ChunkPos(key);
-            offsets.add(new PortableChronoMarkerItem.ChunkOffset(chunk.x - home.x, chunk.z - home.z));
+        if (!chronosphere.isRepositoryBound()) {
+            player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_remote_control.inactive"), true);
+            return ItemInteractionResult.FAIL;
         }
-        PortableChronoMarkerItem.saveOffsets(stack, offsets);
 
-        player.displayClientMessage(Component.translatable("item.temporalindustries.portable_chrono_marker.area_saved"), true);
+        ChronoRemoteControlItem.link(stack, GlobalPos.of(level.dimension(), pos));
+        player.displayClientMessage(Component.translatable("item.temporalindustries.chrono_remote_control.link_set"), true);
         level.playSound(null, pos, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.4F);
         return ItemInteractionResult.SUCCESS;
     }
@@ -152,6 +133,15 @@ public class Chronosphere extends BaseEntityBlock {
         }
 
         return InteractionResult.CONSUME;
+    }
+
+    @Override
+    public @NotNull ItemStack getCloneItemStack(@NotNull LevelReader level, @NotNull BlockPos pos, @NotNull BlockState state) {
+        ItemStack stack = super.getCloneItemStack(level, pos, state);
+        if (level.getBlockEntity(pos) instanceof ChronosphereBlockEntity machine) {
+            stack.applyComponents(machine.collectComponents());
+        }
+        return stack;
     }
 
     @Override

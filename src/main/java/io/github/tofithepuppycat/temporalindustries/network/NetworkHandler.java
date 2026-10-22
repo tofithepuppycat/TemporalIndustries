@@ -80,6 +80,16 @@ public class NetworkHandler {
                 ChronosphereUnbindRepositoryPacket::handle);
 
         registrar.playToServer(
+                ChronosphereSetSaveEntitiesPacket.TYPE,
+                ChronosphereSetSaveEntitiesPacket.STREAM_CODEC,
+                ChronosphereSetSaveEntitiesPacket::handle);
+
+        registrar.playToServer(
+                ChronosphereSetChargeContainersPacket.TYPE,
+                ChronosphereSetChargeContainersPacket.STREAM_CODEC,
+                ChronosphereSetChargeContainersPacket::handle);
+
+        registrar.playToServer(
                 TimelineMachineDeleteHistoryPacket.TYPE,
                 TimelineMachineDeleteHistoryPacket.STREAM_CODEC,
                 TimelineMachineDeleteHistoryPacket::handle);
@@ -103,21 +113,6 @@ public class NetworkHandler {
                 GlueRegionSyncPacket.TYPE,
                 GlueRegionSyncPacket.STREAM_CODEC,
                 GlueRegionSyncPacket::handle);
-
-        registrar.playToServer(
-                ChronoMarkerMapRequestPacket.TYPE,
-                ChronoMarkerMapRequestPacket.STREAM_CODEC,
-                ChronoMarkerMapRequestPacket::handle);
-
-        registrar.playToClient(
-                ChronoMarkerMapSyncPacket.TYPE,
-                ChronoMarkerMapSyncPacket.STREAM_CODEC,
-                ChronoMarkerMapSyncPacket::handle);
-
-        registrar.playToServer(
-                ChronoMarkerSaveSelectionPacket.TYPE,
-                ChronoMarkerSaveSelectionPacket.STREAM_CODEC,
-                ChronoMarkerSaveSelectionPacket::handle);
 
         registrar.playToServer(
                 EntropyCondenserSetRangePacket.TYPE,
@@ -195,14 +190,14 @@ public class NetworkHandler {
                 EntropyManipulatorCycleRecipePacket::handle);
 
         registrar.playToServer(
-                ChronoLensRequestPacket.TYPE,
-                ChronoLensRequestPacket.STREAM_CODEC,
-                ChronoLensRequestPacket::handle);
+                ChronoRemoteActionPacket.TYPE,
+                ChronoRemoteActionPacket.STREAM_CODEC,
+                ChronoRemoteActionPacket::handle);
 
         registrar.playToServer(
-                ChronoLensTravelPacket.TYPE,
-                ChronoLensTravelPacket.STREAM_CODEC,
-                ChronoLensTravelPacket::handle);
+                ChronoLensSavePacket.TYPE,
+                ChronoLensSavePacket.STREAM_CODEC,
+                ChronoLensSavePacket::handle);
 
         registrar.playToClient(
                 ChronoRiftChunkTrackedSyncPacket.TYPE,

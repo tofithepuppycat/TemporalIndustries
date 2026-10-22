@@ -15,7 +15,8 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 /**
  * Chronodial, Chronovault and Chronosphere all refuse to operate while inside the Chrono Rift
  * itself - letting a timeline machine run inside the rift it's built out of would let a player
- * rewrite the history the rift is replaying.
+ * rewrite the history the rift is replaying - or inside the End of Time, which stays outside
+ * history altogether.
  */
 public final class RiftDeviceLock {
     private static final ResourceLocation PARADOX_AVERTED_ID =
@@ -25,7 +26,7 @@ public final class RiftDeviceLock {
 
     /** Call from a block's use handler once its {@code BlockEntity} lookup has succeeded. */
     public static boolean blockIfInRift(Level level, Player player) {
-        if (level.dimension() != ChronoRiftDimension.LEVEL_KEY) {
+        if (level.dimension() != ChronoRiftDimension.LEVEL_KEY && level.dimension() != EndOfTimeDimension.LEVEL_KEY) {
             return false;
         }
 
