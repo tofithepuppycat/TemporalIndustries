@@ -93,6 +93,8 @@ public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
                             Component.translatable("block.temporalindustries.chronosphere.already_tracked"), true);
                     case LIMIT_REACHED -> sender.displayClientMessage(
                             Component.translatable("block.temporalindustries.chronosphere.limit_reached"), true);
+                    case REGION_CHUNK -> sender.displayClientMessage(
+                            Component.translatable("block.temporalindustries.chronosphere.region_chunk"), true);
                     default -> { /* ADDED / REMOVED / IS_HOME / NOT_SELECTED need no feedback */ }
                 }
             }

@@ -6,9 +6,11 @@ import io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereSc
 import io.github.tofithepuppycat.temporalindustries.client.screen.CrudeEntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.DecayAcceleratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.DespawnAcceleratorScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyBalancerScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyManipulatorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.WithergenicReactorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronovaultScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -35,10 +37,12 @@ public class ClientModEvents {
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
         event.register(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), CrudeEntropyCondenserScreen::new);
+        event.register(Registration.ENTROPY_BALANCER_MENU.get(), EntropyBalancerScreen::new);
         event.register(Registration.DECAY_ACCELERATOR_MENU.get(), DecayAcceleratorScreen::new);
         event.register(Registration.DESPAWN_ACCELERATOR_MENU.get(), DespawnAcceleratorScreen::new);
         event.register(Registration.ENTROPY_MANIPULATOR_MENU.get(), EntropyManipulatorScreen::new);
         event.register(Registration.LOOT_GENERATOR_MENU.get(), LootGeneratorScreen::new);
+        event.register(Registration.WITHERGENIC_REACTOR_MENU.get(), WithergenicReactorScreen::new);
     }
 
     @SuppressWarnings("null")
@@ -67,8 +71,11 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void onRegisterItemDecorations(RegisterItemDecorationsEvent event) {
         event.register(Registration.DUAL_ENTROPY_CELL_ITEM.get(), new EntropyContainerItemDecorator());
+        event.register(Registration.RESONANT_DUAL_ENTROPY_CELL_ITEM.get(), new EntropyContainerItemDecorator());
         event.register(Registration.ORDER_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.ORDER));
         event.register(Registration.CHAOS_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.CHAOS));
+        event.register(Registration.RESONANT_ORDER_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.ORDER));
+        event.register(Registration.RESONANT_CHAOS_CELL_ITEM.get(), new EntropyCellItemDecorator(EntropyType.CHAOS));
         event.register(Registration.TEMPORAL_ANCHOR_ITEM.get(), new TemporalAnchorItemDecorator());
     }
 
@@ -83,6 +90,9 @@ public class ClientModEvents {
         event.registerAbove(VanillaGuiLayers.HOTBAR,
                 ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_glasses_overlay"),
                 EntropyGlassesOverlay.INSTANCE);
+        event.registerAbove(VanillaGuiLayers.HOTBAR,
+                ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chrono_remote_overlay"),
+                ChronoRemoteOverlay.INSTANCE);
     }
 
     /**
@@ -97,5 +107,6 @@ public class ClientModEvents {
         GlueSelectionClientState.clear();
         EntropyCondenserRangeClientState.clear();
         ChronoRiftClientState.clearAll();
+        ChronoRemoteClientState.clearAll();
     }
 }

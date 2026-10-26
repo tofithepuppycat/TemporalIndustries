@@ -322,6 +322,12 @@ public class TemporalWorldData extends SavedData {
         return dimChunks == null ? null : dimChunks.get(chunkPos.toLong());
     }
 
+    /** Whether repoId records and restores pos; see {@link TemporalRepository#isTracked}. */
+    public boolean isTrackedBy(UUID repoId, BlockPos pos) {
+        TemporalRepository repo = repositories.get(repoId);
+        return repo == null || repo.isTracked(pos);
+    }
+
     public Set<ChunkPos> getClaimedChunks(UUID repoId) {
         Set<Long> claimed = repoClaimedChunks.get(repoId);
         if (claimed == null) return Collections.emptySet();

@@ -366,6 +366,15 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return Math.min(JUMP_ENTROPIC_MAX_FE, Math.round(JUMP_ENTROPIC_FE_SCALE * Math.expm1(JUMP_ENTROPIC_GROWTH * chaos)));
     }
 
+    /**
+     * Whether pos lies in a claimed chunk but outside the part of it this machine records: such
+     * blocks are neither captured nor restored, exactly like anti-glued ones.
+     */
+    private boolean isOutsideTrackedArea(BlockPos pos) {
+        TemporalRepository repo = getRepository();
+        return repo != null && !repo.isTracked(pos);
+    }
+
     /** Every chunk a jump on this machine moves together, home/primary chunk first. */
     public abstract List<ChunkPos> getAllChunks();
 
@@ -532,6 +541,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public boolean isGluedPos(BlockPos pos) {
         TemporalWorldData data = worldData();
         if (pos.equals(worldPosition)) return true;
+        if (isOutsideTrackedArea(pos)) return true;
         return data != null && level != null && data.isGlued(level.dimension().location(), pos);
     }
 
@@ -836,7 +846,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (data == null || level == null) return worldPosition::equals;
         ResourceLocation dimension = level.dimension().location();
         BlockPos machinePos = worldPosition;
-        return pos -> pos.equals(machinePos) || data.isGlued(dimension, pos);
+        TemporalRepository repo = getRepository();
+        return pos -> pos.equals(machinePos) || data.isGlued(dimension, pos) || (repo != null && !repo.isTracked(pos));
     }
 
     /**
