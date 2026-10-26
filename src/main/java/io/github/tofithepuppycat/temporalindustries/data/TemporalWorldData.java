@@ -379,10 +379,10 @@ public class TemporalWorldData extends SavedData {
         Map<Long, List<EntityDelta>> pendingEntities = repoPendingEntityDeltas.getOrDefault(repoId, Collections.emptyMap());
 
         Map<Long, Map<BlockPos, BlockChangeDelta>> commitBlocks = new HashMap<>(pendingBlocks);
+        // Every claimed chunk is diffed against its stored state, not just those with recorded
+        // events: edits that bypass the block events (bulk tools, commands) would otherwise be missed.
         for (ChunkPos claimed : getClaimedChunks(repoId)) {
-            if (!repo.hasBaseline(claimed)) {
-                commitBlocks.computeIfAbsent(claimed.toLong(), k -> Collections.emptyMap());
-            }
+            commitBlocks.computeIfAbsent(claimed.toLong(), k -> Collections.emptyMap());
         }
 
         RepoCommit result = repo.commit(level, commitBlocks, pendingEntities, gameTime, author);

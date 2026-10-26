@@ -122,7 +122,7 @@ public final class TemporalRepository {
             ChunkState state = chunkStates.computeIfAbsent(chunkKey, k -> new ChunkState());
             ChunkSnapshot snapshot = ChunkSnapshot.capture(level, new ChunkPos(chunkKey));
 
-            ResolvedChunkState head = firstCommit || !state.hasBaseline || deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN
+            ResolvedChunkState head = firstCommit || !state.hasBaseline
                     ? ResolvedChunkState.EMPTY : resolveChunkStateAt(headCommitId, chunkKey, false);
             if (head.states().isEmpty()) {
                 entries.put(chunkKey, ChunkEntry.full(snapshot));
@@ -134,6 +134,11 @@ public final class TemporalRepository {
             List<BlockChangeDelta> blockChanges = diffAgainst(head, snapshot);
             List<EntityDelta> entityChanges = pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
             if (blockChanges.isEmpty() && entityChanges.isEmpty()) continue;
+            if (deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN) {
+                entries.put(chunkKey, ChunkEntry.full(snapshot));
+                state.deltaCount = 0;
+                continue;
+            }
             entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
             state.deltaCount++;
         }
@@ -744,8 +749,14 @@ public final class TemporalRepository {
      */
     private void applyBlockStates(Map<BlockPos, BlockState> states, Map<BlockPos, net.minecraft.nbt.CompoundTag> beTags,
                                    ServerLevel level, Predicate<BlockPos> isGlued, List<BlockPos> deferredSettle) {
-        List<BlockPos> positions = new ArrayList<>(states.keySet());
-        positions.removeIf(isGlued);
+        // A FULL snapshot resolves to every position in the chunk, so only positions whose block
+        // differs from the world or that carry block entity data are worth sorting and visiting.
+        List<BlockPos> positions = new ArrayList<>();
+        for (Map.Entry<BlockPos, BlockState> entry : states.entrySet()) {
+            BlockPos pos = entry.getKey();
+            if (isGlued.test(pos)) continue;
+            if (beTags.get(pos) != null || !level.getBlockState(pos).equals(entry.getValue())) positions.add(pos);
+        }
         positions.sort(ChunkSnapshot.BOTTOM_UP_ORDER);
 
         for (BlockPos pos : positions) {
@@ -758,6 +769,7 @@ public final class TemporalRepository {
             net.minecraft.nbt.CompoundTag beTag = beTags.get(pos);
             BlockEntity be = level.getBlockEntity(pos);
             if (be != null && beTag != null) {
+                if (beTag.equals(be.saveWithFullMetadata(level.registryAccess()))) continue;
                 net.minecraft.nbt.CompoundTag restored = beTag.copy();
                 restored.putInt("x", pos.getX());
                 restored.putInt("y", pos.getY());
