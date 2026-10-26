@@ -1,4 +1,4 @@
-package io.github.tofithepuppycat.temporalindustries.client.screen;
+package io.github.tofithepuppycat.temporalindustries.client.window;
 
 import net.minecraft.client.gui.GuiGraphics;
 

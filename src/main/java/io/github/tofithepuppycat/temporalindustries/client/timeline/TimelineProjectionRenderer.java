@@ -76,6 +76,27 @@ public class TimelineProjectionRenderer {
                     .createCompositeState(false));
 
     /**
+     * Marker decals' render type: vanilla's {@link RenderType#debugQuads()} without the per-frame
+     * depth sort of its translucent quads, which dominates frame time once thousands of decals are
+     * on screen.
+     */
+    private static final RenderType MARKER_RENDER_TYPE = RenderType.create(
+            "temporalindustries_marker",
+            DefaultVertexFormat.POSITION_COLOR,
+            VertexFormat.Mode.QUADS,
+            1536,
+            false,
+            false,
+            RenderType.CompositeState.builder()
+                    .setShaderState(RenderStateShard.POSITION_COLOR_SHADER)
+                    .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
+                    .setCullState(RenderStateShard.NO_CULL)
+                    .createCompositeState(false));
+
+    /** Most marker decals drawn per frame; the rest, being farthest from the camera, are skipped. */
+    private static final int MARKER_RENDER_LIMIT = 6000;
+
+    /**
      * Ghost-block mode's render type: a copy of vanilla's {@link RenderType#entityTranslucent}, not
      * the chunk-batching {@link RenderType#translucent()}.
      */
@@ -138,9 +159,9 @@ public class TimelineProjectionRenderer {
     private static void renderMarkers(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
                                        List<TimelineProjectionManager.ProjectionEntry> entries,
                                        double cameraX, double cameraY, double cameraZ, float alpha) {
-        VertexConsumer quadBuffer = bufferSource.getBuffer(RenderType.debugQuads());
+        VertexConsumer quadBuffer = bufferSource.getBuffer(MARKER_RENDER_TYPE);
 
-        for (TimelineProjectionManager.ProjectionEntry entry : entries) {
+        for (TimelineProjectionManager.ProjectionEntry entry : nearestEntries(entries, cameraX, cameraY, cameraZ, MARKER_RENDER_LIMIT)) {
             BlockPos pos = entry.getPos();
             double relX = pos.getX() - cameraX;
             double relY = pos.getY() - cameraY;
@@ -159,7 +180,7 @@ public class TimelineProjectionRenderer {
             }
         }
 
-        bufferSource.endBatch(RenderType.debugQuads());
+        bufferSource.endBatch(MARKER_RENDER_TYPE);
     }
 
     /**
