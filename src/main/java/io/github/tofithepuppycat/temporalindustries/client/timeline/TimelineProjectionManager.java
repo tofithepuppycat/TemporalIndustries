@@ -130,6 +130,10 @@ public final class TimelineProjectionManager {
         return showChangesEnabled;
     }
 
+    public static void enableShowChanges() {
+        showChangesEnabled = true;
+    }
+
     public static void disableShowChanges() {
         showChangesEnabled = false;
     }

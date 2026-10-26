@@ -3,9 +3,11 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.GlobalPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
@@ -78,7 +80,12 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         }
 
         context.enqueueWork(() -> {
-            if (sender.blockPosition().distSqr(packet.machinePos) > MAX_RANGE_BLOCKS * MAX_RANGE_BLOCKS) return;
+            // A Chrono Remote Control reads its linked machine from any distance, as long as it is loaded.
+            GlobalPos remoteLink = ChronoRemoteControlItem.findHeldLink(sender);
+            boolean viaRemote = remoteLink != null && remoteLink.dimension().equals(sender.level().dimension())
+                    && remoteLink.pos().equals(packet.machinePos);
+            if (viaRemote ? !sender.level().isLoaded(packet.machinePos)
+                    : sender.blockPosition().distSqr(packet.machinePos) > MAX_RANGE_BLOCKS * MAX_RANGE_BLOCKS) return;
             if (!(sender.level().getBlockEntity(packet.machinePos) instanceof TimelineViewProvider machine)) return;
 
             // headCommitId is a cheap "has history moved" fingerprint, avoiding a full re-encode on
