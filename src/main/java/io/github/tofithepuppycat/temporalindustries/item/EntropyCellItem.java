@@ -17,16 +17,22 @@ import net.minecraft.world.item.context.UseOnContext;
 import java.util.List;
 
 /**
- * Single-type liquid entropy storage - the Order Cell and Chaos Cell, distinguished by {@link
- * #type}.
+ * Single-type liquid entropy storage - the Order Cell and Chaos Cell and their resonant variants,
+ * distinguished by {@link #type} and {@link #capacity}.
  */
 @SuppressWarnings("null")
 public class EntropyCellItem extends Item implements EntropyReceptacle {
     private final EntropyType type;
+    private final int capacity;
 
-    public EntropyCellItem(EntropyType type, Properties properties) {
+    public EntropyCellItem(EntropyType type, int capacity, Properties properties) {
         super(properties);
         this.type = type;
+        this.capacity = capacity;
+    }
+
+    public int getCapacity() {
+        return capacity;
     }
 
     public EntropyType getType() {
@@ -40,7 +46,7 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
 
     @Override
     public int capacity(EntropyType type) {
-        return this.type == type ? BottleContents.CAPACITY : 0;
+        return this.type == type ? capacity : 0;
     }
 
     @Override
@@ -53,7 +59,7 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         if (this.type != type || millibuckets <= 0) return 0;
 
         int current = getContents(stack).amount();
-        int filled = Math.min(BottleContents.CAPACITY - current, millibuckets);
+        int filled = Math.min(capacity - current, millibuckets);
         if (filled <= 0) return 0;
 
         stack.set(Registration.BOTTLE_CONTENTS.get(), new BottleContents(current + filled));
@@ -86,7 +92,7 @@ public class EntropyCellItem extends Item implements EntropyReceptacle {
         int amount = getContents(stack).amount();
         String key = type == EntropyType.ORDER ? "item.temporalindustries.order_cell.contents" : "item.temporalindustries.chaos_cell.contents";
         TextColor color = type == EntropyType.ORDER ? EntropyDisplay.ORDER_COLOR : EntropyDisplay.CHAOS_COLOR;
-        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(BottleContents.CAPACITY))
+        tooltip.add(Component.translatable(key, EntropyDisplay.formatFluid(amount), EntropyDisplay.formatFluid(capacity))
                 .setStyle(Style.EMPTY.withColor(color))
                 .append(EntropyDisplay.unit(type)));
         CellTransfer.appendTooltip(stack, tooltip);

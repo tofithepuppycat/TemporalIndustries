@@ -17,13 +17,19 @@ import java.util.List;
 
 /**
  * Holds liquid ORD (order) and CHS (chaos) condensed out of entropy orbs it catches, up to {@link
- * EntropyContents#CAPACITY} mB of each.
+ * #capacity} mB of each.
  */
 @SuppressWarnings("null")
 public class DualEntropyCellItem extends Item implements EntropyReceptacle {
+    private final int capacity;
 
-    public DualEntropyCellItem(Properties properties) {
+    public DualEntropyCellItem(int capacity, Properties properties) {
         super(properties);
+        this.capacity = capacity;
+    }
+
+    public int getCapacity() {
+        return capacity;
     }
 
     @Override
@@ -33,7 +39,7 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
 
     @Override
     public int capacity(EntropyType type) {
-        return EntropyContents.CAPACITY;
+        return capacity;
     }
 
     @Override
@@ -47,7 +53,7 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
 
         EntropyContents contents = getContents(stack);
         int current = contents.amount(type);
-        int filled = Math.min(EntropyContents.CAPACITY - current, millibuckets);
+        int filled = Math.min(capacity - current, millibuckets);
         if (filled <= 0) return 0;
 
         stack.set(Registration.ENTROPY_CONTENTS.get(), contents.with(type, current + filled));
@@ -79,11 +85,11 @@ public class DualEntropyCellItem extends Item implements EntropyReceptacle {
     @Override
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         EntropyContents contents = getContents(stack);
-        String capacity = EntropyDisplay.formatFluid(EntropyContents.CAPACITY);
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.formatFluid(contents.order()), capacity)
+        String capacityText = EntropyDisplay.formatFluid(capacity);
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.order", EntropyDisplay.formatFluid(contents.order()), capacityText)
                 .setStyle(Style.EMPTY.withColor(EntropyDisplay.ORDER_COLOR))
                 .append(EntropyDisplay.unit(EntropyType.ORDER)));
-        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.formatFluid(contents.chaos()), capacity)
+        tooltip.add(Component.translatable("item.temporalindustries.dual_entropy_cell.chaos", EntropyDisplay.formatFluid(contents.chaos()), capacityText)
                 .setStyle(Style.EMPTY.withColor(EntropyDisplay.CHAOS_COLOR))
                 .append(EntropyDisplay.unit(EntropyType.CHAOS)));
         CellTransfer.appendTooltip(stack, tooltip);

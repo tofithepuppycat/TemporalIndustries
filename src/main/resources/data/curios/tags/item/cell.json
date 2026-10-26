@@ -3,6 +3,9 @@
   "values": [
     "temporalindustries:order_cell",
     "temporalindustries:chaos_cell",
-    "temporalindustries:dual_entropy_cell"
+    "temporalindustries:dual_entropy_cell",
+    "temporalindustries:resonant_order_cell",
+    "temporalindustries:resonant_chaos_cell",
+    "temporalindustries:resonant_dual_entropy_cell"
   ]
 }

@@ -1,0 +1,21 @@
+{
+  "type": "temporalindustries:cell_upgrade",
+  "ingredients": [
+    {
+      "item": "temporalindustries:order_cell"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:amethyst_block"
+    }
+  ],
+  "result": {
+    "id": "temporalindustries:resonant_order_cell",
+    "count": 1
+  }
+}
