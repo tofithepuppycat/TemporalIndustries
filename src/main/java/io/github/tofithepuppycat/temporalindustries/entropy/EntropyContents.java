@@ -13,6 +13,7 @@ import net.minecraft.network.codec.StreamCodec;
 public record EntropyContents(int order, int chaos) {
     public static final EntropyContents EMPTY = new EntropyContents(0, 0);
     public static final int CAPACITY = 10_000;
+    public static final int RESONANT_CAPACITY = 40_000;
 
     public static final Codec<EntropyContents> CODEC = RecordCodecBuilder.create(instance -> instance.group(
             Codec.INT.fieldOf("order").forGetter(EntropyContents::order),

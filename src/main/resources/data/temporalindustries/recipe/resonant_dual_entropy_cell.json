@@ -1,0 +1,24 @@
+{
+  "type": "temporalindustries:cell_upgrade",
+  "ingredients": [
+    {
+      "item": "temporalindustries:dual_entropy_cell"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:ender_pearl"
+    }
+  ],
+  "result": {
+    "id": "temporalindustries:resonant_dual_entropy_cell",
+    "count": 1
+  }
+}

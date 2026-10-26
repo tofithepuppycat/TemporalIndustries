@@ -1,0 +1,23 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "FGF",
+    "GBG",
+    "FGF"
+  ],
+  "key": {
+    "F": {
+      "item": "temporalindustries:machine_frame"
+    },
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "B": {
+      "item": "minecraft:bucket"
+    }
+  },
+  "result": {
+    "id": "temporalindustries:reactor_output_hatch",
+    "count": 1
+  }
+}
