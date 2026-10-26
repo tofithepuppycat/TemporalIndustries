@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -27,7 +28,7 @@ import java.util.List;
 import java.util.Optional;
 
 /**
- * Renders Temporal Glue's in-world selections while a Temporal Glue is held: a translucent outlined
+ * Renders Anti-Temporal Glue's in-world selections while a Anti-Temporal Glue is held: a translucent outlined
  * box for every known glued region, plus a live preview box from the pending corner to the
  * crosshair.
  */
@@ -38,6 +39,9 @@ public class GlueSelectionRenderer {
     private static final float[] OUTLINE_COLOR = {0.35F, 0.75F, 1.0F};
     private static final float OUTLINE_ALPHA = 0.9F;
     private static final float OUTLINE_THICKNESS = 0.02F;
+
+    private static final float[] TRACKED_FILL_COLOR = {0.55F, 1.0F, 0.65F};
+    private static final float[] TRACKED_OUTLINE_COLOR = {0.35F, 0.9F, 0.45F};
 
     private static final float[] PREVIEW_COLOR = {1.0F, 0.85F, 0.25F};
     private static final float PREVIEW_FILL_ALPHA = 0.10F;
@@ -62,8 +66,11 @@ public class GlueSelectionRenderer {
         }
 
         ResourceLocation dimension = level.dimension().location();
-        List<BoundingBox> regions = GlueSelectionClientState.getRegions(dimension);
-        Optional<BlockPos> pendingCorner = TemporalGlueItem.getPendingCorner(heldStack);
+        boolean tracked = heldStack.getItem() instanceof TemporalGlueItem;
+        List<BoundingBox> regions = tracked
+                ? GlueSelectionClientState.getTrackedRegions(dimension) : GlueSelectionClientState.getRegions(dimension);
+        Optional<BlockPos> pendingCorner = tracked
+                ? TemporalGlueItem.getPendingCorner(heldStack) : AntiTemporalGlueItem.getPendingCorner(heldStack);
         BoundingBox preview = null;
         if (pendingCorner.isPresent()) {
             BlockPos lookedAt = currentLookedAtBlock(minecraft);
@@ -86,7 +93,8 @@ public class GlueSelectionRenderer {
 
         for (BoundingBox region : regions) {
             renderBox(matrix, quadBuffer, region, camX, camY, camZ,
-                    FILL_COLOR, FILL_ALPHA, OUTLINE_COLOR, OUTLINE_ALPHA, OUTLINE_THICKNESS);
+                    tracked ? TRACKED_FILL_COLOR : FILL_COLOR, FILL_ALPHA,
+                    tracked ? TRACKED_OUTLINE_COLOR : OUTLINE_COLOR, OUTLINE_ALPHA, OUTLINE_THICKNESS);
         }
         if (preview != null) {
             renderBox(matrix, quadBuffer, preview, camX, camY, camZ,
@@ -97,8 +105,9 @@ public class GlueSelectionRenderer {
     }
 
     private static ItemStack holdingGlue(Player player) {
-        if (player.getMainHandItem().getItem() instanceof TemporalGlueItem) return player.getMainHandItem();
-        if (player.getOffhandItem().getItem() instanceof TemporalGlueItem) return player.getOffhandItem();
+        for (ItemStack stack : new ItemStack[] {player.getMainHandItem(), player.getOffhandItem()}) {
+            if (stack.getItem() instanceof AntiTemporalGlueItem || stack.getItem() instanceof TemporalGlueItem) return stack;
+        }
         return null;
     }
 

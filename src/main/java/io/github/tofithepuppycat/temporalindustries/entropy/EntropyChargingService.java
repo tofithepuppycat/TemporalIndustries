@@ -6,7 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.compat.curios.CuriosCompat;
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
-import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
+import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.item.ItemStack;
@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Passively trickles liquid ORD out of any Order Cell / Dual Entropy Cell carried by a player into
- * chargeable items carried the same way (Temporal Glue durability, Temporal Anchor order tank).
+ * chargeable items carried the same way (Anti-Temporal Glue durability, Temporal Anchor order tank).
  */
 public final class EntropyChargingService {
     public static final int CHARGE_INTERVAL_TICKS = 20;
@@ -61,7 +61,7 @@ public final class EntropyChargingService {
     }
 
     private static void chargeTarget(ItemStack stack, List<ItemStack> cells) {
-        if (stack.getItem() instanceof TemporalGlueItem) {
+        if (stack.getItem() instanceof AntiTemporalGlueItem) {
             chargeGlue(stack, cells);
         } else if (stack.getItem() instanceof TemporalAnchorItem) {
             chargeAnchor(stack, cells);

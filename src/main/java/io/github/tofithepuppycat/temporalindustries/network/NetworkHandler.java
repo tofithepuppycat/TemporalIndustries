@@ -120,6 +120,11 @@ public class NetworkHandler {
                 EntropyCondenserSetRangePacket::handle);
 
         registrar.playToServer(
+                EntropyBalancerConfigPacket.TYPE,
+                EntropyBalancerConfigPacket.STREAM_CODEC,
+                EntropyBalancerConfigPacket::handle);
+
+        registrar.playToServer(
                 AnchorModeCyclePacket.TYPE,
                 AnchorModeCyclePacket.STREAM_CODEC,
                 AnchorModeCyclePacket::handle);
@@ -193,6 +198,11 @@ public class NetworkHandler {
                 ChronoRemoteActionPacket.TYPE,
                 ChronoRemoteActionPacket.STREAM_CODEC,
                 ChronoRemoteActionPacket::handle);
+
+        registrar.playToClient(
+                ChronoRemoteStateSyncPacket.TYPE,
+                ChronoRemoteStateSyncPacket.STREAM_CODEC,
+                ChronoRemoteStateSyncPacket::handle);
 
         registrar.playToServer(
                 ChronoLensSavePacket.TYPE,

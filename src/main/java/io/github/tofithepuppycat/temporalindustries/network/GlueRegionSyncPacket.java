@@ -25,14 +25,22 @@ public class GlueRegionSyncPacket implements CustomPacketPayload {
 
     private final ResourceLocation dimension;
     private final List<BoundingBox> regions;
+    /** Whether these are the linked Chronosphere's tracked regions rather than anti-glued ones. */
+    private final boolean tracked;
 
     public GlueRegionSyncPacket(ResourceLocation dimension, List<BoundingBox> regions) {
+        this(dimension, regions, false);
+    }
+
+    public GlueRegionSyncPacket(ResourceLocation dimension, List<BoundingBox> regions, boolean tracked) {
         this.dimension = dimension;
         this.regions = regions;
+        this.tracked = tracked;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, GlueRegionSyncPacket packet) {
         buf.writeResourceLocation(packet.dimension);
+        buf.writeBoolean(packet.tracked);
         buf.writeVarInt(packet.regions.size());
         for (BoundingBox region : packet.regions) {
             buf.writeInt(region.minX());
@@ -46,17 +54,18 @@ public class GlueRegionSyncPacket implements CustomPacketPayload {
 
     public static GlueRegionSyncPacket decode(RegistryFriendlyByteBuf buf) {
         ResourceLocation dimension = buf.readResourceLocation();
+        boolean tracked = buf.readBoolean();
         int count = buf.readVarInt();
         List<BoundingBox> regions = new ArrayList<>(count);
         for (int i = 0; i < count; i++) {
             regions.add(new BoundingBox(buf.readInt(), buf.readInt(), buf.readInt(),
                     buf.readInt(), buf.readInt(), buf.readInt()));
         }
-        return new GlueRegionSyncPacket(dimension, regions);
+        return new GlueRegionSyncPacket(dimension, regions, tracked);
     }
 
     public static void handle(GlueRegionSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> GlueSelectionClientState.updateFromServer(packet.dimension, packet.regions));
+        context.enqueueWork(() -> GlueSelectionClientState.updateFromServer(packet.dimension, packet.regions, packet.tracked));
     }
 
     @Override

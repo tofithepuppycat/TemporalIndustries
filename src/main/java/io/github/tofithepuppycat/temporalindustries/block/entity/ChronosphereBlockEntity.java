@@ -22,6 +22,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
+import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
@@ -50,7 +53,9 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     private static final int ENERGY_TRANSFER  = 1_000_000_000;
     private static final int CREATIVE_ENERGY_CAPACITY = Integer.MAX_VALUE;
 
-    public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED }
+    public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED, REGION_CHUNK }
+
+    public enum RegionResult { ADDED, NOT_BOUND, OUT_OF_BOUNDS, CLAIMED_ELSEWHERE }
 
     /** Claimed chunks beyond the home chunk (which is always implicitly included). */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
@@ -120,6 +125,12 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         List<ChunkPos> chunks = new ArrayList<>(additionalChunks.size() + 1);
         chunks.add(getHomeChunkPos());
         for (long key : additionalChunks) chunks.add(new ChunkPos(key));
+        TemporalRepository repo = getRepository();
+        if (repo != null) {
+            for (long key : repo.getRegionChunks()) {
+                if (!additionalChunks.contains(key)) chunks.add(new ChunkPos(key));
+            }
+        }
         return chunks;
     }
 
@@ -138,11 +149,22 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
+        TemporalRepository repo = getRepository();
         long key = pos.toLong();
+        boolean regionChunk = repo != null && repo.getRegionChunks().contains(key);
 
         if (add) {
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
             if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
+
+            if (regionChunk) {
+                // Already claimed for a glued region; claiming it outright tracks all of it.
+                repo.removeRegionChunk(key);
+                additionalChunks.add(key);
+                worldData.setDirty();
+                setChanged();
+                return ToggleResult.ADDED;
+            }
 
             if (worldData.claimChunk(dimension, pos, repoId)
                     == TemporalWorldData.ClaimResult.ALREADY_CLAIMED_ELSEWHERE) {
@@ -150,18 +172,98 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
             }
 
             additionalChunks.add(key);
-            TemporalRepository repo = getRepository();
             if (repo != null) repo.captureClaimBaseline(serverLevel, pos);
             worldData.setDirty();
             setChanged();
             return ToggleResult.ADDED;
         } else {
+            if (regionChunk) {
+                return releaseRegionChunkIfUnused(repo, worldData, dimension, repoId, pos)
+                        ? ToggleResult.REMOVED : ToggleResult.REGION_CHUNK;
+            }
             if (!additionalChunks.remove(key)) return ToggleResult.NOT_SELECTED;
             worldData.releaseChunk(dimension, pos, repoId);
             worldData.setDirty();
             setChanged();
             return ToggleResult.REMOVED;
         }
+    }
+
+    /**
+     * Marks region as tracked by this machine's repository, claiming whichever of the chunks it
+     * spans aren't claimed yet. Those chunks are only tracked inside the region.
+     */
+    public RegionResult addTrackedRegion(BoundingBox region) {
+        UUID repoId = getRepositoryId();
+        TemporalRepository repo = getRepository();
+        if (repoId == null || repo == null || !(level instanceof ServerLevel serverLevel) || level.getServer() == null) {
+            return RegionResult.NOT_BOUND;
+        }
+
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
+
+        List<ChunkPos> unclaimed = new ArrayList<>();
+        for (int chunkX = region.minX() >> 4; chunkX <= region.maxX() >> 4; chunkX++) {
+            for (int chunkZ = region.minZ() >> 4; chunkZ <= region.maxZ() >> 4; chunkZ++) {
+                ChunkPos chunk = new ChunkPos(chunkX, chunkZ);
+                if (!isWithinBounds(chunk)) return RegionResult.OUT_OF_BOUNDS;
+                UUID owner = worldData.getClaimingRepo(dimension, chunk);
+                if (owner == null) unclaimed.add(chunk);
+                else if (!owner.equals(repoId)) return RegionResult.CLAIMED_ELSEWHERE;
+            }
+        }
+
+        for (ChunkPos chunk : unclaimed) {
+            worldData.claimChunk(dimension, chunk, repoId);
+            repo.addRegionChunk(chunk.toLong());
+            repo.captureClaimBaseline(serverLevel, chunk);
+        }
+        repo.addTrackedRegion(region);
+        worldData.setDirty();
+        setChanged();
+        return RegionResult.ADDED;
+    }
+
+    /** Removes every tracked region the segment from origin to end passes through; returns how many. */
+    public int removeTrackedRegionsAlongRay(Vec3 origin, Vec3 end) {
+        UUID repoId = getRepositoryId();
+        TemporalRepository repo = getRepository();
+        if (repoId == null || repo == null || level == null || level.getServer() == null) return 0;
+
+        int removed = repo.removeTrackedRegions(region -> new AABB(region.minX(), region.minY(), region.minZ(),
+                region.maxX() + 1, region.maxY() + 1, region.maxZ() + 1).clip(origin, end).isPresent());
+        if (removed == 0) return 0;
+
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        ResourceLocation dimension = level.dimension().location();
+        for (long key : new ArrayList<>(repo.getRegionChunks())) {
+            releaseRegionChunkIfUnused(repo, worldData, dimension, repoId, new ChunkPos(key));
+        }
+        worldData.setDirty();
+        setChanged();
+        return removed;
+    }
+
+    /**
+     * Gives up a chunk that was claimed only for glued regions once none of them touches it. A
+     * chunk with recorded history stays: a jump would otherwise restore all of it.
+     */
+    private boolean releaseRegionChunkIfUnused(TemporalRepository repo, TemporalWorldData worldData,
+                                               ResourceLocation dimension, UUID repoId, ChunkPos chunk) {
+        for (BoundingBox region : repo.getTrackedRegions()) {
+            if (region.minX() >> 4 <= chunk.x && chunk.x <= region.maxX() >> 4
+                    && region.minZ() >> 4 <= chunk.z && chunk.z <= region.maxZ() >> 4) {
+                return false;
+            }
+        }
+        if (repo.hasBaseline(chunk)) return false;
+
+        repo.removeRegionChunk(chunk.toLong());
+        worldData.releaseChunk(dimension, chunk, repoId);
+        worldData.setDirty();
+        setChanged();
+        return true;
     }
 
     @Override

@@ -6,5 +6,5 @@
     { "item": "minecraft:amethyst_shard" },
     { "item": "minecraft:gold_nugget" }
   ],
-  "result": { "id": "temporalindustries:temporal_glue", "count": 1 }
+  "result": { "id": "temporalindustries:anti_temporal_glue", "count": 1 }
 }

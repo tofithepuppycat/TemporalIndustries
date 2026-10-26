@@ -6,6 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
+import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorRewindEffectPacket;
 import io.github.tofithepuppycat.temporalindustries.network.AnchorStatusPacket;
@@ -70,7 +71,7 @@ public final class TemporalChangeListener {
 
         // In creative mode, left-clicking destroys the block instantly without going through
         // PlayerInteractEvent.LeftClickBlock's cancellation, so cancel here to stop the destroy.
-        if (player != null && TemporalGlueItem.isHolding(player)) {
+        if (player != null && (AntiTemporalGlueItem.isHolding(player) || TemporalGlueItem.isHolding(player))) {
             event.setCanceled(true);
             return;
         }
@@ -138,7 +139,8 @@ public final class TemporalChangeListener {
         ResourceLocation dimension = level.dimension().location();
         if (data.isGlued(dimension, pos)) return false;
         ChunkPos chunkPos = new ChunkPos(pos);
-        if (data.getClaimingRepo(dimension, chunkPos) != null) return true;
+        UUID claimingRepo = data.getClaimingRepo(dimension, chunkPos);
+        if (claimingRepo != null && data.isTrackedBy(claimingRepo, pos)) return true;
         if (player == null) return false;
         PlayerTemporalState state = data.getPlayerState(player.getUUID());
         return state != null && state.isArmed();
@@ -160,23 +162,26 @@ public final class TemporalChangeListener {
         // 2. Buffer for the repository claiming this chunk
         ChunkPos chunkPos = new ChunkPos(pos);
         UUID repoId = data.getClaimingRepo(dimension, chunkPos);
-        if (repoId != null) {
+        if (repoId != null && data.isTrackedBy(repoId, pos)) {
             data.recordRepoBlockChange(repoId, chunkPos, delta);
         }
     }
 
     /**
-     * Left-clicking while holding Temporal Glue deletes every glued region along the player's sight
+     * Left-clicking while holding Anti-Temporal Glue deletes every glued region along the player's sight
      * line instead of breaking whatever block is under the crosshair.
      */
     @SubscribeEvent
     public static void onLeftClickGlue(PlayerInteractEvent.LeftClickBlock event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
-        if (!(event.getItemStack().getItem() instanceof TemporalGlueItem)) return;
-
-        event.setCanceled(true);
-        TemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
+        if (event.getItemStack().getItem() instanceof AntiTemporalGlueItem) {
+            event.setCanceled(true);
+            AntiTemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
+        } else if (event.getItemStack().getItem() instanceof TemporalGlueItem) {
+            event.setCanceled(true);
+            TemporalGlueItem.deleteRegionsAlongSight(level, player, event.getItemStack());
+        }
     }
 
     /**
@@ -187,11 +192,16 @@ public final class TemporalChangeListener {
     public static void onLeftClickEmptyGlue(PlayerInteractEvent.LeftClickEmpty event) {
         if (!(event.getEntity() instanceof ServerPlayer player)) return;
         if (!(player.level() instanceof ServerLevel level)) return;
-        if (!TemporalGlueItem.isHolding(player)) return;
-
-        ItemStack stack = player.getMainHandItem().getItem() instanceof TemporalGlueItem
-                ? player.getMainHandItem() : player.getOffhandItem();
-        TemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
+        for (ItemStack stack : new ItemStack[] {player.getMainHandItem(), player.getOffhandItem()}) {
+            if (stack.getItem() instanceof AntiTemporalGlueItem) {
+                AntiTemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
+                return;
+            }
+            if (stack.getItem() instanceof TemporalGlueItem) {
+                TemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
+                return;
+            }
+        }
     }
 
     // Entity events
@@ -207,7 +217,7 @@ public final class TemporalChangeListener {
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
         UUID repoId = data.getClaimingRepo(dimension, chunkPos);
-        if (repoId == null) return;
+        if (repoId == null || !data.isTrackedBy(repoId, entity.blockPosition())) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
@@ -226,7 +236,7 @@ public final class TemporalChangeListener {
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
         UUID repoId = data.getClaimingRepo(dimension, chunkPos);
-        if (repoId == null) return;
+        if (repoId == null || !data.isTrackedBy(repoId, entity.blockPosition())) return;
 
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
@@ -247,7 +257,8 @@ public final class TemporalChangeListener {
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         ResourceLocation dimension = level.dimension().location();
-        if (data.getClaimingRepo(dimension, chunkPos) == null) return;
+        UUID claimingRepo = data.getClaimingRepo(dimension, chunkPos);
+        if (claimingRepo == null || !data.isTrackedBy(claimingRepo, entity.blockPosition())) return;
 
         CompoundTag before = new CompoundTag();
         entity.save(before);

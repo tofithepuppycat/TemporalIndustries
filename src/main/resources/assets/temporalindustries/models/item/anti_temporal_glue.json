@@ -1,6 +1,6 @@
 {
   "parent": "minecraft:item/generated",
   "textures": {
-    "layer0": "temporalindustries:item/temporal_glue"
+    "layer0": "temporalindustries:item/anti_temporal_glue"
   }
 }

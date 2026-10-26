@@ -1,0 +1,8 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "top": "temporalindustries:block/machine_base_up",
+    "bottom": "temporalindustries:block/machine_base_down",
+    "side": "temporalindustries:block/machine_base"
+  }
+}
