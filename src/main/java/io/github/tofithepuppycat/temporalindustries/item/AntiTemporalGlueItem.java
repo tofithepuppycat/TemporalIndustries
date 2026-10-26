@@ -34,11 +34,11 @@ import java.util.Optional;
  * excluding it from timeline capture and rollback/jump overwrites entirely.
  */
 @SuppressWarnings("null")
-public class TemporalGlueItem extends Item {
+public class AntiTemporalGlueItem extends Item {
     /** How often (in ticks) the held item polls the server for the current region list. */
     private static final int POLL_INTERVAL_TICKS = 20;
 
-    public TemporalGlueItem(Properties properties) {
+    public AntiTemporalGlueItem(Properties properties) {
         super(properties);
     }
 
@@ -61,7 +61,7 @@ public class TemporalGlueItem extends Item {
             stack.hurtAndBreak(1, serverLevel, player, item -> {});
             broadcastRegions(serverLevel);
 
-            player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.glued"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.anti_temporal_glue.glued"), true);
             level.playSound(null, clicked, SoundEvents.SLIME_BLOCK_PLACE, SoundSource.PLAYERS, 1.0F, 1.0F);
         } else {
             data.putInt("Pos1X", clicked.getX());
@@ -69,7 +69,7 @@ public class TemporalGlueItem extends Item {
             data.putInt("Pos1Z", clicked.getZ());
             writeData(stack, data);
 
-            player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.corner_set"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.anti_temporal_glue.corner_set"), true);
             level.playSound(null, clicked, SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.4F);
         }
         return InteractionResult.SUCCESS;
@@ -86,7 +86,7 @@ public class TemporalGlueItem extends Item {
 
         int removed = worldData.removeGluedRegionsAlongRay(level.dimension().location(), origin, end);
         if (removed > 0) {
-            player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.unglued"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.anti_temporal_glue.unglued"), true);
             level.playSound(null, player.blockPosition(), SoundEvents.SLIME_BLOCK_BREAK, SoundSource.PLAYERS, 1.0F, 1.0F);
             broadcastRegions(level);
             return;
@@ -95,14 +95,14 @@ public class TemporalGlueItem extends Item {
         CompoundTag data = readData(stack);
         if (data.contains("Pos1X")) {
             clearData(stack);
-            player.displayClientMessage(Component.translatable("item.temporalindustries.temporal_glue.selection_cleared"), true);
+            player.displayClientMessage(Component.translatable("item.temporalindustries.anti_temporal_glue.selection_cleared"), true);
         }
     }
 
-    /** Whether player is holding Temporal Glue in either hand. */
+    /** Whether player is holding Anti-Temporal Glue in either hand. */
     public static boolean isHolding(Player player) {
-        return player.getMainHandItem().getItem() instanceof TemporalGlueItem
-                || player.getOffhandItem().getItem() instanceof TemporalGlueItem;
+        return player.getMainHandItem().getItem() instanceof AntiTemporalGlueItem
+                || player.getOffhandItem().getItem() instanceof AntiTemporalGlueItem;
     }
 
     /** Pushes the current region list to every player in level's dimension immediately. */
@@ -133,11 +133,11 @@ public class TemporalGlueItem extends Item {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         CompoundTag data = readData(stack);
         if (data.contains("Pos1X")) {
-            tooltip.add(Component.translatable("item.temporalindustries.temporal_glue.tooltip_pending").withStyle(ChatFormatting.YELLOW));
+            tooltip.add(Component.translatable("item.temporalindustries.anti_temporal_glue.tooltip_pending").withStyle(ChatFormatting.YELLOW));
         }
         TooltipUtil.appendDescription(tooltip,
-                "item.temporalindustries.temporal_glue.tooltip",
-                "item.temporalindustries.temporal_glue.tooltip_remove");
+                "item.temporalindustries.anti_temporal_glue.tooltip",
+                "item.temporalindustries.anti_temporal_glue.tooltip_remove");
     }
 
     private static CompoundTag readData(ItemStack stack) {

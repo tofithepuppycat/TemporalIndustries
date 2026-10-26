@@ -12,9 +12,12 @@ import io.github.tofithepuppycat.temporalindustries.block.ChaosPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.OrderPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
+import io.github.tofithepuppycat.temporalindustries.block.EntropyBalancer;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
+import io.github.tofithepuppycat.temporalindustries.block.ReactorOutputHatch;
+import io.github.tofithepuppycat.temporalindustries.block.WithergenicReactor;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
@@ -27,10 +30,13 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAccelerato
 import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBalancerBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.MachineFrameBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.ReactorOutputHatchBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.WithergenicReactorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
@@ -38,6 +44,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyBalancerItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
@@ -49,7 +56,9 @@ import io.github.tofithepuppycat.temporalindustries.item.EntropyItemFluidHandler
 import io.github.tofithepuppycat.temporalindustries.item.DualEntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.item.SchrodingerGeneratorItem;
+import io.github.tofithepuppycat.temporalindustries.item.WithergenicReactorItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
+import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TimeDilatorItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
@@ -57,9 +66,12 @@ import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMe
 import io.github.tofithepuppycat.temporalindustries.menu.DecayAcceleratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.DespawnAcceleratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyBalancerMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.WithergenicReactorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
+import io.github.tofithepuppycat.temporalindustries.recipe.CellUpgradeRecipe;
 import io.github.tofithepuppycat.temporalindustries.recipe.EntropyManipulatorRecipe;
 import com.mojang.serialization.Codec;
 import com.mojang.serialization.MapCodec;
@@ -173,8 +185,11 @@ public class Registration {
     public static final DeferredItem<Item> CHRONO_REMOTE_CONTROL_ITEM = ITEMS.register("chrono_remote_control",
             () -> new ChronoRemoteControlItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
+    public static final DeferredItem<Item> ANTI_TEMPORAL_GLUE_ITEM = ITEMS.register("anti_temporal_glue",
+            () -> new AntiTemporalGlueItem(new Item.Properties().durability(20)));
+
     public static final DeferredItem<Item> TEMPORAL_GLUE_ITEM = ITEMS.register("temporal_glue",
-            () -> new TemporalGlueItem(new Item.Properties().durability(20)));
+            () -> new TemporalGlueItem(new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> TIME_DILATOR_ITEM = ITEMS.register("time_dilator",
             () -> new TimeDilatorItem(new Item.Properties().durability(64)));
@@ -213,7 +228,10 @@ public class Registration {
             () -> new ChronoBlockItem(TEMPORAL_LIFELINE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredItem<Item> DUAL_ENTROPY_CELL_ITEM = ITEMS.register("dual_entropy_cell",
-            () -> new DualEntropyCellItem(new Item.Properties().stacksTo(1)));
+            () -> new DualEntropyCellItem(EntropyContents.CAPACITY, new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<Item> RESONANT_DUAL_ENTROPY_CELL_ITEM = ITEMS.register("resonant_dual_entropy_cell",
+            () -> new DualEntropyCellItem(EntropyContents.RESONANT_CAPACITY, new Item.Properties().stacksTo(1)));
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<EntropyContents>> ENTROPY_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "entropy_contents", builder -> builder.persistent(EntropyContents.CODEC).networkSynchronized(EntropyContents.STREAM_CODEC));
@@ -221,7 +239,7 @@ public class Registration {
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> BOTTLE_CONTENTS = DATA_COMPONENTS.registerComponentType(
             "bottle_contents", builder -> builder.persistent(BottleContents.CODEC).networkSynchronized(BottleContents.STREAM_CODEC));
 
-    // Temporal Anchor's order tank/mode, a cell's transfer step, and Temporal Glue's charge progress
+    // Temporal Anchor's order tank/mode, a cell's transfer step, and Anti-Temporal Glue's charge progress
     // all reuse BottleContents (a plain persistent+networked int wrapper) rather than new records.
 
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<BottleContents>> ANCHOR_ORDER = DATA_COMPONENTS.registerComponentType(
@@ -237,10 +255,16 @@ public class Registration {
             "glue_charge_progress", builder -> builder.persistent(BottleContents.CODEC));
 
     public static final DeferredItem<Item> ORDER_CELL_ITEM = ITEMS.register("order_cell",
-            () -> new EntropyCellItem(EntropyType.ORDER, new Item.Properties().stacksTo(1)));
+            () -> new EntropyCellItem(EntropyType.ORDER, BottleContents.CAPACITY, new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<Item> RESONANT_ORDER_CELL_ITEM = ITEMS.register("resonant_order_cell",
+            () -> new EntropyCellItem(EntropyType.ORDER, BottleContents.RESONANT_CAPACITY, new Item.Properties().stacksTo(1)));
 
     public static final DeferredItem<Item> CHAOS_CELL_ITEM = ITEMS.register("chaos_cell",
-            () -> new EntropyCellItem(EntropyType.CHAOS, new Item.Properties().stacksTo(1)));
+            () -> new EntropyCellItem(EntropyType.CHAOS, BottleContents.CAPACITY, new Item.Properties().stacksTo(1)));
+
+    public static final DeferredItem<Item> RESONANT_CHAOS_CELL_ITEM = ITEMS.register("resonant_chaos_cell",
+            () -> new EntropyCellItem(EntropyType.CHAOS, BottleContents.RESONANT_CAPACITY, new Item.Properties().stacksTo(1)));
 
     /** The moment a Chronoscope visits on right-click: a game time, or -1 for the End of Time. */
     public static final DeferredHolder<DataComponentType<?>, DataComponentType<Long>> CHRONOSCOPE_TIME = DATA_COMPONENTS.registerComponentType(
@@ -331,6 +355,14 @@ public class Registration {
     public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
             () -> new DescribedBlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
+    // --- Entropy Balancer: buffers ORD/CHS and doses a bound machine toward a target balance ---
+
+    public static final DeferredBlock<EntropyBalancer> ENTROPY_BALANCER_BLOCK = BLOCKS.register("entropy_balancer",
+            () -> new EntropyBalancer(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> ENTROPY_BALANCER_ITEM = ITEMS.register("entropy_balancer",
+            () -> new EntropyBalancerItem(ENTROPY_BALANCER_BLOCK.get(), new Item.Properties()));
+
     // --- Decay Accelerator: early/mid game CHAOS generator, feed it compostable items ---
 
     public static final DeferredBlock<DecayAccelerator> DECAY_ACCELERATOR_BLOCK = BLOCKS.register("decay_accelerator",
@@ -361,6 +393,9 @@ public class Registration {
     public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<EntropyManipulatorRecipe>> ENTROPY_MANIPULATOR_RECIPE_SERIALIZER =
             RECIPE_SERIALIZERS.register("entropy_manipulator", () -> new EntropyManipulatorRecipe.Serializer());
 
+    public static final DeferredHolder<RecipeSerializer<?>, RecipeSerializer<CellUpgradeRecipe>> CELL_UPGRADE_RECIPE_SERIALIZER =
+            RECIPE_SERIALIZERS.register("cell_upgrade", CellUpgradeRecipe.Serializer::new);
+
     // --- Loot Generator: spends liquid Chaos to roll a chosen loot table into its own inventory ---
 
     public static final DeferredBlock<LootGenerator> LOOT_GENERATOR_BLOCK = BLOCKS.register("loot_generator",
@@ -374,6 +409,20 @@ public class Registration {
 
     public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
             () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
+
+    // --- Withergenic Reactor: late-game Chaos generator that needs a captured Wither and liquid Order to stay balanced ---
+
+    public static final DeferredBlock<WithergenicReactor> WITHERGENIC_REACTOR_BLOCK = BLOCKS.register("withergenic_reactor",
+            () -> new WithergenicReactor(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_BLACK).strength(5.0F, 8.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> WITHERGENIC_REACTOR_ITEM = ITEMS.register("withergenic_reactor",
+            () -> new WithergenicReactorItem(WITHERGENIC_REACTOR_BLOCK.get(), new Item.Properties().stacksTo(1)));
+
+    public static final DeferredBlock<ReactorOutputHatch> REACTOR_OUTPUT_HATCH_BLOCK = BLOCKS.register("reactor_output_hatch",
+            () -> new ReactorOutputHatch(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> REACTOR_OUTPUT_HATCH_ITEM = ITEMS.register("reactor_output_hatch",
+            () -> new DescribedBlockItem(REACTOR_OUTPUT_HATCH_BLOCK.get(), new Item.Properties()));
 
     // --- Entropic Pylon: routes liquid Order/Chaos between player-marked blocks ---
 
@@ -419,6 +468,9 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyCondenserBlockEntity>> ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_condenser",
             () -> BlockEntityType.Builder.of(EntropyCondenserBlockEntity::new, ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyBalancerBlockEntity>> ENTROPY_BALANCER_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_balancer",
+            () -> BlockEntityType.Builder.of(EntropyBalancerBlockEntity::new, ENTROPY_BALANCER_BLOCK.get()).build(null));
+
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
             () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
 
@@ -433,6 +485,12 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<LootGeneratorBlockEntity>> LOOT_GENERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("loot_generator",
             () -> BlockEntityType.Builder.of(LootGeneratorBlockEntity::new, LOOT_GENERATOR_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WithergenicReactorBlockEntity>> WITHERGENIC_REACTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("withergenic_reactor",
+            () -> BlockEntityType.Builder.of(WithergenicReactorBlockEntity::new, WITHERGENIC_REACTOR_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ReactorOutputHatchBlockEntity>> REACTOR_OUTPUT_HATCH_BLOCK_ENTITY = BLOCK_ENTITIES.register("reactor_output_hatch",
+            () -> BlockEntityType.Builder.of(ReactorOutputHatchBlockEntity::new, REACTOR_OUTPUT_HATCH_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MachineFrameBlockEntity>> MACHINE_FRAME_BLOCK_ENTITY = BLOCK_ENTITIES.register("machine_frame",
             () -> BlockEntityType.Builder.of(MachineFrameBlockEntity::new, MACHINE_FRAME_BLOCK.get()).build(null));
@@ -460,6 +518,9 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyCondenserMenu>> ENTROPY_CONDENSER_MENU = MENUS.register("entropy_condenser",
             () -> IMenuTypeExtension.create(EntropyCondenserMenu::new));
 
+    public static final DeferredHolder<MenuType<?>, MenuType<EntropyBalancerMenu>> ENTROPY_BALANCER_MENU = MENUS.register("entropy_balancer",
+            () -> IMenuTypeExtension.create(EntropyBalancerMenu::new));
+
     public static final DeferredHolder<MenuType<?>, MenuType<CrudeEntropyCondenserMenu>> CRUDE_ENTROPY_CONDENSER_MENU = MENUS.register("crude_entropy_condenser",
             () -> IMenuTypeExtension.create(CrudeEntropyCondenserMenu::new));
 
@@ -474,6 +535,9 @@ public class Registration {
 
     public static final DeferredHolder<MenuType<?>, MenuType<LootGeneratorMenu>> LOOT_GENERATOR_MENU = MENUS.register("loot_generator",
             () -> IMenuTypeExtension.create(LootGeneratorMenu::new));
+
+    public static final DeferredHolder<MenuType<?>, MenuType<WithergenicReactorMenu>> WITHERGENIC_REACTOR_MENU = MENUS.register("withergenic_reactor",
+            () -> IMenuTypeExtension.create(WithergenicReactorMenu::new));
 
     public static final DeferredHolder<SoundEvent, SoundEvent> RETURN_BY_DEATH_SOUND = SOUND_EVENTS.register("return_by_death",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "return_by_death")));
@@ -496,17 +560,21 @@ public class Registration {
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
                         output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
+                        output.accept(ENTROPY_BALANCER_ITEM);
                         output.accept(DECAY_ACCELERATOR_ITEM);
                         output.accept(DESPAWN_ACCELERATOR_ITEM);
                         output.accept(ENTROPY_MANIPULATOR_ITEM);
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
+                        output.accept(WITHERGENIC_REACTOR_ITEM);
+                        output.accept(REACTOR_OUTPUT_HATCH_ITEM);
                         output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(CHAOS_PYLON_ITEM);
                         output.accept(ORDER_PYLON_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(CHRONO_REMOTE_CONTROL_ITEM);
+                        output.accept(ANTI_TEMPORAL_GLUE_ITEM);
                         output.accept(TEMPORAL_GLUE_ITEM);
                         output.accept(TIME_DILATOR_ITEM);
                         output.accept(CHRONOSCOPE_ITEM);
@@ -514,6 +582,9 @@ public class Registration {
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);
                         output.accept(CHAOS_CELL_ITEM);
+                        output.accept(RESONANT_DUAL_ENTROPY_CELL_ITEM);
+                        output.accept(RESONANT_ORDER_CELL_ITEM);
+                        output.accept(RESONANT_CHAOS_CELL_ITEM);
                         ItemStack fullDual = new ItemStack(DUAL_ENTROPY_CELL_ITEM.get());
                         fullDual.set(ENTROPY_CONTENTS.get(), new EntropyContents(EntropyContents.CAPACITY, EntropyContents.CAPACITY));
                         output.accept(fullDual);
@@ -523,6 +594,15 @@ public class Registration {
                         ItemStack fullChaos = new ItemStack(CHAOS_CELL_ITEM.get());
                         fullChaos.set(BOTTLE_CONTENTS.get(), new BottleContents(BottleContents.CAPACITY));
                         output.accept(fullChaos);
+                        ItemStack fullResonantDual = new ItemStack(RESONANT_DUAL_ENTROPY_CELL_ITEM.get());
+                        fullResonantDual.set(ENTROPY_CONTENTS.get(), new EntropyContents(EntropyContents.RESONANT_CAPACITY, EntropyContents.RESONANT_CAPACITY));
+                        output.accept(fullResonantDual);
+                        ItemStack fullResonantOrder = new ItemStack(RESONANT_ORDER_CELL_ITEM.get());
+                        fullResonantOrder.set(BOTTLE_CONTENTS.get(), new BottleContents(BottleContents.RESONANT_CAPACITY));
+                        output.accept(fullResonantOrder);
+                        ItemStack fullResonantChaos = new ItemStack(RESONANT_CHAOS_CELL_ITEM.get());
+                        fullResonantChaos.set(BOTTLE_CONTENTS.get(), new BottleContents(BottleContents.RESONANT_CAPACITY));
+                        output.accept(fullResonantChaos);
                         output.accept(ORDER_BUCKET_ITEM);
                         output.accept(CHAOS_BUCKET_ITEM);
                     })
@@ -571,6 +651,8 @@ public class Registration {
                 (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_BALANCER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
@@ -587,6 +669,10 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, REACTOR_OUTPUT_HATCH_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, WITHERGENIC_REACTOR_BLOCK_ENTITY.get(),
+                (be, side) -> be.getFluidHandler());
         // Frame parts forward item/fluid capability requests to their controller, so the loot
         // generator multiblock can be fed and emptied from any of its faces, not just the controller.
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, MACHINE_FRAME_BLOCK_ENTITY.get(),
@@ -597,7 +683,8 @@ public class Registration {
         // The cells and the anchor store liquid Order/Chaos on the stack, so they are fluid
         // containers proper - fillable and drainable by anything that speaks IFluidHandler.
         event.registerItem(Capabilities.FluidHandler.ITEM, (stack, ctx) -> new EntropyItemFluidHandler(stack),
-                ORDER_CELL_ITEM.get(), CHAOS_CELL_ITEM.get(), DUAL_ENTROPY_CELL_ITEM.get(), TEMPORAL_ANCHOR_ITEM.get());
+                ORDER_CELL_ITEM.get(), CHAOS_CELL_ITEM.get(), DUAL_ENTROPY_CELL_ITEM.get(),
+                RESONANT_ORDER_CELL_ITEM.get(), RESONANT_CHAOS_CELL_ITEM.get(), RESONANT_DUAL_ENTROPY_CELL_ITEM.get(), TEMPORAL_ANCHOR_ITEM.get());
     }
 
 }

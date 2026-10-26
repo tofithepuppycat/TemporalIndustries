@@ -2,6 +2,8 @@ package io.github.tofithepuppycat.temporalindustries.timeline;
 
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.IntArrayTag;
+import net.minecraft.nbt.LongArrayTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
 import net.minecraft.resources.ResourceLocation;
@@ -15,6 +17,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -55,6 +58,14 @@ public final class TemporalRepository {
     @Nullable private String currentBranchName = null;
     private int nextBranchNameIndex = 0;
 
+    /**
+     * Cuboids that Temporal Glue marked for this repository. Chunks claimed only for these (see
+     * {@link #regionChunks}) are tracked inside the cuboids alone.
+     */
+    private final List<BoundingBox> trackedRegions = new ArrayList<>();
+    /** Chunks claimed solely to cover {@link #trackedRegions}; every other claimed chunk is tracked whole. */
+    private final Set<Long> regionChunks = new HashSet<>();
+
     /** The player-facing handle a Chronosphere uses to find this repository again. */
     private String name = "";
 
@@ -80,6 +91,35 @@ public final class TemporalRepository {
     public boolean hasBaseline(ChunkPos pos) {
         ChunkState state = chunkStates.get(pos.toLong());
         return state != null && state.hasBaseline;
+    }
+
+    public List<BoundingBox> getTrackedRegions() { return Collections.unmodifiableList(trackedRegions); }
+
+    public Set<Long> getRegionChunks() { return Collections.unmodifiableSet(regionChunks); }
+
+    public void addTrackedRegion(BoundingBox region) { trackedRegions.add(region); }
+
+    public void addRegionChunk(long chunkKey) { regionChunks.add(chunkKey); }
+
+    public void removeRegionChunk(long chunkKey) { regionChunks.remove(chunkKey); }
+
+    /** Drops every tracked region matching toRemove; returns how many were dropped. */
+    public int removeTrackedRegions(Predicate<BoundingBox> toRemove) {
+        int before = trackedRegions.size();
+        trackedRegions.removeIf(toRemove);
+        return before - trackedRegions.size();
+    }
+
+    /**
+     * Whether pos belongs to what this repository records and restores: any position of a wholly
+     * claimed chunk, but only the glued cuboids within a chunk claimed for them alone.
+     */
+    public boolean isTracked(BlockPos pos) {
+        if (regionChunks.isEmpty() || !regionChunks.contains(new ChunkPos(pos).toLong())) return true;
+        for (BoundingBox region : trackedRegions) {
+            if (region.isInside(pos)) return true;
+        }
+        return false;
     }
 
     /** Records pos's current state as its claim baseline, if it doesn't already have one. */
@@ -131,7 +171,7 @@ public final class TemporalRepository {
                 continue;
             }
 
-            List<BlockChangeDelta> blockChanges = diffAgainst(head, snapshot);
+            List<BlockChangeDelta> blockChanges = diffAgainst(head, snapshot, this::isTracked);
             List<EntityDelta> entityChanges = pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
             if (blockChanges.isEmpty() && entityChanges.isEmpty()) continue;
             if (deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN) {
@@ -188,7 +228,8 @@ public final class TemporalRepository {
      * Every block position whose state or block entity data differs between the resolved head state
      * and the freshly captured snapshot, with head's values as "previous".
      */
-    private static List<BlockChangeDelta> diffAgainst(ResolvedChunkState head, ChunkSnapshot snapshot) {
+    private static List<BlockChangeDelta> diffAgainst(ResolvedChunkState head, ChunkSnapshot snapshot,
+                                                      Predicate<BlockPos> tracked) {
         Map<BlockPos, BlockState> before = head.states();
         Map<BlockPos, CompoundTag> beforeBE = head.blockEntityTags();
         Map<BlockPos, CompoundTag> afterBE = snapshot.getBlockEntityTags();
@@ -197,6 +238,7 @@ public final class TemporalRepository {
         List<BlockChangeDelta> changes = new ArrayList<>();
         for (Map.Entry<BlockPos, BlockState> entry : snapshot.toBlockStateMap().entrySet()) {
             BlockPos pos = entry.getKey();
+            if (!tracked.test(pos)) continue;
             BlockState prev = before.getOrDefault(pos, air);
             CompoundTag prevTag = beforeBE.get(pos);
             CompoundTag newTag = afterBE.get(pos);
@@ -852,6 +894,14 @@ public final class TemporalRepository {
         }
         tag.put("Branches", branchList);
 
+        ListTag regionList = new ListTag();
+        for (BoundingBox region : trackedRegions) {
+            regionList.add(new IntArrayTag(new int[] {
+                    region.minX(), region.minY(), region.minZ(), region.maxX(), region.maxY(), region.maxZ()}));
+        }
+        tag.put("TrackedRegions", regionList);
+        tag.put("RegionChunks", new LongArrayTag(regionChunks.stream().mapToLong(Long::longValue).toArray()));
+
         return tag;
     }
 
@@ -897,6 +947,13 @@ public final class TemporalRepository {
             CompoundTag entryTag = branchList.getCompound(i);
             repo.branchTips.put(entryTag.getString("Name"), entryTag.getLong("Tip"));
         }
+
+        ListTag regionList = tag.getList("TrackedRegions", Tag.TAG_INT_ARRAY);
+        for (int i = 0; i < regionList.size(); i++) {
+            int[] box = regionList.getIntArray(i);
+            if (box.length == 6) repo.trackedRegions.add(new BoundingBox(box[0], box[1], box[2], box[3], box[4], box[5]));
+        }
+        for (long key : tag.getLongArray("RegionChunks")) repo.regionChunks.add(key);
 
         return repo;
     }

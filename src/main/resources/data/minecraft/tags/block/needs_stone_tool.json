@@ -10,6 +10,7 @@
     "temporalindustries:seebeck_generator",
     "temporalindustries:entropy_condenser",
     "temporalindustries:crude_entropy_condenser",
+    "temporalindustries:entropy_balancer",
     "temporalindustries:decay_accelerator",
     "temporalindustries:despawn_accelerator",
     "temporalindustries:entropy_manipulator",
