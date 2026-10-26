@@ -12,6 +12,7 @@ import net.minecraft.network.codec.StreamCodec;
 public record BottleContents(int amount) {
     public static final BottleContents EMPTY = new BottleContents(0);
     public static final int CAPACITY = 5_000;
+    public static final int RESONANT_CAPACITY = 20_000;
 
     public static final Codec<BottleContents> CODEC = Codec.INT.xmap(BottleContents::new, BottleContents::amount);
 

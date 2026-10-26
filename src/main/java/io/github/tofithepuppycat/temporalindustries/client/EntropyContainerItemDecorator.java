@@ -18,9 +18,10 @@ public class EntropyContainerItemDecorator implements IItemDecorator {
     public boolean render(GuiGraphics guiGraphics, Font font, ItemStack stack, int xOffset, int yOffset) {
         EntropyContents contents = DualEntropyCellItem.getContents(stack);
 
+        int capacity = ((DualEntropyCellItem) stack.getItem()).getCapacity();
         int x = xOffset + 2;
-        drawBar(guiGraphics, x, yOffset + 10, contents.order(), EntropyContents.CAPACITY, EntropyType.ORDER.color());
-        drawBar(guiGraphics, x, yOffset + 13, contents.chaos(), EntropyContents.CAPACITY, EntropyType.CHAOS.color());
+        drawBar(guiGraphics, x, yOffset + 10, contents.order(), capacity, EntropyType.ORDER.color());
+        drawBar(guiGraphics, x, yOffset + 13, contents.chaos(), capacity, EntropyType.CHAOS.color());
         return true;
     }
 

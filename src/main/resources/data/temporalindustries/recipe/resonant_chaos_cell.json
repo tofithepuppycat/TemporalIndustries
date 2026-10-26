@@ -1,0 +1,21 @@
+{
+  "type": "temporalindustries:cell_upgrade",
+  "ingredients": [
+    {
+      "item": "temporalindustries:chaos_cell"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:diamond"
+    },
+    {
+      "item": "minecraft:tnt"
+    }
+  ],
+  "result": {
+    "id": "temporalindustries:resonant_chaos_cell",
+    "count": 1
+  }
+}

@@ -20,6 +20,11 @@
       },
       {
         "type": "match_state",
+        "block": "temporalindustries:withergenic_reactor",
+        "properties": { "formed": "true" }
+      },
+      {
+        "type": "match_state",
         "blocks": [
           "temporalindustries:entropic_pylon",
           "temporalindustries:chaos_pylon",
