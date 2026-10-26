@@ -15,6 +15,9 @@ public final class IconButtonRenderer {
     /** Native resolution of the backing and icon textures. */
     public static final int SIZE = 16;
 
+    private static final int TOGGLE_ON_TINT = 0x6055FF55;
+    private static final int TOGGLE_OFF_TINT = 0x60FF5555;
+
     private IconButtonRenderer() {}
 
     /** Draws the backing, plus an optional tint for active/hovered state. */
@@ -23,6 +26,16 @@ public final class IconButtonRenderer {
         if (tint != 0) {
             guiGraphics.fill(x, y, x + SIZE, y + SIZE, tint);
         }
+    }
+
+    /** Draws a boolean toggle: backing washed green when enabled or red when disabled, darkened on hover, with the icon on top. */
+    public static void renderToggle(GuiGraphics guiGraphics, ResourceLocation icon, boolean enabled, boolean hovered,
+                                    int x, int y) {
+        renderBackground(guiGraphics, x, y, enabled ? TOGGLE_ON_TINT : TOGGLE_OFF_TINT);
+        if (hovered) {
+            guiGraphics.fill(x, y, x + SIZE, y + SIZE, 0x40000000);
+        }
+        renderIcon(guiGraphics, icon, x, y);
     }
 
     /** Draws icon (at its own native SIZE x SIZE resolution) at (x, y). */
