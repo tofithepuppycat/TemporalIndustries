@@ -37,6 +37,8 @@ public class EntropyOrbEntity extends Entity {
     // instead of collapsing into one big one at the spawn point.
     private static final double ORB_MERGE_DISTANCE = 0.1;
     private static final int MERGE_VALUE_LIMIT = 4;
+    private static final float END_ORDER_MULTIPLIER = 1.5F;
+    private static final float NETHER_CHAOS_MULTIPLIER = 1.5F;
 
     private static final EntityDataAccessor<Boolean> DATA_CHAOS =
             SynchedEntityData.defineId(EntropyOrbEntity.class, EntityDataSerializers.BOOLEAN);
@@ -60,8 +62,23 @@ public class EntropyOrbEntity extends Entity {
     }
 
     public static void spawn(ServerLevel level, double x, double y, double z, EntropyType type, int value) {
+        value = applyDimensionBias(level, type, value);
         if (value <= 0) return;
         level.addFreshEntity(new EntropyOrbEntity(level, x, y, z, type, value));
+    }
+
+    /**
+     * Scales the orb value for the dimension's affinity, rounding the fractional part randomly so
+     * small values still average out to the full multiplier.
+     */
+    private static int applyDimensionBias(ServerLevel level, EntropyType type, int value) {
+        float multiplier = 1.0F;
+        if (level.dimension() == Level.END && type == EntropyType.ORDER) multiplier = END_ORDER_MULTIPLIER;
+        else if (level.dimension() == Level.NETHER && type == EntropyType.CHAOS) multiplier = NETHER_CHAOS_MULTIPLIER;
+
+        float scaled = value * multiplier;
+        int whole = (int) scaled;
+        return level.random.nextFloat() < scaled - whole ? whole + 1 : whole;
     }
 
     public EntropyType getEntropyType() {

@@ -1,0 +1,11 @@
+{
+  "required": true,
+  "package": "io.github.tofithepuppycat.temporalindustries.mixin",
+  "compatibilityLevel": "JAVA_21",
+  "mixins": [
+    "BrewingStandBlockEntityMixin"
+  ],
+  "injectors": {
+    "defaultRequire": 1
+  }
+}
