@@ -51,6 +51,8 @@ public class TimelineProjectionRenderer {
      * previewed chunk behind it.
      */
     private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
+    private static final float[] INCLUDED_CHUNK_COLOR = {0.35F, 0.95F, 0.4F};
+    private static final float[] EXCLUDED_CHUNK_COLOR = {1.0F, 0.75F, 0.25F};
     /**
      * Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject.
      */
@@ -146,7 +148,8 @@ public class TimelineProjectionRenderer {
                 * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase));
 
         VertexConsumer wallBuffer = bufferSource.getBuffer(WALL_RENDER_TYPE);
-        renderClaimBoundary(poseStack, wallBuffer, level, cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
+        renderClaimBoundary(poseStack, wallBuffer, level, TimelineProjectionManager.getPreviewChunks(), WALL_COLOR,
+                cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
         bufferSource.endBatch(WALL_RENDER_TYPE);
 
         if (TimelineProjectionManager.isGhostBlockModeEnabled()) {
@@ -154,6 +157,46 @@ public class TimelineProjectionRenderer {
         } else {
             renderMarkers(poseStack, bufferSource, entries, cameraX, cameraY, cameraZ, alpha);
         }
+    }
+
+    /**
+     * While the Chrono Remote Control is picking chunks: the claimed area's outer boundary, plus the
+     * chunk the player stands in, tinted by whether it is currently included.
+     */
+    @SubscribeEvent
+    public static void onRenderChunkSelection(RenderLevelStageEvent event) {
+        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS
+                || !io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState.isSelecting()) {
+            return;
+        }
+
+        Minecraft minecraft = Minecraft.getInstance();
+        Level level = minecraft.level;
+        if (level == null || minecraft.player == null) {
+            return;
+        }
+
+        Set<Long> selected = io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState.getSelectedChunks();
+        List<ChunkPos> claimed = new java.util.ArrayList<>(selected.size());
+        for (long key : selected) claimed.add(new ChunkPos(key));
+        ChunkPos current = minecraft.player.chunkPosition();
+
+        Camera camera = minecraft.gameRenderer.getMainCamera();
+        double cameraX = camera.getPosition().x;
+        double cameraY = camera.getPosition().y;
+        double cameraZ = camera.getPosition().z;
+
+        double blinkPhase = (System.currentTimeMillis() % BLINK_PERIOD_MS) / (double) BLINK_PERIOD_MS;
+        float alpha = (BLINK_ALPHA_MIN + (BLINK_ALPHA_MAX - BLINK_ALPHA_MIN)
+                * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase))) * WALL_ALPHA_SCALE;
+
+        MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
+        VertexConsumer wallBuffer = bufferSource.getBuffer(WALL_RENDER_TYPE);
+        renderClaimBoundary(event.getPoseStack(), wallBuffer, level, claimed, WALL_COLOR, cameraX, cameraY, cameraZ, alpha);
+        renderClaimBoundary(event.getPoseStack(), wallBuffer, level, List.of(current),
+                selected.contains(current.toLong()) ? INCLUDED_CHUNK_COLOR : EXCLUDED_CHUNK_COLOR,
+                cameraX, cameraY, cameraZ, alpha);
+        bufferSource.endBatch(WALL_RENDER_TYPE);
     }
 
     private static void renderMarkers(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
@@ -255,8 +298,8 @@ public class TimelineProjectionRenderer {
      * interior edges so a multi-chunk claim reads as one enclosure.
      */
     private static void renderClaimBoundary(PoseStack poseStack, VertexConsumer buffer, Level level,
+                                            List<ChunkPos> chunks, float[] color,
                                             double cameraX, double cameraY, double cameraZ, float alpha) {
-        List<ChunkPos> chunks = TimelineProjectionManager.getPreviewChunks();
         if (chunks.isEmpty()) {
             return;
         }
@@ -265,7 +308,7 @@ public class TimelineProjectionRenderer {
         for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
 
         Matrix4f matrix = poseStack.last().pose();
-        float r = WALL_COLOR[0], g = WALL_COLOR[1], b = WALL_COLOR[2];
+        float r = color[0], g = color[1], b = color[2];
         // Anchored to the world's build height, not the camera, so the wall stays put as the player flies.
         float yBottom = (float) (level.getMinBuildHeight() - cameraY);
         float yTop = (float) (level.getMaxBuildHeight() - cameraY);

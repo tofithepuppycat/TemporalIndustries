@@ -16,7 +16,7 @@ import java.util.List;
 
 /**
  * Handheld remote for a linked Chronosphere: holding right-click opens a wheel of actions (commit,
- * jump) that run on the Chronosphere from afar.
+ * chunk selection, settings, jump) that run on the Chronosphere from afar.
  */
 public class ChronoRemoteControlItem extends Item {
     public ChronoRemoteControlItem(Properties properties) {
@@ -31,6 +31,18 @@ public class ChronoRemoteControlItem extends Item {
 
     public static void link(ItemStack stack, GlobalPos chronosphere) {
         stack.set(Registration.LINKED_CHRONOSPHERE.get(), chronosphere);
+    }
+
+    /** The machine linked to the first Chrono Remote Control in the player's hands, or null if none is held and linked. */
+    @Nullable
+    public static GlobalPos findHeldLink(Player player) {
+        for (InteractionHand hand : InteractionHand.values()) {
+            ItemStack stack = player.getItemInHand(hand);
+            if (stack.getItem() instanceof ChronoRemoteControlItem) {
+                return getLinkedChronosphere(stack);
+            }
+        }
+        return null;
     }
 
     @Override
