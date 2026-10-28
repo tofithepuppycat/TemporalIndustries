@@ -4,6 +4,7 @@ import java.util.HashSet;
 import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Set;
+import java.util.function.Consumer;
 
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
@@ -51,8 +52,9 @@ public final class ChronosphereMapWindow extends GuiWindow {
     private static final float MAX_ZOOM = 3.0F;
     private static final float ZOOM_STEP = 0.25F;
 
-    private final BlockPos machinePos;
     private final ChunkPos home;
+    private final Runnable requestThumbnails;
+    private final Consumer<Map<Long, Boolean>> sendToggles;
 
     private int ticksSinceMapSync = 0;
 
@@ -82,10 +84,19 @@ public final class ChronosphereMapWindow extends GuiWindow {
     /** Right-click pan state for the zoomed map. */
     private boolean panDragActive = false;
 
+    /** The map of the Chronosphere at machinePos, for use while its menu is open. */
     public ChronosphereMapWindow(BlockPos machinePos) {
+        this(machinePos,
+                () -> PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(machinePos)),
+                toggles -> PacketDistributor.sendToServer(ChronosphereToggleChunkPacket.fromPending(machinePos, toggles)));
+    }
+
+    /** The map of the Chronosphere at machinePos, with the requests it makes left to the caller. */
+    public ChronosphereMapWindow(BlockPos machinePos, Runnable requestThumbnails, Consumer<Map<Long, Boolean>> sendToggles) {
         super(Component.translatable("gui.temporalindustries.chronosphere.map_title"));
-        this.machinePos = machinePos;
         this.home = new ChunkPos(machinePos);
+        this.requestThumbnails = requestThumbnails;
+        this.sendToggles = sendToggles;
     }
 
     private static int countClaimableCells() {
@@ -114,13 +125,13 @@ public final class ChronosphereMapWindow extends GuiWindow {
         panX = 0;
         panY = 0;
         ticksSinceMapSync = 0;
-        PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(machinePos));
+        requestThumbnails.run();
     }
 
     @Override
     protected void onClosed() {
         if (!pendingChunkToggles.isEmpty()) {
-            PacketDistributor.sendToServer(ChronosphereToggleChunkPacket.fromPending(machinePos, pendingChunkToggles));
+            sendToggles.accept(pendingChunkToggles);
             pendingChunkToggles.clear();
         }
         ChunkThumbnailClientState.clearAll();
@@ -131,7 +142,7 @@ public final class ChronosphereMapWindow extends GuiWindow {
         ticksSinceMapSync++;
         if (ticksSinceMapSync >= MAP_SYNC_INTERVAL_TICKS) {
             ticksSinceMapSync = 0;
-            PacketDistributor.sendToServer(new ChronosphereMapRequestPacket(machinePos));
+            requestThumbnails.run();
         }
     }
 

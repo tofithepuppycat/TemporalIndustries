@@ -937,6 +937,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         // jumpTo already defers neighbour settling until every affected chunk has been written, so
         // a settle pass can't see a sibling chunk in its pre-jump state across a chunk boundary.
         List<BlockPos> changedPositions = repo.jumpTo(targetCommitId, serverLevel, isGlued, restoreEntities);
+        worldData.discardPendingEntityDeltas(getRepositoryId());
         worldData.setDirty();
 
         long previousSelectedGameTime = selectedGameTime;

@@ -3,7 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronosphereScreen;
-import io.github.tofithepuppycat.temporalindustries.client.screen.CrudeEntropyCondenserScreen;
+import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyBatteryScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.DecayAcceleratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.DespawnAcceleratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyBalancerScreen;
@@ -36,7 +36,7 @@ public class ClientModEvents {
         event.register(Registration.CHRONOVAULT_MENU.get(), ChronovaultScreen::new);
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
-        event.register(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), CrudeEntropyCondenserScreen::new);
+        event.register(Registration.ENTROPY_BATTERY_MENU.get(), EntropyBatteryScreen::new);
         event.register(Registration.ENTROPY_BALANCER_MENU.get(), EntropyBalancerScreen::new);
         event.register(Registration.DECAY_ACCELERATOR_MENU.get(), DecayAcceleratorScreen::new);
         event.register(Registration.DESPAWN_ACCELERATOR_MENU.get(), DespawnAcceleratorScreen::new);

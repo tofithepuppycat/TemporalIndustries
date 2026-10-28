@@ -17,7 +17,6 @@ import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.level.ChunkPos;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.network.handling.IPayloadContext;
 
@@ -37,10 +36,8 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
         TOGGLE_CHARGE_CONTAINERS,
         UNBIND_REPOSITORY,
         DELETE_HISTORY,
-        /** Includes the chunk the sender stands in in the next commit. */
-        SELECT_CHUNK,
-        /** Excludes the chunk the sender stands in from the next commit. */
-        DESELECT_CHUNK,
+        /** Replies with the machine's settings, claim state and the terrain thumbnails for its chunk map. */
+        MAP,
         /** Jumps to the commit id carried as the argument. */
         JUMP
     }
@@ -120,43 +117,22 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
                 message(sender, "history_deleted");
                 sendState(sender, machine, level);
             }
-            case SELECT_CHUNK -> toggleChunk(sender, machine, level, true);
-            case DESELECT_CHUNK -> toggleChunk(sender, machine, level, false);
+            case MAP -> sendMap(sender, machine, level);
             case JUMP -> jump(sender, machine, argument);
             case SYNC -> { }
         }
     }
 
-    private static void toggleChunk(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level,
-                                    boolean add) {
-        if (!(machine instanceof ChronosphereBlockEntity chronosphere)) {
-            message(sender, "single_chunk");
-            return;
-        }
+    private static void sendMap(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level) {
+        sendState(sender, machine, level);
+        if (!(machine instanceof ChronosphereBlockEntity chronosphere)) return;
         if (sender.level() != level) {
             message(sender, "wrong_dimension");
             return;
         }
-
-        ChunkPos chunk = sender.chunkPosition();
-        ChronosphereBlockEntity.ToggleResult result = chronosphere.toggleChunk(chunk, add);
-        switch (result) {
-            case ADDED -> sender.displayClientMessage(
-                    Component.translatable("gui.temporalindustries.chrono_remote.msg.chunk_selected", chunk.x, chunk.z), true);
-            case REMOVED -> sender.displayClientMessage(
-                    Component.translatable("gui.temporalindustries.chrono_remote.msg.chunk_deselected", chunk.x, chunk.z), true);
-            case IS_HOME -> message(sender, "home_chunk");
-            case NOT_SELECTED -> message(sender, "not_selected");
-            case OUT_OF_BOUNDS -> sender.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronosphere.out_of_bounds"), true);
-            case ALREADY_CLAIMED_ELSEWHERE -> sender.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronosphere.already_tracked"), true);
-            case LIMIT_REACHED -> sender.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronosphere.limit_reached"), true);
-            case REGION_CHUNK -> sender.displayClientMessage(
-                    Component.translatable("block.temporalindustries.chronosphere.region_chunk"), true);
+        if (RequestThrottle.tryAcquire(sender, RequestThrottle.CHRONOSPHERE_MAP, 20)) {
+            ChronosphereMapRequestPacket.sendThumbnails(sender, chronosphere);
         }
-        sendState(sender, machine, level);
     }
 
     private static void jump(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, long target) {

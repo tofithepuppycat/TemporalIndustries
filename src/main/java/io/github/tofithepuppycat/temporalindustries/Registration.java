@@ -5,7 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.block.EchoProjector;
 import io.github.tofithepuppycat.temporalindustries.block.Chronodial;
 import io.github.tofithepuppycat.temporalindustries.block.Chronosphere;
 import io.github.tofithepuppycat.temporalindustries.block.TemporalLifeline;
-import io.github.tofithepuppycat.temporalindustries.block.CrudeEntropyCondenser;
+import io.github.tofithepuppycat.temporalindustries.block.EntropyBattery;
 import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.ChaosPylon;
@@ -25,7 +25,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjector
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TemporalLifelineBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBatteryBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity;
@@ -62,7 +62,7 @@ import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TimeDilatorItem;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
-import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyBatteryMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.DecayAcceleratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.DespawnAcceleratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyManipulatorMenu;
@@ -347,13 +347,13 @@ public class Registration {
     public static final DeferredItem<Item> ENTROPY_CONDENSER_ITEM = ITEMS.register("entropy_condenser",
             () -> new DescribedBlockItem(ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
 
-    // --- Crude Entropy Condenser: unpowered lower tier that drains Cells instead of catching orbs ---
+    // --- Entropy Battery: unpowered lower tier that drains Cells instead of catching orbs ---
 
-    public static final DeferredBlock<CrudeEntropyCondenser> CRUDE_ENTROPY_CONDENSER_BLOCK = BLOCKS.register("crude_entropy_condenser",
-            () -> new CrudeEntropyCondenser(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<EntropyBattery> ENTROPY_BATTERY_BLOCK = BLOCKS.register("entropy_battery",
+            () -> new EntropyBattery(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
-    public static final DeferredItem<Item> CRUDE_ENTROPY_CONDENSER_ITEM = ITEMS.register("crude_entropy_condenser",
-            () -> new DescribedBlockItem(CRUDE_ENTROPY_CONDENSER_BLOCK.get(), new Item.Properties()));
+    public static final DeferredItem<Item> ENTROPY_BATTERY_ITEM = ITEMS.register("entropy_battery",
+            () -> new DescribedBlockItem(ENTROPY_BATTERY_BLOCK.get(), new Item.Properties()));
 
     // --- Entropy Balancer: buffers ORD/CHS and doses a bound machine toward a target balance ---
 
@@ -471,8 +471,8 @@ public class Registration {
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyBalancerBlockEntity>> ENTROPY_BALANCER_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_balancer",
             () -> BlockEntityType.Builder.of(EntropyBalancerBlockEntity::new, ENTROPY_BALANCER_BLOCK.get()).build(null));
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<CrudeEntropyCondenserBlockEntity>> CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY = BLOCK_ENTITIES.register("crude_entropy_condenser",
-            () -> BlockEntityType.Builder.of(CrudeEntropyCondenserBlockEntity::new, CRUDE_ENTROPY_CONDENSER_BLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropyBatteryBlockEntity>> ENTROPY_BATTERY_BLOCK_ENTITY = BLOCK_ENTITIES.register("entropy_battery",
+            () -> BlockEntityType.Builder.of(EntropyBatteryBlockEntity::new, ENTROPY_BATTERY_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<DecayAcceleratorBlockEntity>> DECAY_ACCELERATOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("decay_accelerator",
             () -> BlockEntityType.Builder.of(DecayAcceleratorBlockEntity::new, DECAY_ACCELERATOR_BLOCK.get()).build(null));
@@ -521,8 +521,8 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<EntropyBalancerMenu>> ENTROPY_BALANCER_MENU = MENUS.register("entropy_balancer",
             () -> IMenuTypeExtension.create(EntropyBalancerMenu::new));
 
-    public static final DeferredHolder<MenuType<?>, MenuType<CrudeEntropyCondenserMenu>> CRUDE_ENTROPY_CONDENSER_MENU = MENUS.register("crude_entropy_condenser",
-            () -> IMenuTypeExtension.create(CrudeEntropyCondenserMenu::new));
+    public static final DeferredHolder<MenuType<?>, MenuType<EntropyBatteryMenu>> ENTROPY_BATTERY_MENU = MENUS.register("entropy_battery",
+            () -> IMenuTypeExtension.create(EntropyBatteryMenu::new));
 
     public static final DeferredHolder<MenuType<?>, MenuType<DecayAcceleratorMenu>> DECAY_ACCELERATOR_MENU = MENUS.register("decay_accelerator",
             () -> IMenuTypeExtension.create(DecayAcceleratorMenu::new));
@@ -559,7 +559,7 @@ public class Registration {
                         output.accept(SCHRODINGER_GENERATOR_ITEM);
                         output.accept(SEEBECK_GENERATOR_ITEM);
                         output.accept(ENTROPY_CONDENSER_ITEM);
-                        output.accept(CRUDE_ENTROPY_CONDENSER_ITEM);
+                        output.accept(ENTROPY_BATTERY_ITEM);
                         output.accept(ENTROPY_BALANCER_ITEM);
                         output.accept(DECAY_ACCELERATOR_ITEM);
                         output.accept(DESPAWN_ACCELERATOR_ITEM);
@@ -653,9 +653,9 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_BALANCER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
-        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
+        event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_BATTERY_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
-        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
+        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_BATTERY_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DECAY_ACCELERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());

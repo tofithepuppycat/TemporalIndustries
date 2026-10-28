@@ -20,7 +20,6 @@ public final class ChronoRemoteOverlay implements LayeredDraw.Layer {
     private static final int TITLE_COLOR = 0xFF8FD8FF;
     private static final int TEXT_COLOR = 0xFFE0E0E0;
     private static final int INCLUDED_COLOR = 0xFF66FF8C;
-    private static final int EXCLUDED_COLOR = 0xFFFFC04D;
 
     private ChronoRemoteOverlay() {}
 
@@ -35,19 +34,14 @@ public final class ChronoRemoteOverlay implements LayeredDraw.Layer {
         Component title;
         Component[] lines;
         int[] colors;
-        if (ChronoRemoteClientState.isSelecting()) {
-            long chunk = minecraft.player.chunkPosition().toLong();
-            boolean included = ChronosphereClientState.isSelected(chunk);
+        if (ChronoRemoteClientState.isChunkPreview()) {
             title = Component.translatable("gui.temporalindustries.chrono_remote.overlay.select_title");
             lines = new Component[] {
                     Component.translatable("gui.temporalindustries.chrono_remote.overlay.select_hint"),
-                    Component.translatable(included
-                                    ? "gui.temporalindustries.chrono_remote.overlay.chunk_included"
-                                    : "gui.temporalindustries.chrono_remote.overlay.chunk_excluded",
-                            minecraft.player.chunkPosition().x, minecraft.player.chunkPosition().z,
+                    Component.translatable("gui.temporalindustries.chrono_remote.overlay.chunks_selected",
                             ChronosphereClientState.getSelectedCount())
             };
-            colors = new int[] {TEXT_COLOR, included ? INCLUDED_COLOR : EXCLUDED_COLOR};
+            colors = new int[] {TEXT_COLOR, INCLUDED_COLOR};
         } else {
             long commitId = ChronoRemoteClientState.getPreviewCommitId();
             String hash = "";

@@ -51,8 +51,6 @@ public class TimelineProjectionRenderer {
      * previewed chunk behind it.
      */
     private static final float[] WALL_COLOR = {0.35F, 0.85F, 1.0F};
-    private static final float[] INCLUDED_CHUNK_COLOR = {0.35F, 0.95F, 0.4F};
-    private static final float[] EXCLUDED_CHUNK_COLOR = {1.0F, 0.75F, 0.25F};
     /**
      * Kept well under the block decals' own blink alpha so walls read as backdrop, not the subject.
      */
@@ -159,14 +157,11 @@ public class TimelineProjectionRenderer {
         }
     }
 
-    /**
-     * While the Chrono Remote Control is picking chunks: the claimed area's outer boundary, plus the
-     * chunk the player stands in, tinted by whether it is currently included.
-     */
+    /** While the Chrono Remote Control previews its chunk selection: the claimed area's outer boundary. */
     @SubscribeEvent
     public static void onRenderChunkSelection(RenderLevelStageEvent event) {
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS
-                || !io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState.isSelecting()) {
+                || !io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState.isChunkPreview()) {
             return;
         }
 
@@ -179,7 +174,6 @@ public class TimelineProjectionRenderer {
         Set<Long> selected = io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState.getSelectedChunks();
         List<ChunkPos> claimed = new java.util.ArrayList<>(selected.size());
         for (long key : selected) claimed.add(new ChunkPos(key));
-        ChunkPos current = minecraft.player.chunkPosition();
 
         Camera camera = minecraft.gameRenderer.getMainCamera();
         double cameraX = camera.getPosition().x;
@@ -193,9 +187,6 @@ public class TimelineProjectionRenderer {
         MultiBufferSource.BufferSource bufferSource = minecraft.renderBuffers().bufferSource();
         VertexConsumer wallBuffer = bufferSource.getBuffer(WALL_RENDER_TYPE);
         renderClaimBoundary(event.getPoseStack(), wallBuffer, level, claimed, WALL_COLOR, cameraX, cameraY, cameraZ, alpha);
-        renderClaimBoundary(event.getPoseStack(), wallBuffer, level, List.of(current),
-                selected.contains(current.toLong()) ? INCLUDED_CHUNK_COLOR : EXCLUDED_CHUNK_COLOR,
-                cameraX, cameraY, cameraZ, alpha);
         bufferSource.endBatch(WALL_RENDER_TYPE);
     }
 
