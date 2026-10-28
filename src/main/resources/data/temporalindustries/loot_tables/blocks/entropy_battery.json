@@ -6,7 +6,7 @@
       "entries": [
         {
           "type": "minecraft:item",
-          "name": "temporalindustries:crude_entropy_condenser"
+          "name": "temporalindustries:entropy_battery"
         }
       ],
       "conditions": [

@@ -57,6 +57,12 @@ public abstract class AbstractAcceleratorScreen<T extends AbstractAcceleratorMen
     }
 
     @Override
+    public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        super.render(guiGraphics, mouseX, mouseY, partialTick);
+        renderTooltip(guiGraphics, mouseX, mouseY);
+    }
+
+    @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Component title = machineTitle();
         guiGraphics.drawString(font, title, (imageWidth - font.width(title)) / 2, 6, 0xFF3F3F3F, false);
