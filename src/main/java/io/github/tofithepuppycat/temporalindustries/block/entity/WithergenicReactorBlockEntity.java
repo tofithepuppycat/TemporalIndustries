@@ -58,7 +58,7 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
     /** Chaos produced per tick at perfect balance. */
     public static final int BASE_OUTPUT_PER_TICK = 20;
     /** Balance units (of {@link #ENTROPY_MAX}) pushed toward Chaos per mB of Chaos produced. */
-    public static final double DRIFT_PER_MB = 0.25;
+    public static final double DRIFT_PER_MB = 0.75;
     /** Efficiency below which the reactor shuts down instead of trickling. */
     public static final double MIN_EFFICIENCY = 0.05;
 
