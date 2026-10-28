@@ -21,7 +21,7 @@ import org.jetbrains.annotations.NotNull;
 @SuppressWarnings("null")
 public abstract class AbstractAcceleratorMenu extends AbstractContainerMenu {
     private static final int INPUT_SLOT_X = 80;
-    private static final int INPUT_SLOT_Y = 34;
+    private static final int INPUT_SLOT_Y = 51;
     private static final int INVENTORY_X = 8;
     private static final int INVENTORY_Y = 84;
     private static final int HOTBAR_Y = 142;

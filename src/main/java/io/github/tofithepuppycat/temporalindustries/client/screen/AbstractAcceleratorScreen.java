@@ -4,60 +4,56 @@ import io.github.tofithepuppycat.temporalindustries.menu.AbstractAcceleratorMenu
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Shared flat-fill placeholder GUI for the Decay/Despawn Accelerator screens: an input slot and a
- * progress bar tinted by the entropy color, filled proportionally as the item cooks down.
+ * Shared textured GUI for the Decay/Despawn Accelerator screens: an input slot and a progress icon
+ * drawn over its empty counterpart in the background, revealed from the bottom up as the item cooks down.
  */
 @SuppressWarnings("null")
 public abstract class AbstractAcceleratorScreen<T extends AbstractAcceleratorMenu> extends AbstractContainerScreen<T> {
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
 
-    private static final int SLOT_X = 80;
-    private static final int SLOT_Y = 34;
+    private final ResourceLocation background;
+    private final ResourceLocation progressIcon;
+    private final int progressX;
+    private final int progressY;
+    private final int progressSize;
 
-    private static final int BAR_X = 80;
-    private static final int BAR_Y = 56;
-    private static final int BAR_WIDTH = 16;
-    private static final int BAR_HEIGHT = 6;
-
-    protected AbstractAcceleratorScreen(T menu, Inventory playerInventory, Component title) {
+    protected AbstractAcceleratorScreen(T menu, Inventory playerInventory, Component title,
+                                        ResourceLocation background, ResourceLocation progressIcon,
+                                        int progressX, int progressY, int progressSize) {
         super(menu, playerInventory, title);
+        this.background = background;
+        this.progressIcon = progressIcon;
+        this.progressX = progressX;
+        this.progressY = progressY;
+        this.progressSize = progressSize;
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
         inventoryLabelY = imageHeight - 94;
     }
 
-    protected abstract int entropyColor();
-
     protected abstract Component machineTitle();
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, 0xFFC6C6C6);
-
-        guiGraphics.fill(leftPos + SLOT_X - 1, topPos + SLOT_Y - 1, leftPos + SLOT_X + 17, topPos + SLOT_Y + 17, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + SLOT_X, topPos + SLOT_Y, leftPos + SLOT_X + 16, topPos + SLOT_Y + 16, 0xFF373737);
-
-        renderProgressBar(guiGraphics);
+        guiGraphics.blit(background, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
+        renderProgressIcon(guiGraphics);
     }
 
-    private void renderProgressBar(GuiGraphics guiGraphics) {
-        int x = leftPos + BAR_X;
-        int y = topPos + BAR_Y;
-        guiGraphics.fill(x, y, x + BAR_WIDTH, y + BAR_HEIGHT, 0xFF000000);
-
+    private void renderProgressIcon(GuiGraphics guiGraphics) {
         int progress = menu.getProgress();
         int maxProgress = AbstractAcceleratorMenu.maxProgress();
         if (progress <= 0 || maxProgress <= 0) return;
 
-        int filled = Math.max(1, Math.round((progress / (float) maxProgress) * (BAR_WIDTH - 2)));
-        filled = Math.min(BAR_WIDTH - 2, filled);
-        guiGraphics.fill(x + 1, y + 1, x + 1 + filled, y + BAR_HEIGHT - 1, 0xFF000000 | entropyColor());
+        int filled = Math.clamp(Math.round((progress / (float) maxProgress) * progressSize), 1, progressSize);
+        int skipped = progressSize - filled;
+        guiGraphics.blit(progressIcon, leftPos + progressX, topPos + progressY + skipped,
+                0, skipped, progressSize, filled, progressSize, progressSize);
     }
 
     @Override

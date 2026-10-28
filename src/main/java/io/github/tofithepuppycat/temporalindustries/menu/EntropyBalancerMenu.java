@@ -10,6 +10,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.inventory.ContainerLevelAccess;
 import net.minecraft.world.inventory.SimpleContainerData;
+import net.minecraft.world.inventory.Slot;
 import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
@@ -17,6 +18,9 @@ import org.jetbrains.annotations.NotNull;
 @SuppressWarnings("null")
 public class EntropyBalancerMenu extends AbstractContainerMenu {
     private static final int DATA_COUNT = 12;
+    private static final int INVENTORY_X = 48;
+    private static final int INVENTORY_Y = 158;
+    private static final int HOTBAR_Y = 216;
 
     private final EntropyBalancerBlockEntity blockEntity;
     private final BlockPos blockPos;
@@ -34,6 +38,15 @@ public class EntropyBalancerMenu extends AbstractContainerMenu {
         this.access = ContainerLevelAccess.create(playerInventory.player.level(), blockPos);
         this.data = new SimpleContainerData(DATA_COUNT);
         addDataSlots(data);
+
+        for (int row = 0; row < 3; row++) {
+            for (int col = 0; col < 9; col++) {
+                addSlot(new Slot(playerInventory, col + row * 9 + 9, INVENTORY_X + col * 18, INVENTORY_Y + row * 18));
+            }
+        }
+        for (int col = 0; col < 9; col++) {
+            addSlot(new Slot(playerInventory, col, INVENTORY_X + col * 18, HOTBAR_Y));
+        }
     }
 
     private static EntropyBalancerBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
