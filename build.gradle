@@ -171,10 +171,11 @@ dependencies {
     compileOnly "top.theillusivec4.curios:curios-neoforge:${curios_version}:api"
     localRuntime "top.theillusivec4.curios:curios-neoforge:${curios_version}"
 
-    // Fusion: connected-textures library used for the multiblock frame/casing textures (see
-    // machine_frame's model). Embedded via Jar-in-Jar so players don't need to install it
-    // separately -- see the "fusion" dependency entry in neoforge.mods.toml.
-    jarJar(implementation("maven.modrinth:fusion-connected-textures:${fusion_version}"))
+    // Fusion, for the dev/test environment only: connected-textures library used for the
+    // multiblock frame/casing textures (see machine_frame's model). Not compiled against, so it's
+    // localRuntime rather than implementation -- players install it separately, see the "fusion"
+    // dependency entry in neoforge.mods.toml.
+    localRuntime "maven.modrinth:fusion-connected-textures:${fusion_version}"
 
     // Create (plus its Ponder/Flywheel/Registrate dependencies), for the dev/test environment
     // only: no integration is implemented against it, it's just available in-game via
