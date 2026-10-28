@@ -14,6 +14,7 @@ import net.minecraft.world.level.chunk.LevelChunk;
 import net.minecraft.world.level.chunk.LevelChunkSection;
 
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
@@ -60,6 +61,17 @@ public final class ChunkSnapshot {
         SnapshotSection a = sections.get(sectionIndex);
         SnapshotSection b = other.sections.get(sectionIndex);
         return a.uniform && b.uniform && a.uniformState.equals(b.uniformState);
+    }
+
+    /** Whether section sectionIndex holds exactly the same blocks in this snapshot and other's. */
+    public boolean sectionSameBlocks(ChunkSnapshot other, int sectionIndex) {
+        return sections.get(sectionIndex).sameBlocks(other.sections.get(sectionIndex));
+    }
+
+    /** The block state at pos, which must lie inside this snapshot's chunk and height range. */
+    public BlockState stateAt(BlockPos pos) {
+        int sectionIndex = (pos.getY() >> 4) - minSectionY;
+        return sections.get(sectionIndex).stateAt(pos.getX() & 15, pos.getY() & 15, pos.getZ() & 15);
     }
 
     /** Collects just section sectionIndex's positions, without expanding every other section. */
@@ -217,6 +229,31 @@ public final class ChunkSnapshot {
             int[] indices = runPaletteIndices.stream().mapToInt(Integer::intValue).toArray();
             int[] lengths = runLengths.stream().mapToInt(Integer::intValue).toArray();
             return new SnapshotSection(palette, indices, lengths);
+        }
+
+        /**
+         * Whether both sections hold the same blocks. Capturing is deterministic (palette entries
+         * are numbered by first appearance in a fixed scan order), so equal contents encode
+         * identically.
+         */
+        boolean sameBlocks(SnapshotSection other) {
+            if (uniform || other.uniform) {
+                return uniform && other.uniform && uniformState.equals(other.uniformState);
+            }
+            return palette.equals(other.palette)
+                    && Arrays.equals(runPaletteIndex, other.runPaletteIndex)
+                    && Arrays.equals(runLength, other.runLength);
+        }
+
+        BlockState stateAt(int x, int y, int z) {
+            if (uniform) return uniformState;
+            int target = (y * 16 + z) * 16 + x;
+            int start = 0;
+            for (int run = 0; run < runPaletteIndex.length; run++) {
+                start += runLength[run];
+                if (target < start) return palette.get(runPaletteIndex[run]);
+            }
+            return Blocks.AIR.defaultBlockState();
         }
 
         /**

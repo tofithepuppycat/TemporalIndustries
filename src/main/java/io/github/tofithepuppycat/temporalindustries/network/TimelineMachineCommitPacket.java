@@ -47,7 +47,7 @@ public class TimelineMachineCommitPacket implements CustomPacketPayload {
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
             if (!(menu.getTimelineProvider() instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            machine.commitNow();
+            machine.commitNow(sender);
 
             if (machine instanceof ChronosphereBlockEntity chronosphere) {
                 ChronosphereStateRequestPacket.sendStateSync(sender, chronosphere, packet.machinePos);

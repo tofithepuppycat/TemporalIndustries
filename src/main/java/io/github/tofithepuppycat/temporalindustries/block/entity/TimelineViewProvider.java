@@ -21,7 +21,7 @@ public interface TimelineViewProvider {
      * CHARGING means the stored energy could not cover the cost, so the machine is collecting it and
      * will jump on its own once it has enough.
      */
-    enum JumpResult { SUCCESS, CHARGING }
+    enum JumpResult { SUCCESS, CHARGING, BUSY }
 
     /** Every commit in this machine's repository. */
     List<RepoCommit> getRepositoryCommits();

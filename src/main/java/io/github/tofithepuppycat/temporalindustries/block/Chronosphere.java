@@ -148,7 +148,7 @@ public class Chronosphere extends BaseEntityBlock {
     protected void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
                              @NotNull BlockState newState, boolean isMoving) {
         if (!state.is(newState.getBlock()) && level.getBlockEntity(pos) instanceof ChronosphereBlockEntity chronosphere) {
-            chronosphere.orphanRepository();
+            chronosphere.releaseRepositoryOnBreak();
         }
         super.onRemove(state, level, pos, newState, isMoving);
     }

@@ -97,13 +97,9 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
 
     private static void run(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level,
                             Action action, long argument) {
-        TemporalRepository repo = machine.getRepository();
-        long head = repo.getHeadCommitId();
-
         switch (action) {
             case COMMIT -> {
-                machine.commitNow();
-                message(sender, repo.getHeadCommitId() != head ? "committed" : "nothing_to_commit");
+                machine.commitNow(sender);
                 sendState(sender, machine, level);
             }
             case TOGGLE_SAVE_ENTITIES -> {
@@ -171,8 +167,13 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
             return;
         }
 
-        if (machine.jump(target) == TimelineViewProvider.JumpResult.CHARGING) {
+        TimelineViewProvider.JumpResult result = machine.jump(target);
+        if (result == TimelineViewProvider.JumpResult.CHARGING) {
             sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.charging"), true);
+            return;
+        }
+        if (result == TimelineViewProvider.JumpResult.BUSY) {
+            sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.commit_busy"), true);
             return;
         }
         sender.displayClientMessage(Component.translatable("gui.temporalindustries.chrono_remote.jumped", commit.getShortHash()), true);

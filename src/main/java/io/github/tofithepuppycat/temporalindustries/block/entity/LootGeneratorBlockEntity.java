@@ -357,13 +357,15 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
      * results to be placed one at a time by {@link #processTick()}.
      */
     private void startRoll() {
-        if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty()) return;
+        if (!(level instanceof ServerLevel serverLevel) || selectedLootTable == null || !pendingRoll.isEmpty() || !formed) return;
 
         LootTable table = isChestLootTable(selectedLootTable) ? resolveLootTable(serverLevel, selectedLootTable) : LootTable.EMPTY;
         if (table == LootTable.EMPTY) {
-            lastSelectionValid = false;
-            setChanged();
-            syncToClients();
+            if (lastSelectionValid) {
+                lastSelectionValid = false;
+                setChanged();
+                syncToClients();
+            }
             return;
         }
         int rollCost = getRollCost();
@@ -473,10 +475,16 @@ public class LootGeneratorBlockEntity extends BlockEntity implements Container, 
         syncToClients();
     }
 
+    /** Whether the whole of stack fits into the output slots. */
     private boolean canPlace(ItemStack stack) {
+        int room = 0;
         for (ItemStack existing : items) {
-            if (existing.isEmpty()) return true;
-            if (ItemStack.isSameItemSameComponents(existing, stack) && existing.getCount() < existing.getMaxStackSize()) return true;
+            if (existing.isEmpty()) {
+                room += stack.getMaxStackSize();
+            } else if (ItemStack.isSameItemSameComponents(existing, stack)) {
+                room += Math.max(0, existing.getMaxStackSize() - existing.getCount());
+            }
+            if (room >= stack.getCount()) return true;
         }
         return false;
     }

@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.entropy;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.device.TemporalChangeListener;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.NonNullList;
 import net.minecraft.server.level.ServerLevel;
@@ -21,7 +22,11 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ComposterBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.InteractionHand;
+import net.minecraft.world.entity.player.Player;
+import net.neoforged.bus.api.EventPriority;
 import net.neoforged.bus.api.SubscribeEvent;
+import net.neoforged.neoforge.common.util.TriState;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.ProjectileImpactEvent;
@@ -98,7 +103,7 @@ public final class EntropyEventListener {
         EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.ORDER, CROP_GROWTH_ORDER);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onItemExpire(ItemExpireEvent event) {
         ItemEntity item = event.getEntity();
         if (!(item.level() instanceof ServerLevel level)) return;
@@ -113,6 +118,7 @@ public final class EntropyEventListener {
         if (!(entity.level() instanceof ServerLevel level)) return;
 
         if (entity instanceof ServerPlayer player) {
+            if (TemporalChangeListener.anchorWillInterceptDeath(player)) return;
             EntropyOrbEntity.spawn(level, player.getX(), player.getY() + 0.5, player.getZ(), EntropyType.CHAOS, PLAYER_DEATH_CHAOS);
             return;
         }
@@ -176,9 +182,17 @@ public final class EntropyEventListener {
         EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.CHAOS, LEAF_DECAY_CHAOS);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onCompostHarvest(PlayerInteractEvent.RightClickBlock event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (event.getHand() != InteractionHand.MAIN_HAND) return;
+        if (event.getUseBlock() == TriState.FALSE) return;
+        // Vanilla skips the block interaction when a sneaking player holds anything in either hand,
+        // unless the use is explicitly forced.
+        Player player = event.getEntity();
+        boolean holdingItem = !player.getMainHandItem().isEmpty() || !player.getOffhandItem().isEmpty();
+        if (event.getUseBlock() != TriState.TRUE && player.isSecondaryUseActive() && holdingItem) return;
+
         BlockState state = level.getBlockState(event.getPos());
         if (!state.is(Blocks.COMPOSTER) || state.getValue(ComposterBlock.LEVEL) != ComposterBlock.READY) return;
 

@@ -90,6 +90,14 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         releaseOwnChunks();
     }
 
+    @Override
+    protected void onChunkClaimLost(ChunkPos chunk) {
+        long key = chunk.toLong();
+        additionalChunks.remove(key);
+        TemporalRepository repo = getRepository();
+        if (repo != null) repo.removeRegionChunk(key);
+    }
+
     public static void tick(Level level, BlockPos pos, BlockState state, ChronosphereBlockEntity be) {
         if (level.isClientSide || !be.isRepositoryBound()) return;
         be.commonTick(level);
