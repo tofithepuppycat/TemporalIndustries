@@ -386,6 +386,15 @@ public class TemporalWorldData extends SavedData {
         chunkDeltas.add(delta);
     }
 
+    /**
+     * Forgets repoId's uncommitted entity changes. A jump rewrites the world to a different point
+     * of history, so changes recorded against the old one (and the spawns the jump itself causes)
+     * would otherwise be committed onto the new head as though they had just happened.
+     */
+    public void discardPendingEntityDeltas(UUID repoId) {
+        repoPendingEntityDeltas.remove(repoId);
+    }
+
     public enum CommitStart { STARTED, NOTHING_TO_COMMIT, ALREADY_RUNNING, UNAVAILABLE }
 
     /** A commit being captured over several ticks, and who to tell about it. */

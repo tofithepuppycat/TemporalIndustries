@@ -10,5 +10,5 @@
     "G": { "item": "minecraft:gold_ingot" },
     "A": { "item": "minecraft:amethyst_shard" }
   },
-  "result": { "id": "temporalindustries:crude_entropy_condenser", "count": 1 }
+  "result": { "id": "temporalindustries:entropy_battery", "count": 1 }
 }

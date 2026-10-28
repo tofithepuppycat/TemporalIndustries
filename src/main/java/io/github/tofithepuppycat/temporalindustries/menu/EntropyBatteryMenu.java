@@ -1,7 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.CrudeEntropyCondenserBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBatteryBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
@@ -16,32 +16,34 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Container menu for the Crude Entropy Condenser GUI: one Order/Chaos Cell slot plus both tanks'
- * fill/capacity.
+ * Container menu for the Entropy Battery GUI: a Cell input slot, an output slot the tanks slowly
+ * fill an inserted Cell back out of, and both tanks' fill/capacity.
  */
 @SuppressWarnings("null")
-public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
+public class EntropyBatteryMenu extends AbstractContainerMenu {
     private static final int CELL_SLOT_X = 80;
     private static final int CELL_SLOT_Y = 20;
+    private static final int OUTPUT_SLOT_X = 80;
+    private static final int OUTPUT_SLOT_Y = 51;
     private static final int INVENTORY_X = 8;
     private static final int INVENTORY_Y = 84;
     private static final int HOTBAR_Y = 142;
 
-    private final CrudeEntropyCondenserBlockEntity blockEntity;
+    private final EntropyBatteryBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
     private final ContainerData data;
 
-    public CrudeEntropyCondenserMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
+    public EntropyBatteryMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
         this(id, playerInventory, getBlockEntity(playerInventory, dataBuffer.readBlockPos()));
     }
 
-    public CrudeEntropyCondenserMenu(int id, Inventory playerInventory, CrudeEntropyCondenserBlockEntity blockEntity) {
+    public EntropyBatteryMenu(int id, Inventory playerInventory, EntropyBatteryBlockEntity blockEntity) {
         this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(3));
     }
 
-    public CrudeEntropyCondenserMenu(int id, Inventory playerInventory, CrudeEntropyCondenserBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
-        super(Registration.CRUDE_ENTROPY_CONDENSER_MENU.get(), id);
+    public EntropyBatteryMenu(int id, Inventory playerInventory, EntropyBatteryBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
+        super(Registration.ENTROPY_BATTERY_MENU.get(), id);
         this.blockEntity = blockEntity;
         this.blockPos = blockEntity.getBlockPos();
         this.access = access;
@@ -50,7 +52,12 @@ public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
         checkContainerDataCount(data, 3);
         addDataSlots(data);
 
-        addSlot(new Slot(blockEntity, CrudeEntropyCondenserBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
+        addSlot(new Slot(blockEntity, EntropyBatteryBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
+            @Override public boolean mayPlace(@NotNull ItemStack stack) {
+                return stack.getItem() instanceof EntropyReceptacle;
+            }
+        });
+        addSlot(new Slot(blockEntity, EntropyBatteryBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
             @Override public boolean mayPlace(@NotNull ItemStack stack) {
                 return stack.getItem() instanceof EntropyReceptacle;
             }
@@ -66,11 +73,11 @@ public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
         }
     }
 
-    private static CrudeEntropyCondenserBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
-        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof CrudeEntropyCondenserBlockEntity be) {
+    private static EntropyBatteryBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
+        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof EntropyBatteryBlockEntity be) {
             return be;
         }
-        throw new IllegalStateException("Expected CrudeEntropyCondenserBlockEntity at " + blockPos);
+        throw new IllegalStateException("Expected EntropyBatteryBlockEntity at " + blockPos);
     }
 
     @Override
@@ -102,14 +109,15 @@ public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
         ItemStack stackInSlot = slot.getItem();
         ItemStack result = stackInSlot.copy();
 
-        int cellSlot = CrudeEntropyCondenserBlockEntity.CELL_SLOT;
-        int inventoryStart = cellSlot + 1;
+        int cellSlot = EntropyBatteryBlockEntity.CELL_SLOT;
+        int outputSlot = EntropyBatteryBlockEntity.OUTPUT_SLOT;
+        int inventoryStart = outputSlot + 1;
         int inventoryEnd = inventoryStart + 36;
 
-        if (index == cellSlot) {
+        if (index == cellSlot || index == outputSlot) {
             if (!moveItemStackTo(stackInSlot, inventoryStart, inventoryEnd, true)) return ItemStack.EMPTY;
         } else {
-            if (!(stackInSlot.getItem() instanceof EntropyReceptacle) || !moveItemStackTo(stackInSlot, cellSlot, cellSlot + 1, false)) {
+            if (!(stackInSlot.getItem() instanceof EntropyReceptacle) || !moveItemStackTo(stackInSlot, cellSlot, outputSlot + 1, false)) {
                 return ItemStack.EMPTY;
             }
         }
@@ -124,7 +132,7 @@ public class CrudeEntropyCondenserMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return stillValid(access, player, Registration.CRUDE_ENTROPY_CONDENSER_BLOCK.get());
+        return stillValid(access, player, Registration.ENTROPY_BATTERY_BLOCK.get());
     }
 
     public BlockPos getBlockPos() {

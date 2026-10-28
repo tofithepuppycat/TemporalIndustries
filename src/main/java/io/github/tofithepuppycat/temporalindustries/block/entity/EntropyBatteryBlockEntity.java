@@ -6,7 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.menu.CrudeEntropyCondenserMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropyBatteryMenu;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -39,15 +39,17 @@ import java.util.List;
 
 /**
  * Lower tier of {@link io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser}: drains
- * liquid Order/Chaos out of a cell in its single input slot into its own smaller tanks, no power
- * involved.
+ * liquid Order/Chaos out of a cell in its input slot into its own smaller tanks and fills a cell
+ * in its output slot from them, no power involved.
  */
 @SuppressWarnings("null")
-public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
+public class EntropyBatteryBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
     public static final int TANK_CAPACITY = 4_000;
     private static final int DRAIN_PER_TICK = 25; // mB pulled out of the slotted cell per tick
-    private static final int SLOT_COUNT = 1;
+    private static final int OUTPUT_FILL_PER_TICK = 25; // mB pushed from each tank into the output cell per tick
+    private static final int SLOT_COUNT = 2;
     public static final int CELL_SLOT = 0;
+    public static final int OUTPUT_SLOT = 1;
 
     private final class CondenserFluidHandler implements IFluidHandler {
         @Override public int getTanks() { return 2; }
@@ -102,8 +104,8 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
     private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
-    public CrudeEntropyCondenserBlockEntity(BlockPos pos, BlockState state) {
-        super(Registration.CRUDE_ENTROPY_CONDENSER_BLOCK_ENTITY.get(), pos, state);
+    public EntropyBatteryBlockEntity(BlockPos pos, BlockState state) {
+        super(Registration.ENTROPY_BATTERY_BLOCK_ENTITY.get(), pos, state);
     }
 
     public IItemHandler getItemHandler() {
@@ -134,9 +136,10 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
                         .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
     }
 
-    public static void tick(Level level, BlockPos pos, BlockState state, CrudeEntropyCondenserBlockEntity be) {
+    public static void tick(Level level, BlockPos pos, BlockState state, EntropyBatteryBlockEntity be) {
         if (level.isClientSide) return;
         be.drainCell();
+        be.fillOutput();
     }
 
     private void drainCell() {
@@ -170,6 +173,34 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
         return drained;
     }
 
+    /**
+     * Pushes Order then Chaos out of the tanks into whatever {@link EntropyReceptacle} sits in
+     * {@link #OUTPUT_SLOT}, up to {@link #OUTPUT_FILL_PER_TICK} of each per tick.
+     */
+    private void fillOutput() {
+        ItemStack stack = items.get(OUTPUT_SLOT);
+        if (!(stack.getItem() instanceof EntropyReceptacle receptacle)) return;
+
+        int filledOrder = fillFrom(orderTank, EntropyType.ORDER, stack, receptacle);
+        int filledChaos = fillFrom(chaosTank, EntropyType.CHAOS, stack, receptacle);
+        if (filledOrder <= 0 && filledChaos <= 0) return;
+
+        setChanged();
+        syncToClients();
+    }
+
+    /** Drains up to {@link #OUTPUT_FILL_PER_TICK} mB from {@code tank} into the receptacle. */
+    private int fillFrom(FluidTank tank, EntropyType type, ItemStack stack, EntropyReceptacle receptacle) {
+        int available = Math.min(OUTPUT_FILL_PER_TICK, tank.getFluidAmount());
+        if (available <= 0) return 0;
+
+        int accepted = receptacle.fill(stack, type, available);
+        if (accepted <= 0) return 0;
+
+        tank.drain(accepted, IFluidHandler.FluidAction.EXECUTE);
+        return accepted;
+    }
+
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -193,7 +224,7 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
     }
 
     @Override public int getContainerSize() { return items.size(); }
-    @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty(); }
+    @Override public boolean isEmpty() { return items.get(CELL_SLOT).isEmpty() && items.get(OUTPUT_SLOT).isEmpty(); }
     @Override public ItemStack getItem(int slot) { return items.get(slot); }
     @Override public ItemStack removeItem(int slot, int amount) {
         ItemStack result = ContainerHelper.removeItem(items, slot, amount);
@@ -211,12 +242,12 @@ public class CrudeEntropyCondenserBlockEntity extends BlockEntity implements Con
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("block.temporalindustries.crude_entropy_condenser");
+        return Component.translatable("block.temporalindustries.entropy_battery");
     }
 
     @Override
     public AbstractContainerMenu createMenu(int id, @NotNull Inventory inventory, @NotNull Player player) {
-        return new CrudeEntropyCondenserMenu(id, inventory, this);
+        return new EntropyBatteryMenu(id, inventory, this);
     }
 
     @Override

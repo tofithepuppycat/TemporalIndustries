@@ -73,7 +73,7 @@ public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
         return new ChronosphereToggleChunkPacket(machinePos, adds, removes);
     }
 
-    private static int readCount(RegistryFriendlyByteBuf buf) {
+    static int readCount(RegistryFriendlyByteBuf buf) {
         int count = buf.readVarInt();
         if (count < 0 || count > MAX_CHUNKS_PER_LIST) {
             throw new DecoderException("Chunk list size " + count + " out of range 0.." + MAX_CHUNKS_PER_LIST);
@@ -93,26 +93,30 @@ public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
             BlockEntity be = sender.level().getBlockEntity(packet.machinePos);
             if (!(be instanceof ChronosphereBlockEntity machine)) return;
 
-            for (long key : packet.removes) {
-                machine.toggleChunk(new ChunkPos(key), false);
-            }
-            for (long key : packet.adds) {
-                ChronosphereBlockEntity.ToggleResult result = machine.toggleChunk(new ChunkPos(key), true);
-                switch (result) {
-                    case OUT_OF_BOUNDS -> sender.displayClientMessage(
-                            Component.translatable("block.temporalindustries.chronosphere.out_of_bounds"), true);
-                    case ALREADY_CLAIMED_ELSEWHERE -> sender.displayClientMessage(
-                            Component.translatable("block.temporalindustries.chronosphere.already_tracked"), true);
-                    case LIMIT_REACHED -> sender.displayClientMessage(
-                            Component.translatable("block.temporalindustries.chronosphere.limit_reached"), true);
-                    case REGION_CHUNK -> sender.displayClientMessage(
-                            Component.translatable("block.temporalindustries.chronosphere.region_chunk"), true);
-                    default -> { /* ADDED / REMOVED / IS_HOME / NOT_SELECTED need no feedback */ }
-                }
-            }
-
+            applyBatch(sender, machine, packet.adds, packet.removes);
             ChronosphereStateRequestPacket.sendStateSync(sender, machine, packet.machinePos);
         });
+    }
+
+    /** Releases then claims the given chunks on machine, telling sender why any claim was refused. */
+    public static void applyBatch(ServerPlayer sender, ChronosphereBlockEntity machine, List<Long> adds, List<Long> removes) {
+        for (long key : removes) {
+            machine.toggleChunk(new ChunkPos(key), false);
+        }
+        for (long key : adds) {
+            ChronosphereBlockEntity.ToggleResult result = machine.toggleChunk(new ChunkPos(key), true);
+            switch (result) {
+                case OUT_OF_BOUNDS -> sender.displayClientMessage(
+                        Component.translatable("block.temporalindustries.chronosphere.out_of_bounds"), true);
+                case ALREADY_CLAIMED_ELSEWHERE -> sender.displayClientMessage(
+                        Component.translatable("block.temporalindustries.chronosphere.already_tracked"), true);
+                case LIMIT_REACHED -> sender.displayClientMessage(
+                        Component.translatable("block.temporalindustries.chronosphere.limit_reached"), true);
+                case REGION_CHUNK -> sender.displayClientMessage(
+                        Component.translatable("block.temporalindustries.chronosphere.region_chunk"), true);
+                default -> { /* ADDED / REMOVED / IS_HOME / NOT_SELECTED need no feedback */ }
+            }
+        }
     }
 
     @Override

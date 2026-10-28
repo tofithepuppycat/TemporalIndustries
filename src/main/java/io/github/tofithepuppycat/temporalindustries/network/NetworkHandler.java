@@ -199,6 +199,11 @@ public class NetworkHandler {
                 ChronoRemoteActionPacket.STREAM_CODEC,
                 ChronoRemoteActionPacket::handle);
 
+        registrar.playToServer(
+                ChronoRemoteChunksPacket.TYPE,
+                ChronoRemoteChunksPacket.STREAM_CODEC,
+                ChronoRemoteChunksPacket::handle);
+
         registrar.playToClient(
                 ChronoRemoteStateSyncPacket.TYPE,
                 ChronoRemoteStateSyncPacket.STREAM_CODEC,

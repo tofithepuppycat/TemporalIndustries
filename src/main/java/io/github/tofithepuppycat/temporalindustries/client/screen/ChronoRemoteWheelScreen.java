@@ -84,11 +84,9 @@ public class ChronoRemoteWheelScreen extends Screen {
                 new Option("gui.temporalindustries.chrono_remote.commit",
                         "gui.temporalindustries.chrono_remote.hint.commit",
                         () -> send(ChronoRemoteActionPacket.Action.COMMIT)),
-                new Option(ChronoRemoteClientState.isSelecting()
-                                ? "gui.temporalindustries.chrono_remote.stop_selecting"
-                                : "gui.temporalindustries.chrono_remote.select_chunks",
+                new Option("gui.temporalindustries.chrono_remote.select_chunks",
                         "gui.temporalindustries.chrono_remote.hint.select_chunks",
-                        ChronoRemoteWheelScreen::toggleSelecting),
+                        ChronoRemoteWheelScreen::openChunkSelection),
                 new Option("gui.temporalindustries.chrono_remote.settings",
                         "gui.temporalindustries.chrono_remote.hint.settings",
                         ChronoRemoteWheelScreen::openSettings),
@@ -135,13 +133,19 @@ public class ChronoRemoteWheelScreen extends Screen {
         PacketDistributor.sendToServer(new ChronoRemoteActionPacket(action, argument));
     }
 
-    private static void toggleSelecting() {
-        if (ChronoRemoteClientState.isSelecting()) {
-            ChronoRemoteClientState.endSession();
+    private static void openChunkSelection() {
+        Minecraft minecraft = Minecraft.getInstance();
+        GlobalPos linked = minecraft.player == null ? null : ChronoRemoteControlItem.findHeldLink(minecraft.player);
+        if (linked == null) return;
+        if (minecraft.level == null || !linked.dimension().equals(minecraft.level.dimension())) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("gui.temporalindustries.chrono_remote.msg.wrong_dimension"), true);
             return;
         }
-        ChronoRemoteClientState.startSelecting();
+
+        // The reply closes the screen again if the machine can't have chunks selected.
         send(ChronoRemoteActionPacket.Action.SYNC);
+        minecraft.setScreen(new ChronoRemoteChunkScreen(linked.pos()));
     }
 
     private static void openSettings() {
