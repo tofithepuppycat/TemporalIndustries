@@ -18,17 +18,17 @@ import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * GUI for the Entropy Balancer on the light panel shared with the timeline machines: the two
+ * GUI for the Entropy Balancer on its own panel with the player inventory below: the two
  * buffers at the sides, the target balance in the middle with step buttons, and a gauge showing the
  * bound output's balance against the target.
  */
 @SuppressWarnings("null")
 public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalancerMenu> {
     private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/base.png");
+            TemporalIndustries.MODID, "textures/gui/balancer.png");
 
     private static final int IMAGE_SIZE = 256;
-    /** base.png's artwork sits inset this many pixels within its canvas; offsets below are measured from its edge. */
+    /** balancer.png's artwork sits inset this many pixels within its canvas; offsets below are measured from its edge. */
     private static final int CONTENT_MARGIN = 16;
     private static final int CONTENT_SIZE = IMAGE_SIZE - 2 * CONTENT_MARGIN;
     private static final int CENTER_X = CONTENT_SIZE / 2;
@@ -40,38 +40,38 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
     private static final int WARNING_TEXT = 0xFFB06A00;
     private static final int COLOR_BORDER = 0xFF000000;
 
-    private static final int TANK_Y = 24;
+    private static final int TANK_Y = 20;
     private static final int TANK_WIDTH = 12;
-    private static final int TANK_HEIGHT = 96;
+    private static final int TANK_HEIGHT = 80;
     private static final int ORDER_TANK_X = 12;
     private static final int CHAOS_TANK_X = CONTENT_SIZE - 12 - TANK_WIDTH;
     private static final int TANK_LABEL_Y = TANK_Y + TANK_HEIGHT + 4;
 
-    private static final int TARGET_LABEL_Y = 24;
-    private static final int TARGET_VALUE_Y = 36;
+    private static final int TARGET_LABEL_Y = 18;
+    private static final int TARGET_VALUE_Y = 28;
     private static final float TARGET_VALUE_SCALE = 2.0F;
-    private static final int STEP_ROW_Y = 62;
+    private static final int STEP_ROW_Y = 46;
     private static final int STEP_BUTTON_WIDTH = 24;
     private static final int STEP_BUTTON_GAP = 2;
     private static final int BUTTON_HEIGHT = 16;
     private static final int[] STEPS = {-1000, -100, -10, 10, 100, 1000};
-    private static final int RESET_Y = 84;
+    private static final int RESET_Y = 66;
     private static final int RESET_WIDTH = 64;
+    private static final int ACTION_GAP = 4;
 
-    private static final int GAUGE_Y = 110;
+    private static final int GAUGE_Y = 90;
     private static final int GAUGE_WIDTH = 140;
     private static final int GAUGE_HEIGHT = 8;
-    private static final int GAUGE_CAPTION_Y = 122;
-    private static final int STATUS_Y = 140;
+    private static final int GAUGE_CAPTION_Y = 102;
+    private static final int STATUS_Y = 114;
     private static final int STATUS_WIDTH = 150;
-    private static final int UNBIND_Y = 176;
-    private static final int UNBIND_WIDTH = 100;
+    private static final int UNBIND_WIDTH = 64;
 
     public EntropyBalancerScreen(EntropyBalancerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_SIZE;
         imageHeight = IMAGE_SIZE;
-        inventoryLabelY = imageHeight + 100; // Push off-screen to hide inventory
+        inventoryLabelY = imageHeight + 100; // Push off-screen to hide the inventory label
     }
 
     private int panelX() {
@@ -87,12 +87,15 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
         return panelX() + CENTER_X - total / 2 + index * (STEP_BUTTON_WIDTH + STEP_BUTTON_GAP);
     }
 
+    /** Centered on its own, or beside the unbind button while an output is bound. */
     private int resetX() {
-        return panelX() + CENTER_X - RESET_WIDTH / 2;
+        return isBound()
+                ? panelX() + CENTER_X - ACTION_GAP / 2 - RESET_WIDTH
+                : panelX() + CENTER_X - RESET_WIDTH / 2;
     }
 
     private int unbindX() {
-        return panelX() + CENTER_X - UNBIND_WIDTH / 2;
+        return panelX() + CENTER_X + ACTION_GAP / 2;
     }
 
     private int gaugeX() {
@@ -193,7 +196,7 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
             }
         }
         if (isBound()) {
-            drawButton(guiGraphics, unbindX(), panelY() + UNBIND_Y, UNBIND_WIDTH,
+            drawButton(guiGraphics, unbindX(), panelY() + RESET_Y, UNBIND_WIDTH,
                     Component.translatable("gui.temporalindustries.entropy_balancer.unbind"), true, mouseX, mouseY);
         }
     }
@@ -263,7 +266,7 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
                 sendTarget(0, false);
                 return true;
             }
-            if (isBound() && isOver(mouseX, mouseY, unbindX(), panelY() + UNBIND_Y, UNBIND_WIDTH, BUTTON_HEIGHT)) {
+            if (isBound() && isOver(mouseX, mouseY, unbindX(), panelY() + RESET_Y, UNBIND_WIDTH, BUTTON_HEIGHT)) {
                 sendTarget(menu.getTarget(), true);
                 return true;
             }

@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ReactorOutputHatchBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -8,17 +9,21 @@ import io.github.tofithepuppycat.temporalindustries.menu.WithergenicReactorMenu;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
 
 import java.util.List;
 
 /**
- * Flat-fill GUI for the Withergenic Reactor: the internal Order/Chaos balance bar to keep centred,
+ * Textured GUI for the Withergenic Reactor: the internal Order/Chaos balance bar to keep centred,
  * the output hatch's Chaos buffer, and the current efficiency and status.
  */
 @SuppressWarnings("null")
 public class WithergenicReactorScreen extends AbstractContainerScreen<WithergenicReactorMenu> {
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/wither_reactor.png");
+
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
 
@@ -27,10 +32,11 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
     private static final int BALANCE_BAR_WIDTH = 124;
     private static final int BALANCE_BAR_HEIGHT = 10;
 
-    private static final int BUFFER_BAR_X = 142;
-    private static final int BUFFER_BAR_Y = 18;
-    private static final int BUFFER_BAR_WIDTH = 26;
-    private static final int BUFFER_BAR_HEIGHT = 58;
+    /** The tank's frame starts at (138, 19); the fluid fills its 25x46 interior. */
+    private static final int BUFFER_BAR_X = 139;
+    private static final int BUFFER_BAR_Y = 20;
+    private static final int BUFFER_BAR_WIDTH = 25;
+    private static final int BUFFER_BAR_HEIGHT = 46;
 
     private static final int TEXT_COLOR = 0xFF3F3F3F;
 
@@ -43,32 +49,15 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        guiGraphics.fill(leftPos, topPos, leftPos + imageWidth, topPos + imageHeight, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + 1, topPos + 1, leftPos + imageWidth - 1, topPos + imageHeight - 1, 0xFFC6C6C6);
+        guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         EntropyBalanceBar.render(guiGraphics, leftPos + BALANCE_BAR_X, topPos + BALANCE_BAR_Y,
                 BALANCE_BAR_WIDTH, BALANCE_BAR_HEIGHT, menu.getBalance());
 
-        int bx = leftPos + BUFFER_BAR_X;
-        int by = topPos + BUFFER_BAR_Y;
-        guiGraphics.fill(bx, by, bx + BUFFER_BAR_WIDTH, by + BUFFER_BAR_HEIGHT, 0xFF000000);
-        FluidBarRenderer.renderVertical(guiGraphics, bx + 1, by + 1, BUFFER_BAR_WIDTH - 2, BUFFER_BAR_HEIGHT - 2,
+        FluidBarRenderer.renderVertical(guiGraphics, leftPos + BUFFER_BAR_X, topPos + BUFFER_BAR_Y,
+                BUFFER_BAR_WIDTH, BUFFER_BAR_HEIGHT,
                 menu.getBufferAmount(), ReactorOutputHatchBlockEntity.BUFFER_CAPACITY,
                 Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
-
-        for (int row = 0; row < 3; row++) {
-            for (int col = 0; col < 9; col++) {
-                drawSlot(guiGraphics, 8 + col * 18, 84 + row * 18);
-            }
-        }
-        for (int col = 0; col < 9; col++) {
-            drawSlot(guiGraphics, 8 + col * 18, 142);
-        }
-    }
-
-    private void drawSlot(GuiGraphics guiGraphics, int x, int y) {
-        guiGraphics.fill(leftPos + x - 1, topPos + y - 1, leftPos + x + 17, topPos + y + 17, 0xFF8B8B8B);
-        guiGraphics.fill(leftPos + x, topPos + y, leftPos + x + 16, topPos + y + 16, 0xFF373737);
     }
 
     @Override
