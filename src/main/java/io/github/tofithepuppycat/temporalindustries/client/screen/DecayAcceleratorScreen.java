@@ -1,18 +1,19 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
-import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.menu.DecayAcceleratorMenu;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 
 public class DecayAcceleratorScreen extends AbstractAcceleratorScreen<DecayAcceleratorMenu> {
-    public DecayAcceleratorScreen(DecayAcceleratorMenu menu, Inventory playerInventory, Component title) {
-        super(menu, playerInventory, title);
-    }
+    private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/decay_accelerator.png");
+    private static final ResourceLocation PROGRESS_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/decay_progress.png");
 
-    @Override
-    protected int entropyColor() {
-        return EntropyType.CHAOS.color();
+    public DecayAcceleratorScreen(DecayAcceleratorMenu menu, Inventory playerInventory, Component title) {
+        super(menu, playerInventory, title, TEXTURE, PROGRESS_TEXTURE, 78, 21, 28);
     }
 
     @Override

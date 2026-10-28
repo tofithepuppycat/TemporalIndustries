@@ -178,7 +178,7 @@
 	"gui.temporalindustries.chronosphere.bind_unavailable": "That repository could not be opened",
 	"gui.temporalindustries.chronosphere.repository_tooltip": "Repository: %s",
 	"gui.temporalindustries.chronosphere.map_title": "Select Chunks",
-	"gui.temporalindustries.chronosphere.map_hint": "Selected Chunks will be included in next save",
+	"gui.temporalindustries.chronosphere.map_hint": "Selected Chunks will be included in commits",
 	"gui.temporalindustries.chronosphere.map_tooltip": "Chunk Map",
 	"gui.temporalindustries.timeline_machine.settings_tooltip": "Settings",
 	"gui.temporalindustries.timeline_machine.settings_title": "Settings",
