@@ -11,7 +11,11 @@ import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.Container;
+import net.minecraft.world.entity.item.ItemEntity;
+import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.block.entity.BlockEntity;
+import net.minecraft.world.phys.AABB;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
@@ -24,7 +28,12 @@ import java.util.*;
 public class PlayerTemporalState {
     private final UUID playerId;
     @Nullable private PlayerSnapshot checkpoint;
-    private final List<PlayerBlockChange> changes = new ArrayList<>();
+    private static final double DROP_SEARCH_RADIUS = 3.0;
+
+    private record ChangeKey(ResourceLocation dimension, BlockPos pos) {}
+
+    // The earliest recorded change per position, in the order the positions were first touched.
+    private final Map<ChangeKey, PlayerBlockChange> changes = new LinkedHashMap<>();
     @Nullable private ChronoRiftOrigin chronoRiftOrigin;
 
     /**
@@ -44,8 +53,11 @@ public class PlayerTemporalState {
             return tag;
         }
 
+        @Nullable
         public static ChronoRiftOrigin fromTag(CompoundTag tag) {
-            return new ChronoRiftOrigin(ResourceLocation.tryParse(tag.getString("Dimension")),
+            ResourceLocation dimension = ResourceLocation.tryParse(tag.getString("Dimension"));
+            if (dimension == null) return null;
+            return new ChronoRiftOrigin(dimension,
                     tag.getDouble("X"), tag.getDouble("Y"), tag.getDouble("Z"),
                     tag.getFloat("YRot"), tag.getFloat("XRot"));
         }
@@ -95,47 +107,65 @@ public class PlayerTemporalState {
         this.chronoRiftOrigin = null;
     }
 
+    /**
+     * Records a change; only the earliest change per position matters for the revert, so later
+     * ones at the same position are dropped rather than accumulated.
+     */
     public void recordChange(ResourceLocation dimension, BlockChangeDelta delta) {
         if (checkpoint == null) return;
-        changes.add(new PlayerBlockChange(dimension, delta));
+        changes.putIfAbsent(new ChangeKey(dimension, delta.getPos()), new PlayerBlockChange(dimension, delta));
     }
 
     /**
-     * Restores every tracked block to its state at the last checkpoint, using the earliest recorded
-     * change per position, then clears the change list.
+     * Restores every tracked block to its state at the last checkpoint, then clears the change list.
      */
     public int revertWorldChanges(MinecraftServer server) {
-        Map<ResourceLocation, Map<BlockPos, BlockChangeDelta>> earliestByDim = new LinkedHashMap<>();
-        for (PlayerBlockChange pbc : changes) {
-            earliestByDim.computeIfAbsent(pbc.dimension(), d -> new LinkedHashMap<>())
-                         .putIfAbsent(pbc.delta().getPos(), pbc.delta());
-        }
-
         int reverted = 0;
-        for (Map.Entry<ResourceLocation, Map<BlockPos, BlockChangeDelta>> dimEntry : earliestByDim.entrySet()) {
-            ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, dimEntry.getKey()));
+        for (PlayerBlockChange change : changes.values()) {
+            ServerLevel level = server.getLevel(ResourceKey.create(Registries.DIMENSION, change.dimension()));
             if (level == null) continue;
 
-            for (BlockChangeDelta delta : dimEntry.getValue().values()) {
-                BlockPos pos = delta.getPos();
-                level.setBlock(pos, delta.getPreviousState(), 3);
+            BlockChangeDelta delta = change.delta();
+            BlockPos pos = delta.getPos();
+            level.setBlock(pos, delta.getPreviousState(), 3);
 
-                CompoundTag prevBE = delta.getPreviousBlockEntityTag();
-                BlockEntity be = level.getBlockEntity(pos);
-                if (be != null && prevBE != null) {
-                    CompoundTag restored = prevBE.copy();
-                    restored.putInt("x", pos.getX());
-                    restored.putInt("y", pos.getY());
-                    restored.putInt("z", pos.getZ());
-                    be.loadWithComponents(restored, level.registryAccess());
-                    be.setChanged();
-                }
-                reverted++;
+            CompoundTag prevBE = delta.getPreviousBlockEntityTag();
+            BlockEntity be = level.getBlockEntity(pos);
+            if (be != null && prevBE != null) {
+                CompoundTag restored = prevBE.copy();
+                restored.putInt("x", pos.getX());
+                restored.putInt("y", pos.getY());
+                restored.putInt("z", pos.getZ());
+                be.loadWithComponents(restored, level.registryAccess());
+                be.setChanged();
+                if (be instanceof Container container) removeDroppedContents(level, pos, container);
             }
+            reverted++;
         }
 
         changes.clear();
         return reverted;
+    }
+
+    /**
+     * A container restored with its contents gets them back from the items it dropped when it was
+     * broken, so matching item entities lying near it are taken away.
+     */
+    private static void removeDroppedContents(ServerLevel level, BlockPos pos, Container container) {
+        List<ItemEntity> dropped = level.getEntitiesOfClass(ItemEntity.class, new AABB(pos).inflate(DROP_SEARCH_RADIUS));
+        if (dropped.isEmpty()) return;
+        for (int slot = 0; slot < container.getContainerSize(); slot++) {
+            ItemStack content = container.getItem(slot);
+            int remaining = content.getCount();
+            for (ItemEntity entity : dropped) {
+                if (remaining <= 0) break;
+                if (entity.isRemoved() || !ItemStack.isSameItemSameComponents(entity.getItem(), content)) continue;
+                int taken = Math.min(remaining, entity.getItem().getCount());
+                entity.getItem().shrink(taken);
+                if (entity.getItem().isEmpty()) entity.discard();
+                remaining -= taken;
+            }
+        }
     }
 
     public CompoundTag toTag() {
@@ -143,7 +173,7 @@ public class PlayerTemporalState {
         tag.putUUID("PlayerId", playerId);
         if (checkpoint != null) tag.put("Checkpoint", checkpoint.toTag());
         ListTag changeList = new ListTag();
-        for (PlayerBlockChange pbc : changes) changeList.add(pbc.toTag());
+        for (PlayerBlockChange pbc : changes.values()) changeList.add(pbc.toTag());
         tag.put("Changes", changeList);
         if (chronoRiftOrigin != null) tag.put("ChronoRiftOrigin", chronoRiftOrigin.toTag());
         return tag;
@@ -157,7 +187,9 @@ public class PlayerTemporalState {
         }
         ListTag changeList = tag.getList("Changes", Tag.TAG_COMPOUND);
         for (int i = 0; i < changeList.size(); i++) {
-            state.changes.add(PlayerBlockChange.fromTag(changeList.getCompound(i)));
+            PlayerBlockChange change = PlayerBlockChange.fromTag(changeList.getCompound(i));
+            if (change.dimension() == null) continue;
+            state.changes.putIfAbsent(new ChangeKey(change.dimension(), change.delta().getPos()), change);
         }
         if (tag.contains("ChronoRiftOrigin", Tag.TAG_COMPOUND)) {
             state.chronoRiftOrigin = ChronoRiftOrigin.fromTag(tag.getCompound("ChronoRiftOrigin"));

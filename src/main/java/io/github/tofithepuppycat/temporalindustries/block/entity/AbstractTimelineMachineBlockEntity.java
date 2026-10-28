@@ -17,6 +17,7 @@ import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
@@ -421,6 +422,20 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         data.clearRepositoryOwner(repositoryId);
     }
 
+    /**
+     * Called when this machine is broken: frees its repository, and drops it entirely if it never
+     * recorded history and still has its automatic name, since nothing could be bound back to it.
+     * Energy already moved aside for a charging jump goes back into the pool, so it travels with
+     * the dropped item.
+     */
+    public void releaseRepositoryOnBreak() {
+        cancelCharging();
+        TemporalWorldData data = worldData();
+        if (data == null || repositoryId == null) return;
+        data.clearRepositoryOwner(repositoryId);
+        data.discardRepositoryIfUnused(repositoryId);
+    }
+
     /** This machine's repository, created on first access. */
     @Nullable
     public TemporalRepository getRepository() {
@@ -450,10 +465,18 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         TemporalRepository repo = getRepository();
         data.setRepositoryOwner(repoId, GlobalPos.of(level.dimension(), worldPosition));
         for (ChunkPos chunk : getAllChunks()) {
-            data.claimChunk(dimension, chunk, repoId);
+            if (data.claimChunk(dimension, chunk, repoId) == TemporalWorldData.ClaimResult.ALREADY_CLAIMED_ELSEWHERE) {
+                onChunkClaimLost(chunk);
+                continue;
+            }
             if (repo != null) repo.captureClaimBaseline(serverLevel, chunk);
         }
         data.setDirty();
+        setChanged();
+    }
+
+    /** Called when a chunk this machine used to control is now claimed by another repository. */
+    protected void onChunkClaimLost(ChunkPos chunk) {
     }
 
     /** Releases every chunk this machine's repository claims. */
@@ -468,15 +491,30 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      * Commits everything this machine's claimed chunks have accumulated since its last commit,
      * baselining any claimed chunk that doesn't have history yet.
      */
-    public void commitNow() {
+    public void commitNow(@Nullable ServerPlayer requester) {
         UUID repoId = getRepositoryId();
         if (repoId == null || !(level instanceof ServerLevel) || level.getServer() == null) return;
-        RepoCommit created = TemporalWorldData.get(level.getServer())
-                .commitRepository(level.getServer(), repoId, level.getGameTime(), null);
-        if (created != null) {
-            setChanged();
-            syncToClients();
+        TemporalWorldData.CommitStart start = TemporalWorldData.get(level.getServer()).beginRepositoryCommit(
+                level.getServer(), repoId, level.getGameTime(), null, requester == null ? null : requester.getUUID(),
+                created -> {
+                    if (created == null || isRemoved()) return;
+                    setChanged();
+                    syncToClients();
+                });
+        if (requester == null) return;
+        switch (start) {
+            case NOTHING_TO_COMMIT -> requester.displayClientMessage(
+                    Component.translatable("gui.temporalindustries.chrono_remote.msg.nothing_to_commit"), true);
+            case ALREADY_RUNNING -> requester.displayClientMessage(
+                    Component.translatable("gui.temporalindustries.timeline_view.commit_busy"), true);
+            default -> { }
         }
+    }
+
+    /** Whether this machine's repository is still capturing a commit, which freezes its history. */
+    public boolean isCommitInProgress() {
+        TemporalWorldData data = worldData();
+        return data != null && repositoryId != null && data.isCommitInProgress(repositoryId);
     }
 
 
@@ -603,6 +641,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     public void deleteRepository() {
         if (!(level instanceof ServerLevel) || level.getServer() == null || repositoryId == null) return;
+        if (isCommitInProgress()) return;
 
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         data.deleteRepository(repositoryId);
@@ -621,7 +660,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public boolean deleteCommit(long commitId) {
         TemporalRepository repo = getRepository();
         TemporalWorldData data = worldData();
-        if (repo == null || data == null) return false;
+        if (repo == null || data == null || isCommitInProgress()) return false;
 
         boolean deleted = repo.deleteCommit(commitId);
         if (deleted) {
@@ -857,6 +896,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     public JumpResult applyTimelineView(long targetCommitId) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
+        if (isCommitInProgress()) return JumpResult.BUSY;
 
         if (charging && chargeTarget == targetCommitId) return JumpResult.CHARGING;
 

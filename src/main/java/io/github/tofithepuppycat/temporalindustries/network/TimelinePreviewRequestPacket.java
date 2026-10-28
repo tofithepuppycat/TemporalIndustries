@@ -74,12 +74,16 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
     /** Max distance (blocks) the sender may be from machinePos. */
     private static final double MAX_RANGE_BLOCKS = 256.0D;
 
+    private static final int MIN_REQUEST_INTERVAL_TICKS = 5;
+
     public static void handle(TimelinePreviewRequestPacket packet, IPayloadContext context) {
         if (!(context.player() instanceof ServerPlayer sender)) {
             return;
         }
 
         context.enqueueWork(() -> {
+            if (!RequestThrottle.tryAcquire(sender, RequestThrottle.TIMELINE_PREVIEW, MIN_REQUEST_INTERVAL_TICKS)) return;
+
             // A Chrono Remote Control reads its linked machine from any distance, as long as it is loaded.
             GlobalPos remoteLink = ChronoRemoteControlItem.findHeldLink(sender);
             boolean viaRemote = remoteLink != null && remoteLink.dimension().equals(sender.level().dimension())

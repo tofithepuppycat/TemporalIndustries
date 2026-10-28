@@ -47,7 +47,9 @@ public class ChronoLensSavePacket implements CustomPacketPayload {
             for (InteractionHand hand : InteractionHand.values()) {
                 ItemStack stack = sender.getItemInHand(hand);
                 if (stack.getItem() instanceof ChronoscopeItem) {
-                    stack.set(Registration.CHRONOSCOPE_TIME.get(), packet.time);
+                    long time = packet.time == ChronoscopeItem.END_OF_TIME
+                            ? packet.time : Math.min(packet.time, sender.level().getGameTime());
+                    stack.set(Registration.CHRONOSCOPE_TIME.get(), time);
                     return;
                 }
             }

@@ -151,37 +151,101 @@ public final class TemporalRepository {
     @Nullable
     public RepoCommit commit(ServerLevel level, Map<Long, Map<BlockPos, BlockChangeDelta>> pendingBlockChanges,
                               Map<Long, List<EntityDelta>> pendingEntityChanges, long gameTime, @Nullable UUID author) {
-        Set<Long> chunkKeys = new HashSet<>();
+        CommitJob job = beginCommit(level, pendingBlockChanges, pendingEntityChanges, gameTime, author);
+        if (job == null) return null;
+        while (!stepCommit(job, Long.MAX_VALUE)) { }
+        return finishCommit(job);
+    }
+
+    /**
+     * A commit being assembled one chunk at a time, so a large repository doesn't have to be
+     * captured within a single tick. The head must stay put until {@link #finishCommit} runs.
+     */
+    public static final class CommitJob {
+        private final ServerLevel level;
+        private final Deque<Long> remaining;
+        private final int total;
+        private final Map<Long, List<EntityDelta>> pendingEntityChanges;
+        private final Map<Long, ChunkEntry> entries = new HashMap<>();
+        private final List<RepoCommit> headChain;
+        private final boolean firstCommit;
+        private final long gameTime;
+        @Nullable private final UUID author;
+
+        private CommitJob(ServerLevel level, Collection<Long> chunkKeys, Map<Long, List<EntityDelta>> pendingEntityChanges,
+                          List<RepoCommit> headChain, boolean firstCommit, long gameTime, @Nullable UUID author) {
+            this.level = level;
+            this.remaining = new ArrayDeque<>(chunkKeys);
+            this.total = chunkKeys.size();
+            this.pendingEntityChanges = pendingEntityChanges;
+            this.headChain = headChain;
+            this.firstCommit = firstCommit;
+            this.gameTime = gameTime;
+            this.author = author;
+        }
+
+        /** Fraction of the chunks already captured, 0 to 1. */
+        public float progress() {
+            return total == 0 ? 1.0F : (total - remaining.size()) / (float) total;
+        }
+    }
+
+    /** Starts a commit of the chunks pendingBlockChanges/pendingEntityChanges name, or null if there are none. */
+    @Nullable
+    public CommitJob beginCommit(ServerLevel level, Map<Long, Map<BlockPos, BlockChangeDelta>> pendingBlockChanges,
+                                 Map<Long, List<EntityDelta>> pendingEntityChanges, long gameTime, @Nullable UUID author) {
+        Set<Long> chunkKeys = new LinkedHashSet<>();
         chunkKeys.addAll(pendingBlockChanges.keySet());
         chunkKeys.addAll(pendingEntityChanges.keySet());
         if (chunkKeys.isEmpty()) return null;
 
         boolean firstCommit = headCommitId == RepoCommit.NO_PARENT;
-        Map<Long, ChunkEntry> entries = new HashMap<>();
-        for (long chunkKey : chunkKeys) {
-            ChunkState state = chunkStates.computeIfAbsent(chunkKey, k -> new ChunkState());
-            ChunkSnapshot snapshot = ChunkSnapshot.capture(level, new ChunkPos(chunkKey));
+        return new CommitJob(level, chunkKeys, pendingEntityChanges, ancestryChain(headCommitId), firstCommit, gameTime, author);
+    }
 
-            ResolvedChunkState head = firstCommit || !state.hasBaseline
-                    ? ResolvedChunkState.EMPTY : resolveChunkStateAt(headCommitId, chunkKey, false);
-            if (head.states().isEmpty()) {
-                entries.put(chunkKey, ChunkEntry.full(snapshot));
-                state.hasBaseline = true;
-                state.deltaCount = 0;
-                continue;
-            }
+    /**
+     * Captures chunks until deadlineNanos ({@link System#nanoTime} scale) has passed, always at
+     * least one. Returns whether every chunk is done.
+     */
+    public boolean stepCommit(CommitJob job, long deadlineNanos) {
+        do {
+            Long chunkKey = job.remaining.poll();
+            if (chunkKey == null) break;
+            captureChunkForCommit(job, chunkKey);
+        } while (!job.remaining.isEmpty() && System.nanoTime() < deadlineNanos);
+        return job.remaining.isEmpty();
+    }
 
-            List<BlockChangeDelta> blockChanges = diffAgainst(head, snapshot, this::isTracked);
-            List<EntityDelta> entityChanges = pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
-            if (blockChanges.isEmpty() && entityChanges.isEmpty()) continue;
-            if (deltaDepth(headCommitId, chunkKey) >= MAX_DELTA_CHAIN) {
-                entries.put(chunkKey, ChunkEntry.full(snapshot));
-                state.deltaCount = 0;
-                continue;
-            }
-            entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
-            state.deltaCount++;
+    private void captureChunkForCommit(CommitJob job, long chunkKey) {
+        ChunkState state = chunkStates.computeIfAbsent(chunkKey, k -> new ChunkState());
+        ChunkSnapshot snapshot = ChunkSnapshot.capture(job.level, new ChunkPos(chunkKey));
+
+        List<BlockChangeDelta> blockChanges = job.firstCommit || !state.hasBaseline
+                ? null : diffAgainstHead(job.headChain, chunkKey, snapshot);
+        if (blockChanges == null) {
+            job.entries.put(chunkKey, ChunkEntry.full(snapshot));
+            state.hasBaseline = true;
+            state.deltaCount = 0;
+            return;
         }
+
+        List<EntityDelta> entityChanges = job.pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
+        if (blockChanges.isEmpty() && entityChanges.isEmpty()) return;
+        if (deltaDepth(job.headChain, chunkKey) >= MAX_DELTA_CHAIN) {
+            job.entries.put(chunkKey, ChunkEntry.full(snapshot));
+            state.deltaCount = 0;
+            return;
+        }
+        job.entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
+        state.deltaCount++;
+    }
+
+    /** Turns a job whose chunks are all captured into the new head commit, or null if nothing changed. */
+    @Nullable
+    public RepoCommit finishCommit(CommitJob job) {
+        Map<Long, ChunkEntry> entries = job.entries;
+        long gameTime = job.gameTime;
+        UUID author = job.author;
         if (entries.isEmpty()) return null;
 
         long parentId = headCommitId;
@@ -208,42 +272,91 @@ public final class TemporalRepository {
      * Number of consecutive DELTA entries for chunkKey on commitId's ancestry, newest first,
      * stopping at the nearest FULL entry.
      */
-    private int deltaDepth(long commitId, long chunkKey) {
+    private static int deltaDepth(List<RepoCommit> chain, long chunkKey) {
         int depth = 0;
-        long cur = commitId;
-        while (cur != RepoCommit.NO_PARENT) {
-            RepoCommit c = commits.get(cur);
-            if (c == null) break;
-            ChunkEntry e = c.getChunkEntries().get(chunkKey);
-            if (e != null) {
-                if (e.getType() == ChunkEntry.Type.FULL) break;
-                depth++;
-            }
-            cur = c.getParentId();
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            ChunkEntry e = chain.get(i).getChunkEntries().get(chunkKey);
+            if (e == null) continue;
+            if (e.getType() == ChunkEntry.Type.FULL) break;
+            depth++;
         }
         return depth;
     }
 
     /**
-     * Every block position whose state or block entity data differs between the resolved head state
-     * and the freshly captured snapshot, with head's values as "previous".
+     * Every block position whose state or block entity data differs between chunkKey's state at
+     * the end of chain and the freshly captured snapshot, with the old values as "previous"; null
+     * if the chunk has no recorded state to compare against.
+     * <p>
+     * The old state is its baseline snapshot plus the sparse deltas recorded after it, so only
+     * sections that differ from the baseline or hold a delta position are expanded and compared.
      */
-    private static List<BlockChangeDelta> diffAgainst(ResolvedChunkState head, ChunkSnapshot snapshot,
-                                                      Predicate<BlockPos> tracked) {
-        Map<BlockPos, BlockState> before = head.states();
-        Map<BlockPos, CompoundTag> beforeBE = head.blockEntityTags();
-        Map<BlockPos, CompoundTag> afterBE = snapshot.getBlockEntityTags();
-        BlockState air = Blocks.AIR.defaultBlockState();
+    @Nullable
+    private List<BlockChangeDelta> diffAgainstHead(List<RepoCommit> chain, long chunkKey, ChunkSnapshot snapshot) {
+        int fullIndex = -1;
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            ChunkEntry e = chain.get(i).getChunkEntries().get(chunkKey);
+            if (e != null && e.getType() == ChunkEntry.Type.FULL) { fullIndex = i; break; }
+        }
 
+        ChunkSnapshot baseline;
+        if (fullIndex >= 0) {
+            baseline = chain.get(fullIndex).getChunkEntries().get(chunkKey).getSnapshot();
+        } else {
+            baseline = claimBaselines.get(chunkKey);
+            if (baseline == null) return null;
+        }
+
+        Map<BlockPos, BlockState> overlay = new HashMap<>();
+        Map<BlockPos, CompoundTag> beforeBE = new HashMap<>(baseline.getBlockEntityTags());
+        for (int i = fullIndex + 1; i < chain.size(); i++) {
+            ChunkEntry e = chain.get(i).getChunkEntries().get(chunkKey);
+            if (e == null) continue;
+            for (BlockChangeDelta change : e.getBlockChanges()) {
+                overlay.put(change.getPos(), change.getNewState());
+                beforeBE.put(change.getPos(), change.getNewBlockEntityTag());
+            }
+        }
+
+        int sectionCount = snapshot.sectionCount();
+        Set<Integer> dirty = new TreeSet<>();
+        for (int i = 0; i < sectionCount; i++) {
+            if (!baseline.sectionSameBlocks(snapshot, i)) dirty.add(i);
+        }
+        for (BlockPos pos : overlay.keySet()) {
+            int index = (pos.getY() >> 4) - snapshot.minSectionY();
+            if (index >= 0 && index < sectionCount) dirty.add(index);
+        }
+
+        Map<BlockPos, CompoundTag> afterBE = snapshot.getBlockEntityTags();
         List<BlockChangeDelta> changes = new ArrayList<>();
-        for (Map.Entry<BlockPos, BlockState> entry : snapshot.toBlockStateMap().entrySet()) {
-            BlockPos pos = entry.getKey();
-            if (!tracked.test(pos)) continue;
-            BlockState prev = before.getOrDefault(pos, air);
+        for (int index : dirty) {
+            Map<BlockPos, BlockState> after = new HashMap<>();
+            Map<BlockPos, BlockState> base = new HashMap<>();
+            snapshot.collectSectionInto(index, after);
+            baseline.collectSectionInto(index, base);
+            for (Map.Entry<BlockPos, BlockState> entry : after.entrySet()) {
+                BlockPos pos = entry.getKey();
+                if (!isTracked(pos)) continue;
+                BlockState prev = overlay.getOrDefault(pos, base.get(pos));
+                CompoundTag prevTag = beforeBE.get(pos);
+                CompoundTag newTag = afterBE.get(pos);
+                if (prev.equals(entry.getValue()) && Objects.equals(prevTag, newTag)) continue;
+                changes.add(new BlockChangeDelta(pos, prev, entry.getValue(), prevTag, newTag));
+            }
+        }
+
+        // Block entities that changed inside a section whose blocks did not.
+        Set<BlockPos> beOnly = new HashSet<>(beforeBE.keySet());
+        beOnly.addAll(afterBE.keySet());
+        for (BlockPos pos : beOnly) {
+            int index = (pos.getY() >> 4) - snapshot.minSectionY();
+            if (index < 0 || index >= sectionCount || dirty.contains(index) || !isTracked(pos)) continue;
             CompoundTag prevTag = beforeBE.get(pos);
             CompoundTag newTag = afterBE.get(pos);
-            if (prev.equals(entry.getValue()) && Objects.equals(prevTag, newTag)) continue;
-            changes.add(new BlockChangeDelta(pos, prev, entry.getValue(), prevTag, newTag));
+            if (Objects.equals(prevTag, newTag)) continue;
+            BlockState state = snapshot.stateAt(pos);
+            changes.add(new BlockChangeDelta(pos, state, state, prevTag, newTag));
         }
         return changes;
     }
@@ -542,6 +655,7 @@ public final class TemporalRepository {
         commits.clear();
         childCount.clear();
         chunkStates.clear();
+        claimBaselines.clear();
         branchTips.clear();
         currentBranchName = null;
         nextBranchNameIndex = 0;
@@ -907,6 +1021,7 @@ public final class TemporalRepository {
 
     public static TemporalRepository fromTag(CompoundTag tag) {
         ResourceLocation dimension = ResourceLocation.tryParse(tag.getString("Dimension"));
+        if (dimension == null) dimension = net.minecraft.world.level.Level.OVERWORLD.location();
         TemporalRepository repo = new TemporalRepository(dimension);
         repo.name = tag.getString("Name");
         repo.nextId = tag.getLong("NextId");

@@ -62,6 +62,8 @@ public class RollbackChunkPacket implements CustomPacketPayload {
             TimelineViewProvider.JumpResult result = menu.getTimelineProvider().jump(packet.targetCommitId);
             if (result == TimelineViewProvider.JumpResult.CHARGING) {
                 sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.charging"), true);
+            } else if (result == TimelineViewProvider.JumpResult.BUSY) {
+                sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.commit_busy"), true);
             }
         });
     }

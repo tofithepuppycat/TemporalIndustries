@@ -49,6 +49,10 @@ public final class ChronoActionRecorder {
      */
     private static final int MAX_FRAMES = 20 * 60;
 
+    // Together these keep a finished recording well inside the item component sync limit.
+    private static final int MAX_ACTIONS = 256;
+    private static final int MAX_ACTION_BYTES = 4096;
+
     /** player UUID -> the container-capable block they most recently right-clicked. */
     private static final Map<UUID, BlockPos> PENDING_CONTAINER_POS = new HashMap<>();
 
@@ -312,8 +316,10 @@ public final class ChronoActionRecorder {
         action.putInt("DZ", pos.getZ() - (int) Math.floor(startZ));
         action.putInt("Type", type.ordinal());
         fill.accept(action);
+        if (action.sizeInBytes() > MAX_ACTION_BYTES) return;
 
         ListTag actions = data.getList("Actions", Tag.TAG_COMPOUND);
+        if (actions.size() >= MAX_ACTIONS) return;
         actions.add(action);
         data.put("Actions", actions);
         EchoRecordItem.writeData(recorder, data);

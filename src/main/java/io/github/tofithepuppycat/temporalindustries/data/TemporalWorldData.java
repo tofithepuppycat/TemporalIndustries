@@ -11,9 +11,11 @@ import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
+import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -22,6 +24,7 @@ import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
 import java.util.*;
+import java.util.function.Consumer;
 
 /**
  * Central server-side store: repositories, per-player checkpoint state, glued regions, and the
@@ -29,6 +32,7 @@ import java.util.*;
  */
 @SuppressWarnings("null")
 public class TemporalWorldData extends SavedData {
+    private static final org.slf4j.Logger LOGGER = com.mojang.logging.LogUtils.getLogger();
     private static final String NAME = TemporalIndustries.MODID + "_temporal";
     private static final SavedData.Factory<TemporalWorldData> FACTORY =
             new SavedData.Factory<>(TemporalWorldData::new, TemporalWorldData::load);
@@ -48,6 +52,8 @@ public class TemporalWorldData extends SavedData {
     // Transient pending deltas awaiting a manual Commit, keyed by owning repository.
     private final Map<UUID, Map<Long, Map<BlockPos, BlockChangeDelta>>> repoPendingBlockDeltas = new HashMap<>();
     private final Map<UUID, Map<Long, List<EntityDelta>>> repoPendingEntityDeltas = new HashMap<>();
+    // Bounds the memory a busy claimed chunk (mob farm, item stream) can hold between commits.
+    private static final int MAX_PENDING_ENTITY_DELTAS_PER_CHUNK = 512;
 
     // dimension -> cuboid regions marked with Temporal Glue. Glued blocks are never captured
     // into a delta and are skipped by rollback/jump, so they sit outside the timeline system.
@@ -95,6 +101,7 @@ public class TemporalWorldData extends SavedData {
 
     public void markChronoRiftChunkUnloaded(ChunkPos pos) {
         chronoRiftLoadedChunks.remove(pos.toLong());
+        chronoRiftPendingFill.remove(pos.toLong());
     }
 
     @Nullable
@@ -260,11 +267,20 @@ public class TemporalWorldData extends SavedData {
      */
     public void deleteRepository(UUID repoId) {
         releaseAllClaimedChunks(repoId);
+        activeCommits.remove(repoId);
         repoPendingBlockDeltas.remove(repoId);
         repoPendingEntityDeltas.remove(repoId);
         repositoryOwners.remove(repoId);
         repositories.remove(repoId);
         setDirty();
+    }
+
+    /** Deletes repoId if it has no commits and nobody ever gave it a name of its own. */
+    public void discardRepositoryIfUnused(UUID repoId) {
+        TemporalRepository repo = repositories.get(repoId);
+        if (repo == null || activeCommits.containsKey(repoId)) return;
+        if (!repo.getAllCommits().isEmpty() || !repo.getName().equals(defaultRepositoryName(repoId))) return;
+        deleteRepository(repoId);
     }
 
     public boolean hasRepositoryOwner(UUID repoId) {
@@ -363,23 +379,52 @@ public class TemporalWorldData extends SavedData {
     }
 
     public void recordRepoEntityDelta(UUID repoId, ChunkPos chunkPos, EntityDelta delta) {
-        repoPendingEntityDeltas
+        List<EntityDelta> chunkDeltas = repoPendingEntityDeltas
                 .computeIfAbsent(repoId, id -> new HashMap<>())
-                .computeIfAbsent(chunkPos.toLong(), c -> new ArrayList<>())
-                .add(delta);
+                .computeIfAbsent(chunkPos.toLong(), c -> new ArrayList<>());
+        if (chunkDeltas.size() >= MAX_PENDING_ENTITY_DELTAS_PER_CHUNK) return;
+        chunkDeltas.add(delta);
+    }
+
+    public enum CommitStart { STARTED, NOTHING_TO_COMMIT, ALREADY_RUNNING, UNAVAILABLE }
+
+    /** A commit being captured over several ticks, and who to tell about it. */
+    private static final class ActiveCommit {
+        final TemporalRepository.CommitJob job;
+        @Nullable final UUID requester;
+        final Consumer<RepoCommit> onFinished;
+        int ticks;
+
+        ActiveCommit(TemporalRepository.CommitJob job, @Nullable UUID requester, Consumer<RepoCommit> onFinished) {
+            this.job = job;
+            this.requester = requester;
+            this.onFinished = onFinished;
+        }
+    }
+
+    // Not persisted: commits that are still being captured. A repository's history is frozen
+    // (no jumps, no deletions) until its commit has finished.
+    private final Map<UUID, ActiveCommit> activeCommits = new HashMap<>();
+    private static final long COMMIT_TICK_BUDGET_NANOS = 10_000_000L;
+    private static final int COMMIT_PROGRESS_INTERVAL_TICKS = 10;
+
+    public boolean isCommitInProgress(UUID repoId) {
+        return activeCommits.containsKey(repoId);
     }
 
     /**
-     * Bundles repoId's pending changes into one new commit, including a baseline for any currently-
-     * claimed chunk that doesn't have history yet.
+     * Starts bundling repoId's pending changes into one new commit, including a baseline for any
+     * currently-claimed chunk that doesn't have history yet. The chunks are captured a few per tick
+     * by {@link #tickCommits}; onFinished receives the new commit, or null if nothing had changed.
      */
-    @Nullable
-    public RepoCommit commitRepository(MinecraftServer server, UUID repoId, long gameTime, @Nullable UUID author) {
+    public CommitStart beginRepositoryCommit(MinecraftServer server, UUID repoId, long gameTime, @Nullable UUID author,
+                                             @Nullable UUID requester, Consumer<RepoCommit> onFinished) {
+        if (activeCommits.containsKey(repoId)) return CommitStart.ALREADY_RUNNING;
         TemporalRepository repo = repositories.get(repoId);
-        if (repo == null) return null;
+        if (repo == null) return CommitStart.UNAVAILABLE;
         ServerLevel level = server.getLevel(net.minecraft.resources.ResourceKey.create(
                 net.minecraft.core.registries.Registries.DIMENSION, repo.getDimension()));
-        if (level == null) return null;
+        if (level == null) return CommitStart.UNAVAILABLE;
 
         Map<Long, Map<BlockPos, BlockChangeDelta>> pendingBlocks = repoPendingBlockDeltas.getOrDefault(repoId, Collections.emptyMap());
         Map<Long, List<EntityDelta>> pendingEntities = repoPendingEntityDeltas.getOrDefault(repoId, Collections.emptyMap());
@@ -391,11 +436,59 @@ public class TemporalWorldData extends SavedData {
             commitBlocks.computeIfAbsent(claimed.toLong(), k -> Collections.emptyMap());
         }
 
-        RepoCommit result = repo.commit(level, commitBlocks, pendingEntities, gameTime, author);
+        TemporalRepository.CommitJob job = repo.beginCommit(level, commitBlocks, new HashMap<>(pendingEntities), gameTime, author);
+        // Changes recorded from here on belong to the next commit.
         repoPendingBlockDeltas.remove(repoId);
         repoPendingEntityDeltas.remove(repoId);
-        if (result != null) setDirty();
-        return result;
+        if (job == null) return CommitStart.NOTHING_TO_COMMIT;
+
+        activeCommits.put(repoId, new ActiveCommit(job, requester, onFinished));
+        return CommitStart.STARTED;
+    }
+
+    /** Advances every running commit within a fixed time budget, finishing those that are done. */
+    public void tickCommits(MinecraftServer server) {
+        if (activeCommits.isEmpty()) return;
+
+        long deadline = System.nanoTime() + COMMIT_TICK_BUDGET_NANOS;
+        Iterator<Map.Entry<UUID, ActiveCommit>> it = activeCommits.entrySet().iterator();
+        while (it.hasNext()) {
+            Map.Entry<UUID, ActiveCommit> entry = it.next();
+            ActiveCommit active = entry.getValue();
+            TemporalRepository repo = repositories.get(entry.getKey());
+            if (repo == null) {
+                it.remove();
+                continue;
+            }
+
+            boolean done;
+            try {
+                done = repo.stepCommit(active.job, deadline);
+            } catch (RuntimeException e) {
+                LOGGER.error("Commit of repository {} failed", entry.getKey(), e);
+                it.remove();
+                continue;
+            }
+
+            ServerPlayer requester = active.requester == null ? null : server.getPlayerList().getPlayer(active.requester);
+            if (!done) {
+                if (requester != null && active.ticks++ % COMMIT_PROGRESS_INTERVAL_TICKS == 0) {
+                    requester.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_machine.commit_progress",
+                            Math.round(active.job.progress() * 100)), true);
+                }
+                continue;
+            }
+
+            it.remove();
+            RepoCommit created = repo.finishCommit(active.job);
+            if (created != null) setDirty();
+            active.onFinished.accept(created);
+            if (requester != null) {
+                requester.displayClientMessage(Component.translatable(created != null
+                        ? "gui.temporalindustries.chrono_remote.msg.committed"
+                        : "gui.temporalindustries.chrono_remote.msg.nothing_to_commit"), true);
+            }
+        }
     }
 
 
@@ -489,11 +582,22 @@ public class TemporalWorldData extends SavedData {
         for (int i = 0; i < glueList.size(); i++) {
             CompoundTag gTag = glueList.getCompound(i);
             ResourceLocation dim = ResourceLocation.tryParse(gTag.getString("Dimension"));
+            if (dim == null) continue;
             BoundingBox region = new BoundingBox(
                     gTag.getInt("MinX"), gTag.getInt("MinY"), gTag.getInt("MinZ"),
                     gTag.getInt("MaxX"), gTag.getInt("MaxY"), gTag.getInt("MaxZ"));
             data.gluedRegions.computeIfAbsent(dim, d -> new ArrayList<>()).add(region);
         }
+
+        if (tag.contains("ChronoRiftActiveTime", Tag.TAG_LONG)) {
+            data.chronoRiftActiveTime = tag.getLong("ChronoRiftActiveTime");
+        }
+        ListTag filledList = tag.getList("ChronoRiftFilledChunks", Tag.TAG_COMPOUND);
+        for (int i = 0; i < filledList.size(); i++) {
+            CompoundTag filledTag = filledList.getCompound(i);
+            data.chronoRiftFilledChunks.put(filledTag.getLong("Chunk"), filledTag.getLong("Time"));
+        }
+        for (long key : tag.getLongArray("ChronoRiftTrackedChunks")) data.chronoRiftTrackedChunks.add(key);
 
         return data;
     }
@@ -540,6 +644,17 @@ public class TemporalWorldData extends SavedData {
             }
         }
         tag.put("GluedRegions", glueList);
+
+        tag.putLong("ChronoRiftActiveTime", chronoRiftActiveTime);
+        ListTag filledList = new ListTag();
+        for (Map.Entry<Long, Long> entry : chronoRiftFilledChunks.entrySet()) {
+            CompoundTag filledTag = new CompoundTag();
+            filledTag.putLong("Chunk", entry.getKey());
+            filledTag.putLong("Time", entry.getValue());
+            filledList.add(filledTag);
+        }
+        tag.put("ChronoRiftFilledChunks", filledList);
+        tag.putLongArray("ChronoRiftTrackedChunks", chronoRiftTrackedChunks.stream().mapToLong(Long::longValue).toArray());
 
         return tag;
     }
