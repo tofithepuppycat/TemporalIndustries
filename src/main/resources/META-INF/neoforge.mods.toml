@@ -99,8 +99,7 @@ enumExtensions="META-INF/enumextensions.json"
     side="BOTH"
 
 # Fusion is a connected-textures rendering library used for the machine_frame multiblock
-# casing model. It's embedded in this mod's jar via Jar-in-Jar (see build.gradle), so players
-# don't need to install it separately.
+# casing model. It is not bundled, so players must install it separately.
 [[dependencies.${mod_id}]]
     modId="fusion"
     type="required"
