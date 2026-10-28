@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.network;
 
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.netty.handler.codec.DecoderException;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import net.minecraft.core.BlockPos;
@@ -29,6 +30,9 @@ public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
 
     public static final StreamCodec<RegistryFriendlyByteBuf, ChronosphereToggleChunkPacket> STREAM_CODEC =
             StreamCodec.of(ChronosphereToggleChunkPacket::encode, ChronosphereToggleChunkPacket::decode);
+
+    // The map is 11x11 chunks, so a legitimate batch never exceeds that many entries per list.
+    private static final int MAX_CHUNKS_PER_LIST = 121;
 
     private final BlockPos machinePos;
     private final List<Long> adds;
@@ -60,13 +64,21 @@ public class ChronosphereToggleChunkPacket implements CustomPacketPayload {
 
     public static ChronosphereToggleChunkPacket decode(RegistryFriendlyByteBuf buf) {
         BlockPos machinePos = buf.readBlockPos();
-        int addCount = buf.readVarInt();
+        int addCount = readCount(buf);
         List<Long> adds = new ArrayList<>(addCount);
         for (int i = 0; i < addCount; i++) adds.add(buf.readLong());
-        int removeCount = buf.readVarInt();
+        int removeCount = readCount(buf);
         List<Long> removes = new ArrayList<>(removeCount);
         for (int i = 0; i < removeCount; i++) removes.add(buf.readLong());
         return new ChronosphereToggleChunkPacket(machinePos, adds, removes);
+    }
+
+    private static int readCount(RegistryFriendlyByteBuf buf) {
+        int count = buf.readVarInt();
+        if (count < 0 || count > MAX_CHUNKS_PER_LIST) {
+            throw new DecoderException("Chunk list size " + count + " out of range 0.." + MAX_CHUNKS_PER_LIST);
+        }
+        return count;
     }
 
     public static void handle(ChronosphereToggleChunkPacket packet, IPayloadContext context) {

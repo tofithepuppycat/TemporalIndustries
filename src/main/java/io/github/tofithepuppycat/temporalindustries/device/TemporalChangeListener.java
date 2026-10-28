@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.data.PlayerTemporalState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyChargingService;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalAnchorItem;
 import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
@@ -20,6 +21,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.ExperienceOrb;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.level.ChunkPos;
@@ -210,8 +212,9 @@ public final class TemporalChangeListener {
     public static void onEntityJoin(EntityJoinLevelEvent event) {
         if (event.getLevel().isClientSide()) return;
         if (!(event.getLevel() instanceof ServerLevel level)) return;
+        if (event.loadedFromDisk()) return;
         Entity entity = event.getEntity();
-        if (entity instanceof ServerPlayer) return;
+        if (entity instanceof ServerPlayer || entity instanceof ExperienceOrb || entity instanceof EntropyOrbEntity) return;
 
         ChunkPos chunkPos = new ChunkPos(entity.blockPosition());
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
@@ -222,10 +225,10 @@ public final class TemporalChangeListener {
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
         EntityDelta delta = new EntityDelta(entity.getUUID(), EntityDelta.Type.SPAWNED, null, stateTag);
-        if (repoId != null) data.recordRepoEntityDelta(repoId, chunkPos, delta);
+        data.recordRepoEntityDelta(repoId, chunkPos, delta);
     }
 
-    @SubscribeEvent
+    @SubscribeEvent(priority = EventPriority.LOWEST)
     public static void onEntityDeath(LivingDeathEvent event) {
         if (event.isCanceled()) return;
         if (!(event.getEntity().level() instanceof ServerLevel level)) return;
@@ -241,7 +244,7 @@ public final class TemporalChangeListener {
         CompoundTag stateTag = new CompoundTag();
         entity.save(stateTag);
         EntityDelta delta = new EntityDelta(entity.getUUID(), EntityDelta.Type.REMOVED, stateTag, null);
-        if (repoId != null) data.recordRepoEntityDelta(repoId, chunkPos, delta);
+        data.recordRepoEntityDelta(repoId, chunkPos, delta);
     }
 
     /**
@@ -283,6 +286,14 @@ public final class TemporalChangeListener {
             }
         }
         PENDING_ENTITY_CHECKS.clear();
+    }
+
+    /** Whether player's anchor will cancel their next death and rewind them instead. */
+    public static boolean anchorWillInterceptDeath(ServerPlayer player) {
+        MinecraftServer server = player.getServer();
+        if (server == null) return false;
+        PlayerTemporalState state = TemporalWorldData.get(server).getPlayerState(player.getUUID());
+        return state != null && state.isArmed() && TemporalAnchorItem.findChargedAnchor(player) != null;
     }
 
     // Player death (anchor rewind) — cancels the death outright so the rewind pre-empts the
@@ -335,6 +346,7 @@ public final class TemporalChangeListener {
         if (server == null) return;
 
         processPendingEntityChecks(server);
+        TemporalWorldData.get(server).tickCommits(server);
 
         long gameTime = server.overworld().getGameTime();
         if (gameTime % CHARGE_INTERVAL_TICKS != 0) return;

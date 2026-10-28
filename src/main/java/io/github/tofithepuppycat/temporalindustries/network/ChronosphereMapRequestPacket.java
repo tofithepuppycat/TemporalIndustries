@@ -30,6 +30,8 @@ public class ChronosphereMapRequestPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, ChronosphereMapRequestPacket> STREAM_CODEC =
             StreamCodec.of(ChronosphereMapRequestPacket::encode, ChronosphereMapRequestPacket::decode);
 
+    private static final int MIN_REQUEST_INTERVAL_TICKS = 20;
+
     private final BlockPos machinePos;
 
     public ChronosphereMapRequestPacket(BlockPos machinePos) {
@@ -52,6 +54,7 @@ public class ChronosphereMapRequestPacket implements CustomPacketPayload {
         context.enqueueWork(() -> {
             if (!(sender.containerMenu instanceof ChronosphereMenu menu)) return;
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
+            if (!RequestThrottle.tryAcquire(sender, RequestThrottle.CHRONOSPHERE_MAP, MIN_REQUEST_INTERVAL_TICKS)) return;
 
             BlockEntity be = sender.level().getBlockEntity(packet.machinePos);
             if (!(be instanceof ChronosphereBlockEntity machine)) return;
