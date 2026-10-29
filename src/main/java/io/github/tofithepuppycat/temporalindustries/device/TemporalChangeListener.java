@@ -34,6 +34,7 @@ import net.neoforged.neoforge.event.entity.EntityJoinLevelEvent;
 import net.neoforged.neoforge.event.entity.living.LivingDeathEvent;
 import net.neoforged.neoforge.event.entity.player.PlayerInteractEvent;
 import net.neoforged.neoforge.event.level.BlockEvent;
+import net.neoforged.neoforge.event.server.ServerStoppedEvent;
 import net.neoforged.neoforge.event.tick.ServerTickEvent;
 import net.neoforged.neoforge.network.PacketDistributor;
 import net.neoforged.neoforge.server.ServerLifecycleHooks;
@@ -336,6 +337,12 @@ public final class TemporalChangeListener {
                         player.getFoodData().getFoodLevel(),
                         player.getFoodData().getSaturationLevel(),
                         player.getFoodData().getExhaustionLevel()));
+    }
+
+    /** The world's final save has run by now; repository files are written off-thread, so wait for them. */
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event) {
+        TemporalWorldData.flushRepositoryWrites();
     }
 
     // Periodic tick

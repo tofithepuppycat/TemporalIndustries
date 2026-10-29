@@ -48,7 +48,7 @@ public final class RepoCommit {
         return String.format("%07x", h & 0xFFFFFFFL);
     }
 
-    public CompoundTag toTag() {
+    CompoundTag toTag(SectionPool pool) {
         CompoundTag tag = new CompoundTag();
         tag.putLong("Id", id);
         tag.putLong("ParentId", parentId);
@@ -59,14 +59,14 @@ public final class RepoCommit {
         for (Map.Entry<Long, ChunkEntry> entry : chunkEntries.entrySet()) {
             CompoundTag entryTag = new CompoundTag();
             entryTag.putLong("Chunk", entry.getKey());
-            entryTag.put("Entry", entry.getValue().toTag());
+            entryTag.put("Entry", entry.getValue().toTag(pool));
             entries.add(entryTag);
         }
         tag.put("ChunkEntries", entries);
         return tag;
     }
 
-    public static RepoCommit fromTag(CompoundTag tag) {
+    static RepoCommit fromTag(CompoundTag tag, java.util.List<ChunkSnapshot.SnapshotSection> pool) {
         long id = tag.getLong("Id");
         long parentId = tag.getLong("ParentId");
         long gameTime = tag.getLong("GameTime");
@@ -76,7 +76,7 @@ public final class RepoCommit {
         ListTag entries = tag.getList("ChunkEntries", Tag.TAG_COMPOUND);
         for (int i = 0; i < entries.size(); i++) {
             CompoundTag entryTag = entries.getCompound(i);
-            chunkEntries.put(entryTag.getLong("Chunk"), ChunkEntry.fromTag(entryTag.getCompound("Entry")));
+            chunkEntries.put(entryTag.getLong("Chunk"), ChunkEntry.fromTag(entryTag.getCompound("Entry"), pool));
         }
 
         return new RepoCommit(id, parentId, gameTime, author, chunkEntries);

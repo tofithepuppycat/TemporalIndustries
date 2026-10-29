@@ -46,11 +46,11 @@ public final class ChunkEntry {
     /** Only meaningful when {@link #getType()} == {@link Type#DELTA}. */
     public List<EntityDelta> getEntityChanges() { return entityChanges; }
 
-    public CompoundTag toTag() {
+    CompoundTag toTag(SectionPool pool) {
         CompoundTag tag = new CompoundTag();
         tag.putInt("Type", type.ordinal());
         if (type == Type.FULL) {
-            tag.put("Snapshot", snapshot.toTag());
+            tag.put("Snapshot", snapshot.toTag(pool));
         } else {
             ListTag changes = new ListTag();
             for (BlockChangeDelta delta : blockChanges) changes.add(delta.toTag());
@@ -62,10 +62,10 @@ public final class ChunkEntry {
         return tag;
     }
 
-    public static ChunkEntry fromTag(CompoundTag tag) {
+    static ChunkEntry fromTag(CompoundTag tag, java.util.List<ChunkSnapshot.SnapshotSection> pool) {
         Type type = Type.values()[tag.getInt("Type")];
         if (type == Type.FULL) {
-            return full(ChunkSnapshot.fromTag(tag.getCompound("Snapshot")));
+            return full(ChunkSnapshot.fromTag(tag.getCompound("Snapshot"), pool));
         }
 
         List<BlockChangeDelta> changes = new ArrayList<>();

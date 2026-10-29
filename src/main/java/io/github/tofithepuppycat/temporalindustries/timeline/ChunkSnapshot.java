@@ -88,6 +88,21 @@ public final class ChunkSnapshot {
         sections.get(sectionIndex).collectDiffering(chunkPos, minSectionY + sectionIndex, live, out);
     }
 
+    /**
+     * This snapshot with every section that holds the same blocks as the matching section of
+     * reference replaced by reference's own, so the two share one copy in memory and on disk.
+     */
+    public ChunkSnapshot internAgainst(ChunkSnapshot reference) {
+        if (reference.sections.size() != sections.size()) return this;
+        List<SnapshotSection> shared = new ArrayList<>(sections.size());
+        for (int i = 0; i < sections.size(); i++) {
+            SnapshotSection own = sections.get(i);
+            SnapshotSection other = reference.sections.get(i);
+            shared.add(own.sameBlocks(other) ? other : own);
+        }
+        return new ChunkSnapshot(chunkPos, minSectionY, shared, blockEntities);
+    }
+
     /** Section sectionIndex's blocks as a flat array indexed (y * 16 + z) * 16 + x. */
     public BlockState[] decodeSection(int sectionIndex) {
         BlockState[] out = new BlockState[16 * 16 * 16];
@@ -128,15 +143,19 @@ public final class ChunkSnapshot {
 
     // NBT — server-only; never sent over the network.
 
-    public CompoundTag toTag() {
+    /**
+     * Where this snapshot's sections go is up to pool, which stores each distinct section once for
+     * every snapshot written through it; the tag holds only references.
+     */
+    CompoundTag toTag(SectionPool pool) {
         CompoundTag tag = new CompoundTag();
         tag.putInt("ChunkX", chunkPos.x);
         tag.putInt("ChunkZ", chunkPos.z);
         tag.putInt("MinSectionY", minSectionY);
 
-        ListTag sectionList = new ListTag();
-        for (SnapshotSection section : sections) sectionList.add(section.toTag());
-        tag.put("Sections", sectionList);
+        int[] refs = new int[sections.size()];
+        for (int i = 0; i < refs.length; i++) refs[i] = pool.intern(sections.get(i));
+        tag.putIntArray("SectionRefs", refs);
 
         ListTag beList = new ListTag();
         for (Map.Entry<BlockPos, CompoundTag> entry : blockEntities.entrySet()) {
@@ -152,13 +171,24 @@ public final class ChunkSnapshot {
         return tag;
     }
 
-    public static ChunkSnapshot fromTag(CompoundTag tag) {
+    /**
+     * Reads a snapshot written by {@link #toTag}; pool holds the sections its references point
+     * into. Snapshots saved before pooling carry their sections inline and are read as such.
+     */
+    static ChunkSnapshot fromTag(CompoundTag tag, List<SnapshotSection> pool) {
         ChunkPos chunkPos = new ChunkPos(tag.getInt("ChunkX"), tag.getInt("ChunkZ"));
         int minSectionY = tag.getInt("MinSectionY");
 
-        ListTag sectionList = tag.getList("Sections", Tag.TAG_COMPOUND);
-        List<SnapshotSection> sections = new ArrayList<>(sectionList.size());
-        for (int i = 0; i < sectionList.size(); i++) sections.add(SnapshotSection.fromTag(sectionList.getCompound(i)));
+        List<SnapshotSection> sections;
+        if (tag.contains("SectionRefs")) {
+            int[] refs = tag.getIntArray("SectionRefs");
+            sections = new ArrayList<>(refs.length);
+            for (int ref : refs) sections.add(pool.get(ref));
+        } else {
+            ListTag sectionList = tag.getList("Sections", Tag.TAG_COMPOUND);
+            sections = new ArrayList<>(sectionList.size());
+            for (int i = 0; i < sectionList.size(); i++) sections.add(SnapshotSection.fromTag(sectionList.getCompound(i)));
+        }
 
         Map<BlockPos, CompoundTag> blockEntities = new HashMap<>();
         ListTag beList = tag.getList("BlockEntities", Tag.TAG_COMPOUND);
@@ -173,7 +203,7 @@ public final class ChunkSnapshot {
 
     // One 16x16x16 section: either a single uniform state, or a palette + run-length encoding.
 
-    private static final class SnapshotSection {
+    static final class SnapshotSection {
         private final boolean uniform;
         private final BlockState uniformState;
         private final List<BlockState> palette;
@@ -244,6 +274,11 @@ public final class ChunkSnapshot {
                 return new SnapshotSection(palette.get(0));
             }
             return new SnapshotSection(palette, runPaletteIndices.toIntArray(), runLengths.toIntArray());
+        }
+
+        /** The one state this section consists of, or null if it holds more than one. */
+        BlockState uniformStateOrNull() {
+            return uniform ? uniformState : null;
         }
 
         /** Writes every block of this section into out, indexed (y * 16 + z) * 16 + x. */

@@ -64,6 +64,8 @@ public final class TemporalRepository {
     private int nextBranchNameIndex = 0;
     /** The most recently built jump plan; dropped whenever the history it was built from changes. */
     @Nullable private JumpPlan planCache;
+    /** Bumped by every change that has to be saved, so the saver can skip repositories that have none. */
+    private long revision;
 
     /**
      * Cuboids that Temporal Glue marked for this repository. Chunks claimed only for these (see
@@ -82,7 +84,9 @@ public final class TemporalRepository {
 
     public ResourceLocation getDimension() { return dimension; }
     public String getName() { return name; }
-    public void setName(String name) { this.name = name; }
+    public void setName(String name) { this.name = name; revision++; }
+
+    public long getRevision() { return revision; }
     public boolean isEmpty() { return rootCommitId == RepoCommit.NO_PARENT; }
     public long getHeadCommitId() { return headCommitId; }
     public long getRootCommitId() { return rootCommitId; }
@@ -104,16 +108,17 @@ public final class TemporalRepository {
 
     public Set<Long> getRegionChunks() { return Collections.unmodifiableSet(regionChunks); }
 
-    public void addTrackedRegion(BoundingBox region) { trackedRegions.add(region); }
+    public void addTrackedRegion(BoundingBox region) { trackedRegions.add(region); revision++; }
 
-    public void addRegionChunk(long chunkKey) { regionChunks.add(chunkKey); }
+    public void addRegionChunk(long chunkKey) { regionChunks.add(chunkKey); revision++; }
 
-    public void removeRegionChunk(long chunkKey) { regionChunks.remove(chunkKey); }
+    public void removeRegionChunk(long chunkKey) { regionChunks.remove(chunkKey); revision++; }
 
     /** Drops every tracked region matching toRemove; returns how many were dropped. */
     public int removeTrackedRegions(Predicate<BoundingBox> toRemove) {
         int before = trackedRegions.size();
         trackedRegions.removeIf(toRemove);
+        revision++;
         return before - trackedRegions.size();
     }
 
@@ -134,6 +139,7 @@ public final class TemporalRepository {
         if (claimBaselines.containsKey(pos.toLong())) return;
         claimBaselines.put(pos.toLong(), ChunkSnapshot.capture(level, pos));
         planCache = null;
+        revision++;
     }
 
     public Collection<RepoCommit> getAllCommits() { return commits.values(); }
@@ -232,7 +238,7 @@ public final class TemporalRepository {
         List<BlockChangeDelta> blockChanges = job.firstCommit || !state.hasBaseline
                 ? null : diffAgainstHead(job.headChain, chunkKey, snapshot);
         if (blockChanges == null) {
-            job.entries.put(chunkKey, ChunkEntry.full(snapshot));
+            job.entries.put(chunkKey, ChunkEntry.full(internAgainstLatest(job.headChain, chunkKey, snapshot)));
             state.hasBaseline = true;
             state.deltaCount = 0;
             return;
@@ -241,12 +247,26 @@ public final class TemporalRepository {
         List<EntityDelta> entityChanges = job.pendingEntityChanges.getOrDefault(chunkKey, Collections.emptyList());
         if (blockChanges.isEmpty() && entityChanges.isEmpty()) return;
         if (deltaDepth(job.headChain, chunkKey) >= MAX_DELTA_CHAIN) {
-            job.entries.put(chunkKey, ChunkEntry.full(snapshot));
+            job.entries.put(chunkKey, ChunkEntry.full(internAgainstLatest(job.headChain, chunkKey, snapshot)));
             state.deltaCount = 0;
             return;
         }
         job.entries.put(chunkKey, ChunkEntry.delta(blockChanges, entityChanges));
         state.deltaCount++;
+    }
+
+    /**
+     * snapshot sharing every section it has in common with the chunk's most recent full state — its
+     * latest FULL entry on chain, or else its claim baseline — so a re-snapshot costs only what
+     * actually changed.
+     */
+    private ChunkSnapshot internAgainstLatest(List<RepoCommit> chain, long chunkKey, ChunkSnapshot snapshot) {
+        for (int i = chain.size() - 1; i >= 0; i--) {
+            ChunkEntry e = chain.get(i).getChunkEntries().get(chunkKey);
+            if (e != null && e.getType() == ChunkEntry.Type.FULL) return snapshot.internAgainst(e.getSnapshot());
+        }
+        ChunkSnapshot baseline = claimBaselines.get(chunkKey);
+        return baseline == null ? snapshot : snapshot.internAgainst(baseline);
     }
 
     /** Turns a job whose chunks are all captured into the new head commit, or null if nothing changed. */
@@ -275,6 +295,7 @@ public final class TemporalRepository {
         branchTips.put(currentBranchName, id);
         headCommitId = id;
         planCache = null;
+        revision++;
         return newCommit;
     }
 
@@ -646,6 +667,7 @@ public final class TemporalRepository {
             if (entry.getValue() == targetCommitId) { currentBranchName = entry.getKey(); break; }
         }
         planCache = null;
+        revision++;
     }
 
 
@@ -697,6 +719,7 @@ public final class TemporalRepository {
 
         rebuildChunkStates();
         planCache = null;
+        revision++;
         return true;
     }
 
@@ -717,6 +740,7 @@ public final class TemporalRepository {
         rootCommitId = RepoCommit.NO_PARENT;
         headCommitId = RepoCommit.NO_PARENT;
         planCache = null;
+        revision++;
 
         // Every chunk is listed with no pending changes: chunkStates is empty, so commit() sees
         // each as un-baselined and captures a FULL entry for it.
@@ -907,6 +931,7 @@ public final class TemporalRepository {
 
     public CompoundTag toTag() {
         CompoundTag tag = new CompoundTag();
+        SectionPool pool = new SectionPool();
         tag.putString("Dimension", dimension.toString());
         tag.putString("Name", name);
         tag.putLong("NextId", nextId);
@@ -916,7 +941,7 @@ public final class TemporalRepository {
         tag.putInt("NextBranchNameIndex", nextBranchNameIndex);
 
         ListTag commitList = new ListTag();
-        for (RepoCommit commit : commits.values()) commitList.add(commit.toTag());
+        for (RepoCommit commit : commits.values()) commitList.add(commit.toTag(pool));
         tag.put("Commits", commitList);
 
         ListTag childCountList = new ListTag();
@@ -942,10 +967,11 @@ public final class TemporalRepository {
         for (Map.Entry<Long, ChunkSnapshot> entry : claimBaselines.entrySet()) {
             CompoundTag entryTag = new CompoundTag();
             entryTag.putLong("Chunk", entry.getKey());
-            entryTag.put("Snapshot", entry.getValue().toTag());
+            entryTag.put("Snapshot", entry.getValue().toTag(pool));
             claimBaselineList.add(entryTag);
         }
         tag.put("ClaimBaselines", claimBaselineList);
+        tag.put("SectionPool", pool.toTag());
 
         ListTag branchList = new ListTag();
         for (Map.Entry<String, Long> entry : branchTips.entrySet()) {
@@ -978,9 +1004,10 @@ public final class TemporalRepository {
         repo.currentBranchName = tag.contains("CurrentBranch") ? tag.getString("CurrentBranch") : null;
         repo.nextBranchNameIndex = tag.getInt("NextBranchNameIndex");
 
+        List<ChunkSnapshot.SnapshotSection> pool = SectionPool.fromTag(tag.getList("SectionPool", Tag.TAG_COMPOUND));
         ListTag commitList = tag.getList("Commits", Tag.TAG_COMPOUND);
         for (int i = 0; i < commitList.size(); i++) {
-            RepoCommit commit = RepoCommit.fromTag(commitList.getCompound(i));
+            RepoCommit commit = RepoCommit.fromTag(commitList.getCompound(i), pool);
             repo.commits.put(commit.getId(), commit);
         }
 
@@ -1002,7 +1029,7 @@ public final class TemporalRepository {
         ListTag claimBaselineList = tag.getList("ClaimBaselines", Tag.TAG_COMPOUND);
         for (int i = 0; i < claimBaselineList.size(); i++) {
             CompoundTag entryTag = claimBaselineList.getCompound(i);
-            repo.claimBaselines.put(entryTag.getLong("Chunk"), ChunkSnapshot.fromTag(entryTag.getCompound("Snapshot")));
+            repo.claimBaselines.put(entryTag.getLong("Chunk"), ChunkSnapshot.fromTag(entryTag.getCompound("Snapshot"), pool));
         }
 
         ListTag branchList = tag.getList("Branches", Tag.TAG_COMPOUND);

@@ -11,6 +11,8 @@ import net.minecraft.core.GlobalPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.NbtAccounter;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -18,13 +20,24 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import org.jetbrains.annotations.Nullable;
 
+import java.io.IOException;
+import java.nio.file.AtomicMoveNotSupportedException;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.util.*;
+import java.util.concurrent.CompletableFuture;
+import java.util.concurrent.ConcurrentHashMap;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.stream.Stream;
 import java.util.function.Consumer;
 
 /**
@@ -167,7 +180,138 @@ public class TemporalWorldData extends SavedData {
 
 
     public static TemporalWorldData get(MinecraftServer server) {
-        return server.overworld().getDataStorage().computeIfAbsent(FACTORY, NAME);
+        TemporalWorldData data = server.overworld().getDataStorage().computeIfAbsent(FACTORY, NAME);
+        if (data.attachedTo != server) data.attachStorage(server);
+        return data;
+    }
+
+    // Each repository lives in its own file, written only when it has changed since it was last
+    // written, so saving a world does not re-encode every repository's whole history.
+    private static final String REPOSITORY_DIRECTORY = "temporalindustries_repos";
+    private static final String REPOSITORY_EXTENSION = ".dat";
+
+    @Nullable private static ExecutorService repositoryIo;
+    private static final List<CompletableFuture<Void>> PENDING_REPOSITORY_IO = new ArrayList<>();
+
+    @Nullable private MinecraftServer attachedTo;
+    @Nullable private Path repositoryDirectory;
+    // Repository id -> the revision last handed to the writer; absent means never written.
+    private final Map<UUID, Long> savedRevisions = new ConcurrentHashMap<>();
+    // Repositories read from the world's main data file, which keeps carrying them until their own
+    // file has been written.
+    private final Set<UUID> legacyRepositories = ConcurrentHashMap.newKeySet();
+
+    private void attachStorage(MinecraftServer server) {
+        attachedTo = server;
+        Path directory = server.getWorldPath(LevelResource.ROOT).resolve("data").resolve(REPOSITORY_DIRECTORY);
+        repositoryDirectory = directory;
+        if (Files.isDirectory(directory)) {
+            try (Stream<Path> files = Files.list(directory)) {
+                for (Path file : (Iterable<Path>) files::iterator) loadRepositoryFile(file);
+            } catch (IOException e) {
+                LOGGER.error("Could not list temporal repositories in {}", directory, e);
+            }
+        }
+        if (!legacyRepositories.isEmpty()) setDirty();
+    }
+
+    private void loadRepositoryFile(Path file) {
+        String fileName = file.getFileName().toString();
+        if (!fileName.endsWith(REPOSITORY_EXTENSION)) return;
+        try {
+            UUID id = UUID.fromString(fileName.substring(0, fileName.length() - REPOSITORY_EXTENSION.length()));
+            if (legacyRepositories.contains(id)) return;
+            TemporalRepository repo = TemporalRepository.fromTag(NbtIo.readCompressed(file, NbtAccounter.unlimitedHeap()));
+            if (repo.getName().isEmpty()) repo.setName(defaultRepositoryName(id));
+            repositories.put(id, repo);
+            savedRevisions.put(id, repo.getRevision());
+        } catch (IllegalArgumentException | IOException e) {
+            LOGGER.error("Could not read temporal repository {}", file, e);
+        }
+    }
+
+    private static synchronized ExecutorService repositoryIo() {
+        if (repositoryIo == null) {
+            repositoryIo = Executors.newSingleThreadExecutor(task -> {
+                Thread thread = new Thread(task, "TemporalIndustries-repository-io");
+                thread.setDaemon(true);
+                return thread;
+            });
+        }
+        return repositoryIo;
+    }
+
+    private static void queueRepositoryIo(Runnable work) {
+        CompletableFuture<Void> future = CompletableFuture.runAsync(work, repositoryIo());
+        synchronized (PENDING_REPOSITORY_IO) {
+            PENDING_REPOSITORY_IO.removeIf(CompletableFuture::isDone);
+            PENDING_REPOSITORY_IO.add(future);
+        }
+    }
+
+    /** Waits for every queued repository write; call once the world has finished saving. */
+    public static void flushRepositoryWrites() {
+        List<CompletableFuture<Void>> pending;
+        synchronized (PENDING_REPOSITORY_IO) {
+            pending = new ArrayList<>(PENDING_REPOSITORY_IO);
+            PENDING_REPOSITORY_IO.clear();
+        }
+        for (CompletableFuture<Void> future : pending) future.join();
+    }
+
+    /**
+     * Encodes every repository that changed since it was last written and queues its file write.
+     * Returns the encoded repositories, so a caller that needs one of them does not encode it twice.
+     */
+    private Map<UUID, CompoundTag> saveChangedRepositories() {
+        Map<UUID, CompoundTag> encoded = new HashMap<>();
+        Path directory = repositoryDirectory;
+        if (directory == null) return encoded;
+
+        for (Map.Entry<UUID, TemporalRepository> entry : repositories.entrySet()) {
+            UUID id = entry.getKey();
+            long revision = entry.getValue().getRevision();
+            Long saved = savedRevisions.get(id);
+            if (saved != null && saved == revision) continue;
+
+            CompoundTag repoTag = entry.getValue().toTag();
+            encoded.put(id, repoTag);
+            savedRevisions.put(id, revision);
+            queueRepositoryIo(() -> writeRepositoryFile(directory, id, repoTag));
+        }
+        return encoded;
+    }
+
+    private void writeRepositoryFile(Path directory, UUID id, CompoundTag repoTag) {
+        Path temporary = directory.resolve(id + REPOSITORY_EXTENSION + ".tmp");
+        Path target = directory.resolve(id + REPOSITORY_EXTENSION);
+        try {
+            Files.createDirectories(directory);
+            NbtIo.writeCompressed(repoTag, temporary);
+            try {
+                Files.move(temporary, target, StandardCopyOption.ATOMIC_MOVE);
+            } catch (AtomicMoveNotSupportedException e) {
+                Files.move(temporary, target, StandardCopyOption.REPLACE_EXISTING);
+            }
+            legacyRepositories.remove(id);
+        } catch (IOException e) {
+            LOGGER.error("Could not write temporal repository {}", id, e);
+            savedRevisions.remove(id);
+        }
+    }
+
+    private void deleteRepositoryFile(UUID id) {
+        Path directory = repositoryDirectory;
+        savedRevisions.remove(id);
+        legacyRepositories.remove(id);
+        if (directory == null) return;
+        queueRepositoryIo(() -> {
+            try {
+                Files.deleteIfExists(directory.resolve(id + REPOSITORY_EXTENSION));
+            } catch (IOException e) {
+                LOGGER.error("Could not delete temporal repository {}", id, e);
+            }
+        });
     }
 
 
@@ -275,6 +419,7 @@ public class TemporalWorldData extends SavedData {
         repoPendingEntityDeltas.remove(repoId);
         repositoryOwners.remove(repoId);
         repositories.remove(repoId);
+        deleteRepositoryFile(repoId);
         setDirty();
     }
 
@@ -653,6 +798,7 @@ public class TemporalWorldData extends SavedData {
             TemporalRepository repo = TemporalRepository.fromTag(repoTag.getCompound("Repository"));
             if (repo.getName().isEmpty()) repo.setName(defaultRepositoryName(id));
             data.repositories.put(id, repo);
+            data.legacyRepositories.add(id);
         }
 
         ListTag ownerList = tag.getList("RepositoryOwners", Tag.TAG_COMPOUND);
@@ -697,11 +843,14 @@ public class TemporalWorldData extends SavedData {
         }
         tag.put("Players", playerList);
 
+        Map<UUID, CompoundTag> encoded = saveChangedRepositories();
         ListTag repoList = new ListTag();
-        for (Map.Entry<UUID, TemporalRepository> entry : repositories.entrySet()) {
+        for (UUID id : legacyRepositories) {
+            TemporalRepository repo = repositories.get(id);
+            if (repo == null) continue;
             CompoundTag repoTag = new CompoundTag();
-            repoTag.putUUID("Id", entry.getKey());
-            repoTag.put("Repository", entry.getValue().toTag());
+            repoTag.putUUID("Id", id);
+            repoTag.put("Repository", encoded.containsKey(id) ? encoded.get(id) : repo.toTag());
             repoList.add(repoTag);
         }
         tag.put("Repositories", repoList);
