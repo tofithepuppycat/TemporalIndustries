@@ -204,6 +204,10 @@ public class ChronoRemoteRepositoryScreen extends Screen {
             change(nameBox.getValue());
             return true;
         }
+        if (!nameBox.isFocused() && minecraft != null && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            ChronoRemoteWheelScreen.openSettings();
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 }

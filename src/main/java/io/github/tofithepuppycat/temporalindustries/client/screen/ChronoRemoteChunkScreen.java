@@ -43,6 +43,8 @@ public class ChronoRemoteChunkScreen extends Screen {
     private int panelTop;
     private int panelWidth;
     private int panelHeight;
+    /** Height of the band holding the map and the sidebar: the taller of the two. */
+    private int areaHeight;
 
     public ChronoRemoteChunkScreen(BlockPos machinePos) {
         super(Component.translatable("gui.temporalindustries.chrono_remote.select_chunks"));
@@ -54,7 +56,8 @@ public class ChronoRemoteChunkScreen extends Screen {
     @Override
     protected void init() {
         panelWidth = 3 * PADDING + mapView.gridPixels() + SIDEBAR_WIDTH;
-        panelHeight = HEADER_HEIGHT + mapView.gridPixels() + PADDING + FOOTER_HEIGHT;
+        areaHeight = Math.max(mapView.gridPixels(), sidebarContentHeight());
+        panelHeight = HEADER_HEIGHT + areaHeight + PADDING + FOOTER_HEIGHT;
         panelLeft = (width - panelWidth) / 2;
         panelTop = Math.max(0, (height - panelHeight) / 2);
 
@@ -70,7 +73,18 @@ public class ChronoRemoteChunkScreen extends Screen {
     }
 
     private int mapTop() {
+        return areaTop() + (areaHeight - mapView.gridPixels()) / 2;
+    }
+
+    private int areaTop() {
         return panelTop + HEADER_HEIGHT;
+    }
+
+    /** What the sidebar needs: the count, the legend and the wrapped controls text. */
+    private int sidebarContentHeight() {
+        int controlLines = font.split(Component.translatable("gui.temporalindustries.chrono_remote.chunks.controls"),
+                SIDEBAR_WIDTH - 2 * PADDING).size();
+        return PADDING + LINE_HEIGHT * 2 + 6 + LINE_HEIGHT * 3 + 6 + controlLines * font.lineHeight + PADDING;
     }
 
     private int sidebarLeft() {
@@ -135,9 +149,9 @@ public class ChronoRemoteChunkScreen extends Screen {
 
     private void renderSidebar(GuiGraphics guiGraphics) {
         int left = sidebarLeft();
-        int top = mapTop();
+        int top = areaTop();
         int sidebarWidth = sidebarWidth();
-        drawPanel(guiGraphics, left, top, sidebarWidth, mapView.gridPixels(), SIDEBAR_COLOR, DIVIDER_COLOR);
+        drawPanel(guiGraphics, left, top, sidebarWidth, areaHeight, SIDEBAR_COLOR, DIVIDER_COLOR);
 
         int x = left + PADDING;
         int y = top + PADDING;
@@ -168,6 +182,15 @@ public class ChronoRemoteChunkScreen extends Screen {
         drawButton(guiGraphics, font, previewButtonLeft(), buttonTop(), PREVIEW_BUTTON_WIDTH, previewLabel(), true, false, mouseX, mouseY);
         drawButton(guiGraphics, font, doneButtonLeft(), buttonTop(), DONE_BUTTON_WIDTH,
                 Component.translatable("gui.temporalindustries.chrono_remote.done"), true, true, mouseX, mouseY);
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (minecraft != null && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            ChronoRemoteWheelScreen.openMain();
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override

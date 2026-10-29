@@ -298,6 +298,10 @@ public class ChronoRemoteTimelineScreen extends Screen {
             startPreview();
             return true;
         }
+        if (minecraft != null && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            ChronoRemoteWheelScreen.openMain();
+            return true;
+        }
         return super.keyPressed(keyCode, scanCode, modifiers);
     }
 

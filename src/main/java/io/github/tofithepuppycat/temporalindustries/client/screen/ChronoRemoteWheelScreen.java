@@ -36,8 +36,6 @@ public class ChronoRemoteWheelScreen extends Screen {
     private static final int OUTER_RADIUS = 118;
     private static final int HUB_RADIUS = INNER_RADIUS - 6;
     private static final int HINT_GAP = 14;
-    /** Angular gap left between neighbouring slices. */
-    private static final double SLICE_GAP = Math.toRadians(1.6D);
     /** Largest angle one segment of a slice's outline may span. */
     private static final double SEGMENT_ANGLE = Math.toRadians(4.0D);
     private static final int LABEL_PADDING = 6;
@@ -82,6 +80,8 @@ public class ChronoRemoteWheelScreen extends Screen {
     }
 
     private final List<Option> options;
+    /** Where the inventory key leads; null for a wheel with nothing above it, which closes instead. */
+    @Nullable private Runnable back;
     @Nullable private Option armed;
 
     private ChronoRemoteWheelScreen(List<Option> options) {
@@ -92,6 +92,11 @@ public class ChronoRemoteWheelScreen extends Screen {
     /** Opens the wheel that fits what the remote is doing: the jump confirmation while previewing, else the main wheel. */
     public static void open() {
         Minecraft.getInstance().setScreen(ChronoRemoteClientState.isPreviewing() ? confirmWheel() : mainWheel());
+    }
+
+    /** Reopens the main wheel; the screens opened from it use this to go back. */
+    static void openMain() {
+        Minecraft.getInstance().setScreen(mainWheel());
     }
 
     private static ChronoRemoteWheelScreen mainWheel() {
@@ -114,7 +119,7 @@ public class ChronoRemoteWheelScreen extends Screen {
         send(ChronoRemoteActionPacket.Action.SYNC);
         String prefix = "gui.temporalindustries.chrono_remote.setting.";
         String hints = "gui.temporalindustries.chrono_remote.hint.";
-        return new ChronoRemoteWheelScreen(List.of(
+        ChronoRemoteWheelScreen wheel = new ChronoRemoteWheelScreen(List.of(
                 new Option(prefix + "ghost_preview", hints + "ghost_preview", TimelineProjectionManager::toggleGhostBlockMode)
                         .toggle(TimelineProjectionManager::isGhostBlockModeEnabled),
                 new Option(prefix + "save_entities", hints + "save_entities",
@@ -127,6 +132,8 @@ public class ChronoRemoteWheelScreen extends Screen {
                         () -> Minecraft.getInstance().setScreen(mainWheel())),
                 new Option(prefix + "change_repository", hints + "change_repository",
                         ChronoRemoteWheelScreen::openRepository)));
+        wheel.back = ChronoRemoteWheelScreen::openMain;
+        return wheel;
     }
 
     private static ChronoRemoteWheelScreen confirmWheel() {
@@ -166,7 +173,7 @@ public class ChronoRemoteWheelScreen extends Screen {
         Minecraft.getInstance().setScreen(new ChronoRemoteRepositoryScreen());
     }
 
-    private static void openSettings() {
+    static void openSettings() {
         Minecraft.getInstance().setScreen(settingsWheel());
     }
 
@@ -247,13 +254,12 @@ public class ChronoRemoteWheelScreen extends Screen {
 
         Option hovered = hovered(mouseX, mouseY);
         double step = sliceStep();
-        double gap = options.size() > 1 ? SLICE_GAP : 0.0D;
         for (int i = 0; i < options.size(); i++) {
             Option option = options.get(i);
             double angle = sliceAngle(i);
             int color = option == armed ? SLICE_ARMED_COLOR : (option == hovered ? SLICE_HOVER_COLOR : SLICE_COLOR);
             fillSlice(guiGraphics, centerX(), centerY(), INNER_RADIUS, OUTER_RADIUS,
-                    angle - step / 2.0D + gap, angle + step / 2.0D - gap, color);
+                    angle - step / 2.0D, angle + step / 2.0D, color);
             renderLabel(guiGraphics, option, angle, step);
         }
 
@@ -314,6 +320,19 @@ public class ChronoRemoteWheelScreen extends Screen {
         if (!option.keepsWheelOpen && minecraft != null && minecraft.screen == before) {
             onClose();
         }
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (minecraft != null && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
+            if (back != null) {
+                back.run();
+            } else {
+                onClose();
+            }
+            return true;
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     @Override
