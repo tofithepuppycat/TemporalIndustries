@@ -51,7 +51,8 @@ import java.util.List;
  * Multiblock Chaos generator powered by a captured Wither. Every unit of Chaos it produces drags
  * its internal Order/Chaos balance toward Chaos, and output efficiency falls away as the balance
  * leaves the centre, so liquid Order has to be fed in through any face of the structure to keep it
- * running. The Chaos itself accumulates in the {@link ReactorOutputHatchBlockEntity}.
+ * running. The Chaos itself accumulates in an output buffer that can be drained through any face of
+ * the structure.
  */
 @SuppressWarnings("null")
 public class WithergenicReactorBlockEntity extends BlockEntity implements MenuProvider, EntropyInfoProvider, MachineFrameController {
@@ -63,6 +64,8 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
     public static final double MIN_EFFICIENCY = 0.05;
 
     public static final int ENTROPY_MAX = AbstractTimelineMachineBlockEntity.ENTROPY_MAX;
+    /** Kept within a short so the menu can sync the fill level through container data. */
+    public static final int OUTPUT_CAPACITY = 32_000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
 
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
@@ -73,9 +76,8 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
     /** Reasons the reactor is not producing, synced to the menu as an int. */
     public static final int STATUS_RUNNING = 0;
     public static final int STATUS_NO_WITHER = 1;
-    public static final int STATUS_NO_HATCH = 2;
-    public static final int STATUS_BUFFER_FULL = 3;
-    public static final int STATUS_UNSTABLE = 4;
+    public static final int STATUS_BUFFER_FULL = 2;
+    public static final int STATUS_UNSTABLE = 3;
 
     private final FluidTank orderTank = new FluidTank(ENTROPY_MAX) {
         @Override public boolean isFluidValid(FluidStack stack) {
@@ -88,15 +90,25 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         }
     };
 
+    private final FluidTank outputTank = new FluidTank(OUTPUT_CAPACITY) {
+        @Override public boolean isFluidValid(FluidStack stack) {
+            return stack.getFluid().isSame(Registration.CHAOS_FLUID.get());
+        }
+
+        @Override protected void onContentsChanged() {
+            setChanged();
+        }
+    };
+
     /**
      * Accepts liquid Order only, which displaces the same amount of Chaos from the internal
-     * balance. Nothing can be drained back out.
+     * balance. Only the produced Chaos can be drained back out.
      */
-    private final IFluidHandler orderInput = new IFluidHandler() {
-        @Override public int getTanks() { return 1; }
-        @Override public @NotNull FluidStack getFluidInTank(int tank) { return orderTank.getFluid(); }
-        @Override public int getTankCapacity(int tank) { return orderTank.getCapacity(); }
-        @Override public boolean isFluidValid(int tank, @NotNull FluidStack stack) { return orderTank.isFluidValid(stack); }
+    private final IFluidHandler fluidIo = new IFluidHandler() {
+        @Override public int getTanks() { return 2; }
+        @Override public @NotNull FluidStack getFluidInTank(int tank) { return tank == 0 ? orderTank.getFluid() : outputTank.getFluid(); }
+        @Override public int getTankCapacity(int tank) { return tank == 0 ? orderTank.getCapacity() : outputTank.getCapacity(); }
+        @Override public boolean isFluidValid(int tank, @NotNull FluidStack stack) { return tank == 0 && orderTank.isFluidValid(stack); }
 
         @Override public int fill(@NotNull FluidStack resource, @NotNull FluidAction action) {
             if (!orderTank.isFluidValid(resource)) return 0;
@@ -110,8 +122,13 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
             return filled;
         }
 
-        @Override public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) { return FluidStack.EMPTY; }
-        @Override public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) { return FluidStack.EMPTY; }
+        @Override public @NotNull FluidStack drain(@NotNull FluidStack resource, @NotNull FluidAction action) {
+            return outputTank.drain(resource, action);
+        }
+
+        @Override public @NotNull FluidStack drain(int maxDrain, @NotNull FluidAction action) {
+            return outputTank.drain(maxDrain, action);
+        }
     };
 
     private final ContainerData menuData = new ContainerData() {
@@ -119,7 +136,7 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
             return switch (index) {
                 case 0 -> chaosTank.getFluidAmount();
                 case 1 -> (int) Math.round(getEfficiency() * 100.0);
-                case 2 -> hatchAmount();
+                case 2 -> outputTank.getFluidAmount();
                 case 3 -> status;
                 case 4 -> outputPerTick;
                 default -> 0;
@@ -215,7 +232,7 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
 
     @Override
     public IFluidHandler getFluidHandler() {
-        return orderInput;
+        return fluidIo;
     }
 
     @Override
@@ -240,29 +257,10 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         return missing;
     }
 
-    public BlockPos hatchPosition() {
-        return WithergenicReactorStructure.hatchPosition(worldPosition, getBlockState().getValue(WithergenicReactor.FACING));
-    }
-
-    @Nullable
-    private ReactorOutputHatchBlockEntity findHatch() {
-        if (level == null) return null;
-        return level.getBlockEntity(hatchPosition()) instanceof ReactorOutputHatchBlockEntity hatch ? hatch : null;
-    }
-
-    public boolean hasHatch() {
-        return findHatch() != null;
-    }
-
-    private int hatchAmount() {
-        ReactorOutputHatchBlockEntity hatch = findHatch();
-        return hatch == null ? 0 : hatch.getAmount();
-    }
-
     /** Re-scans the shell, updating {@link #formed} and the controller's block state. */
     public boolean checkStructure() {
         boolean wasFormed = formed;
-        formed = findMissingFrames().isEmpty() && hasHatch();
+        formed = findMissingFrames().isEmpty();
         if (formed != wasFormed) {
             setChanged();
             syncToClients();
@@ -289,7 +287,6 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         Direction facing = getBlockState().getValue(WithergenicReactor.FACING);
         List<BlockPos> corners = new ArrayList<>(WithergenicReactorStructure.framePositions(worldPosition, facing));
         corners.add(worldPosition);
-        corners.add(hatchPosition());
 
         int minX = corners.stream().mapToInt(BlockPos::getX).min().orElseThrow();
         int minY = corners.stream().mapToInt(BlockPos::getY).min().orElseThrow();
@@ -317,34 +314,31 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         }
         if (!formed) {
             outputPerTick = 0;
-            status = hasHatch() ? STATUS_NO_WITHER : STATUS_NO_HATCH;
+            status = STATUS_NO_WITHER;
             return;
         }
 
-        ReactorOutputHatchBlockEntity hatch = findHatch();
-        if (hatch == null) {
-            status = STATUS_NO_HATCH;
-        } else if (!isOccupied()) {
+        if (!isOccupied()) {
             status = STATUS_NO_WITHER;
         } else if (getEfficiency() < MIN_EFFICIENCY) {
             status = STATUS_UNSTABLE;
-        } else if (hatch.freeSpace() <= 0) {
+        } else if (outputTank.getFluidAmount() >= outputTank.getCapacity()) {
             status = STATUS_BUFFER_FULL;
         } else {
             status = STATUS_RUNNING;
-            produce(serverLevel, hatch);
+            produce(serverLevel);
             return;
         }
         outputPerTick = 0;
         syncIfDue(serverLevel);
     }
 
-    private void produce(ServerLevel serverLevel, ReactorOutputHatchBlockEntity hatch) {
+    private void produce(ServerLevel serverLevel) {
         outputCarry += BASE_OUTPUT_PER_TICK * getEfficiency();
         int wanted = (int) outputCarry;
         outputCarry -= wanted;
 
-        int stored = hatch.insertChaos(wanted);
+        int stored = outputTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), wanted), IFluidHandler.FluidAction.EXECUTE);
         outputPerTick = stored;
         if (stored > 0) {
             driftCarry += stored * DRIFT_PER_MB;
@@ -431,6 +425,7 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         super.saveAdditional(tag, registries);
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("OutputTank", outputTank.writeToNBT(registries, new CompoundTag()));
         if (witherTypeId != null) tag.putString("CapturedType", witherTypeId.toString());
         if (witherName != null) tag.putString("CapturedName", Component.Serializer.toJson(witherName, registries));
         tag.putBoolean("Formed", formed);
@@ -446,6 +441,7 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
             orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
             chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
         }
+        if (tag.contains("OutputTank")) outputTank.readFromNBT(registries, tag.getCompound("OutputTank"));
         witherTypeId = tag.contains("CapturedType") ? ResourceLocation.parse(tag.getString("CapturedType")) : null;
         witherName = tag.contains("CapturedName") ? Component.Serializer.fromJson(tag.getString("CapturedName"), registries) : null;
         formed = tag.getBoolean("Formed");

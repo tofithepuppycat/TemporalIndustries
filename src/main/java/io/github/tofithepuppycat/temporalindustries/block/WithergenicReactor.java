@@ -43,7 +43,7 @@ import java.util.List;
 @SuppressWarnings("null")
 public class WithergenicReactor extends BaseEntityBlock {
     public static final DirectionProperty FACING = BlockStateProperties.HORIZONTAL_FACING;
-    // Whether the surrounding shell and output hatch are in place - see WithergenicReactorBlockEntity#checkStructure.
+    // Whether the surrounding shell is in place - see WithergenicReactorBlockEntity#checkStructure.
     public static final BooleanProperty FORMED = BooleanProperty.create("formed");
 
     private static final MapCodec<WithergenicReactor> CODEC = simpleCodec(WithergenicReactor::new);
@@ -143,12 +143,7 @@ public class WithergenicReactor extends BaseEntityBlock {
 
         List<BlockPos> missing = be.findMissingFrames();
         highlight((ServerLevel) level, missing, player);
-        if (!be.hasHatch()) {
-            highlight((ServerLevel) level, List.of(be.hatchPosition()), player);
-            player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_hatch"), true);
-        } else {
-            player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame", missing.size()), true);
-        }
+        player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame", missing.size()), true);
         return InteractionResult.CONSUME;
     }
 

@@ -16,7 +16,6 @@ import io.github.tofithepuppycat.temporalindustries.block.EntropyBalancer;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyCondenser;
 import io.github.tofithepuppycat.temporalindustries.block.LootGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
-import io.github.tofithepuppycat.temporalindustries.block.ReactorOutputHatch;
 import io.github.tofithepuppycat.temporalindustries.block.WithergenicReactor;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
@@ -33,7 +32,6 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBalancer
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyCondenserBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.LootGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.MachineFrameBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.ReactorOutputHatchBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.WithergenicReactorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
@@ -415,12 +413,6 @@ public class Registration {
     public static final DeferredItem<Item> WITHERGENIC_REACTOR_ITEM = ITEMS.register("withergenic_reactor",
             () -> new WithergenicReactorItem(WITHERGENIC_REACTOR_BLOCK.get(), new Item.Properties().stacksTo(1)));
 
-    public static final DeferredBlock<ReactorOutputHatch> REACTOR_OUTPUT_HATCH_BLOCK = BLOCKS.register("reactor_output_hatch",
-            () -> new ReactorOutputHatch(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
-
-    public static final DeferredItem<Item> REACTOR_OUTPUT_HATCH_ITEM = ITEMS.register("reactor_output_hatch",
-            () -> new DescribedBlockItem(REACTOR_OUTPUT_HATCH_BLOCK.get(), new Item.Properties()));
-
     // --- Entropic Pylon: routes liquid Order/Chaos between player-marked blocks ---
 
     public static final DeferredBlock<EntropicPylon> ENTROPIC_PYLON_BLOCK = BLOCKS.register("entropic_pylon",
@@ -485,9 +477,6 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<WithergenicReactorBlockEntity>> WITHERGENIC_REACTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("withergenic_reactor",
             () -> BlockEntityType.Builder.of(WithergenicReactorBlockEntity::new, WITHERGENIC_REACTOR_BLOCK.get()).build(null));
-
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ReactorOutputHatchBlockEntity>> REACTOR_OUTPUT_HATCH_BLOCK_ENTITY = BLOCK_ENTITIES.register("reactor_output_hatch",
-            () -> BlockEntityType.Builder.of(ReactorOutputHatchBlockEntity::new, REACTOR_OUTPUT_HATCH_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<MachineFrameBlockEntity>> MACHINE_FRAME_BLOCK_ENTITY = BLOCK_ENTITIES.register("machine_frame",
             () -> BlockEntityType.Builder.of(MachineFrameBlockEntity::new, MACHINE_FRAME_BLOCK.get()).build(null));
@@ -561,7 +550,6 @@ public class Registration {
                         output.accept(LOOT_GENERATOR_ITEM);
                         output.accept(MACHINE_FRAME_ITEM);
                         output.accept(WITHERGENIC_REACTOR_ITEM);
-                        output.accept(REACTOR_OUTPUT_HATCH_ITEM);
                         output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(CHAOS_PYLON_ITEM);
                         output.accept(ORDER_PYLON_ITEM);
@@ -664,8 +652,6 @@ public class Registration {
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, LOOT_GENERATOR_BLOCK_ENTITY.get(),
-                (be, side) -> be.getFluidHandler());
-        event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, REACTOR_OUTPUT_HATCH_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, WITHERGENIC_REACTOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());

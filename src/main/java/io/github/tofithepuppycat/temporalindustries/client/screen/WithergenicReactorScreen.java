@@ -2,7 +2,7 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.block.entity.ReactorOutputHatchBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.WithergenicReactorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.WithergenicReactorMenu;
@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Textured GUI for the Withergenic Reactor: the internal Order/Chaos balance bar to keep centred,
- * the output hatch's Chaos buffer, and the current efficiency and status.
+ * the Chaos output buffer, and the current efficiency and status.
  */
 @SuppressWarnings("null")
 public class WithergenicReactorScreen extends AbstractContainerScreen<WithergenicReactorMenu> {
@@ -56,7 +56,7 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
 
         FluidBarRenderer.renderVertical(guiGraphics, leftPos + BUFFER_BAR_X, topPos + BUFFER_BAR_Y,
                 BUFFER_BAR_WIDTH, BUFFER_BAR_HEIGHT,
-                menu.getBufferAmount(), ReactorOutputHatchBlockEntity.BUFFER_CAPACITY,
+                menu.getBufferAmount(), WithergenicReactorBlockEntity.OUTPUT_CAPACITY,
                 Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 
@@ -81,7 +81,7 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
             guiGraphics.renderComponentTooltip(font, List.of(
                     Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
                                     EntropyDisplay.formatFluid(menu.getBufferAmount()),
-                                    EntropyDisplay.formatFluid(ReactorOutputHatchBlockEntity.BUFFER_CAPACITY))
+                                    EntropyDisplay.formatFluid(WithergenicReactorBlockEntity.OUTPUT_CAPACITY))
                             .append(EntropyDisplay.unit(EntropyType.CHAOS))), mouseX, mouseY);
         }
     }

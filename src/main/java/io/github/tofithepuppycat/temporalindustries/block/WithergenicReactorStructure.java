@@ -8,12 +8,10 @@ import java.util.List;
 
 /**
  * Defines the 3x3x3 shell required around a {@link WithergenicReactor} controller: the controller
- * sits in the middle of the front face, the output hatch in the middle of the back face, and the
- * remaining 24 shell positions are Machine Frames. The centre of the cube is the open chamber the
+ * sits in the middle of the front face and the remaining 25 shell positions are Machine Frames. The centre of the cube is the open chamber the
  * captured Wither floats in.
  */
 public final class WithergenicReactorStructure {
-    private static final BlockPos HATCH_OFFSET = new BlockPos(0, 0, 2);
     private static final List<BlockPos> FRAME_OFFSETS = buildFrameOffsets();
 
     private WithergenicReactorStructure() {}
@@ -25,8 +23,7 @@ public final class WithergenicReactorStructure {
                 for (int z = 0; z <= 2; z++) {
                     boolean chamber = x == 0 && y == 0 && z == 1;
                     boolean controller = x == 0 && y == 0 && z == 0;
-                    boolean hatch = x == 0 && y == 0 && z == 2;
-                    if (chamber || controller || hatch) continue;
+                    if (chamber || controller) continue;
                     offsets.add(new BlockPos(x, y, z));
                 }
             }
@@ -34,17 +31,13 @@ public final class WithergenicReactorStructure {
         return List.copyOf(offsets);
     }
 
-    /** The 24 Machine Frame positions in world space for a controller at {@code controllerPos}. */
+    /** The 25 Machine Frame positions in world space for a controller at {@code controllerPos}. */
     public static List<BlockPos> framePositions(BlockPos controllerPos, Direction facing) {
         List<BlockPos> positions = new ArrayList<>(FRAME_OFFSETS.size());
         for (BlockPos offset : FRAME_OFFSETS) {
             positions.add(controllerPos.offset(rotate(offset, facing)));
         }
         return positions;
-    }
-
-    public static BlockPos hatchPosition(BlockPos controllerPos, Direction facing) {
-        return controllerPos.offset(rotate(HATCH_OFFSET, facing));
     }
 
     /** The open centre of the cube, where the captured Wither is rendered as particles. */
