@@ -24,10 +24,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.ChatFormatting;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.chat.Style;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
 
-import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ShortEnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
@@ -39,8 +37,9 @@ import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
  */
 @SuppressWarnings("null")
 public final class TimelineGraphWidget {
-    private static final ResourceLocation INNER_TEXTURE = ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "textures/gui/inner.png");
-    private static final int INNER_TEXTURE_SIZE = 256;
+    private static final int BACKGROUND_FILL = 0xFF1E1E1E;
+    private static final int BACKGROUND_SHADOW = 0xFF101010;
+    private static final int BACKGROUND_LIGHT = 0xFF666666;
 
     private static final int COLUMN_SPACING = 26;
     private static final int ROW_SPACING = 32;
@@ -135,7 +134,7 @@ public final class TimelineGraphWidget {
     public void render(GuiGraphics guiGraphics, Font font, int graphX, int graphY, int graphWidth, int graphHeight) {
         renderedCommits.clear();
 
-        guiGraphics.blit(INNER_TEXTURE, graphX, graphY, 0, 0, graphWidth, graphHeight, INNER_TEXTURE_SIZE, INNER_TEXTURE_SIZE);
+        drawInsetBackground(guiGraphics, graphX, graphY, graphWidth, graphHeight);
 
         List<CommitNode> commits = TimelineProjectionManager.getCommits();
         if (commits.isEmpty()) return;
@@ -239,6 +238,19 @@ public final class TimelineGraphWidget {
         }
 
         guiGraphics.disableScissor();
+    }
+
+    /**
+     * A sunken panel: dark on its top and left edges, light on the bottom and right. Drawn from
+     * fills so it can be any size; a bevelled texture would repeat its light edge inside a graph
+     * larger than the texture.
+     */
+    private static void drawInsetBackground(GuiGraphics guiGraphics, int x, int y, int width, int height) {
+        guiGraphics.fill(x, y, x + width, y + height, BACKGROUND_FILL);
+        guiGraphics.fill(x, y, x + width, y + 1, BACKGROUND_SHADOW);
+        guiGraphics.fill(x, y, x + 1, y + height, BACKGROUND_SHADOW);
+        guiGraphics.fill(x, y + height - 1, x + width, y + height, BACKGROUND_LIGHT);
+        guiGraphics.fill(x + width - 1, y, x + width, y + height, BACKGROUND_LIGHT);
     }
 
     private static void beginRawDraw() {
