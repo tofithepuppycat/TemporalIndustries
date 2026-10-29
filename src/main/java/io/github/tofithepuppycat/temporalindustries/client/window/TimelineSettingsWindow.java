@@ -33,24 +33,26 @@ public final class TimelineSettingsWindow extends GuiWindow {
 
     // Rows share one left/right inset; a "display" section and a "danger" section are split by
     // dividers.
-    private static final int INSET = 20;
+    private static final int INSET = 12;
+    private static final int LINE_HEIGHT = 9;
     private static final int TITLE_DIVIDER_Y_OFFSET = 16;
-    private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 26;
-    private static final int GHOST_TOGGLE_HINT_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + TOGGLE_SIZE + 4;
-    private static final int SECTION_DIVIDER_Y_OFFSET = 86;
-    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = 92;
-    private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = 118;
-    private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + TOGGLE_SIZE + 4;
-    private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 30;
+    private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 24;
+    private static final int GHOST_TOGGLE_HINT_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + TOGGLE_SIZE + 3;
+    private static final int GHOST_TOGGLE_HINT_HEIGHT = 2 * LINE_HEIGHT;
+    private static final int SECTION_DIVIDER_Y_OFFSET = GHOST_TOGGLE_HINT_Y_OFFSET + GHOST_TOGGLE_HINT_HEIGHT + 3;
+    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = SECTION_DIVIDER_Y_OFFSET + 6;
+    private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
+    private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + TOGGLE_SIZE + 3;
+    private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 2 * LINE_HEIGHT;
     private static final int SAVE_ENTITIES_DIVIDER_Y_OFFSET = CHARGE_CONTAINERS_HINT_Y_OFFSET + CHARGE_CONTAINERS_HINT_HEIGHT + 2;
     private static final int CHANGE_REPOSITORY_BUTTON_Y_OFFSET = SAVE_ENTITIES_DIVIDER_Y_OFFSET + 4;
-    private static final int DANGER_DIVIDER_Y_OFFSET = CHANGE_REPOSITORY_BUTTON_Y_OFFSET + 26;
+    private static final int DANGER_DIVIDER_Y_OFFSET = CHANGE_REPOSITORY_BUTTON_Y_OFFSET + DELETE_BUTTON_HEIGHT + 6;
     private static final int DELETE_HISTORY_HINT_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 4;
-    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 42;
+    private static final int DELETE_HISTORY_BUTTON_Y_OFFSET = DELETE_HISTORY_HINT_Y_OFFSET + 3 * LINE_HEIGHT + 5;
     private static final int CONTENT_HEIGHT = DELETE_HISTORY_BUTTON_Y_OFFSET + DELETE_BUTTON_HEIGHT + 6;
     /** The rows scroll beneath the title, within this band of the window. */
     private static final int VIEWPORT_TOP = TITLE_DIVIDER_Y_OFFSET + 2;
-    private static final int VIEWPORT_HEIGHT = SIZE - 6 - VIEWPORT_TOP;
+    private static final int VIEWPORT_HEIGHT = MEDIUM_PANEL.height() - 6 - VIEWPORT_TOP;
     private static final int COLOR_WARNING = 0xFFB06A00;
 
     private final BlockPos machinePos;
@@ -66,7 +68,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
      */
     public TimelineSettingsWindow(BlockPos machinePos, Supplier<AbstractTimelineMachineBlockEntity> machine,
                                   Runnable onRepositoryDetached) {
-        super(Component.translatable("gui.temporalindustries.timeline_machine.settings_title"));
+        super(Component.translatable("gui.temporalindustries.timeline_machine.settings_title"), MEDIUM_PANEL);
         this.machinePos = machinePos;
         this.machine = machine;
         this.onRepositoryDetached = onRepositoryDetached;
@@ -83,15 +85,15 @@ public final class TimelineSettingsWindow extends GuiWindow {
         drawDivider(guiGraphics, y + TITLE_DIVIDER_Y_OFFSET, INSET);
 
         scroll.update(CONTENT_HEIGHT, VIEWPORT_HEIGHT);
-        guiGraphics.enableScissor(x, y + VIEWPORT_TOP, x + SIZE, y + VIEWPORT_TOP + VIEWPORT_HEIGHT);
+        guiGraphics.enableScissor(x, y + VIEWPORT_TOP, x + panelWidth, y + VIEWPORT_TOP + VIEWPORT_HEIGHT);
         renderRows(guiGraphics, mouseX, mouseY);
         guiGraphics.disableScissor();
-        scroll.renderBar(guiGraphics, x + SIZE - INSET / 2, y + VIEWPORT_TOP, CONTENT_HEIGHT, VIEWPORT_HEIGHT);
+        scroll.renderBar(guiGraphics, x + panelWidth - INSET / 2 - 2, y + VIEWPORT_TOP, CONTENT_HEIGHT, VIEWPORT_HEIGHT);
     }
 
     private void renderRows(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         int textX = x + INSET;
-        int textWidth = SIZE - 2 * INSET;
+        int textWidth = panelWidth - 2 * INSET;
         int toggleX = toggleX();
         AbstractTimelineMachineBlockEntity be = machine.get();
 
@@ -122,8 +124,8 @@ public final class TimelineSettingsWindow extends GuiWindow {
 
         int buttonY = rowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
         if (deleteHistoryConfirmPending) {
-            drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
-                    x + SIZE / 2, buttonY - 14, 0xFFB03030);
+            drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
+                    textX, rowY(DELETE_HISTORY_HINT_Y_OFFSET), textWidth, 0xFFB03030);
             int confirmX = confirmButtonX();
             int cancelX = cancelButtonX();
             drawButton(guiGraphics, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
@@ -154,7 +156,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
 
     @Override
     protected boolean mouseClicked(double mouseX, double mouseY, int button) {
-        if (button != 0 || !isOver(mouseX, mouseY, x, y + VIEWPORT_TOP, SIZE, VIEWPORT_HEIGHT)) {
+        if (button != 0 || !isOver(mouseX, mouseY, x, y + VIEWPORT_TOP, panelWidth, VIEWPORT_HEIGHT)) {
             return true;
         }
         AbstractTimelineMachineBlockEntity be = machine.get();
@@ -207,15 +209,15 @@ public final class TimelineSettingsWindow extends GuiWindow {
     }
 
     private int toggleX() {
-        return x + SIZE - INSET - TOGGLE_SIZE;
+        return x + panelWidth - INSET - TOGGLE_SIZE;
     }
 
     private int centeredX(int width) {
-        return x + (SIZE - width) / 2;
+        return x + (panelWidth - width) / 2;
     }
 
     private int confirmButtonX() {
-        return x + (SIZE - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
+        return x + (panelWidth - CONFIRM_BUTTON_WIDTH * 2 - 6) / 2;
     }
 
     private int cancelButtonX() {

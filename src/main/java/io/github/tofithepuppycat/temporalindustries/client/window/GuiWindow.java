@@ -10,22 +10,38 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.FormattedCharSequence;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * A movable panel layered over a container screen and owned by a {@link WindowManager}. It draws
- * the shared base.png frame with a title and close button; subclasses draw and handle input for
+ * a frame with a title and close button (base.png unless a {@link Panel} says otherwise, which may
+ * also be drawn at any size by {@link VanillaBackground}); subclasses draw and handle input for
  * the area inside, measured from {@link #x}/{@link #y} (the frame artwork's top-left corner).
  * A pinned window remembers its position and is reopened there whenever a screen is opened.
  */
 public abstract class GuiWindow {
-    private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/base.png");
-
     private static final int CANVAS_SIZE = 256;
     /** base.png's artwork sits inset this many pixels within its 256x256 canvas. */
     private static final int ART_MARGIN = 16;
-    /** Width and height of a window's usable area. */
+    /** Width and height of the default panel's usable area. */
     public static final int SIZE = CANVAS_SIZE - 2 * ART_MARGIN;
+
+    /**
+     * A window's frame and the usable area it encloses. A textured panel is drawn from a 256x256
+     * canvas, {@code margin} being how far the artwork is inset from the canvas corner; a panel
+     * without a texture is generated at its size in the vanilla container style.
+     */
+    protected record Panel(@Nullable ResourceLocation texture, int margin, int width, int height) {
+        /** A vanilla-style panel generated at width x height, so any size is possible. */
+        protected static Panel generated(int width, int height) {
+            return new Panel(null, 0, width, height);
+        }
+    }
+
+    protected static final Panel DEFAULT_PANEL = new Panel(ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/base.png"), ART_MARGIN, SIZE, SIZE);
+    protected static final Panel MEDIUM_PANEL = new Panel(ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/base_medium.png"), 0, 176, 166);
 
     protected static final int TEXT_PRIMARY = 0xFF2B2B2B;
     protected static final int TEXT_SECONDARY = 0xFF5A5A5A;
@@ -46,7 +62,10 @@ public abstract class GuiWindow {
     protected final Font font = Minecraft.getInstance().font;
     protected int x;
     protected int y;
+    protected final int panelWidth;
+    protected final int panelHeight;
 
+    private final Panel panel;
     private final Component title;
     private WindowManager manager;
     private boolean dragging;
@@ -54,7 +73,14 @@ public abstract class GuiWindow {
     private int dragOffsetY;
 
     protected GuiWindow(Component title) {
+        this(title, DEFAULT_PANEL);
+    }
+
+    protected GuiWindow(Component title, Panel panel) {
         this.title = title;
+        this.panel = panel;
+        this.panelWidth = panel.width();
+        this.panelHeight = panel.height();
     }
 
     /** Draws the window's own content; called after the frame, title and close button. */
@@ -116,17 +142,22 @@ public abstract class GuiWindow {
     }
 
     final void moveTo(int newX, int newY) {
-        x = Math.max(0, Math.min(newX, manager.screenWidth() - SIZE));
-        y = Math.max(0, Math.min(newY, manager.screenHeight() - SIZE));
+        x = Math.max(0, Math.min(newX, manager.screenWidth() - panelWidth));
+        y = Math.max(0, Math.min(newY, manager.screenHeight() - panelHeight));
     }
 
     final boolean contains(double mouseX, double mouseY) {
-        return isOver(mouseX, mouseY, x, y, SIZE, SIZE);
+        return isOver(mouseX, mouseY, x, y, panelWidth, panelHeight);
     }
 
     final void renderWindow(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.blit(BASE_TEXTURE, x - ART_MARGIN, y - ART_MARGIN, 0, 0, CANVAS_SIZE, CANVAS_SIZE);
-        drawCenteredNoShadow(guiGraphics, title, x + SIZE / 2, y + TITLE_Y_OFFSET, TEXT_PRIMARY);
+        if (panel.texture() == null) {
+            VanillaBackground.render(guiGraphics, x, y, panelWidth, panelHeight);
+        } else {
+            int margin = panel.margin();
+            guiGraphics.blit(panel.texture(), x - margin, y - margin, 0, 0, panelWidth + 2 * margin, panelHeight + 2 * margin);
+        }
+        drawCenteredNoShadow(guiGraphics, title, x + panelWidth / 2, y + TITLE_Y_OFFSET, TEXT_PRIMARY);
 
         int closeX = closeX();
         int closeY = closeY();
@@ -150,7 +181,7 @@ public abstract class GuiWindow {
             close();
         } else if (button == 0 && isOverPin(mouseX, mouseY)) {
             togglePin();
-        } else if (button == 0 && isOver(mouseX, mouseY, x, y, SIZE, TITLE_BAR_HEIGHT)) {
+        } else if (button == 0 && isOver(mouseX, mouseY, x, y, panelWidth, TITLE_BAR_HEIGHT)) {
             dragging = true;
             dragOffsetX = (int) mouseX - x;
             dragOffsetY = (int) mouseY - y;
@@ -195,7 +226,7 @@ public abstract class GuiWindow {
     }
 
     private int closeX() {
-        return x + SIZE - CLOSE_SIZE - CLOSE_X_INSET;
+        return x + panelWidth - CLOSE_SIZE - CLOSE_X_INSET;
     }
 
     private int pinX() {
@@ -246,7 +277,7 @@ public abstract class GuiWindow {
     }
 
     protected final void drawDivider(GuiGraphics guiGraphics, int dividerY, int inset) {
-        guiGraphics.fill(x + inset, dividerY, x + SIZE - inset, dividerY + 1, COLOR_DIVIDER);
+        guiGraphics.fill(x + inset, dividerY, x + panelWidth - inset, dividerY + 1, COLOR_DIVIDER);
     }
 
     private static int brighten(int color) {
