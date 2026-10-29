@@ -85,7 +85,8 @@ public class ChronoRemoteChunksPacket implements CustomPacketPayload {
 
             ChronosphereToggleChunkPacket.applyBatch(sender, machine, packet.adds, packet.removes);
             PacketDistributor.sendToPlayer(sender, new ChronoRemoteStateSyncPacket(true, true,
-                    machine.isSaveEntities(), machine.isChargeContainers()));
+                    machine.isSaveEntities(), machine.isChargeContainers(),
+                    machine.getRepository() == null ? "" : machine.getRepository().getName()));
             ChronosphereStateRequestPacket.sendStateSync(sender, machine, machine.getBlockPos());
         });
     }

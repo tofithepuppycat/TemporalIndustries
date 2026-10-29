@@ -77,6 +77,7 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
         guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         renderEnergyBar(guiGraphics, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y,
@@ -109,10 +110,10 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
 
     private void renderEnergyBar(GuiGraphics guiGraphics, int x, int y, int amount, int capacity) {
         if (capacity <= 0 || amount <= 0) return;
-        int filled = Math.max(1, Math.round((amount / (float) capacity) * ENERGY_BAR_HEIGHT));
-        filled = Math.min(ENERGY_BAR_HEIGHT, filled);
-        int bottom = y + ENERGY_BAR_HEIGHT;
-        guiGraphics.fill(x, bottom - filled, x + ENERGY_BAR_WIDTH, bottom, ENERGY_COLOR);
+        int innerHeight = ENERGY_BAR_HEIGHT - 2;
+        int filled = Math.min(innerHeight, Math.max(1, Math.round((amount / (float) capacity) * innerHeight)));
+        int bottom = y + ENERGY_BAR_HEIGHT - 1;
+        guiGraphics.fill(x + 1, bottom - filled, x + ENERGY_BAR_WIDTH - 1, bottom, ENERGY_COLOR);
     }
 
     @Override

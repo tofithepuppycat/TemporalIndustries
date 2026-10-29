@@ -429,6 +429,7 @@ public class ChronovaultScreen extends AbstractContainerScreen<ChronovaultMenu> 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
         RenderSystem.setShaderTexture(0, INVENTORY_TEXTURE);
+        InnerBackground.render(guiGraphics, panelX(), panelY(), CONTENT_SIZE, CONTENT_SIZE);
         guiGraphics.blit(INVENTORY_TEXTURE, leftPos, topPos, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
 
         if (isBound()) {

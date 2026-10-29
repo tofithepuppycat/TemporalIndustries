@@ -32,11 +32,10 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
     private static final int BALANCE_BAR_WIDTH = 124;
     private static final int BALANCE_BAR_HEIGHT = 10;
 
-    /** The tank's frame starts at (138, 19); the fluid fills its 25x46 interior. */
-    private static final int BUFFER_BAR_X = 139;
-    private static final int BUFFER_BAR_Y = 20;
-    private static final int BUFFER_BAR_WIDTH = 25;
-    private static final int BUFFER_BAR_HEIGHT = 46;
+    private static final int BUFFER_BAR_X = 154;
+    private static final int BUFFER_BAR_Y = 9;
+    private static final int BUFFER_BAR_WIDTH = 11;
+    private static final int BUFFER_BAR_HEIGHT = 67;
 
     private static final int TEXT_COLOR = 0xFF3F3F3F;
 
@@ -49,6 +48,7 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
         guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         EntropyBalanceBar.render(guiGraphics, leftPos + BALANCE_BAR_X, topPos + BALANCE_BAR_Y,
@@ -66,7 +66,6 @@ public class WithergenicReactorScreen extends AbstractContainerScreen<Withergeni
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.withergenic_reactor.balance"), BALANCE_BAR_X, BALANCE_BAR_Y - 11, TEXT_COLOR, false);
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.withergenic_reactor.efficiency", menu.getEfficiencyPercent()), BALANCE_BAR_X, 50, TEXT_COLOR, false);
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.withergenic_reactor.output", menu.getOutputPerTick()), BALANCE_BAR_X, 61, TEXT_COLOR, false);
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.withergenic_reactor.status." + menu.getStatus()), BALANCE_BAR_X, 72, TEXT_COLOR, false);
         guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, TEXT_COLOR, false);
     }
 

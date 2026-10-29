@@ -34,8 +34,6 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
         COMMIT,
         TOGGLE_SAVE_ENTITIES,
         TOGGLE_CHARGE_CONTAINERS,
-        UNBIND_REPOSITORY,
-        DELETE_HISTORY,
         /** Replies with the machine's settings, claim state and the terrain thumbnails for its chunk map. */
         MAP,
         /** Jumps to the commit id carried as the argument. */
@@ -107,16 +105,6 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
                 machine.setChargeContainers(!machine.isChargeContainers());
                 sendState(sender, machine, level);
             }
-            case UNBIND_REPOSITORY -> {
-                machine.unbindRepository();
-                message(sender, "repository_detached");
-                sendState(sender, machine, level);
-            }
-            case DELETE_HISTORY -> {
-                machine.deleteRepository();
-                message(sender, "history_deleted");
-                sendState(sender, machine, level);
-            }
             case MAP -> sendMap(sender, machine, level);
             case JUMP -> jump(sender, machine, argument);
             case SYNC -> { }
@@ -156,11 +144,12 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
     }
 
     /** Pushes the machine's settings, plus its claim map when the sender is in the same dimension to read it against. */
-    private static void sendState(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level) {
+    static void sendState(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level) {
         boolean chronosphere = machine instanceof ChronosphereBlockEntity;
         PacketDistributor.sendToPlayer(sender, new ChronoRemoteStateSyncPacket(
                 machine.isRepositoryBound() && machine.getRepository() != null, chronosphere,
-                machine.isSaveEntities(), machine.isChargeContainers()));
+                machine.isSaveEntities(), machine.isChargeContainers(),
+                machine.getRepository() == null ? "" : machine.getRepository().getName()));
 
         if (machine instanceof ChronosphereBlockEntity sphere && sender.level() == level) {
             BlockPos pos = sphere.getBlockPos();
@@ -168,7 +157,7 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
         }
     }
 
-    private static void message(ServerPlayer sender, String key) {
+    static void message(ServerPlayer sender, String key) {
         sender.displayClientMessage(Component.translatable("gui.temporalindustries.chrono_remote.msg." + key), true);
     }
 
