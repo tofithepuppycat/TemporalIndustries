@@ -1,5 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.timeline;
 
+import it.unimi.dsi.fastutil.ints.Int2ObjectMap;
+import it.unimi.dsi.fastutil.ints.Int2ObjectOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.IntArrayTag;
@@ -336,30 +338,42 @@ public final class TemporalRepository {
             if (index >= 0 && index < sectionCount) dirty.add(index);
         }
 
+        Map<Integer, Int2ObjectMap<BlockState>> overlayBySection = new HashMap<>();
+        for (Map.Entry<BlockPos, BlockState> entry : overlay.entrySet()) {
+            BlockPos pos = entry.getKey();
+            int index = (pos.getY() >> 4) - snapshot.minSectionY();
+            int local = ((pos.getY() & 15) << 8) | ((pos.getZ() & 15) << 4) | (pos.getX() & 15);
+            overlayBySection.computeIfAbsent(index, k -> new Int2ObjectOpenHashMap<>()).put(local, entry.getValue());
+        }
+
         Map<BlockPos, CompoundTag> afterBE = snapshot.getBlockEntityTags();
         List<BlockChangeDelta> changes = new ArrayList<>();
+        Set<BlockPos> changedPositions = new HashSet<>();
+        ChunkPos chunkPos = new ChunkPos(chunkKey);
         for (int index : dirty) {
-            Map<BlockPos, BlockState> after = new HashMap<>();
-            Map<BlockPos, BlockState> base = new HashMap<>();
-            snapshot.collectSectionInto(index, after);
-            baseline.collectSectionInto(index, base);
-            for (Map.Entry<BlockPos, BlockState> entry : after.entrySet()) {
-                BlockPos pos = entry.getKey();
+            BlockState[] after = snapshot.decodeSection(index);
+            BlockState[] base = baseline.decodeSection(index);
+            Int2ObjectMap<BlockState> sectionOverlay = overlayBySection.get(index);
+            int minBlockY = (snapshot.minSectionY() + index) * 16;
+            for (int local = 0; local < after.length; local++) {
+                BlockState prev = sectionOverlay != null && sectionOverlay.containsKey(local)
+                        ? sectionOverlay.get(local) : base[local];
+                if (prev == after[local]) continue;
+
+                BlockPos pos = new BlockPos(chunkPos.getMinBlockX() + (local & 15), minBlockY + (local >> 8),
+                        chunkPos.getMinBlockZ() + ((local >> 4) & 15));
                 if (!isTracked(pos)) continue;
-                BlockState prev = overlay.getOrDefault(pos, base.get(pos));
-                CompoundTag prevTag = beforeBE.get(pos);
-                CompoundTag newTag = afterBE.get(pos);
-                if (prev.equals(entry.getValue()) && Objects.equals(prevTag, newTag)) continue;
-                changes.add(new BlockChangeDelta(pos, prev, entry.getValue(), prevTag, newTag));
+                changes.add(new BlockChangeDelta(pos, prev, after[local], beforeBE.get(pos), afterBE.get(pos)));
+                changedPositions.add(pos);
             }
         }
 
-        // Block entities that changed inside a section whose blocks did not.
+        // Block entities whose data changed under a block that stayed the same.
         Set<BlockPos> beOnly = new HashSet<>(beforeBE.keySet());
         beOnly.addAll(afterBE.keySet());
         for (BlockPos pos : beOnly) {
             int index = (pos.getY() >> 4) - snapshot.minSectionY();
-            if (index < 0 || index >= sectionCount || dirty.contains(index) || !isTracked(pos)) continue;
+            if (index < 0 || index >= sectionCount || changedPositions.contains(pos) || !isTracked(pos)) continue;
             CompoundTag prevTag = beforeBE.get(pos);
             CompoundTag newTag = afterBE.get(pos);
             if (Objects.equals(prevTag, newTag)) continue;

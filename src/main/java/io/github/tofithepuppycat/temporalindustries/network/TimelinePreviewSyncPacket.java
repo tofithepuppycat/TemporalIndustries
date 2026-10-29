@@ -33,6 +33,9 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     public static final StreamCodec<RegistryFriendlyByteBuf, TimelinePreviewSyncPacket> STREAM_CODEC =
             StreamCodec.of(TimelinePreviewSyncPacket::encode, TimelinePreviewSyncPacket::decode);
 
+    /** Added to a block's Y before packing it, so heights below zero stay non-negative. */
+    private static final int HEIGHT_BIAS = 2048;
+
     private final BlockPos machinePos;
     private final long placedGameTime;
     private final long selectedGameTime;
@@ -92,10 +95,20 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             body.writeLong(entry.getKey());
             JumpCostBreakdown.encode(entry.getValue(), body);
         }
-        body.writeVarInt(packet.previewTargetStates.size());
+        // Grouped by chunk so each position needs only its chunk-local offset, not a full BlockPos.
+        Map<Long, List<Map.Entry<BlockPos, BlockState>>> byChunk = new HashMap<>();
         for (Map.Entry<BlockPos, BlockState> entry : packet.previewTargetStates.entrySet()) {
-            body.writeBlockPos(entry.getKey());
-            body.writeVarInt(Block.getId(entry.getValue()));
+            byChunk.computeIfAbsent(ChunkPos.asLong(entry.getKey()), k -> new ArrayList<>()).add(entry);
+        }
+        body.writeVarInt(byChunk.size());
+        for (Map.Entry<Long, List<Map.Entry<BlockPos, BlockState>>> group : byChunk.entrySet()) {
+            body.writeLong(group.getKey());
+            body.writeVarInt(group.getValue().size());
+            for (Map.Entry<BlockPos, BlockState> entry : group.getValue()) {
+                BlockPos pos = entry.getKey();
+                body.writeVarInt((pos.getX() & 15) | ((pos.getZ() & 15) << 4) | ((pos.getY() + HEIGHT_BIAS) << 8));
+                body.writeVarInt(Block.getId(entry.getValue()));
+            }
         }
         body.writeVarInt(packet.previewChunks.size());
         for (ChunkPos chunk : packet.previewChunks) body.writeLong(chunk.toLong());
@@ -145,11 +158,17 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
             jumpCosts.put(commitId, JumpCostBreakdown.decode(body));
         }
 
-        int previewCount = body.readVarInt();
+        int previewChunkGroups = body.readVarInt();
         Map<BlockPos, BlockState> previewTargetStates = new HashMap<>();
-        for (int i = 0; i < previewCount; i++) {
-            BlockPos pos = body.readBlockPos();
-            previewTargetStates.put(pos, Block.stateById(body.readVarInt()));
+        for (int i = 0; i < previewChunkGroups; i++) {
+            ChunkPos chunk = new ChunkPos(body.readLong());
+            int count = body.readVarInt();
+            for (int j = 0; j < count; j++) {
+                int packed = body.readVarInt();
+                BlockPos pos = new BlockPos(chunk.getMinBlockX() + (packed & 15), (packed >> 8) - HEIGHT_BIAS,
+                        chunk.getMinBlockZ() + ((packed >> 4) & 15));
+                previewTargetStates.put(pos, Block.stateById(body.readVarInt()));
+            }
         }
 
         int previewChunkCount = body.readVarInt();

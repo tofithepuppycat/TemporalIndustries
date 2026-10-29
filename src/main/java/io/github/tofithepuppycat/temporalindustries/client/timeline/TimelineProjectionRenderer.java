@@ -6,6 +6,7 @@ import java.util.List;
 import java.util.PriorityQueue;
 import java.util.Set;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
 import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
 import com.mojang.blaze3d.vertex.PoseStack;
@@ -195,7 +196,7 @@ public class TimelineProjectionRenderer {
                                        double cameraX, double cameraY, double cameraZ, float alpha) {
         VertexConsumer quadBuffer = bufferSource.getBuffer(MARKER_RENDER_TYPE);
 
-        for (TimelineProjectionManager.ProjectionEntry entry : nearestEntries(entries, cameraX, cameraY, cameraZ, MARKER_RENDER_LIMIT)) {
+        for (TimelineProjectionManager.ProjectionEntry entry : cachedNearest(MARKER_CACHE, entries, cameraX, cameraY, cameraZ, MARKER_RENDER_LIMIT)) {
             BlockPos pos = entry.getPos();
             double relX = pos.getX() - cameraX;
             double relY = pos.getY() - cameraY;
@@ -227,7 +228,7 @@ public class TimelineProjectionRenderer {
                                            List<TimelineProjectionManager.ProjectionEntry> entries,
                                            double cameraX, double cameraY, double cameraZ, float alpha) {
         List<TimelineProjectionManager.ProjectionEntry> nearest =
-                nearestEntries(entries, cameraX, cameraY, cameraZ, TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT);
+                cachedNearest(GHOST_CACHE, entries, cameraX, cameraY, cameraZ, TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT);
         if (nearest.isEmpty()) return;
 
         MultiBufferSource forcedGhost = renderType -> bufferSource.getBuffer(GHOST_BLOCK_RENDER_TYPE);
@@ -252,6 +253,37 @@ public class TimelineProjectionRenderer {
     }
 
     private record RankedEntry(TimelineProjectionManager.ProjectionEntry entry, double distSqr) {}
+
+    /** The last nearest-entries selection, reused while the camera stays within a few blocks of where it was made. */
+    private static final class NearestCache {
+        List<TimelineProjectionManager.ProjectionEntry> source;
+        int limit;
+        double x, y, z;
+        List<TimelineProjectionManager.ProjectionEntry> result;
+    }
+
+    private static final double NEAREST_REUSE_DISTANCE_SQR = 4.0 * 4.0;
+    private static final NearestCache MARKER_CACHE = new NearestCache();
+    private static final NearestCache GHOST_CACHE = new NearestCache();
+
+    private static List<TimelineProjectionManager.ProjectionEntry> cachedNearest(
+            NearestCache cache, List<TimelineProjectionManager.ProjectionEntry> entries,
+            double cameraX, double cameraY, double cameraZ, int limit) {
+        if (entries.size() <= limit) return entries;
+
+        double dx = cameraX - cache.x, dy = cameraY - cache.y, dz = cameraZ - cache.z;
+        if (cache.source == entries && cache.limit == limit
+                && dx * dx + dy * dy + dz * dz < NEAREST_REUSE_DISTANCE_SQR) {
+            return cache.result;
+        }
+        cache.result = nearestEntries(entries, cameraX, cameraY, cameraZ, limit);
+        cache.source = entries;
+        cache.limit = limit;
+        cache.x = cameraX;
+        cache.y = cameraY;
+        cache.z = cameraZ;
+        return cache.result;
+    }
 
     /**
      * The limit nearest entries to (cameraX, cameraY, cameraZ), via a bounded max-heap (farthest
@@ -295,8 +327,7 @@ public class TimelineProjectionRenderer {
             return;
         }
 
-        Set<Long> claimed = new HashSet<>();
-        for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
+        int[] edges = boundaryEdges(chunks);
 
         Matrix4f matrix = poseStack.last().pose();
         float r = color[0], g = color[1], b = color[2];
@@ -304,29 +335,62 @@ public class TimelineProjectionRenderer {
         float yBottom = (float) (level.getMinBuildHeight() - cameraY);
         float yTop = (float) (level.getMaxBuildHeight() - cameraY);
 
-        for (ChunkPos chunk : chunks) {
-            float minX = (float) (chunk.getMinBlockX() - cameraX);
-            float maxX = (float) (chunk.getMinBlockX() + 16 - cameraX);
-            float minZ = (float) (chunk.getMinBlockZ() - cameraZ);
-            float maxZ = (float) (chunk.getMinBlockZ() + 16 - cameraZ);
+        for (int i = 0; i < edges.length; i += 3) {
+            float minX = (float) (edges[i] * 16 - cameraX);
+            float maxX = (float) (edges[i] * 16 + 16 - cameraX);
+            float minZ = (float) (edges[i + 1] * 16 - cameraZ);
+            float maxZ = (float) (edges[i + 1] * 16 + 16 - cameraZ);
 
-            if (!claimed.contains(new ChunkPos(chunk.x - 1, chunk.z).toLong())) {
-                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, minX, yBottom, maxZ,
+            switch (edges[i + 2]) {
+                case EDGE_WEST -> quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, minX, yBottom, maxZ,
                         minX, yTop, maxZ, minX, yTop, minZ);
-            }
-            if (!claimed.contains(new ChunkPos(chunk.x + 1, chunk.z).toLong())) {
-                quad(matrix, buffer, r, g, b, alpha, maxX, yBottom, minZ, maxX, yBottom, maxZ,
+                case EDGE_EAST -> quad(matrix, buffer, r, g, b, alpha, maxX, yBottom, minZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, maxX, yTop, minZ);
-            }
-            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z - 1).toLong())) {
-                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, maxX, yBottom, minZ,
+                case EDGE_NORTH -> quad(matrix, buffer, r, g, b, alpha, minX, yBottom, minZ, maxX, yBottom, minZ,
                         maxX, yTop, minZ, minX, yTop, minZ);
-            }
-            if (!claimed.contains(new ChunkPos(chunk.x, chunk.z + 1).toLong())) {
-                quad(matrix, buffer, r, g, b, alpha, minX, yBottom, maxZ, maxX, yBottom, maxZ,
+                default -> quad(matrix, buffer, r, g, b, alpha, minX, yBottom, maxZ, maxX, yBottom, maxZ,
                         maxX, yTop, maxZ, minX, yTop, maxZ);
             }
         }
+    }
+
+    private static final int EDGE_WEST = 0;
+    private static final int EDGE_EAST = 1;
+    private static final int EDGE_NORTH = 2;
+    private static final int EDGE_SOUTH = 3;
+
+    private static int boundaryKey = 0;
+    private static int[] boundaryEdges = new int[0];
+
+    /**
+     * The outer boundary of chunks as (chunkX, chunkZ, side) triples, recomputed only when the set
+     * of chunks changes rather than on every frame.
+     */
+    private static int[] boundaryEdges(List<ChunkPos> chunks) {
+        int key = chunks.size();
+        for (ChunkPos chunk : chunks) key = key * 31 + Long.hashCode(chunk.toLong());
+        if (key == boundaryKey && boundaryEdges.length > 0) return boundaryEdges;
+
+        Set<Long> claimed = new HashSet<>();
+        for (ChunkPos chunk : chunks) claimed.add(chunk.toLong());
+
+        IntArrayList edges = new IntArrayList();
+        for (ChunkPos chunk : chunks) {
+            addEdgeIf(edges, claimed, chunk, chunk.x - 1, chunk.z, EDGE_WEST);
+            addEdgeIf(edges, claimed, chunk, chunk.x + 1, chunk.z, EDGE_EAST);
+            addEdgeIf(edges, claimed, chunk, chunk.x, chunk.z - 1, EDGE_NORTH);
+            addEdgeIf(edges, claimed, chunk, chunk.x, chunk.z + 1, EDGE_SOUTH);
+        }
+        boundaryKey = key;
+        boundaryEdges = edges.toIntArray();
+        return boundaryEdges;
+    }
+
+    private static void addEdgeIf(IntArrayList edges, Set<Long> claimed, ChunkPos chunk, int neighbourX, int neighbourZ, int side) {
+        if (claimed.contains(ChunkPos.asLong(neighbourX, neighbourZ))) return;
+        edges.add(chunk.x);
+        edges.add(chunk.z);
+        edges.add(side);
     }
 
     /**

@@ -111,6 +111,7 @@ public final class TimelineProjectionManager {
         selectedCommitId = -1L;
         jumpCosts = new HashMap<>();
         previewTargetStates = new HashMap<>();
+        invalidateEntries();
         previewChunks = new ArrayList<>();
         previewVersion = Long.MIN_VALUE;
         showChangesEnabled = false;
@@ -124,6 +125,7 @@ public final class TimelineProjectionManager {
     public static void clearSelectedCommit() {
         selectedCommitId = -1L;
         previewTargetStates = new HashMap<>();
+        invalidateEntries();
     }
 
     public static boolean isShowChangesEnabled() {
@@ -167,7 +169,8 @@ public final class TimelineProjectionManager {
         currentBranch = serverCurrentBranch;
         headCommitId = serverHeadCommitId;
         jumpCosts = new HashMap<>(serverJumpCosts);
-        previewTargetStates = new HashMap<>(serverPreviewTargetStates);
+        previewTargetStates = serverPreviewTargetStates;
+        invalidateEntries();
         previewChunks = new ArrayList<>(serverPreviewChunks);
         previewVersion = serverPreviewVersion;
     }
@@ -186,6 +189,7 @@ public final class TimelineProjectionManager {
         selectedCommitId = commitId;
         selectedGameTime = clampSelected(commit.gameTime());
         previewTargetStates = new HashMap<>();
+        invalidateEntries();
     }
 
     public static boolean isBranchTip(long commitId) {
@@ -239,10 +243,32 @@ public final class TimelineProjectionManager {
         return previewChunks;
     }
 
-    /** Diffs the server's resolved target states against the live world right now. */
+    /** How often the diff against the live world is redone; in between, the last result is reused. */
+    private static final long ENTRY_REFRESH_TICKS = 10L;
+    private static List<ProjectionEntry> cachedEntries;
+    private static long cachedEntriesTick = Long.MIN_VALUE;
+
+    private static void invalidateEntries() {
+        cachedEntries = null;
+    }
+
+    /**
+     * Diffs the server's resolved target states against the live world, at most once every few
+     * ticks; the returned list is stable between refreshes so callers can cache work against it.
+     */
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 
+        long now = level.getGameTime();
+        if (cachedEntries != null && now - cachedEntriesTick < ENTRY_REFRESH_TICKS && now >= cachedEntriesTick) {
+            return cachedEntries;
+        }
+        cachedEntries = computeEntries(level);
+        cachedEntriesTick = now;
+        return cachedEntries;
+    }
+
+    private static List<ProjectionEntry> computeEntries(Level level) {
         List<ProjectionEntry> entries = new ArrayList<>();
         for (Map.Entry<BlockPos, BlockState> entry : previewTargetStates.entrySet()) {
             BlockPos pos = entry.getKey();

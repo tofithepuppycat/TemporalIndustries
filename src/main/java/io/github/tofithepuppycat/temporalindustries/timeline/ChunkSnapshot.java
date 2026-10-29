@@ -1,5 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.timeline;
 
+import it.unimi.dsi.fastutil.ints.IntArrayList;
+import it.unimi.dsi.fastutil.objects.Reference2IntOpenHashMap;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -17,7 +19,6 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashMap;
-import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
@@ -85,6 +86,13 @@ public final class ChunkSnapshot {
      */
     public void collectDifferingInto(int sectionIndex, LevelChunkSection live, List<BlockPos> out) {
         sections.get(sectionIndex).collectDiffering(chunkPos, minSectionY + sectionIndex, live, out);
+    }
+
+    /** Section sectionIndex's blocks as a flat array indexed (y * 16 + z) * 16 + x. */
+    public BlockState[] decodeSection(int sectionIndex) {
+        BlockState[] out = new BlockState[16 * 16 * 16];
+        sections.get(sectionIndex).decode(out);
+        return out;
     }
 
     /** Every block position this baseline covers, expanded from its section encoding. */
@@ -193,50 +201,62 @@ public final class ChunkSnapshot {
                 return new SnapshotSection(Blocks.AIR.defaultBlockState());
             }
 
-            BlockState first = section.getBlockState(0, 0, 0);
-            boolean allSame = true;
-
-            Map<BlockState, Integer> paletteIndex = new LinkedHashMap<>();
-            List<Integer> runPaletteIndices = new ArrayList<>();
-            List<Integer> runLengths = new ArrayList<>();
-            int currentIndex = -1;
-            int currentRunLength = 0;
+            Reference2IntOpenHashMap<BlockState> paletteIndex = new Reference2IntOpenHashMap<>();
+            paletteIndex.defaultReturnValue(-1);
+            List<BlockState> palette = new ArrayList<>();
+            IntArrayList runPaletteIndices = new IntArrayList();
+            IntArrayList runLengths = new IntArrayList();
+            BlockState previous = null;
+            int previousIndex = -1;
+            int runLength = 0;
 
             // y-major, then z, then x: sections are usually more uniform within one Y-layer than
-            // across the vertical stack, maximizing run length.
+            // across the vertical stack, maximizing run length. Block states are interned, so a
+            // run is extended by identity and the palette is only consulted when it ends.
             for (int y = 0; y < 16; y++) {
                 for (int z = 0; z < 16; z++) {
                     for (int x = 0; x < 16; x++) {
                         BlockState state = section.getBlockState(x, y, z);
-                        if (allSame && !state.equals(first)) allSame = false;
-
-                        int index = paletteIndex.computeIfAbsent(state, s -> paletteIndex.size());
-                        if (index == currentIndex) {
-                            currentRunLength++;
-                        } else {
-                            if (currentRunLength > 0) {
-                                runPaletteIndices.add(currentIndex);
-                                runLengths.add(currentRunLength);
-                            }
-                            currentIndex = index;
-                            currentRunLength = 1;
+                        if (state == previous) {
+                            runLength++;
+                            continue;
                         }
+                        if (previous != null) {
+                            runPaletteIndices.add(previousIndex);
+                            runLengths.add(runLength);
+                        }
+                        int index = paletteIndex.getInt(state);
+                        if (index < 0) {
+                            index = palette.size();
+                            palette.add(state);
+                            paletteIndex.put(state, index);
+                        }
+                        previous = state;
+                        previousIndex = index;
+                        runLength = 1;
                     }
                 }
             }
-            if (currentRunLength > 0) {
-                runPaletteIndices.add(currentIndex);
-                runLengths.add(currentRunLength);
-            }
+            runPaletteIndices.add(previousIndex);
+            runLengths.add(runLength);
 
-            if (allSame) {
-                return new SnapshotSection(first);
+            if (runPaletteIndices.size() == 1) {
+                return new SnapshotSection(palette.get(0));
             }
+            return new SnapshotSection(palette, runPaletteIndices.toIntArray(), runLengths.toIntArray());
+        }
 
-            List<BlockState> palette = new ArrayList<>(paletteIndex.keySet());
-            int[] indices = runPaletteIndices.stream().mapToInt(Integer::intValue).toArray();
-            int[] lengths = runLengths.stream().mapToInt(Integer::intValue).toArray();
-            return new SnapshotSection(palette, indices, lengths);
+        /** Writes every block of this section into out, indexed (y * 16 + z) * 16 + x. */
+        void decode(BlockState[] out) {
+            if (uniform) {
+                Arrays.fill(out, uniformState);
+                return;
+            }
+            int cursor = 0;
+            for (int run = 0; run < runPaletteIndex.length; run++) {
+                Arrays.fill(out, cursor, cursor + runLength[run], palette.get(runPaletteIndex[run]));
+                cursor += runLength[run];
+            }
         }
 
         /**
