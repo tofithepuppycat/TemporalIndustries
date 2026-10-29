@@ -61,7 +61,8 @@ public class ChronosphereMenu extends AbstractContainerMenu implements TimelineV
     @Override
     public boolean stillValid(@NotNull Player player) {
         return stillValid(access, player, Registration.CHRONOSPHERE_BLOCK.get())
-                || stillValid(access, player, Registration.CREATIVE_CHRONOSPHERE_BLOCK.get());
+                || stillValid(access, player, Registration.CREATIVE_CHRONOSPHERE_BLOCK.get())
+                || stillValid(access, player, Registration.CHRONOVAULT_BLOCK.get());
     }
 
     public int getEnergyStored() {

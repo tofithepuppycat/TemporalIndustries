@@ -16,6 +16,7 @@ import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProj
 import io.github.tofithepuppycat.temporalindustries.client.window.ChronosphereMapWindow;
 import io.github.tofithepuppycat.temporalindustries.client.window.TimelineSettingsWindow;
 import io.github.tofithepuppycat.temporalindustries.client.window.WindowManager;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.menu.ChronosphereMenu;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereBindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.RepositorySuggestRequestPacket;
@@ -34,8 +35,8 @@ import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 
 /**
- * GUI for the Chronosphere block: the same timeline graph view as the Chronovault (via {@link
- * TimelineGraphWidget}), except Jump moves every chunk this Chronosphere has claimed.
+ * GUI for the Chronosphere and Chronovault blocks: a timeline graph view (via {@link
+ * TimelineGraphWidget}) where Jump moves every chunk the machine has claimed.
  */
 @SuppressWarnings("null")
 public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu> {
@@ -677,7 +678,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             if (isMouseOverEnergyBar(mouseX, mouseY)) {
                 guiGraphics.renderTooltip(font, Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/" + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE"), mouseX, mouseY);
             } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
-                guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+                guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
             }
             return;
         }
@@ -690,7 +691,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverEnergyBar(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/" + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE"), mouseX, mouseY);
         } else if (isMouseOverEntropyBar(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, ChronovaultScreen.entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, entropyTooltip(menu.getEntropy(), menu.getEntropyMax()), mouseX, mouseY);
         } else if (isMouseOverRect(mouseX, mouseY, panelX() + TITLE_HOVER_X_OFFSET, panelY() + TITLE_HOVER_Y_OFFSET,
                 TITLE_HOVER_WIDTH, TITLE_HOVER_HEIGHT)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.repository_tooltip",
@@ -708,13 +709,24 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         } else if (isMouseOverCommitButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.commit_tooltip"), mouseX, mouseY);
         } else if (isMouseOverDeleteCommitButton(mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, ChronovaultScreen.deleteCommitTooltip(), mouseX, mouseY);
+            guiGraphics.renderTooltip(font, deleteCommitTooltip(), mouseX, mouseY);
         }
+    }
+
+    private static Component deleteCommitTooltip() {
+        return Component.translatable("gui.temporalindustries.chronovault.delete_commit");
+    }
+
+    private static Component entropyTooltip(int entropy, int max) {
+        int offset = entropy - max / 2;
+        String sign = offset >= 0 ? "+" : "";
+        String display = sign + EntropyDisplay.formatBalance(offset);
+        return Component.translatable("gui.temporalindustries.entropy.value", display);
     }
 
     @Override
     protected void renderLabels(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        drawCenteredNoShadow(guiGraphics, Component.translatable("block.temporalindustries.chronosphere"), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
+        drawCenteredNoShadow(guiGraphics, menu.getBlockEntity().getBlockState().getBlock().getName(), panelX() + CONTENT_SIZE / 2, panelY() + 8, 0xFF3F3F3F);
         if (!isBound()) return;
 
         long now = TimelineProjectionManager.getCurrentGameTime();

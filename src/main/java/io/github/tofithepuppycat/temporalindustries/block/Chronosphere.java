@@ -42,8 +42,9 @@ import java.util.ArrayList;
 import java.util.List;
 
 /**
- * Multi-chunk-tier time machine: can claim up to an 11x11 area of chunks around itself (see {@link
- * ChronosphereBlockEntity}), all moved together by one jump from a shared energy pool.
+ * Multi-chunk-tier time machine: can claim up to an 11x11 area of chunks around itself (3x3 for the
+ * Chronovault, see {@link ChronosphereBlockEntity}), all moved together by one jump from a shared
+ * energy pool.
  */
 @SuppressWarnings("null")
 public class Chronosphere extends BaseEntityBlock {
@@ -156,7 +157,9 @@ public class Chronosphere extends BaseEntityBlock {
     @Nullable
     @Override
     public <T extends BlockEntity> BlockEntityTicker<T> getTicker(Level level, BlockState state, BlockEntityType<T> type) {
-        return createTickerHelper(type, Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), ChronosphereBlockEntity::tick);
+        return createTickerHelper(type,
+                ChronosphereBlockEntity.isChronovault(state) ? Registration.CHRONOVAULT_BLOCK_ENTITY.get() : Registration.CHRONOSPHERE_BLOCK_ENTITY.get(),
+                ChronosphereBlockEntity::tick);
     }
 
     @Nullable

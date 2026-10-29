@@ -56,8 +56,8 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.function.Predicate;
 
 /**
- * Shared logic between {@link ChronovaultBlockEntity} (one claimed chunk) and {@link
- * ChronosphereBlockEntity} (up to 121, sharing one energy pool).
+ * Shared logic between {@link ChronosphereBlockEntity} (Chronovault and Chronosphere: up to 9 or
+ * 121 chunks, sharing one energy pool) and the Chronodial.
  */
 @SuppressWarnings("null")
 public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity

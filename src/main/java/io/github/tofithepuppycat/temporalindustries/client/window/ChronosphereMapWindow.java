@@ -50,8 +50,8 @@ public final class ChronosphereMapWindow extends GuiWindow {
 
         // The block entity the menu holds is the client's stale copy, so ChronosphereClientState
         // (plus this visit's pending toggles) is the only client-accurate source.
-        int footerY = y + GRID_Y_OFFSET + ChronosphereMapView.gridPixels() + FOOTER_GAP;
-        drawCenteredNoShadow(guiGraphics, Component.literal(view.selectedCount() + "/" + ChronosphereMapView.totalClaimable() + " chunks selected"),
+        int footerY = y + GRID_Y_OFFSET + view.gridPixels() + FOOTER_GAP;
+        drawCenteredNoShadow(guiGraphics, Component.literal(view.selectedCount() + "/" + view.totalClaimable() + " chunks selected"),
                 x + SIZE / 2, footerY, TEXT_SECONDARY);
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
                 x + SIZE / 2, footerY + FOOTER_LINE_SPACING, TEXT_MUTED);

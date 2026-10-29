@@ -10,11 +10,13 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlo
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
 import io.github.tofithepuppycat.temporalindustries.client.ChunkThumbnailClientState;
 import io.github.tofithepuppycat.temporalindustries.client.chunkmap.ChunkSelectionGrid;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.Level;
 
 /**
  * The Chronosphere's chunk claim map, drawn and driven inside whatever area its host gives it.
@@ -27,9 +29,6 @@ public final class ChronosphereMapView {
 
     /** 15px cells rather than the grid's 32px default, so the map fits a window with room around it. */
     private static final int MAP_CELL_SIZE = 15;
-    private static final ChunkSelectionGrid MAP_GRID = new ChunkSelectionGrid(
-            ChronosphereBlockEntity.MAX_RADIUS, ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
-    private static final int TOTAL_CLAIMABLE = countClaimableCells();
 
     private static final int COLOR_HOME = 0xFFFFD166;
     private static final int COLOR_SELECTED = 0xFF3D9BE0;
@@ -46,6 +45,8 @@ public final class ChronosphereMapView {
     private static final float ZOOM_STEP = 0.25F;
 
     private final ChunkPos home;
+    private final ChunkSelectionGrid mapGrid;
+    private final int totalClaimable;
     private final Runnable requestThumbnails;
     private final Consumer<Map<Long, Boolean>> sendToggles;
 
@@ -82,19 +83,26 @@ public final class ChronosphereMapView {
     /** Right-click pan state for the zoomed map. */
     private boolean panDragActive = false;
 
-    /** The map of the Chronosphere at machinePos, with the requests it makes left to the caller. */
+    /** The map of the machine at machinePos, with the requests it makes left to the caller. */
     public ChronosphereMapView(BlockPos machinePos, Runnable requestThumbnails, Consumer<Map<Long, Boolean>> sendToggles) {
         this.home = new ChunkPos(machinePos);
+        int radius = claimRadiusAt(machinePos);
+        this.mapGrid = new ChunkSelectionGrid(radius, ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
+        this.totalClaimable = countClaimableCells(radius);
         this.requestThumbnails = requestThumbnails;
         this.sendToggles = sendToggles;
     }
 
-    private static int countClaimableCells() {
-        int radius = ChronosphereBlockEntity.MAX_RADIUS;
+    private static int claimRadiusAt(BlockPos machinePos) {
+        Level level = Minecraft.getInstance().level;
+        return level == null ? ChronosphereBlockEntity.MAX_RADIUS : ChronosphereBlockEntity.radiusFor(level.getBlockState(machinePos));
+    }
+
+    private static int countClaimableCells(int radius) {
         int count = 0;
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {
-                if (ChronosphereBlockEntity.isWithinRadius(dx, dz)) count++;
+                if (ChronosphereBlockEntity.isWithinRadius(radius, dx, dz)) count++;
             }
         }
         return count;
@@ -148,12 +156,12 @@ public final class ChronosphereMapView {
     }
 
     /** Pixel size of the unzoomed map; hosts size the area they give it from this. */
-    public static int gridPixels() {
-        return MAP_GRID.gridPixels();
+    public int gridPixels() {
+        return mapGrid.gridPixels();
     }
 
-    public static int totalClaimable() {
-        return TOTAL_CLAIMABLE;
+    public int totalClaimable() {
+        return totalClaimable;
     }
 
     public int selectedCount() {
@@ -172,7 +180,7 @@ public final class ChronosphereMapView {
     }
 
     private int gridX() {
-        return areaLeft + (areaWidth - MAP_GRID.gridPixels()) / 2;
+        return areaLeft + (areaWidth - mapGrid.gridPixels()) / 2;
     }
 
     private int gridY() {
@@ -181,11 +189,11 @@ public final class ChronosphereMapView {
 
     /** The viewport's fixed footprint: the unzoomed grid size, so the layout around it never moves. */
     private int viewportSize() {
-        return MAP_GRID.gridPixels();
+        return mapGrid.gridPixels();
     }
 
     private int maxPan() {
-        return Math.max(0, MAP_GRID.gridPixels(zoom) - viewportSize());
+        return Math.max(0, mapGrid.gridPixels(zoom) - viewportSize());
     }
 
     private void clampPan() {
@@ -219,7 +227,7 @@ public final class ChronosphereMapView {
     }
 
     private ChunkPos cellAt(double mouseX, double mouseY) {
-        return MAP_GRID.cellAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom, home);
+        return mapGrid.cellAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom, home);
     }
 
     public void render(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -229,7 +237,7 @@ public final class ChronosphereMapView {
         int gridY = gridY();
 
         guiGraphics.enableScissor(gridX, gridY, gridX + viewportSize, gridY + viewportSize);
-        MAP_GRID.render(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, home, new ChunkSelectionGrid.CellPainter() {
+        mapGrid.render(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, home, new ChunkSelectionGrid.CellPainter() {
             @Override
             public int tint(int dx, int dz, long chunkKey) {
                 if (dx == 0 && dz == 0) return COLOR_HOME;
@@ -250,20 +258,20 @@ public final class ChronosphereMapView {
         });
 
         if (isOverGrid(mouseX, mouseY)) {
-            MAP_GRID.renderHover(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, mouseX, mouseY);
+            mapGrid.renderHover(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, mouseX, mouseY);
         }
         if (rectDragActive) {
-            MAP_GRID.renderRectHighlight(guiGraphics, zoomedGridX(), zoomedGridY(), zoom,
+            mapGrid.renderRectHighlight(guiGraphics, zoomedGridX(), zoomedGridY(), zoom,
                     rectStartDx, rectStartDz, rectHoverDx, rectHoverDz, COLOR_RECT_PREVIEW);
         }
         guiGraphics.disableScissor();
-        MAP_GRID.renderFrame(guiGraphics, gridX, gridY, viewportSize);
+        mapGrid.renderFrame(guiGraphics, gridX, gridY, viewportSize);
     }
 
     public void mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (Screen.hasControlDown()) {
-                int[] start = MAP_GRID.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
+                int[] start = mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
                 rectStartDx = rectHoverDx = start[0];
                 rectStartDz = rectHoverDz = start[1];
                 rectDragActive = true;
@@ -291,7 +299,7 @@ public final class ChronosphereMapView {
             panY -= (int) Math.round(dragY);
             clampPan();
         } else if (button == 0 && rectDragActive) {
-            int[] hover = MAP_GRID.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
+            int[] hover = mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
             rectHoverDx = hover[0];
             rectHoverDz = hover[1];
         } else if (button == 0 && dragActive) {
@@ -335,7 +343,7 @@ public final class ChronosphereMapView {
         for (int dx = minDx; dx <= maxDx; dx++) {
             for (int dz = minDz; dz <= maxDz; dz++) {
                 if (dx == 0 && dz == 0) continue; // home chunk isn't toggleable
-                if (!MAP_GRID.isWithinRadius(dx, dz)) continue;
+                if (!mapGrid.isWithinRadius(dx, dz)) continue;
                 applyDragToggle(new ChunkPos(home.x + dx, home.z + dz).toLong());
             }
         }

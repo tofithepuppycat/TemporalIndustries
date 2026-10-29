@@ -49,8 +49,8 @@ public class TimelineMachineDeleteHistoryPacket implements CustomPacketPayload {
 
             machine.deleteRepository();
 
-            // Chronosphere's claim map/tracked-count footer reads from ChronosphereClientState, not
-            // the synced block entity, so it needs this extra push; Chronovault doesn't.
+            // The claim map/tracked-count footer reads from ChronosphereClientState, not the synced
+            // block entity, so it needs this extra push.
             if (machine instanceof ChronosphereBlockEntity chronosphere) {
                 ChronosphereStateRequestPacket.sendStateSync(sender, chronosphere, packet.machinePos);
             }

@@ -53,12 +53,12 @@ public class ChronoRemoteChunkScreen extends Screen {
 
     @Override
     protected void init() {
-        panelWidth = 3 * PADDING + ChronosphereMapView.gridPixels() + SIDEBAR_WIDTH;
-        panelHeight = HEADER_HEIGHT + ChronosphereMapView.gridPixels() + PADDING + FOOTER_HEIGHT;
+        panelWidth = 3 * PADDING + mapView.gridPixels() + SIDEBAR_WIDTH;
+        panelHeight = HEADER_HEIGHT + mapView.gridPixels() + PADDING + FOOTER_HEIGHT;
         panelLeft = (width - panelWidth) / 2;
         panelTop = Math.max(0, (height - panelHeight) / 2);
 
-        mapView.layout(mapLeft(), mapTop(), ChronosphereMapView.gridPixels());
+        mapView.layout(mapLeft(), mapTop(), mapView.gridPixels());
         if (!opened) {
             opened = true;
             mapView.open();
@@ -74,7 +74,7 @@ public class ChronoRemoteChunkScreen extends Screen {
     }
 
     private int sidebarLeft() {
-        return mapLeft() + ChronosphereMapView.gridPixels() + PADDING;
+        return mapLeft() + mapView.gridPixels() + PADDING;
     }
 
     private int sidebarWidth() {
@@ -127,7 +127,7 @@ public class ChronoRemoteChunkScreen extends Screen {
 
         guiGraphics.drawString(font, title, panelLeft + PADDING + 2, panelTop + (HEADER_HEIGHT - font.lineHeight) / 2, ACCENT_COLOR);
 
-        mapView.layout(mapLeft(), mapTop(), ChronosphereMapView.gridPixels());
+        mapView.layout(mapLeft(), mapTop(), mapView.gridPixels());
         mapView.render(guiGraphics, mouseX, mouseY);
         renderSidebar(guiGraphics);
         renderFooter(guiGraphics, mouseX, mouseY);
@@ -137,13 +137,13 @@ public class ChronoRemoteChunkScreen extends Screen {
         int left = sidebarLeft();
         int top = mapTop();
         int sidebarWidth = sidebarWidth();
-        drawPanel(guiGraphics, left, top, sidebarWidth, ChronosphereMapView.gridPixels(), SIDEBAR_COLOR, DIVIDER_COLOR);
+        drawPanel(guiGraphics, left, top, sidebarWidth, mapView.gridPixels(), SIDEBAR_COLOR, DIVIDER_COLOR);
 
         int x = left + PADDING;
         int y = top + PADDING;
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.selected"), x, y, TEXT_MUTED);
         y += LINE_HEIGHT;
-        guiGraphics.drawString(font, mapView.selectedCount() + "/" + ChronosphereMapView.totalClaimable(), x, y, ACCENT_COLOR);
+        guiGraphics.drawString(font, mapView.selectedCount() + "/" + mapView.totalClaimable(), x, y, ACCENT_COLOR);
         y += LINE_HEIGHT + 6;
 
         y = legend(guiGraphics, x, y, COLOR_HOME, "home");

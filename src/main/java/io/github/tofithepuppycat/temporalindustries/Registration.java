@@ -20,7 +20,6 @@ import io.github.tofithepuppycat.temporalindustries.block.ReactorOutputHatch;
 import io.github.tofithepuppycat.temporalindustries.block.WithergenicReactor;
 import io.github.tofithepuppycat.temporalindustries.block.SchrodingerGenerator;
 import io.github.tofithepuppycat.temporalindustries.block.SeebeckGenerator;
-import io.github.tofithepuppycat.temporalindustries.block.Chronovault;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronoProjectorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronodialBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.ChronosphereBlockEntity;
@@ -38,7 +37,6 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.ReactorOutputHa
 import io.github.tofithepuppycat.temporalindustries.block.entity.SchrodingerGeneratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.WithergenicReactorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.SeebeckGeneratorBlockEntity;
-import io.github.tofithepuppycat.temporalindustries.block.entity.ChronovaultBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
@@ -70,7 +68,6 @@ import io.github.tofithepuppycat.temporalindustries.menu.EntropyBalancerMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyCondenserMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.LootGeneratorMenu;
 import io.github.tofithepuppycat.temporalindustries.menu.WithergenicReactorMenu;
-import io.github.tofithepuppycat.temporalindustries.menu.ChronovaultMenu;
 import io.github.tofithepuppycat.temporalindustries.recipe.CellUpgradeRecipe;
 import io.github.tofithepuppycat.temporalindustries.recipe.EntropyManipulatorRecipe;
 import com.mojang.serialization.Codec;
@@ -159,8 +156,8 @@ public class Registration {
                 }
             });
 
-    public static final DeferredBlock<Chronovault> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
-            () -> new Chronovault(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+    public static final DeferredBlock<Chronosphere> CHRONOVAULT_BLOCK = BLOCKS.register("chronovault",
+            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> CHRONOVAULT_ITEM = ITEMS.register("chronovault",
             () -> new ChronoBlockItem(CHRONOVAULT_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
@@ -444,8 +441,8 @@ public class Registration {
     public static final DeferredItem<Item> ORDER_PYLON_ITEM = ITEMS.register("order_pylon",
             () -> new EntropicPylonItem(ORDER_PYLON_BLOCK.get(), new Item.Properties()));
 
-    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronovaultBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
-            () -> BlockEntityType.Builder.of(ChronovaultBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
+            () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronoProjectorBlockEntity>> CHRONO_PROJECTOR_BLOCK_ENTITY = BLOCK_ENTITIES.register("chrono_projector",
             () -> BlockEntityType.Builder.of(ChronoProjectorBlockEntity::new, ECHO_PROJECTOR_BLOCK.get()).build(null));
@@ -508,9 +505,6 @@ public class Registration {
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ORDER_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("order_pylon",
             () -> orderPylonBlockEntityType = BlockEntityType.Builder.of((pos, state) -> new EntropicPylonBlockEntity(orderPylonBlockEntityType, pos, state, EntropyType.ORDER), ORDER_PYLON_BLOCK.get()).build(null));
-
-    public static final DeferredHolder<MenuType<?>, MenuType<ChronovaultMenu>> CHRONOVAULT_MENU = MENUS.register("chronovault",
-            () -> IMenuTypeExtension.create(ChronovaultMenu::new));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronosphereMenu>> CHRONOSPHERE_MENU = MENUS.register("chronosphere",
             () -> IMenuTypeExtension.create(ChronosphereMenu::new));

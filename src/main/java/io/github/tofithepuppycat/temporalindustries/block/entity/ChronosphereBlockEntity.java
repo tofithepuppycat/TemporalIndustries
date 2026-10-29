@@ -36,20 +36,22 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Block entity for the Chronosphere: the player claims up to an 11x11 chunk area (centred on and
- * always including the home chunk), and a single jump moves every claimed chunk to the same target
- * time, paid from one shared energy pool.
+ * Block entity for the Chronosphere and the Chronovault: the player claims a square chunk area
+ * (centred on and always including the home chunk), 11x11 for the Chronosphere and 3x3 for the
+ * Chronovault, and a single jump moves every claimed chunk to the same target time, paid from one
+ * shared energy pool.
  */
 public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
     /**
-     * Chunks may be claimed up to this many steps from the home chunk on either axis, i.e. an 11x11
-     * box.
+     * Chronosphere chunks may be claimed up to this many steps from the home chunk on either axis,
+     * i.e. an 11x11 box.
      */
     public static final int MAX_RADIUS = 5;
-    /** Home chunk plus up to this many additional chunks = 121 chunks, a full 11x11 box. */
-    public static final int MAX_ADDITIONAL_CHUNKS = (MAX_RADIUS * 2 + 1) * (MAX_RADIUS * 2 + 1) - 1;
+    /** The Chronovault's equivalent, a 3x3 box. */
+    public static final int CHRONOVAULT_RADIUS = 1;
 
     private static final int ENERGY_CAPACITY = 500_000;
+    private static final int CHRONOVAULT_ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000_000_000;
     private static final int CREATIVE_ENERGY_CAPACITY = Integer.MAX_VALUE;
 
@@ -61,9 +63,30 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
 
     public ChronosphereBlockEntity(BlockPos blockPos, BlockState blockState) {
-        super(Registration.CHRONOSPHERE_BLOCK_ENTITY.get(), blockPos, blockState,
-                blockState.is(Registration.CREATIVE_CHRONOSPHERE_BLOCK.get()) ? CREATIVE_ENERGY_CAPACITY : ENERGY_CAPACITY,
+        super(isChronovault(blockState) ? Registration.CHRONOVAULT_BLOCK_ENTITY.get() : Registration.CHRONOSPHERE_BLOCK_ENTITY.get(),
+                blockPos, blockState,
+                blockState.is(Registration.CREATIVE_CHRONOSPHERE_BLOCK.get()) ? CREATIVE_ENERGY_CAPACITY
+                        : isChronovault(blockState) ? CHRONOVAULT_ENERGY_CAPACITY : ENERGY_CAPACITY,
                 ENERGY_TRANSFER);
+    }
+
+    public static boolean isChronovault(BlockState state) {
+        return state.is(Registration.CHRONOVAULT_BLOCK.get());
+    }
+
+    /** The claim radius of the machine block state belongs to. */
+    public static int radiusFor(BlockState state) {
+        return isChronovault(state) ? CHRONOVAULT_RADIUS : MAX_RADIUS;
+    }
+
+    public int getMaxRadius() {
+        return radiusFor(getBlockState());
+    }
+
+    /** Home chunk plus up to this many additional chunks fills the whole claimable box. */
+    public int getMaxAdditionalChunks() {
+        int side = getMaxRadius() * 2 + 1;
+        return side * side - 1;
     }
 
     @Override
@@ -109,7 +132,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
     public boolean isWithinBounds(ChunkPos pos) {
         ChunkPos home = getHomeChunkPos();
-        return isWithinRadius(pos.x - home.x, pos.z - home.z);
+        return isWithinRadius(getMaxRadius(), pos.x - home.x, pos.z - home.z);
     }
 
     /**
@@ -123,8 +146,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
      * with the client screen and network handlers so shape, hit-testing, and server rule always
      * agree.
      */
-    public static boolean isWithinRadius(int dx, int dz) {
-        return CLAIM_SHAPE.contains(MAX_RADIUS, dx, dz);
+    public static boolean isWithinRadius(int radius, int dx, int dz) {
+        return CLAIM_SHAPE.contains(radius, dx, dz);
     }
 
     /** Every chunk this machine currently controls, home chunk first. */
@@ -163,7 +186,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
         if (add) {
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
-            if (additionalChunks.size() >= MAX_ADDITIONAL_CHUNKS) return ToggleResult.LIMIT_REACHED;
+            if (additionalChunks.size() >= getMaxAdditionalChunks()) return ToggleResult.LIMIT_REACHED;
 
             if (regionChunk) {
                 // Already claimed for a glued region; claiming it outright tracks all of it.
@@ -276,7 +299,9 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
     @Override
     public Component getDisplayName() {
-        return Component.translatable("container.temporalindustries.chronosphere");
+        return Component.translatable(isChronovault(getBlockState())
+                ? "container.temporalindustries.chronovault"
+                : "container.temporalindustries.chronosphere");
     }
 
     @Nullable

@@ -11,7 +11,6 @@ import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyManipul
 import io.github.tofithepuppycat.temporalindustries.client.screen.EntropyCondenserScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.LootGeneratorScreen;
 import io.github.tofithepuppycat.temporalindustries.client.screen.WithergenicReactorScreen;
-import io.github.tofithepuppycat.temporalindustries.client.screen.ChronovaultScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.resources.ResourceLocation;
@@ -33,7 +32,6 @@ public class ClientModEvents {
     @SuppressWarnings("null")
     @SubscribeEvent
     public static void onRegisterMenuScreens(RegisterMenuScreensEvent event) {
-        event.register(Registration.CHRONOVAULT_MENU.get(), ChronovaultScreen::new);
         event.register(Registration.CHRONOSPHERE_MENU.get(), ChronosphereScreen::new);
         event.register(Registration.ENTROPY_CONDENSER_MENU.get(), EntropyCondenserScreen::new);
         event.register(Registration.ENTROPY_BATTERY_MENU.get(), EntropyBatteryScreen::new);

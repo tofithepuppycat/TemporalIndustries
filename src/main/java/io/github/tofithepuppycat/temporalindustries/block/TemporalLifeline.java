@@ -11,7 +11,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Tethers the chunks of an adjacent {@link Chronosphere}'s or {@link Chronovault}'s repository
+ * Tethers the chunks of an adjacent {@link Chronosphere}'s repository
  * against explosions: while touching one with any face, explosions cannot destroy blocks inside
  * its claimed chunks (see {@link
  * io.github.tofithepuppycat.temporalindustries.device.TemporalLifelineListener}).
