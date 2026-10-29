@@ -15,6 +15,7 @@ import net.minecraft.nbt.CompoundTag;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
@@ -101,6 +102,11 @@ public final class TimelineEntityGhostRenderer {
             entity.zo = entity.zOld = entity.getZ();
             entity.yRotO = entity.getYRot();
             entity.xRotO = entity.getXRot();
+            // Renderers interpolate from the previous-frame values, which start at zero on a fresh entity.
+            if (entity instanceof LivingEntity living) {
+                living.yBodyRotO = living.yBodyRot;
+                living.yHeadRotO = living.yHeadRot;
+            }
             GHOSTS.add(entity);
         }
         builtFrom = source;
