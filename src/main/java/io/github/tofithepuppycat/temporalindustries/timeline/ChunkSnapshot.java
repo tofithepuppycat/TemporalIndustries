@@ -79,6 +79,14 @@ public final class ChunkSnapshot {
         sections.get(sectionIndex).collectInto(chunkPos, minSectionY + sectionIndex, out);
     }
 
+    /**
+     * Adds to out, bottom-up, every position of section sectionIndex whose block in live differs
+     * from the one captured here; unchanged blocks allocate nothing.
+     */
+    public void collectDifferingInto(int sectionIndex, LevelChunkSection live, List<BlockPos> out) {
+        sections.get(sectionIndex).collectDiffering(chunkPos, minSectionY + sectionIndex, live, out);
+    }
+
     /** Every block position this baseline covers, expanded from its section encoding. */
     public Map<BlockPos, BlockState> toBlockStateMap() {
         Map<BlockPos, BlockState> map = new HashMap<>();
@@ -283,6 +291,38 @@ public final class ChunkSnapshot {
                 while (remaining > 0) {
                     out.put(new BlockPos(baseX + x, baseY + y, baseZ + z), state);
                     remaining--;
+                    x++;
+                    if (x == 16) { x = 0; z++; if (z == 16) { z = 0; y++; } }
+                }
+            }
+        }
+
+        void collectDiffering(ChunkPos chunkPos, int sectionY, LevelChunkSection live, List<BlockPos> out) {
+            int baseX = chunkPos.getMinBlockX();
+            int baseZ = chunkPos.getMinBlockZ();
+            int baseY = sectionY * 16;
+
+            if (uniform) {
+                if (uniformState.is(Blocks.AIR) && live.hasOnlyAir()) return;
+                for (int y = 0; y < 16; y++) {
+                    for (int z = 0; z < 16; z++) {
+                        for (int x = 0; x < 16; x++) {
+                            if (!live.getBlockState(x, y, z).equals(uniformState)) {
+                                out.add(new BlockPos(baseX + x, baseY + y, baseZ + z));
+                            }
+                        }
+                    }
+                }
+                return;
+            }
+
+            int y = 0, z = 0, x = 0;
+            for (int run = 0; run < runPaletteIndex.length; run++) {
+                BlockState state = palette.get(runPaletteIndex[run]);
+                for (int remaining = runLength[run]; remaining > 0; remaining--) {
+                    if (!live.getBlockState(x, y, z).equals(state)) {
+                        out.add(new BlockPos(baseX + x, baseY + y, baseZ + z));
+                    }
                     x++;
                     if (x == 16) { x = 0; z++; if (z == 16) { z = 0; y++; } }
                 }

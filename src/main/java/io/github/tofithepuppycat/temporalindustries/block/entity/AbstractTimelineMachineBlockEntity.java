@@ -7,11 +7,13 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineBlockChangeFlashPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineJumpEffectPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
+import io.github.tofithepuppycat.temporalindustries.timeline.JumpJob;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.component.DataComponentMap;
 import net.minecraft.core.component.DataComponents;
@@ -25,6 +27,7 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.util.RandomSource;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.item.component.CustomData;
@@ -511,10 +514,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
     }
 
-    /** Whether this machine's repository is still capturing a commit, which freezes its history. */
-    public boolean isCommitInProgress() {
+    /**
+     * Whether this machine's repository is still capturing a commit or rewriting the world for a
+     * jump, either of which freezes its history.
+     */
+    public boolean isHistoryBusy() {
         TemporalWorldData data = worldData();
-        return data != null && repositoryId != null && data.isCommitInProgress(repositoryId);
+        return data != null && repositoryId != null && data.isHistoryBusy(repositoryId);
     }
 
 
@@ -549,18 +555,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return getAllChunks();
     }
 
+    /**
+     * The cost of jumping to selectedCommitId, or nothing while it is still being measured in the
+     * background; the preview poll asks again until it is there.
+     */
     @Override
     public Map<Long, JumpCostBreakdown> getJumpCosts(long selectedCommitId) {
         if (selectedCommitId < 0) return Map.of();
         TemporalRepository repo = getRepository();
         if (repo == null || repo.getCommit(selectedCommitId) == null) return Map.of();
-        return Map.of(selectedCommitId, computeJumpCostBreakdown(selectedCommitId));
-    }
-
-    @Override
-    public Map<ChunkPos, Map<BlockPos, BlockState>> previewJumpTargetStates(long targetCommitId) {
-        TemporalRepository repo = getRepository();
-        return repo == null ? Map.of() : repo.previewJumpTargetStates(targetCommitId);
+        JumpCostBreakdown breakdown = costBreakdown(selectedCommitId);
+        return breakdown == null ? Map.of() : Map.of(selectedCommitId, breakdown);
     }
 
     @Override
@@ -572,7 +577,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     public Map<BlockPos, BlockState> previewChunkTargetStates(long targetCommitId, ChunkPos chunk) {
         TemporalRepository repo = getRepository();
-        return repo == null ? Map.of() : repo.previewChunkTargetStates(targetCommitId, chunk);
+        return repo == null || !(level instanceof ServerLevel serverLevel)
+                ? Map.of() : repo.previewChunkTargetStates(targetCommitId, chunk, serverLevel);
     }
 
     @Override
@@ -640,7 +646,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
 
         if (isRepositoryBound()) {
-            if (isCommitInProgress()) return BindResult.UNAVAILABLE;
+            if (isHistoryBusy()) return BindResult.UNAVAILABLE;
             unbindRepository();
         }
         return bindToRepositoryNamed(name);
@@ -668,7 +674,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     public void deleteRepository() {
         if (!(level instanceof ServerLevel) || level.getServer() == null || repositoryId == null) return;
-        if (isCommitInProgress()) return;
+        if (isHistoryBusy()) return;
 
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
         data.deleteRepository(repositoryId);
@@ -687,8 +693,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public boolean deleteCommit(long commitId) {
         TemporalRepository repo = getRepository();
         TemporalWorldData data = worldData();
-        if (repo == null || data == null || isCommitInProgress()) return false;
+        if (repo == null || data == null || isHistoryBusy()) return false;
 
+        data.cancelJumpEstimate(repositoryId);
         boolean deleted = repo.deleteCommit(commitId);
         if (deleted) {
             data.setDirty();
@@ -758,12 +765,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             charged += take;
             setChanged();
         }
-        if (charged < chargeCost) return;
+        if (charged < chargeCost || isHistoryBusy()) return;
 
         long paid = chargeCost;
         charging = false;
         charged = 0L;
-        performJump(repo, target, chargeTarget, paid);
+        launchJump(repo, target, chargeTarget, paid, false);
     }
 
     /**
@@ -803,9 +810,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     @Override
-    public JumpResult jump(long targetCommitId) {
+    public JumpResult jump(long targetCommitId, @Nullable UUID requester) {
         if (level == null || level.isClientSide) return JumpResult.SUCCESS;
-        return applyTimelineView(targetCommitId);
+        return applyTimelineView(targetCommitId, requester);
     }
 
     @Override
@@ -830,34 +837,67 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return Math.max(min, Math.min(max, gameTime));
     }
 
+    /** A background estimate for the cost display, valid for as long as its inputs are unchanged. */
+    private record CachedEstimate(long target, long head, boolean saveEntities, boolean chargeContainers,
+                                  JumpJob.Estimate estimate) {}
+
+    @Nullable private CachedEstimate cachedEstimate;
+    /** Who asked for the jump in flight, so they can be told if it has to charge first. */
+    @Nullable private UUID jumpRequester;
+
     /**
      * Read-only cost of jumping the repository to targetCommitId: the time-distance cost, the cost
-     * of every changed block, and the entropic cost.
+     * of every changed block, and the entropic cost. The block, entity and container parts are
+     * measured by a background job that only looks at loaded chunks, so a GUI poll can neither
+     * stall the tick nor force-load the claim; until it has finished this returns null.
      */
-    public JumpCostBreakdown computeJumpCostBreakdown(long targetCommitId) {
-        JumpCostBreakdown free = new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0.0, 0.0,
-                savesEntities(), chargesContainers());
-        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return free;
+    @Nullable
+    private JumpCostBreakdown costBreakdown(long targetCommitId) {
+        if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return null;
         TemporalRepository repo = getRepository();
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
-        if (target == null || targetCommitId == repo.getHeadCommitId() || isCreative()) return free;
+        if (target == null) return null;
+        if (targetCommitId == repo.getHeadCommitId() || isCreative()) {
+            return new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0.0, 0.0,
+                    savesEntities(), chargesContainers());
+        }
 
-        // Estimate only: unloaded chunks are skipped so a GUI poll can't force-load the claim.
-        AtomicLong changedBlocks = new AtomicLong();
-        long blocks = repo.computeJumpCost(targetCommitId, serverLevel, state -> {
-            changedBlocks.incrementAndGet();
-            return costOf(state);
-        }, gluePredicate(), true);
+        CachedEstimate cached = cachedEstimate;
+        if (cached != null && cached.target() == targetCommitId && cached.head() == repo.getHeadCommitId()
+                && cached.saveEntities() == savesEntities() && cached.chargeContainers() == chargesContainers()) {
+            return breakdown(serverLevel, target, cached.estimate());
+        }
+        startEstimate(repo, serverLevel, targetCommitId);
+        return null;
+    }
+
+    private void startEstimate(TemporalRepository repo, ServerLevel serverLevel, long targetCommitId) {
+        TemporalWorldData data = worldData();
+        UUID repoId = getRepositoryId();
+        if (data == null || repoId == null || data.isHistoryBusy(repoId)) return;
+        JumpJob running = data.getJumpJob(repoId);
+        if (running != null && !running.isOver() && running.targetCommitId() == targetCommitId) return;
+
+        long head = repo.getHeadCommitId();
+        boolean saveEntitiesNow = savesEntities();
+        boolean chargeContainersNow = chargesContainers();
+        JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveEntitiesNow, chargeContainersNow,
+                true, false, false,
+                finished -> cachedEstimate = new CachedEstimate(targetCommitId, head, saveEntitiesNow,
+                        chargeContainersNow, finished.estimate()),
+                finished -> { }));
+        if (job != null) data.startJumpJob(repoId, job);
+    }
+
+    private JumpCostBreakdown breakdown(ServerLevel serverLevel, RepoCommit target, JumpJob.Estimate estimate) {
+        TemporalRepository.EntityJumpStats entityStats =
+                new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth());
+        TemporalRepository.ContainerJumpStats containerStats =
+                TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf);
         double minutes = Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
-        TemporalRepository.EntityJumpStats entityStats = savesEntities()
-                ? repo.computeEntityJumpStats(targetCommitId, serverLevel)
-                : new TemporalRepository.EntityJumpStats(0, 0.0);
-        TemporalRepository.ContainerJumpStats containerStats = chargesContainers()
-                ? repo.computeContainerJumpStats(targetCommitId, serverLevel, AbstractTimelineMachineBlockEntity::itemCostOf,
-                        gluePredicate(), true)
-                : TemporalRepository.ContainerJumpStats.NONE;
-        return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), blocks,
-                entityCost(entityStats), containerStats.cost(), entropicCost(), minutes, changedBlocks.get(),
+        return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), estimate.blockCost(),
+                entityCost(entityStats), containerStats.cost(), entropicCost(), minutes, estimate.changedBlocks(),
                 entityStats.count(), entityStats.health(), containerStats.slots(),
                 getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
     }
@@ -922,8 +962,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      * returns CHARGING, and the jump runs once enough energy has been collected.
      */
     public JumpResult applyTimelineView(long targetCommitId) {
+        return applyTimelineView(targetCommitId, null);
+    }
+
+    /**
+     * As above, for a requester who is told if the jump has to charge. The cost is measured and the
+     * world rewritten by a {@link JumpJob} over the following ticks, so this returns at once.
+     */
+    public JumpResult applyTimelineView(long targetCommitId, @Nullable UUID requester) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return JumpResult.SUCCESS;
-        if (isCommitInProgress()) return JumpResult.BUSY;
+        if (isHistoryBusy()) return JumpResult.BUSY;
 
         if (charging && chargeTarget == targetCommitId) return JumpResult.CHARGING;
 
@@ -931,39 +979,74 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
         if (target == null) return JumpResult.SUCCESS;
 
-        Predicate<BlockPos> isGlued = gluePredicate();
-        boolean restoreEntities = savesEntities();
-        long totalCost = 0L;
-        if (targetCommitId != repo.getHeadCommitId() && !isCreative()) {
-            totalCost = timeDistanceCost(target, serverLevel.getGameTime())
-                    + repo.computeJumpCost(targetCommitId, serverLevel, AbstractTimelineMachineBlockEntity::costOf, isGlued)
-                    + (restoreEntities ? entityCost(repo.computeEntityJumpStats(targetCommitId, serverLevel)) : 0L)
-                    + (chargesContainers() ? repo.computeContainerJumpStats(targetCommitId, serverLevel,
-                            AbstractTimelineMachineBlockEntity::itemCostOf, isGlued, false).cost() : 0L)
-                    + entropicCost();
-        }
-
-        if (totalCost > energyStorage.getEnergyStored()) {
-            beginCharging(targetCommitId, totalCost);
-            serverLevel.playSound(null, worldPosition, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0F, 1.0F);
-            return JumpResult.CHARGING;
-        }
-        cancelCharging();
-        energyStorage.consumeInternal(totalCost);
-        performJump(repo, target, targetCommitId, totalCost);
+        jumpRequester = requester;
+        // Nothing to pay: either the head is already there, or the machine is creative.
+        boolean free = targetCommitId == repo.getHeadCommitId() || isCreative();
+        if (free) cancelCharging();
+        launchJump(repo, target, targetCommitId, 0L, !free);
         return JumpResult.SUCCESS;
     }
 
-    /** Writes the jump to the live world once its cost has been paid. */
-    private void performJump(TemporalRepository repo, RepoCommit target, long targetCommitId, long totalCost) {
+    /**
+     * Starts the job that carries out a jump. With measureCost it first measures the cost and pays
+     * it from the pool (or starts charging if the pool falls short); otherwise paid is already
+     * covered and the world is rewritten straight away.
+     */
+    private void launchJump(TemporalRepository repo, RepoCommit target, long targetCommitId, long paid, boolean measureCost) {
         if (!(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
-        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
-        Predicate<BlockPos> isGlued = gluePredicate();
-        boolean restoreEntities = savesEntities();
+        TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        UUID repoId = getRepositoryId();
+        long[] totalPaid = {paid};
 
-        // jumpTo already defers neighbour settling until every affected chunk has been written, so
-        // a settle pass can't see a sibling chunk in its pre-jump state across a chunk boundary.
-        List<BlockPos> changedPositions = repo.jumpTo(targetCommitId, serverLevel, isGlued, restoreEntities);
+        JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, savesEntities(), chargesContainers(),
+                false, !measureCost, true,
+                estimated -> onJumpEstimated(estimated, target, totalPaid),
+                finished -> onJumpFinished(target, totalPaid[0], finished.changedPositions())));
+        if (job == null) {
+            onJumpFinished(target, paid, new LongArrayList());
+            return;
+        }
+        if (!data.startJumpJob(repoId, job)) job.cancel();
+    }
+
+    /** Pays for the measured jump and lets it go ahead, or starts charging if the pool cannot cover it. */
+    private void onJumpEstimated(JumpJob job, RepoCommit target, long[] totalPaid) {
+        if (isRemoved() || !(level instanceof ServerLevel serverLevel)) {
+            job.cancel();
+            return;
+        }
+
+        JumpJob.Estimate estimate = job.estimate();
+        TemporalRepository.ContainerJumpStats containers = chargesContainers()
+                ? TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf)
+                : TemporalRepository.ContainerJumpStats.NONE;
+        long totalCost = timeDistanceCost(target, serverLevel.getGameTime()) + estimate.blockCost()
+                + entityCost(new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth()))
+                + containers.cost() + entropicCost();
+
+        if (totalCost > energyStorage.getEnergyStored()) {
+            beginCharging(target.getId(), totalCost);
+            serverLevel.playSound(null, worldPosition, SoundEvents.BEACON_ACTIVATE, SoundSource.BLOCKS, 1.0F, 1.0F);
+            ServerPlayer requester = jumpRequester == null ? null : serverLevel.getServer().getPlayerList().getPlayer(jumpRequester);
+            if (requester != null) {
+                requester.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.charging"), true);
+            }
+            job.cancel();
+            return;
+        }
+        cancelCharging();
+        energyStorage.consumeInternal(totalCost);
+        totalPaid[0] = totalCost;
+        job.proceed();
+    }
+
+    /** Everything that follows once the world has been rewritten and the head has moved. */
+    private void onJumpFinished(RepoCommit target, long totalCost, LongArrayList changedPositions) {
+        if (isRemoved() || !(level instanceof ServerLevel serverLevel) || level.getServer() == null) return;
+        TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
+        cachedEstimate = null;
+
         worldData.discardPendingEntityDeltas(getRepositoryId());
         worldData.setDirty();
 
@@ -988,19 +1071,21 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     private static final int MAX_FLASH_POSITIONS = 1500;
 
-    private static void broadcastBlockChangeFlashes(ServerLevel level, List<BlockPos> changed, boolean intoFuture) {
+    private static void broadcastBlockChangeFlashes(ServerLevel level, LongArrayList changed, boolean intoFuture) {
         if (changed.isEmpty()) return;
 
-        List<BlockPos> sampled = changed;
-        if (changed.size() > MAX_FLASH_POSITIONS) {
-            sampled = new ArrayList<>(changed);
-            Collections.shuffle(sampled);
-            sampled = sampled.subList(0, MAX_FLASH_POSITIONS);
-        }
-
         Map<ChunkPos, List<BlockPos>> byChunk = new HashMap<>();
-        for (BlockPos pos : sampled) {
-            byChunk.computeIfAbsent(new ChunkPos(pos), k -> new ArrayList<>()).add(pos);
+        if (changed.size() <= MAX_FLASH_POSITIONS) {
+            for (long packed : changed) {
+                BlockPos pos = BlockPos.of(packed);
+                byChunk.computeIfAbsent(new ChunkPos(pos), k -> new ArrayList<>()).add(pos);
+            }
+        } else {
+            RandomSource random = level.getRandom();
+            for (int i = 0; i < MAX_FLASH_POSITIONS; i++) {
+                BlockPos pos = BlockPos.of(changed.getLong(random.nextInt(changed.size())));
+                byChunk.computeIfAbsent(new ChunkPos(pos), k -> new ArrayList<>()).add(pos);
+            }
         }
         for (Map.Entry<ChunkPos, List<BlockPos>> entry : byChunk.entrySet()) {
             PacketDistributor.sendToPlayersTrackingChunk(level, entry.getKey(),

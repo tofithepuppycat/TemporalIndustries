@@ -131,7 +131,7 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
             return;
         }
 
-        TimelineViewProvider.JumpResult result = machine.jump(target);
+        TimelineViewProvider.JumpResult result = machine.jump(target, sender.getUUID());
         if (result == TimelineViewProvider.JumpResult.CHARGING) {
             sender.displayClientMessage(Component.translatable("gui.temporalindustries.timeline_view.charging"), true);
             return;

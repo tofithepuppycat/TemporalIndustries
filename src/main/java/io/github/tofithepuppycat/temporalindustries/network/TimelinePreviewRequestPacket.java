@@ -5,6 +5,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewPro
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
+import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
@@ -96,7 +97,9 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
             // every poll. previewVersion additionally catches a changed selection or glue state,
             // which the head id alone wouldn't.
             long headCommitId = machine.getHeadCommitId();
-            long previewVersion = computePreviewVersion(sender, machine, packet.selectedCommitId);
+            // Measured in the background, so it may not be ready yet; the version flips once it is.
+            Map<Long, JumpCostBreakdown> jumpCosts = machine.getJumpCosts(packet.selectedCommitId);
+            long previewVersion = computePreviewVersion(sender, machine, packet.selectedCommitId, !jumpCosts.isEmpty());
             if (headCommitId == packet.lastKnownHeadCommitId && previewVersion == packet.lastKnownPreviewVersion) {
                 return;
             }
@@ -113,7 +116,7 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
                     machine.getBranchTips(),
                     machine.getCurrentNamedBranch(),
                     headCommitId,
-                    machine.getJumpCosts(packet.selectedCommitId),
+                    jumpCosts,
                     resolvePreview(machine, packet.selectedCommitId, sender),
                     machine.getClaimedChunks(),
                     previewVersion));
@@ -158,9 +161,11 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
      * Combines the repository head with the player's selection and the world's glue-state version,
      * so changes invisible to headCommitId alone still invalidate the client's cache.
      */
-    private static long computePreviewVersion(ServerPlayer sender, TimelineViewProvider machine, long selectedCommitId) {
+    private static long computePreviewVersion(ServerPlayer sender, TimelineViewProvider machine, long selectedCommitId,
+                                              boolean costsReady) {
         long combined = machine.getHeadCommitId();
         combined = combined * 1_000_003L + selectedCommitId;
+        combined = combined * 1_000_003L + (costsReady ? 1L : 0L);
         for (ChunkPos chunk : machine.getClaimedChunks()) {
             combined = combined * 1_000_003L + chunk.toLong();
         }

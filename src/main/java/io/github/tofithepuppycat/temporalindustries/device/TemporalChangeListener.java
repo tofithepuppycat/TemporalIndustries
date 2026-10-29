@@ -346,7 +346,9 @@ public final class TemporalChangeListener {
         if (server == null) return;
 
         processPendingEntityChecks(server);
-        TemporalWorldData.get(server).tickCommits(server);
+        TemporalWorldData worldData = TemporalWorldData.get(server);
+        worldData.tickCommits(server);
+        worldData.tickJumps();
 
         long gameTime = server.overworld().getGameTime();
         if (gameTime % CHARGE_INTERVAL_TICKS != 0) return;

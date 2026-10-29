@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.data;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.timeline.BlockChangeDelta;
 import io.github.tofithepuppycat.temporalindustries.timeline.EntityDelta;
+import io.github.tofithepuppycat.temporalindustries.timeline.JumpJob;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import net.minecraft.core.BlockPos;
@@ -268,6 +269,8 @@ public class TemporalWorldData extends SavedData {
     public void deleteRepository(UUID repoId) {
         releaseAllClaimedChunks(repoId);
         activeCommits.remove(repoId);
+        JumpJob jump = activeJumps.remove(repoId);
+        if (jump != null) jump.cancel();
         repoPendingBlockDeltas.remove(repoId);
         repoPendingEntityDeltas.remove(repoId);
         repositoryOwners.remove(repoId);
@@ -421,6 +424,80 @@ public class TemporalWorldData extends SavedData {
         return activeCommits.containsKey(repoId);
     }
 
+    // Not persisted: at most one jump job per repository, in the order they were last served.
+    private final Map<UUID, JumpJob> activeJumps = new LinkedHashMap<>();
+    /** Time every running jump shares each tick, however many repositories or chunks there are. */
+    private static final long JUMP_TICK_BUDGET_NANOS = 10_000_000L;
+
+    @Nullable
+    public JumpJob getJumpJob(UUID repoId) {
+        return activeJumps.get(repoId);
+    }
+
+    /** Whether repoId is in the middle of a jump that will rewrite the world, which freezes its history. */
+    public boolean isJumpInProgress(UUID repoId) {
+        JumpJob job = activeJumps.get(repoId);
+        return job != null && job.applies() && !job.isOver();
+    }
+
+    /** Whether repoId's history is being captured or rewritten, and so must not be changed. */
+    public boolean isHistoryBusy(UUID repoId) {
+        return isCommitInProgress(repoId) || isJumpInProgress(repoId);
+    }
+
+    /**
+     * Runs job on repoId's behalf. A background cost estimate gives way to it, but nothing displaces
+     * a jump that is rewriting the world; false means job was not started.
+     */
+    public boolean startJumpJob(UUID repoId, JumpJob job) {
+        JumpJob existing = activeJumps.get(repoId);
+        if (existing != null && !existing.isOver()) {
+            if (existing.applies()) return false;
+            existing.cancel();
+        }
+        activeJumps.put(repoId, job);
+        return true;
+    }
+
+    /** Drops the estimate-only job running for repoId, if any; its result would describe a stale history. */
+    public void cancelJumpEstimate(UUID repoId) {
+        JumpJob job = activeJumps.get(repoId);
+        if (job != null && !job.applies()) {
+            job.cancel();
+            activeJumps.remove(repoId);
+        }
+    }
+
+    /**
+     * Advances every running jump within one shared time budget, served in turn so a large jump
+     * cannot starve the others. Only the first job is guaranteed progress once the budget is gone.
+     */
+    public void tickJumps() {
+        if (activeJumps.isEmpty()) return;
+
+        long deadline = System.nanoTime() + JUMP_TICK_BUDGET_NANOS;
+        boolean first = true;
+        for (UUID repoId : new ArrayList<>(activeJumps.keySet())) {
+            JumpJob job = activeJumps.get(repoId);
+            if (job == null) continue;
+            if (!first && System.nanoTime() >= deadline) break;
+
+            boolean over;
+            try {
+                over = job.step(deadline, first);
+            } catch (RuntimeException e) {
+                LOGGER.error("Jump of repository {} failed", repoId, e);
+                job.cancel();
+                over = true;
+            }
+            first = false;
+
+            activeJumps.remove(repoId);
+            if (!over) activeJumps.put(repoId, job);
+            else if (job.phase() == JumpJob.Phase.DONE) setDirty();
+        }
+    }
+
     /**
      * Starts bundling repoId's pending changes into one new commit, including a baseline for any
      * currently-claimed chunk that doesn't have history yet. The chunks are captured a few per tick
@@ -428,7 +505,8 @@ public class TemporalWorldData extends SavedData {
      */
     public CommitStart beginRepositoryCommit(MinecraftServer server, UUID repoId, long gameTime, @Nullable UUID author,
                                              @Nullable UUID requester, Consumer<RepoCommit> onFinished) {
-        if (activeCommits.containsKey(repoId)) return CommitStart.ALREADY_RUNNING;
+        if (isHistoryBusy(repoId)) return CommitStart.ALREADY_RUNNING;
+        cancelJumpEstimate(repoId);
         TemporalRepository repo = repositories.get(repoId);
         if (repo == null) return CommitStart.UNAVAILABLE;
         ServerLevel level = server.getLevel(net.minecraft.resources.ResourceKey.create(

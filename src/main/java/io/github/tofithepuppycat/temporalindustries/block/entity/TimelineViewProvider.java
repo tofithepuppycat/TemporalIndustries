@@ -17,9 +17,9 @@ import java.util.Map;
  */
 public interface TimelineViewProvider {
     /**
-     * Outcome of a {@link #jump(long)}: SUCCESS covers an actual jump or a no-op;
-     * CHARGING means the stored energy could not cover the cost, so the machine is collecting it and
-     * will jump on its own once it has enough.
+     * Outcome of a {@link #jump(long)}: SUCCESS covers a jump that has started or a no-op; BUSY
+     * means the history is being captured or rewritten; CHARGING means a jump to that commit is
+     * already collecting the energy it could not find stored, and will run on its own.
      */
     enum JumpResult { SUCCESS, CHARGING, BUSY }
 
@@ -45,22 +45,29 @@ public interface TimelineViewProvider {
     long getSelectedGameTime();
 
     /**
-     * Per affected chunk, that chunk's resolved target block states if the player jumped to
-     * targetCommitId right now.
+     * Every chunk a jump to targetCommitId could change, without resolving any of them, so a huge
+     * claim can be budgeted.
      */
-    Map<ChunkPos, Map<BlockPos, BlockState>> previewJumpTargetStates(long targetCommitId);
-
-    /** The chunk set of {@link #previewJumpTargetStates} without resolving any of them. */
     java.util.Set<ChunkPos> previewAffectedChunks(long targetCommitId);
 
-    /** One chunk's resolved target states; resolve lazily so a huge claim can be budgeted. */
+    /**
+     * Target states of the positions in one chunk that a jump to targetCommitId would change right
+     * now; resolve lazily so a huge claim can be budgeted.
+     */
     Map<BlockPos, BlockState> previewChunkTargetStates(long targetCommitId, ChunkPos chunk);
 
     /** Whether pos is glued, and so would be skipped by a jump (and by the ghost preview). */
     boolean isGluedPos(BlockPos pos);
 
-    /** Jumps to targetCommitId, applying it to the live world immediately. */
-    JumpResult jump(long targetCommitId);
+    /**
+     * Starts a jump to targetCommitId. The world is rewritten over the following ticks, nearest
+     * the players first; requester, if any, is told when the jump has to charge first.
+     */
+    JumpResult jump(long targetCommitId, @org.jetbrains.annotations.Nullable java.util.UUID requester);
+
+    default JumpResult jump(long targetCommitId) {
+        return jump(targetCommitId, null);
+    }
 
     /**
      * Points selectedGameTime at commitId's recorded time, optionally applying it to the world.
