@@ -455,6 +455,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+        InnerBackground.render(guiGraphics, panelX(), panelY(), CONTENT_SIZE, CONTENT_SIZE);
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         renderEnergyBar(guiGraphics);

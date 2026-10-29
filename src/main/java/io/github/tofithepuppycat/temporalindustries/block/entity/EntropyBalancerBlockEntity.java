@@ -23,6 +23,8 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.capabilities.Capabilities;
+import net.neoforged.neoforge.energy.EnergyStorage;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -44,12 +46,36 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
     /** Largest distance, per axis, between the balancer and its output. */
     public static final int BIND_RANGE = 16;
 
+    public static final int ENERGY_CAPACITY = 20_000;
+    private static final int ENERGY_MAX_RECEIVE = 500;
+    private static final int FE_PER_MB = 5;
+
     private static final int PULSE_INTERVAL_TICKS = 5;
     private static final int PULSE_AMOUNT = 100;
     /** Scale of the target and of the offsets reported to the menu, matching ENTROPY_MAX of the machines. */
     private static final int BALANCE_SCALE = 10_000;
 
     public enum OutputStatus { UNBOUND, ACTIVE, UNREACHABLE }
+
+    private final class BalancerEnergyStorage extends EnergyStorage {
+        BalancerEnergyStorage() {
+            super(ENERGY_CAPACITY, ENERGY_MAX_RECEIVE, 0);
+        }
+
+        @Override public int receiveEnergy(int max, boolean simulate) {
+            int received = super.receiveEnergy(max, simulate);
+            if (!simulate && received > 0) setChanged();
+            return received;
+        }
+
+        /** Dosing spends stored FE directly, since extractEnergy is capped at 0 (receive-only). */
+        void consumeInternal(int amount) {
+            energy = Math.max(0, energy - amount);
+            setChanged();
+        }
+    }
+
+    private final BalancerEnergyStorage energyStorage = new BalancerEnergyStorage();
 
     private final FluidTank orderTank = new FluidTank(TANK_CAPACITY) {
         @Override public boolean isFluidValid(FluidStack stack) {
@@ -111,6 +137,7 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
     }
 
     public IFluidHandler getFluidHandler() { return fluidHandler; }
+    public IEnergyStorage getEnergyStorage() { return energyStorage; }
     public FluidTank getOrderTank() { return orderTank; }
     public FluidTank getChaosTank() { return chaosTank; }
     public int getTarget() { return target; }
@@ -186,13 +213,16 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
 
         EntropyType type = delta > 0 ? EntropyType.CHAOS : EntropyType.ORDER;
         FluidTank tank = type == EntropyType.CHAOS ? chaosTank : orderTank;
-        int wanted = Math.min(Math.min(Math.abs(delta), PULSE_AMOUNT), tank.getFluidAmount());
+        int wanted = Math.min(Math.min(Math.abs(delta), PULSE_AMOUNT), Math.min(tank.getFluidAmount(), energyStorage.getEnergyStored() / FE_PER_MB));
         if (wanted <= 0) return;
 
         int accepted = handler.fill(EntropyFluids.stack(type, wanted), IFluidHandler.FluidAction.SIMULATE);
         if (accepted <= 0) return;
         int filled = handler.fill(EntropyFluids.stack(type, accepted), IFluidHandler.FluidAction.EXECUTE);
-        if (filled > 0) tank.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+        if (filled > 0) {
+            tank.drain(filled, IFluidHandler.FluidAction.EXECUTE);
+            energyStorage.consumeInternal(filled * FE_PER_MB);
+        }
     }
 
     @Override
@@ -247,6 +277,7 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
         super.saveAdditional(tag, registries);
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.put("Energy", energyStorage.serializeNBT(registries));
         tag.putInt("Target", target);
         if (outputPos != null) tag.putLong("OutputPos", outputPos.asLong());
     }
@@ -256,6 +287,7 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
         super.loadAdditional(tag, registries);
         if (tag.contains("OrderTank")) orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
         if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        if (tag.contains("Energy")) energyStorage.deserializeNBT(registries, tag.get("Energy"));
         target = Math.clamp(tag.getInt("Target"), -MAX_TARGET, MAX_TARGET);
         outputPos = tag.contains("OutputPos") ? BlockPos.of(tag.getLong("OutputPos")) : null;
     }

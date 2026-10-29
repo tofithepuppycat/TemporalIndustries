@@ -16,7 +16,7 @@ import org.jetbrains.annotations.NotNull;
 
 /**
  * Container menu for the Withergenic Reactor GUI: no slots of its own, just the synced internal
- * balance, efficiency, output hatch fill and status shown by the screen.
+ * balance, efficiency and output hatch fill shown by the screen.
  */
 @SuppressWarnings("null")
 public class WithergenicReactorMenu extends AbstractContainerMenu {
@@ -77,10 +77,6 @@ public class WithergenicReactorMenu extends AbstractContainerMenu {
 
     public int getBufferAmount() {
         return data.get(2);
-    }
-
-    public int getStatus() {
-        return data.get(3);
     }
 
     public int getOutputPerTick() {

@@ -16,6 +16,8 @@ import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 
+import static io.github.tofithepuppycat.temporalindustries.client.screen.RemoteUi.*;
+
 /**
  * Commit picker of the Chrono Remote Control's jump option: the linked machine's timeline on a
  * dark panel with the selected commit's details beside it. Choosing a commit closes the screen and
@@ -29,28 +31,13 @@ public class ChronoRemoteTimelineScreen extends Screen {
     private static final int HEADER_HEIGHT = 26;
     private static final int FOOTER_HEIGHT = 32;
     private static final int SIDEBAR_WIDTH = 150;
-    private static final int BUTTON_HEIGHT = 18;
     private static final int PRIMARY_BUTTON_WIDTH = 112;
     private static final int SECONDARY_BUTTON_WIDTH = 64;
     private static final int LINE_HEIGHT = 11;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
-    private static final int BACKDROP_COLOR = 0x90000000;
-    private static final int PANEL_COLOR = 0xF2141420;
-    private static final int PANEL_BORDER_COLOR = 0xFF3A3A55;
-    private static final int SIDEBAR_COLOR = 0xFF1B1B2B;
-    private static final int DIVIDER_COLOR = 0xFF2C2C42;
-    private static final int TEXT_PRIMARY = 0xFFEDEDF5;
-    private static final int TEXT_SECONDARY = 0xFFA8A8BC;
-    private static final int TEXT_MUTED = 0xFF70708A;
-    private static final int ACCENT_COLOR = 0xFF8FD8FF;
     private static final int COST_COLOR = 0xFFFFD166;
-    private static final int PRIMARY_COLOR = 0xFF3F7F5A;
-    private static final int PRIMARY_HOVER_COLOR = 0xFF52A074;
-    private static final int SECONDARY_COLOR = 0xFF2C2C42;
-    private static final int SECONDARY_HOVER_COLOR = 0xFF3C3C5A;
-    private static final int DISABLED_COLOR = 0xFF26263A;
 
     private final BlockPos machinePos;
     private final TimelineGraphWidget graphWidget = new TimelineGraphWidget();
@@ -253,33 +240,10 @@ public class ChronoRemoteTimelineScreen extends Screen {
         guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.controls"),
                 panelLeft + PADDING + 2, footerTop() + (FOOTER_HEIGHT - font.lineHeight) / 2, TEXT_MUTED);
 
-        drawButton(guiGraphics, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
+        RemoteUi.drawButton(guiGraphics, font, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
                 Component.translatable("gui.temporalindustries.chrono_remote.close"), true, false, mouseX, mouseY);
-        drawButton(guiGraphics, previewButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH,
+        RemoteUi.drawButton(guiGraphics, font, previewButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH,
                 Component.translatable("gui.temporalindustries.chrono_remote.timeline.preview"), canPreview(), true, mouseX, mouseY);
-    }
-
-    private void drawButton(GuiGraphics guiGraphics, int x, int y, int buttonWidth, Component label, boolean enabled,
-                            boolean primary, int mouseX, int mouseY) {
-        boolean hovered = enabled && isOver(mouseX, mouseY, x, y, buttonWidth, BUTTON_HEIGHT);
-        int color = !enabled ? DISABLED_COLOR
-                : primary ? (hovered ? PRIMARY_HOVER_COLOR : PRIMARY_COLOR)
-                : (hovered ? SECONDARY_HOVER_COLOR : SECONDARY_COLOR);
-        drawPanel(guiGraphics, x, y, buttonWidth, BUTTON_HEIGHT, color, color);
-        guiGraphics.drawCenteredString(font, label, x + buttonWidth / 2, y + (BUTTON_HEIGHT - font.lineHeight) / 2 + 1,
-                enabled ? TEXT_PRIMARY : TEXT_MUTED);
-    }
-
-    /** A filled rectangle with notched corners and a 1px border. */
-    private static void drawPanel(GuiGraphics guiGraphics, int x, int y, int w, int h, int fill, int border) {
-        guiGraphics.fill(x + 1, y, x + w - 1, y + h, border);
-        guiGraphics.fill(x, y + 1, x + w, y + h - 1, border);
-        guiGraphics.fill(x + 2, y + 1, x + w - 2, y + h - 1, fill);
-        guiGraphics.fill(x + 1, y + 2, x + w - 1, y + h - 2, fill);
-    }
-
-    private static boolean isOver(double mouseX, double mouseY, int x, int y, int w, int h) {
-        return mouseX >= x && mouseX < x + w && mouseY >= y && mouseY < y + h;
     }
 
     private CommitNode selectedCommit() {

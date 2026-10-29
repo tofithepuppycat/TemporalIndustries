@@ -82,6 +82,7 @@ public class EntropyManipulatorScreen extends AbstractContainerScreen<EntropyMan
         // Drawn before the background blit so the texture's transparent tank window shows it through.
         renderLiquidTank(guiGraphics);
 
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
         guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         renderEntropyBar(guiGraphics, leftPos + CHAOS_BAR_X, topPos + BAR_Y,

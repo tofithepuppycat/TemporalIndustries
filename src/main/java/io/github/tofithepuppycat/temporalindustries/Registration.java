@@ -651,6 +651,8 @@ public class Registration {
                 (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_CONDENSER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ENTROPY_BALANCER_BLOCK_ENTITY.get(),
+                (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPY_BALANCER_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, ENTROPY_BATTERY_BLOCK_ENTITY.get(),

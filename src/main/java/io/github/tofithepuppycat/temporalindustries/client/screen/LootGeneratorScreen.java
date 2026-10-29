@@ -330,6 +330,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
         guiGraphics.blit(TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         lootTableField.setTextColor(menu.isSelectionValid() ? 0xFFFFFFFF : 0xFFFF5555);
@@ -359,7 +360,7 @@ public class LootGeneratorScreen extends AbstractContainerScreen<LootGeneratorMe
         int x = leftPos + CHAOS_BAR_X;
         int y = topPos + CHAOS_BAR_Y;
         guiGraphics.fill(x, y, x + CHAOS_BAR_WIDTH, y + CHAOS_BAR_HEIGHT, 0xFF000000);
-        FluidBarRenderer.renderVertical(guiGraphics, x + 1, y + 1, CHAOS_BAR_WIDTH - 2, CHAOS_BAR_HEIGHT - 2,
+        FluidBarRenderer.renderVertical(guiGraphics, x, y, CHAOS_BAR_WIDTH, CHAOS_BAR_HEIGHT,
                 menu.getChaosFluidAmount(), menu.getChaosTankCapacity(), Registration.CHAOS_FLUID_TYPE.get(), EntropyType.CHAOS.color());
     }
 

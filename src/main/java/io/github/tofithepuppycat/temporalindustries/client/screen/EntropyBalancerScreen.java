@@ -3,19 +3,21 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBalancerBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.menu.EntropyBalancerMenu;
 import io.github.tofithepuppycat.temporalindustries.network.EntropyBalancerConfigPacket;
 import net.minecraft.client.gui.GuiGraphics;
+import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
-import net.minecraft.util.FormattedCharSequence;
 import net.minecraft.world.entity.player.Inventory;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
+import org.lwjgl.glfw.GLFW;
 
 /**
  * GUI for the Entropy Balancer on its own panel with the player inventory below: the two
@@ -27,83 +29,124 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
     private static final ResourceLocation BASE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/balancer.png");
 
-    private static final int IMAGE_SIZE = 256;
-    /** balancer.png's artwork sits inset this many pixels within its canvas; offsets below are measured from its edge. */
-    private static final int CONTENT_MARGIN = 16;
-    private static final int CONTENT_SIZE = IMAGE_SIZE - 2 * CONTENT_MARGIN;
-    private static final int CENTER_X = CONTENT_SIZE / 2;
+    private static final int IMAGE_WIDTH = 176;
+    private static final int IMAGE_HEIGHT = 166;
+    /** Offsets below are measured from the image's top-left corner; controls sit between the tanks, centred on this. */
+    private static final int CENTER_X = IMAGE_WIDTH / 2;
+    private static final int AREA_LEFT = 28;
+    private static final int AREA_RIGHT = IMAGE_WIDTH - AREA_LEFT;
 
     private static final int TEXT_PRIMARY = 0xFF2B2B2B;
     private static final int TEXT_MUTED = 0xFF6A6A6A;
+    private static final int EDIT_BOX_TEXT = 0xFFE0E0E0;
     private static final int ORDER_TEXT = 0xFF7B52B8;
     private static final int CHAOS_TEXT = 0xFF0A8A95;
     private static final int WARNING_TEXT = 0xFFB06A00;
-    private static final int COLOR_BORDER = 0xFF000000;
 
-    private static final int TANK_Y = 20;
-    private static final int TANK_WIDTH = 12;
-    private static final int TANK_HEIGHT = 80;
-    private static final int ORDER_TANK_X = 12;
-    private static final int CHAOS_TANK_X = CONTENT_SIZE - 12 - TANK_WIDTH;
-    private static final int TANK_LABEL_Y = TANK_Y + TANK_HEIGHT + 4;
+    /** The tanks are part of the texture; these are the fluid areas. */
+    private static final int TANK_Y = 9;
+    private static final int TANK_WIDTH = 11;
+    private static final int TANK_HEIGHT = 67;
+    private static final int ORDER_TANK_X = 11;
+    private static final int CHAOS_TANK_X = IMAGE_WIDTH - ORDER_TANK_X - TANK_WIDTH;
 
-    private static final int TARGET_LABEL_Y = 18;
-    private static final int TARGET_VALUE_Y = 28;
-    private static final float TARGET_VALUE_SCALE = 2.0F;
-    private static final int STEP_ROW_Y = 46;
-    private static final int STEP_BUTTON_WIDTH = 24;
-    private static final int STEP_BUTTON_GAP = 2;
-    private static final int BUTTON_HEIGHT = 16;
-    private static final int[] STEPS = {-1000, -100, -10, 10, 100, 1000};
-    private static final int RESET_Y = 66;
-    private static final int RESET_WIDTH = 64;
-    private static final int ACTION_GAP = 4;
+    private static final int TITLE_Y = 6;
+    private static final int INPUT_Y = 39;
+    private static final int INPUT_WIDTH = 64;
+    private static final int INPUT_HEIGHT = 14;
+    private static final int INPUT_MAX_LENGTH = 7;
 
-    private static final int GAUGE_Y = 90;
-    private static final int GAUGE_WIDTH = 140;
+    private static final int GAUGE_Y = 59;
+    private static final int GAUGE_WIDTH = AREA_RIGHT - AREA_LEFT;
     private static final int GAUGE_HEIGHT = 8;
-    private static final int GAUGE_CAPTION_Y = 102;
-    private static final int STATUS_Y = 114;
-    private static final int STATUS_WIDTH = 150;
-    private static final int UNBIND_WIDTH = 64;
+    private static final int GAUGE_MARKER_OVERHANG = 2;
+    private static final int ENERGY_BAR_X = 56;
+    private static final int ENERGY_BAR_Y = 73;
+    private static final int ENERGY_BAR_WIDTH = 64;
+    private static final int ENERGY_BAR_HEIGHT = 5;
+    private static final int ENERGY_COLOR = 0xFF3BFB98;
+    private static final int STATUS_Y = 15;
+
+    private EditBox targetBox;
 
     public EntropyBalancerScreen(EntropyBalancerMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
-        imageWidth = IMAGE_SIZE;
-        imageHeight = IMAGE_SIZE;
+        imageWidth = IMAGE_WIDTH;
+        imageHeight = IMAGE_HEIGHT;
         inventoryLabelY = imageHeight + 100; // Push off-screen to hide the inventory label
     }
 
-    private int panelX() {
-        return leftPos + CONTENT_MARGIN;
+    @Override
+    protected void init() {
+        super.init();
+        String previous = targetBox == null ? null : targetBox.getValue();
+        targetBox = new EditBox(font, leftPos + CENTER_X - INPUT_WIDTH / 2, topPos + INPUT_Y, INPUT_WIDTH, INPUT_HEIGHT,
+                Component.translatable("gui.temporalindustries.entropy_balancer.target_input"));
+        targetBox.setMaxLength(INPUT_MAX_LENGTH);
+        targetBox.setFilter(text -> text.matches("[+-]?\\d*[.,]?\\d{0,2}"));
+        targetBox.setResponder(text -> targetBox.setTextColor(targetColor(text)));
+        targetBox.setValue(previous != null ? previous : formatTarget(menu.getTarget()));
+        addRenderableWidget(targetBox);
     }
 
-    private int panelY() {
-        return topPos + CONTENT_MARGIN;
+    private static String formatTarget(int raw) {
+        return signed(raw);
     }
 
-    private int stepButtonX(int index) {
-        int total = STEPS.length * STEP_BUTTON_WIDTH + (STEPS.length - 1) * STEP_BUTTON_GAP;
-        return panelX() + CENTER_X - total / 2 + index * (STEP_BUTTON_WIDTH + STEP_BUTTON_GAP);
+    /** Order-coloured for a negative value, Chaos-coloured for a positive one. */
+    private static int targetColor(String text) {
+        try {
+            double value = Double.parseDouble(text.replace(',', '.'));
+            return value == 0 ? EDIT_BOX_TEXT : (value < 0 ? ORDER_TEXT : CHAOS_TEXT);
+        } catch (NumberFormatException e) {
+            return EDIT_BOX_TEXT;
+        }
     }
 
-    /** Centered on its own, or beside the unbind button while an output is bound. */
-    private int resetX() {
-        return isBound()
-                ? panelX() + CENTER_X - ACTION_GAP / 2 - RESET_WIDTH
-                : panelX() + CENTER_X - RESET_WIDTH / 2;
+    /** Sends the typed target, clamped to the allowed range; unreadable text just restores the current target. */
+    private void applyTargetInput() {
+        String text = targetBox.getValue().replace(',', '.');
+        try {
+            int raw = (int) Math.round(Double.parseDouble(text) * 100.0);
+            sendTarget(Math.clamp(raw, -EntropyBalancerBlockEntity.MAX_TARGET, EntropyBalancerBlockEntity.MAX_TARGET), false);
+        } catch (NumberFormatException e) {
+            targetBox.setValue(formatTarget(menu.getTarget()));
+        }
     }
 
-    private int unbindX() {
-        return panelX() + CENTER_X + ACTION_GAP / 2;
+    @Override
+    protected void containerTick() {
+        super.containerTick();
+        // Follows the machine's target (after a clamp) except while the player is typing.
+        if (!targetBox.isFocused() && !targetBox.getValue().equals(formatTarget(menu.getTarget()))) {
+            targetBox.setValue(formatTarget(menu.getTarget()));
+        }
+    }
+
+    @Override
+    public void removed() {
+        if (targetBox.isFocused()) applyTargetInput();
+        super.removed();
+    }
+
+    @Override
+    public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
+        if (targetBox.isFocused()) {
+            if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+                applyTargetInput();
+                targetBox.setFocused(false);
+                return true;
+            }
+            // Typing 'e' (the inventory key) must edit the box rather than close the screen.
+            if (keyCode != GLFW.GLFW_KEY_ESCAPE && (targetBox.keyPressed(keyCode, scanCode, modifiers) || targetBox.canConsumeInput())) {
+                return true;
+            }
+        }
+        return super.keyPressed(keyCode, scanCode, modifiers);
     }
 
     private int gaugeX() {
-        return panelX() + CENTER_X - GAUGE_WIDTH / 2;
-    }
-
-    private boolean isBound() {
-        return menu.getStatus() != EntropyBalancerBlockEntity.OutputStatus.UNBOUND;
+        return leftPos + AREA_LEFT;
     }
 
     private void sendTarget(int target, boolean clearOutput) {
@@ -112,114 +155,67 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
-        guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_SIZE, IMAGE_SIZE);
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
+        guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
 
         renderTank(guiGraphics, ORDER_TANK_X, menu.getOrderFluidAmount(), EntropyType.ORDER);
         renderTank(guiGraphics, CHAOS_TANK_X, menu.getChaosFluidAmount(), EntropyType.CHAOS);
-        drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.order"),
-                panelX() + ORDER_TANK_X + TANK_WIDTH / 2, panelY() + TANK_LABEL_Y, ORDER_TEXT);
-        drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.chaos"),
-                panelX() + CHAOS_TANK_X + TANK_WIDTH / 2, panelY() + TANK_LABEL_Y, CHAOS_TEXT);
 
-        renderTarget(guiGraphics, mouseX, mouseY);
         renderGauge(guiGraphics);
-        renderStatus(guiGraphics, mouseX, mouseY);
+        renderEnergyBar(guiGraphics);
+        renderStatus(guiGraphics);
     }
 
     private void renderTank(GuiGraphics guiGraphics, int xOffset, int amount, EntropyType type) {
-        int x = panelX() + xOffset;
-        int y = panelY() + TANK_Y;
-        guiGraphics.fill(x - 1, y - 1, x + TANK_WIDTH + 1, y + TANK_HEIGHT + 1, COLOR_BORDER);
-        guiGraphics.fill(x, y, x + TANK_WIDTH, y + TANK_HEIGHT, 0xFF2A2A33);
+        int x = leftPos + xOffset;
+        int y = topPos + TANK_Y;
         FluidBarRenderer.renderVertical(guiGraphics, x, y, TANK_WIDTH, TANK_HEIGHT, amount, menu.getTankCapacity(),
                 type == EntropyType.ORDER ? Registration.ORDER_FLUID_TYPE.get() : Registration.CHAOS_FLUID_TYPE.get(), type.color());
     }
 
-    private void renderTarget(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        int centerX = panelX() + CENTER_X;
-        drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.target"),
-                centerX, panelY() + TARGET_LABEL_Y, TEXT_MUTED);
-
-        int target = menu.getTarget();
-        Component value = Component.literal(signed(target));
-        int color = target == 0 ? TEXT_PRIMARY : (target < 0 ? ORDER_TEXT : CHAOS_TEXT);
-        guiGraphics.pose().pushPose();
-        guiGraphics.pose().translate(centerX, panelY() + TARGET_VALUE_Y, 0);
-        guiGraphics.pose().scale(TARGET_VALUE_SCALE, TARGET_VALUE_SCALE, 1.0F);
-        guiGraphics.drawString(font, value, -font.width(value) / 2, 0, color, false);
-        guiGraphics.pose().popPose();
-
-        for (int i = 0; i < STEPS.length; i++) {
-            int step = STEPS[i];
-            boolean atLimit = step < 0 ? target <= -EntropyBalancerBlockEntity.MAX_TARGET : target >= EntropyBalancerBlockEntity.MAX_TARGET;
-            drawButton(guiGraphics, stepButtonX(i), panelY() + STEP_ROW_Y, STEP_BUTTON_WIDTH,
-                    Component.literal((step > 0 ? "+" : "-") + EntropyDisplay.formatBalance(Math.abs(step)).replaceAll("\\.?0+$", "")),
-                    !atLimit, mouseX, mouseY);
-        }
-        drawButton(guiGraphics, resetX(), panelY() + RESET_Y, RESET_WIDTH,
-                Component.translatable("gui.temporalindustries.entropy_balancer.reset"), target != 0, mouseX, mouseY);
+    private void renderEnergyBar(GuiGraphics guiGraphics) {
+        int capacity = menu.getEnergyCapacity();
+        int amount = menu.getEnergyStored();
+        if (capacity <= 0 || amount <= 0) return;
+        int innerWidth = ENERGY_BAR_WIDTH - 2;
+        int filled = Math.min(innerWidth, Math.max(1, Math.round(amount / (float) capacity * innerWidth)));
+        int x = leftPos + ENERGY_BAR_X + 1;
+        int y = topPos + ENERGY_BAR_Y + 1;
+        guiGraphics.fill(x, y, x + filled, y + ENERGY_BAR_HEIGHT - 2, ENERGY_COLOR);
     }
 
     /** The output's balance as a bar from full Order to full Chaos, with a tick at the target. */
     private void renderGauge(GuiGraphics guiGraphics) {
         int x = gaugeX();
-        int y = panelY() + GAUGE_Y;
+        int y = topPos + GAUGE_Y;
         boolean active = menu.getStatus() == EntropyBalancerBlockEntity.OutputStatus.ACTIVE;
         EntropyBalanceBar.render(guiGraphics, x, y, GAUGE_WIDTH, GAUGE_HEIGHT,
                 active ? Math.clamp(menu.getOutputOffset() / (float) EntropyBalancerBlockEntity.MAX_TARGET, -1.0F, 1.0F) : 0.0F);
 
         int half = GAUGE_WIDTH / 2 - 1;
         int markerX = x + GAUGE_WIDTH / 2 + Math.round(menu.getTarget() / (float) EntropyBalancerBlockEntity.MAX_TARGET * half);
-        guiGraphics.fill(markerX, y - 3, markerX + 1, y + GAUGE_HEIGHT + 3, 0xFFFFC04D);
+        guiGraphics.fill(markerX, y - GAUGE_MARKER_OVERHANG, markerX + 1, y + GAUGE_HEIGHT + GAUGE_MARKER_OVERHANG, 0xFFFFC04D);
 
-        Component caption = active
-                ? Component.translatable("gui.temporalindustries.entropy_balancer.output_balance", signed(menu.getOutputOffset()))
-                : Component.translatable("gui.temporalindustries.entropy_balancer.output_balance", "--");
-        drawCentered(guiGraphics, caption, panelX() + CENTER_X, panelY() + GAUGE_CAPTION_Y, TEXT_MUTED);
     }
 
-    private void renderStatus(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        int x = panelX() + CENTER_X - STATUS_WIDTH / 2;
-        int y = panelY() + STATUS_Y;
+    private void renderStatus(GuiGraphics guiGraphics) {
+        int centerX = leftPos + CENTER_X;
+        int y = topPos + STATUS_Y;
         switch (menu.getStatus()) {
-            case UNBOUND -> drawWrapped(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.unbound"),
-                    x, y, TEXT_MUTED);
-            case UNREACHABLE -> {
-                BlockPos pos = menu.getOutputPos();
-                drawWrapped(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.unreachable",
-                        pos.getX(), pos.getY(), pos.getZ()), x, y, WARNING_TEXT);
-            }
+            case UNBOUND -> drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.unbound"),
+                    centerX, y, TEXT_MUTED);
+            case UNREACHABLE -> drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.unreachable"),
+                    centerX, y, WARNING_TEXT);
             case ACTIVE -> {
                 BlockPos pos = menu.getOutputPos();
-                drawWrapped(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.bound",
-                        pos.getX(), pos.getY(), pos.getZ()), x, y, TEXT_PRIMARY);
+                drawCentered(guiGraphics, Component.translatable("gui.temporalindustries.entropy_balancer.bound",
+                        pos.getX(), pos.getY(), pos.getZ()), centerX, y, TEXT_PRIMARY);
             }
         }
-        if (isBound()) {
-            drawButton(guiGraphics, unbindX(), panelY() + RESET_Y, UNBIND_WIDTH,
-                    Component.translatable("gui.temporalindustries.entropy_balancer.unbind"), true, mouseX, mouseY);
-        }
-    }
-
-    private void drawButton(GuiGraphics guiGraphics, int x, int y, int width, Component label, boolean enabled,
-                            int mouseX, int mouseY) {
-        boolean hovered = enabled && isOver(mouseX, mouseY, x, y, width, BUTTON_HEIGHT);
-        int fill = !enabled ? 0xFF8A8A8A : (hovered ? 0xFF5A6E9A : 0xFF3F4F73);
-        guiGraphics.fill(x, y, x + width, y + BUTTON_HEIGHT, COLOR_BORDER);
-        guiGraphics.fill(x + 1, y + 1, x + width - 1, y + BUTTON_HEIGHT - 1, fill);
-        guiGraphics.drawCenteredString(font, label, x + width / 2, y + (BUTTON_HEIGHT - font.lineHeight) / 2 + 1,
-                enabled ? 0xFFFFFFFF : 0xFFC8C8C8);
     }
 
     private void drawCentered(GuiGraphics guiGraphics, Component text, int centerX, int y, int color) {
         guiGraphics.drawString(font, text, centerX - font.width(text) / 2, y, color, false);
-    }
-
-    private void drawWrapped(GuiGraphics guiGraphics, Component text, int x, int y, int color) {
-        for (FormattedCharSequence line : font.split(text, STATUS_WIDTH)) {
-            guiGraphics.drawString(font, line, x, y, color, false);
-            y += font.lineHeight;
-        }
     }
 
     /** A balance offset in the displayed 0.01 units with an explicit sign. */
@@ -230,19 +226,23 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
         Component title = Component.translatable("block.temporalindustries.entropy_balancer");
-        guiGraphics.drawString(font, title, CONTENT_MARGIN + CENTER_X - font.width(title) / 2, CONTENT_MARGIN + 8, 0xFF3F3F3F, false);
+        guiGraphics.drawString(font, title, CENTER_X - font.width(title) / 2, TITLE_Y, 0xFF3F3F3F, false);
     }
 
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
-        if (isOver(mouseX, mouseY, panelX() + ORDER_TANK_X, panelY() + TANK_Y, TANK_WIDTH, TANK_HEIGHT)) {
+        if (isOver(mouseX, mouseY, leftPos + ORDER_TANK_X, topPos + TANK_Y, TANK_WIDTH, TANK_HEIGHT)) {
             guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), EntropyType.ORDER), mouseX, mouseY);
-        } else if (isOver(mouseX, mouseY, panelX() + CHAOS_TANK_X, panelY() + TANK_Y, TANK_WIDTH, TANK_HEIGHT)) {
+        } else if (isOver(mouseX, mouseY, leftPos + CHAOS_TANK_X, topPos + TANK_Y, TANK_WIDTH, TANK_HEIGHT)) {
             guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), EntropyType.CHAOS), mouseX, mouseY);
-        } else if (isOver(mouseX, mouseY, gaugeX(), panelY() + GAUGE_Y - 3, GAUGE_WIDTH, GAUGE_HEIGHT + 6)) {
-            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.entropy_balancer.gauge_tooltip"), mouseX, mouseY);
+        } else if (isOver(mouseX, mouseY, leftPos + ENERGY_BAR_X, topPos + ENERGY_BAR_Y, ENERGY_BAR_WIDTH, ENERGY_BAR_HEIGHT)) {
+            guiGraphics.renderTooltip(font, Component.literal(EnergyDisplay.format(menu.getEnergyStored()) + "/"
+                    + EnergyDisplay.format(menu.getEnergyCapacity()) + " FE"), mouseX, mouseY);
+        } else if (isOver(mouseX, mouseY, gaugeX(), topPos + GAUGE_Y - GAUGE_MARKER_OVERHANG, GAUGE_WIDTH, GAUGE_HEIGHT + 2 * GAUGE_MARKER_OVERHANG)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.entropy_balancer.output_balance",
+                    menu.getStatus() == EntropyBalancerBlockEntity.OutputStatus.ACTIVE ? signed(menu.getOutputOffset()) : "--"), mouseX, mouseY);
         }
         renderTooltip(guiGraphics, mouseX, mouseY);
     }
@@ -255,20 +255,8 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
-            for (int i = 0; i < STEPS.length; i++) {
-                if (isOver(mouseX, mouseY, stepButtonX(i), panelY() + STEP_ROW_Y, STEP_BUTTON_WIDTH, BUTTON_HEIGHT)) {
-                    sendTarget(Math.clamp((long) menu.getTarget() + STEPS[i],
-                            -EntropyBalancerBlockEntity.MAX_TARGET, EntropyBalancerBlockEntity.MAX_TARGET), false);
-                    return true;
-                }
-            }
-            if (isOver(mouseX, mouseY, resetX(), panelY() + RESET_Y, RESET_WIDTH, BUTTON_HEIGHT)) {
-                sendTarget(0, false);
-                return true;
-            }
-            if (isBound() && isOver(mouseX, mouseY, unbindX(), panelY() + RESET_Y, UNBIND_WIDTH, BUTTON_HEIGHT)) {
-                sendTarget(menu.getTarget(), true);
-                return true;
+            if (targetBox.isFocused() && !targetBox.isMouseOver(mouseX, mouseY)) {
+                applyTargetInput();
             }
         }
         return super.mouseClicked(mouseX, mouseY, button);

@@ -4,40 +4,55 @@ import io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientSta
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoRemoteControlItem;
 import io.github.tofithepuppycat.temporalindustries.network.ChronoRemoteActionPacket;
+import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.BufferUploader;
+import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.Tesselator;
+import com.mojang.blaze3d.vertex.VertexFormat;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.core.GlobalPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
+import org.joml.Matrix4f;
 import org.lwjgl.glfw.GLFW;
 
 import java.util.List;
 import java.util.function.BooleanSupplier;
 
 /**
- * Selection wheel of the Chrono Remote Control: opens while right-click is held, the option the
+ * Selection wheel of the Chrono Remote Control: opens while right-click is held, the slice the
  * cursor points at runs when the button is released (or on left-click). The same screen shows the
  * main wheel, the settings wheel and the jump confirmation.
  */
 public class ChronoRemoteWheelScreen extends Screen {
-    private static final int WHEEL_RADIUS = 78;
-    private static final int DEAD_ZONE = 18;
-    private static final int TILE_WIDTH = 100;
-    private static final int TILE_HEIGHT = 24;
-    private static final int HINT_GAP = 18;
+    private static final int INNER_RADIUS = 38;
+    private static final int OUTER_RADIUS = 118;
+    private static final int HUB_RADIUS = INNER_RADIUS - 6;
+    private static final int HINT_GAP = 14;
+    /** Angular gap left between neighbouring slices. */
+    private static final double SLICE_GAP = Math.toRadians(1.6D);
+    /** Largest angle one segment of a slice's outline may span. */
+    private static final double SEGMENT_ANGLE = Math.toRadians(4.0D);
+    private static final int LABEL_PADDING = 6;
+    private static final int MAX_LABEL_LINES = 2;
 
-    private static final int TILE_COLOR = 0xB0202028;
-    private static final int TILE_HOVER_COLOR = 0xE0546E9E;
-    private static final int TILE_ARMED_COLOR = 0xE0A03838;
+    private static final int SLICE_COLOR = 0xB0202028;
+    private static final int SLICE_HOVER_COLOR = 0xE0546E9E;
+    private static final int SLICE_ARMED_COLOR = 0xE0A03838;
+    private static final int HUB_COLOR = 0xC0101018;
     private static final int TEXT_COLOR = 0xFFFFFFFF;
     private static final int HINT_COLOR = 0xFFB8B8C8;
     private static final int ON_COLOR = 0xFF66FF8C;
     private static final int OFF_COLOR = 0xFFFF7070;
 
-    /** One tile of the wheel. */
+    /** One slice of the wheel. */
     private static final class Option {
         private final Component label;
         private final Component hint;
@@ -110,10 +125,8 @@ public class ChronoRemoteWheelScreen extends Screen {
                         .toggle(ChronoRemoteClientState::isChargeContainers),
                 new Option("gui.temporalindustries.chrono_remote.back", null,
                         () -> Minecraft.getInstance().setScreen(mainWheel())),
-                new Option(prefix + "delete_repository", hints + "delete_repository",
-                        () -> send(ChronoRemoteActionPacket.Action.DELETE_HISTORY)).confirm(),
                 new Option(prefix + "change_repository", hints + "change_repository",
-                        () -> send(ChronoRemoteActionPacket.Action.UNBIND_REPOSITORY)).confirm()));
+                        ChronoRemoteWheelScreen::openRepository)));
     }
 
     private static ChronoRemoteWheelScreen confirmWheel() {
@@ -148,6 +161,11 @@ public class ChronoRemoteWheelScreen extends Screen {
         minecraft.setScreen(new ChronoRemoteChunkScreen(linked.pos()));
     }
 
+    private static void openRepository() {
+        send(ChronoRemoteActionPacket.Action.SYNC);
+        Minecraft.getInstance().setScreen(new ChronoRemoteRepositoryScreen());
+    }
+
     private static void openSettings() {
         Minecraft.getInstance().setScreen(settingsWheel());
     }
@@ -179,21 +197,48 @@ public class ChronoRemoteWheelScreen extends Screen {
         return height / 2;
     }
 
-    /** Center of option index's tile; option 0 sits at the top, the rest clockwise. */
-    private double tileAngle(int index) {
-        return -Math.PI / 2.0D + 2.0D * Math.PI * index / options.size();
+    private double sliceStep() {
+        return 2.0D * Math.PI / options.size();
+    }
+
+    /** Center angle of option index's slice; option 0 sits at the top, the rest clockwise. */
+    private double sliceAngle(int index) {
+        return -Math.PI / 2.0D + sliceStep() * index;
     }
 
     @Nullable
     private Option hovered(double mouseX, double mouseY) {
         double dx = mouseX - centerX();
         double dy = mouseY - centerY();
-        if (dx * dx + dy * dy < DEAD_ZONE * DEAD_ZONE) return null;
+        if (dx * dx + dy * dy < INNER_RADIUS * INNER_RADIUS) return null;
 
-        double step = 2.0D * Math.PI / options.size();
+        double step = sliceStep();
         double angle = Math.atan2(dy, dx) + Math.PI / 2.0D + step / 2.0D;
         angle = ((angle % (2.0D * Math.PI)) + 2.0D * Math.PI) % (2.0D * Math.PI);
         return options.get((int) (angle / step) % options.size());
+    }
+
+    /** Fills the ring segment between the two radii from angle start to end (radians, clockwise on screen). */
+    private static void fillSlice(GuiGraphics guiGraphics, float centerX, float centerY, float innerRadius, float outerRadius,
+                                  double start, double end, int color) {
+        Matrix4f matrix = guiGraphics.pose().last().pose();
+        int segments = Math.max(1, (int) Math.ceil((end - start) / SEGMENT_ANGLE));
+
+        RenderSystem.enableBlend();
+        RenderSystem.defaultBlendFunc();
+        RenderSystem.disableCull();
+        RenderSystem.setShader(GameRenderer::getPositionColorShader);
+        BufferBuilder buffer = Tesselator.getInstance().begin(VertexFormat.Mode.TRIANGLE_STRIP, DefaultVertexFormat.POSITION_COLOR);
+        for (int i = 0; i <= segments; i++) {
+            double angle = start + (end - start) * i / segments;
+            float cos = (float) Math.cos(angle);
+            float sin = (float) Math.sin(angle);
+            buffer.addVertex(matrix, centerX + cos * outerRadius, centerY + sin * outerRadius, 0.0F).setColor(color);
+            buffer.addVertex(matrix, centerX + cos * innerRadius, centerY + sin * innerRadius, 0.0F).setColor(color);
+        }
+        BufferUploader.drawWithShader(buffer.buildOrThrow());
+        RenderSystem.enableCull();
+        RenderSystem.disableBlend();
     }
 
     @Override
@@ -201,39 +246,54 @@ public class ChronoRemoteWheelScreen extends Screen {
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         Option hovered = hovered(mouseX, mouseY);
+        double step = sliceStep();
+        double gap = options.size() > 1 ? SLICE_GAP : 0.0D;
         for (int i = 0; i < options.size(); i++) {
             Option option = options.get(i);
-            int x = centerX() + (int) Math.round(Math.cos(tileAngle(i)) * WHEEL_RADIUS);
-            int y = centerY() + (int) Math.round(Math.sin(tileAngle(i)) * WHEEL_RADIUS);
-            int left = x - TILE_WIDTH / 2;
-            int top = y - TILE_HEIGHT / 2;
-
-            int color = option == armed ? TILE_ARMED_COLOR : (option == hovered ? TILE_HOVER_COLOR : TILE_COLOR);
-            guiGraphics.fill(left, top, left + TILE_WIDTH, top + TILE_HEIGHT, color);
-
-            Component detail = null;
-            int detailColor = TEXT_COLOR;
-            if (option == armed) {
-                detail = Component.translatable("gui.temporalindustries.chrono_remote.click_to_confirm");
-            } else if (option.state != null) {
-                boolean on = option.state.getAsBoolean();
-                detail = Component.translatable(on ? "gui.temporalindustries.chrono_remote.on" : "gui.temporalindustries.chrono_remote.off");
-                detailColor = on ? ON_COLOR : OFF_COLOR;
-            }
-
-            if (detail == null) {
-                guiGraphics.drawCenteredString(font, option.label, x, y - font.lineHeight / 2, TEXT_COLOR);
-            } else {
-                guiGraphics.drawCenteredString(font, option.label, x, top + 3, TEXT_COLOR);
-                guiGraphics.drawCenteredString(font, detail, x, top + 3 + font.lineHeight, detailColor);
-            }
+            double angle = sliceAngle(i);
+            int color = option == armed ? SLICE_ARMED_COLOR : (option == hovered ? SLICE_HOVER_COLOR : SLICE_COLOR);
+            fillSlice(guiGraphics, centerX(), centerY(), INNER_RADIUS, OUTER_RADIUS,
+                    angle - step / 2.0D + gap, angle + step / 2.0D - gap, color);
+            renderLabel(guiGraphics, option, angle, step);
         }
 
+        fillSlice(guiGraphics, centerX(), centerY(), 0.0F, HUB_RADIUS, 0.0D, 2.0D * Math.PI, HUB_COLOR);
         if (hovered != null && hovered.hint != Component.empty()) {
-            guiGraphics.drawCenteredString(font, hovered.hint, centerX(),
-                    centerY() + WHEEL_RADIUS + TILE_HEIGHT / 2 + HINT_GAP, HINT_COLOR);
+            guiGraphics.drawCenteredString(font, hovered.hint, centerX(), centerY() + OUTER_RADIUS + HINT_GAP, HINT_COLOR);
         }
-        guiGraphics.fill(centerX() - 2, centerY() - 2, centerX() + 2, centerY() + 2, TEXT_COLOR);
+    }
+
+    /** Draws an option's name, wrapped to fit its slice, with its state or confirmation prompt beneath. */
+    private void renderLabel(GuiGraphics guiGraphics, Option option, double angle, double step) {
+        double middleRadius = (INNER_RADIUS + OUTER_RADIUS) / 2.0D;
+        int x = centerX() + (int) Math.round(Math.cos(angle) * middleRadius);
+        int y = centerY() + (int) Math.round(Math.sin(angle) * middleRadius);
+
+        // The slice narrows toward the hub, so wrap to the chord at the middle radius.
+        double chord = 2.0D * middleRadius * Math.sin(Math.min(step, Math.PI) / 2.0D);
+        int maxWidth = (int) Math.min(OUTER_RADIUS - INNER_RADIUS, chord) - LABEL_PADDING;
+        List<FormattedCharSequence> lines = font.split(option.label, Math.max(40, maxWidth));
+        if (lines.size() > MAX_LABEL_LINES) lines = lines.subList(0, MAX_LABEL_LINES);
+
+        Component detail = null;
+        int detailColor = TEXT_COLOR;
+        if (option == armed) {
+            detail = Component.translatable("gui.temporalindustries.chrono_remote.click_to_confirm");
+        } else if (option.state != null) {
+            boolean on = option.state.getAsBoolean();
+            detail = Component.translatable(on ? "gui.temporalindustries.chrono_remote.on" : "gui.temporalindustries.chrono_remote.off");
+            detailColor = on ? ON_COLOR : OFF_COLOR;
+        }
+
+        int rows = lines.size() + (detail == null ? 0 : 1);
+        int lineY = y - rows * font.lineHeight / 2;
+        for (FormattedCharSequence line : lines) {
+            guiGraphics.drawString(font, line, x - font.width(line) / 2, lineY, TEXT_COLOR);
+            lineY += font.lineHeight;
+        }
+        if (detail != null) {
+            guiGraphics.drawCenteredString(font, detail, x, lineY, detailColor);
+        }
     }
 
     private void choose(double mouseX, double mouseY) {

@@ -10,14 +10,21 @@ import net.neoforged.neoforge.fluids.FluidType;
 
 /**
  * Tiles a fluid's still texture, tinted with an entropy color, over a filled portion of a bar;
- * shared by every Order/Chaos tank bar in the mod, vertical or horizontal.
+ * shared by every Order/Chaos tank bar in the mod. The fluid is drawn one pixel inside the given
+ * bounds, which are the bar's full size including its border.
  */
 final class FluidBarRenderer {
     private FluidBarRenderer() {}
 
+    private static final int BORDER = 1;
+
     /** Fills bottom-up over a vertical bar. */
-    static void renderVertical(GuiGraphics guiGraphics, int x, int y, int width, int height,
+    static void renderVertical(GuiGraphics guiGraphics, int barX, int barY, int barWidth, int barHeight,
                                 int amount, int capacity, FluidType fluidType, int tintColor) {
+        int x = barX + BORDER;
+        int y = barY + BORDER;
+        int width = barWidth - 2 * BORDER;
+        int height = barHeight - 2 * BORDER;
         if (capacity <= 0 || amount <= 0) return;
         int filled = Math.max(1, Math.round((amount / (float) capacity) * height));
         filled = Math.min(height, filled);

@@ -17,10 +17,10 @@ import org.jetbrains.annotations.NotNull;
 /** Container menu for the Entropy Balancer GUI: both buffers, the target and the state of the bound output. */
 @SuppressWarnings("null")
 public class EntropyBalancerMenu extends AbstractContainerMenu {
-    private static final int DATA_COUNT = 12;
-    private static final int INVENTORY_X = 48;
-    private static final int INVENTORY_Y = 158;
-    private static final int HOTBAR_Y = 216;
+    private static final int DATA_COUNT = 14;
+    private static final int INVENTORY_X = 8;
+    private static final int INVENTORY_Y = 84;
+    private static final int HOTBAR_Y = 142;
 
     private final EntropyBalancerBlockEntity blockEntity;
     private final BlockPos blockPos;
@@ -64,6 +64,8 @@ public class EntropyBalancerMenu extends AbstractContainerMenu {
         data.set(3, blockEntity.getTarget());
         data.set(4, blockEntity.getStatus().ordinal());
         data.set(5, blockEntity.getOutputOffset());
+        data.set(12, blockEntity.getEnergyStorage().getEnergyStored());
+        data.set(13, blockEntity.getEnergyStorage().getMaxEnergyStored());
         BlockPos output = blockEntity.getOutputPos();
         setIntPacked(6, output == null ? 0 : output.getX());
         setIntPacked(8, output == null ? 0 : output.getY());
@@ -92,6 +94,9 @@ public class EntropyBalancerMenu extends AbstractContainerMenu {
 
     /** The output's offset from balance on the same scale as {@link #getTarget()}. */
     public int getOutputOffset() { return data.get(5); }
+
+    public int getEnergyStored() { return data.get(12); }
+    public int getEnergyCapacity() { return data.get(13); }
 
     public BlockPos getOutputPos() {
         return new BlockPos(getIntPacked(6), getIntPacked(8), getIntPacked(10));
