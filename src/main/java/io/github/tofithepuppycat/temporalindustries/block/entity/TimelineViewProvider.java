@@ -56,6 +56,15 @@ public interface TimelineViewProvider {
      */
     Map<BlockPos, BlockState> previewChunkTargetStates(long targetCommitId, ChunkPos chunk);
 
+    /**
+     * Recorded state of every entity a jump to targetCommitId would restore; empty unless the
+     * machine saves and loads entities.
+     */
+    Map<java.util.UUID, net.minecraft.nbt.CompoundTag> previewEntityStates(long targetCommitId);
+
+    /** Whether jumps on this machine also save and load entities. */
+    boolean isSaveEntities();
+
     /** Whether pos is glued, and so would be skipped by a jump (and by the ghost preview). */
     boolean isGluedPos(BlockPos pos);
 

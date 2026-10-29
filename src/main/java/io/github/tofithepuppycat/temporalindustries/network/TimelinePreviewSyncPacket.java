@@ -6,6 +6,7 @@ import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import io.netty.buffer.Unpooled;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
@@ -52,6 +53,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
     private final Map<BlockPos, BlockState> previewTargetStates;
     /** Every chunk the machine has claimed, for the in-world boundary outline. */
     private final List<ChunkPos> previewChunks;
+    /** Recorded state of each entity the selected jump would restore, for the in-world ghosts. */
+    private final List<CompoundTag> previewEntities;
     /** Fingerprint matching {@link TimelinePreviewRequestPacket}'s lastKnownPreviewVersion. */
     private final long previewVersion;
 
@@ -59,7 +62,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                                      long currentGameTime, List<CommitNode> commits,
                                      Map<String, Long> branchTips, String currentBranch, long headCommitId,
                                      Map<Long, JumpCostBreakdown> jumpCosts, Map<BlockPos, BlockState> previewTargetStates,
-                                     List<ChunkPos> previewChunks, long previewVersion) {
+                                     List<ChunkPos> previewChunks, List<CompoundTag> previewEntities,
+                                     long previewVersion) {
         this.machinePos = machinePos;
         this.placedGameTime = placedGameTime;
         this.selectedGameTime = selectedGameTime;
@@ -71,6 +75,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         this.jumpCosts = jumpCosts;
         this.previewTargetStates = previewTargetStates;
         this.previewChunks = previewChunks;
+        this.previewEntities = previewEntities;
         this.previewVersion = previewVersion;
     }
 
@@ -112,6 +117,8 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         }
         body.writeVarInt(packet.previewChunks.size());
         for (ChunkPos chunk : packet.previewChunks) body.writeLong(chunk.toLong());
+        body.writeVarInt(packet.previewEntities.size());
+        for (CompoundTag entity : packet.previewEntities) body.writeNbt(entity);
 
         byte[] rawBody = new byte[body.readableBytes()];
         body.readBytes(rawBody);
@@ -174,6 +181,13 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         int previewChunkCount = body.readVarInt();
         List<ChunkPos> previewChunks = new ArrayList<>(previewChunkCount);
         for (int i = 0; i < previewChunkCount; i++) previewChunks.add(new ChunkPos(body.readLong()));
+
+        int previewEntityCount = body.readVarInt();
+        List<CompoundTag> previewEntities = new ArrayList<>(previewEntityCount);
+        for (int i = 0; i < previewEntityCount; i++) {
+            CompoundTag entity = body.readNbt();
+            if (entity != null) previewEntities.add(entity);
+        }
         body.release();
 
         String currentBranch = buf.readUtf(64);
@@ -181,7 +195,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
         long previewVersion = buf.readLong();
         return new TimelinePreviewSyncPacket(machinePos, placedGameTime, selectedGameTime, currentGameTime,
                 commits, branchTips, currentBranch, headCommitId, jumpCosts, previewTargetStates,
-                previewChunks, previewVersion);
+                previewChunks, previewEntities, previewVersion);
     }
 
     public static void handle(TimelinePreviewSyncPacket packet, IPayloadContext context) {
@@ -196,6 +210,7 @@ public class TimelinePreviewSyncPacket implements CustomPacketPayload {
                 packet.jumpCosts,
                 packet.previewTargetStates,
                 packet.previewChunks,
+                packet.previewEntities,
                 packet.previewVersion));
     }
 

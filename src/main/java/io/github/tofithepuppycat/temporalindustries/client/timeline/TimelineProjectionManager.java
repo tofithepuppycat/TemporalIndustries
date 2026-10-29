@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.client.timeline;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import net.minecraft.core.BlockPos;
+import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
@@ -64,6 +65,8 @@ public final class TimelineProjectionManager {
      * Every chunk the machine has claimed, used to outline the claim's outer boundary in-world.
      */
     private static List<ChunkPos> previewChunks = new ArrayList<>();
+    /** Recorded state of every entity a jump to selectedCommitId would restore. */
+    private static List<CompoundTag> previewEntities = new ArrayList<>();
     /**
      * Last-synced previewVersion fingerprint, echoed back so the server can skip replying when
      * nothing changed.
@@ -113,6 +116,7 @@ public final class TimelineProjectionManager {
         previewTargetStates = new HashMap<>();
         invalidateEntries();
         previewChunks = new ArrayList<>();
+        previewEntities = new ArrayList<>();
         previewVersion = Long.MIN_VALUE;
         showChangesEnabled = false;
     }
@@ -125,6 +129,7 @@ public final class TimelineProjectionManager {
     public static void clearSelectedCommit() {
         selectedCommitId = -1L;
         previewTargetStates = new HashMap<>();
+        previewEntities = new ArrayList<>();
         invalidateEntries();
     }
 
@@ -160,7 +165,8 @@ public final class TimelineProjectionManager {
                                         String serverCurrentBranch, long serverHeadCommitId,
                                         Map<Long, JumpCostBreakdown> serverJumpCosts,
                                         Map<BlockPos, BlockState> serverPreviewTargetStates,
-                                        List<ChunkPos> serverPreviewChunks, long serverPreviewVersion) {
+                                        List<ChunkPos> serverPreviewChunks, List<CompoundTag> serverPreviewEntities,
+                                        long serverPreviewVersion) {
         activeMachinePos = machinePos;
         placedGameTime = Math.max(0L, placed);
         currentGameTime = Math.max(placedGameTime, current);
@@ -172,6 +178,7 @@ public final class TimelineProjectionManager {
         previewTargetStates = serverPreviewTargetStates;
         invalidateEntries();
         previewChunks = new ArrayList<>(serverPreviewChunks);
+        previewEntities = new ArrayList<>(serverPreviewEntities);
         previewVersion = serverPreviewVersion;
     }
 
@@ -189,6 +196,7 @@ public final class TimelineProjectionManager {
         selectedCommitId = commitId;
         selectedGameTime = clampSelected(commit.gameTime());
         previewTargetStates = new HashMap<>();
+        previewEntities = new ArrayList<>();
         invalidateEntries();
     }
 
@@ -241,6 +249,14 @@ public final class TimelineProjectionManager {
      */
     public static List<ChunkPos> getPreviewChunks() {
         return previewChunks;
+    }
+
+    /**
+     * Recorded entities the active preview would restore. The list is replaced, never mutated, on
+     * every change, so its identity tells a cache when to rebuild.
+     */
+    public static List<CompoundTag> getPreviewEntities() {
+        return previewEntities;
     }
 
     /** How often the diff against the live world is redone; in between, the last result is reused. */

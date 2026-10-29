@@ -9,11 +9,16 @@ import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.GlobalPos;
+import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.network.PacketDistributor;
@@ -23,6 +28,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 
 /**
  * Client -> server: poll for a machine's repository graph, plus the resolved ghost-preview diff for
@@ -38,6 +44,8 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
 
     /** Hard ceiling on synced preview entries. */
     private static final int MAX_PREVIEW_ENTRIES = 60_000;
+    /** Hard ceiling on synced entity ghosts, nearest to the viewer first. */
+    private static final int MAX_PREVIEW_ENTITIES = 64;
 
     private final BlockPos machinePos;
     private final long lastKnownHeadCommitId;
@@ -119,6 +127,7 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
                     jumpCosts,
                     resolvePreview(machine, packet.selectedCommitId, sender),
                     machine.getClaimedChunks(),
+                    resolveEntityPreview(machine, packet.selectedCommitId, sender),
                     previewVersion));
         });
     }
@@ -158,6 +167,39 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
     }
 
     /**
+     * The recorded state of each entity a jump to selectedCommitId would restore, nearest the viewer
+     * first. Entities already standing where they were recorded are left out, as they would not
+     * visibly change.
+     */
+    private static List<CompoundTag> resolveEntityPreview(TimelineViewProvider machine, long selectedCommitId,
+                                                          ServerPlayer viewer) {
+        if (selectedCommitId < 0 || !machine.isSaveEntities()) return List.of();
+        ServerLevel level = viewer.serverLevel();
+
+        record Candidate(CompoundTag tag, double distanceSqr) {}
+        List<Candidate> candidates = new ArrayList<>();
+        for (Map.Entry<UUID, CompoundTag> entry : machine.previewEntityStates(selectedCommitId).entrySet()) {
+            CompoundTag tag = entry.getValue();
+            ListTag pos = tag.getList("Pos", Tag.TAG_DOUBLE);
+            if (pos.size() < 3) continue;
+            if (tag.contains("Health") && tag.getFloat("Health") <= 0.0F) continue;
+
+            double x = pos.getDouble(0), y = pos.getDouble(1), z = pos.getDouble(2);
+            Entity live = level.getEntity(entry.getKey());
+            if (live != null && !live.isRemoved() && live.distanceToSqr(x, y, z) < 0.25D) continue;
+            candidates.add(new Candidate(tag, viewer.distanceToSqr(x, y, z)));
+        }
+
+        candidates.sort(java.util.Comparator.comparingDouble(Candidate::distanceSqr));
+        List<CompoundTag> out = new ArrayList<>(Math.min(candidates.size(), MAX_PREVIEW_ENTITIES));
+        for (Candidate candidate : candidates) {
+            if (out.size() >= MAX_PREVIEW_ENTITIES) break;
+            out.add(candidate.tag());
+        }
+        return out;
+    }
+
+    /**
      * Combines the repository head with the player's selection and the world's glue-state version,
      * so changes invisible to headCommitId alone still invalidate the client's cache.
      */
@@ -166,6 +208,7 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         long combined = machine.getHeadCommitId();
         combined = combined * 1_000_003L + selectedCommitId;
         combined = combined * 1_000_003L + (costsReady ? 1L : 0L);
+        combined = combined * 1_000_003L + (machine.isSaveEntities() ? 1L : 0L);
         for (ChunkPos chunk : machine.getClaimedChunks()) {
             combined = combined * 1_000_003L + chunk.toLong();
         }

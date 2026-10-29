@@ -649,6 +649,21 @@ public final class TemporalRepository {
     }
 
     /**
+     * Recorded state of every entity a jump to targetCommitId would bring back or rewrite. The tags
+     * are the recorded ones, uncopied: callers must treat them as read-only.
+     */
+    public Map<UUID, CompoundTag> previewEntityStates(long targetCommitId) {
+        JumpPlan plan = planJump(targetCommitId);
+        if (plan == null) return Map.of();
+
+        Map<UUID, CompoundTag> out = new HashMap<>();
+        for (Map.Entry<UUID, CompoundTag> entry : resolveJumpEntities(plan).entrySet()) {
+            if (entry.getValue() != null) out.put(entry.getKey(), entry.getValue());
+        }
+        return out;
+    }
+
+    /**
      * Starts a jump of the head to targetCommitId that is carried out a slice at a time (see {@link
      * JumpJob}), or returns null if the head is already there or the commit does not exist.
      * origin is where chunks are ranked from while no player is in the level.

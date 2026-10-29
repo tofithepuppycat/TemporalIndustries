@@ -582,6 +582,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     @Override
+    public Map<java.util.UUID, net.minecraft.nbt.CompoundTag> previewEntityStates(long targetCommitId) {
+        TemporalRepository repo = getRepository();
+        return repo == null || !saveEntities ? Map.of() : repo.previewEntityStates(targetCommitId);
+    }
+
+    @Override
     public boolean isGluedPos(BlockPos pos) {
         TemporalWorldData data = worldData();
         if (pos.equals(worldPosition)) return true;
