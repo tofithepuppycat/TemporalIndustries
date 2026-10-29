@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "GEG",
-    "CMC",
-    "GEG"
+    "CEC",
+    "GMG"
   ],
   "key": {
     "G": { "item": "minecraft:gold_ingot" },

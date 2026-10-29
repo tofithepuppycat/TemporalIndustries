@@ -1,12 +1,11 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "DGD",
+    " G ",
     "GCG",
-    "DAD"
+    " A "
   ],
   "key": {
-    "D": { "item": "minecraft:deepslate" },
     "G": { "item": "minecraft:gold_ingot" },
     "C": { "item": "minecraft:clock" },
     "A": { "item": "minecraft:amethyst_shard" }

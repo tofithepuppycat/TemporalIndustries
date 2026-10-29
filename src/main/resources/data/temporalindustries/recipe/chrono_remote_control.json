@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "GDG",
-    "DCD",
-    "GAG"
+    "GAG",
+    "DCD"
   ],
   "key": {
     "G": { "item": "minecraft:gold_ingot" },

@@ -2,14 +2,12 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "EAE",
-    "ACA",
-    "EGE"
+    "ACA"
   ],
   "key": {
     "E": { "item": "minecraft:echo_shard" },
     "A": { "item": "minecraft:amethyst_shard" },
-    "C": { "item": "temporalindustries:chronovault" },
-    "G": { "item": "minecraft:gold_ingot" }
+    "C": { "item": "temporalindustries:chronovault" }
   },
   "result": { "id": "temporalindustries:chronosphere", "count": 1 }
 }

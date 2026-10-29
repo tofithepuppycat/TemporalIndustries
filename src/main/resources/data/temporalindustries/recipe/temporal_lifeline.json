@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "DTD",
-    "GCG",
-    "DTD"
+    "TCT",
+    "DGD"
   ],
   "key": {
     "D": { "item": "minecraft:deepslate" },

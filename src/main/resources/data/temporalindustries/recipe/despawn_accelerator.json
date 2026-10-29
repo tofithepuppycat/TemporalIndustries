@@ -2,8 +2,7 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "IEI",
-    "EGE",
-    "IEI"
+    "EGE"
   ],
   "key": {
     "I": { "item": "minecraft:iron_ingot" },

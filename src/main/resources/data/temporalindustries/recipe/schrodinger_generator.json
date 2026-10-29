@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "DGD",
-    "GAG",
-    "DWD"
+    "DAD",
+    "GWG"
   ],
   "key": {
     "D": { "item": "minecraft:deepslate" },

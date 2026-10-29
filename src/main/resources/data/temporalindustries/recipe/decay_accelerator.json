@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "WGW",
     "GCG",
-    "WGW"
+    "WWW"
   ],
   "key": {
     "W": { "item": "minecraft:oak_planks" },

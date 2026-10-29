@@ -1,29 +1,15 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "ABA",
-    "GMG",
-    "AEA"
+    " B ",
+    "AMA",
+    " E "
   ],
   "key": {
-    "A": {
-      "item": "minecraft:amethyst_shard"
-    },
-    "B": {
-      "item": "minecraft:bucket"
-    },
-    "G": {
-      "item": "minecraft:gold_ingot"
-    },
-    "M": {
-      "item": "temporalindustries:machine_frame"
-    },
-    "E": {
-      "item": "minecraft:echo_shard"
-    }
+    "A": { "item": "minecraft:amethyst_shard" },
+    "B": { "item": "minecraft:bucket" },
+    "M": { "item": "temporalindustries:machine_frame" },
+    "E": { "item": "minecraft:echo_shard" }
   },
-  "result": {
-    "id": "temporalindustries:entropy_balancer",
-    "count": 1
-  }
+  "result": { "id": "temporalindustries:entropy_balancer", "count": 1 }
 }

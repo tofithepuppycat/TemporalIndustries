@@ -1,9 +1,8 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "EGE",
-    "GCG",
-    "EAE"
+    "EAE",
+    "GCG"
   ],
   "key": {
     "E": { "item": "minecraft:echo_shard" },

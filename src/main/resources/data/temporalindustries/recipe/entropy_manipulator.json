@@ -2,8 +2,7 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "AEA",
-    "EME",
-    "GAG"
+    "GMG"
   ],
   "key": {
     "A": { "item": "minecraft:amethyst_shard" },
