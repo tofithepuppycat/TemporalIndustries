@@ -291,6 +291,7 @@ public class ChronoLensScreen extends Screen {
     @Override
     public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         renderTransparentBackground(guiGraphics);
+        InnerBackground.render(guiGraphics, panelX(), panelY(), CONTENT_SIZE, CONTENT_SIZE);
         guiGraphics.blit(BASE_TEXTURE, leftPos, topPos, 0, 0, TEXTURE_WIDTH, TEXTURE_HEIGHT);
     }
 

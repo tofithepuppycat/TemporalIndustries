@@ -620,6 +620,33 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     /**
+     * Switches this machine to the repository called rawName (created if new), detaching from the
+     * current one first. Nothing changes unless the new repository can actually be bound.
+     */
+    public BindResult changeRepositoryTo(String rawName) {
+        if (!(level instanceof ServerLevel) || level.getServer() == null) return BindResult.UNAVAILABLE;
+
+        String name = TemporalWorldData.normalizeRepositoryName(rawName);
+        if (name == null) return BindResult.INVALID_NAME;
+
+        TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        UUID existingId = data.findRepositoryByName(name);
+        if (existingId != null) {
+            if (existingId.equals(repositoryId)) return BindResult.ALREADY_BOUND;
+            TemporalRepository existing = data.getRepository(existingId);
+            if (existing == null) return BindResult.UNAVAILABLE;
+            if (data.hasRepositoryOwner(existingId)) return BindResult.IN_USE;
+            if (!existing.getDimension().equals(level.dimension().location())) return BindResult.WRONG_DIMENSION;
+        }
+
+        if (isRepositoryBound()) {
+            if (isCommitInProgress()) return BindResult.UNAVAILABLE;
+            unbindRepository();
+        }
+        return bindToRepositoryNamed(name);
+    }
+
+    /**
      * Detaches this machine from its repository without touching the repository or its history: its
      * chunk claims are released and the repository becomes free for any machine to bind by name.
      */

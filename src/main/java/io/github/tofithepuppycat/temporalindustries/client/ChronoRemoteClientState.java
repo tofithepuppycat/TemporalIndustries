@@ -21,6 +21,7 @@ public final class ChronoRemoteClientState {
     private static boolean chronosphere;
     private static boolean saveEntities;
     private static boolean chargeContainers;
+    private static String repositoryName = "";
 
     private ChronoRemoteClientState() {}
 
@@ -67,13 +68,15 @@ public final class ChronoRemoteClientState {
     public static boolean isChronosphere() { return chronosphere; }
     public static boolean isSaveEntities() { return saveEntities; }
     public static boolean isChargeContainers() { return chargeContainers; }
+    public static String getRepositoryName() { return repositoryName; }
 
     public static void onSettingsSynced(boolean boundNow, boolean chronosphereNow, boolean saveEntitiesNow,
-                                        boolean chargeContainersNow) {
+                                        boolean chargeContainersNow, String repositoryNameNow) {
         bound = boundNow;
         chronosphere = chronosphereNow;
         saveEntities = saveEntitiesNow;
         chargeContainers = chargeContainersNow;
+        repositoryName = repositoryNameNow;
 
         // Chunk selection only makes sense on a machine that claims more than its own chunk.
         if (chronosphereNow && boundNow) {
@@ -104,5 +107,6 @@ public final class ChronoRemoteClientState {
         chronosphere = false;
         saveEntities = false;
         chargeContainers = false;
+        repositoryName = "";
     }
 }

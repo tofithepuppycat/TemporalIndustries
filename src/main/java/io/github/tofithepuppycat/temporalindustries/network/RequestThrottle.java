@@ -19,6 +19,8 @@ import java.util.UUID;
 public final class RequestThrottle {
     public static final ResourceLocation TIMELINE_PREVIEW =
             ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "timeline_preview");
+    public static final ResourceLocation REPOSITORY_SUGGEST =
+            ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "repository_suggest");
     public static final ResourceLocation CHRONOSPHERE_MAP =
             ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "chronosphere_map");
 

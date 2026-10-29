@@ -388,8 +388,11 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
                 : Component.translatable("overlay.temporalindustries.entropy_glasses.withergenic_reactor.empty").withStyle(ChatFormatting.GRAY));
         lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.withergenic_reactor.efficiency",
                 (int) Math.round(getEfficiency() * 100.0)).withStyle(ChatFormatting.GRAY));
-        lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.withergenic_reactor.status." + status)
-                .withStyle(status == STATUS_RUNNING ? ChatFormatting.YELLOW : ChatFormatting.RED));
+        // An empty reactor already says "No Wither" above.
+        if (status != STATUS_NO_WITHER) {
+            lines.add(Component.translatable("overlay.temporalindustries.entropy_glasses.withergenic_reactor.status." + status)
+                    .withStyle(status == STATUS_RUNNING ? ChatFormatting.YELLOW : ChatFormatting.RED));
+        }
         return lines;
     }
 

@@ -41,6 +41,7 @@ public abstract class AbstractAcceleratorScreen<T extends AbstractAcceleratorMen
 
     @Override
     protected void renderBg(@NotNull GuiGraphics guiGraphics, float partialTick, int mouseX, int mouseY) {
+        InnerBackground.render(guiGraphics, leftPos, topPos, IMAGE_WIDTH, IMAGE_HEIGHT);
         guiGraphics.blit(background, leftPos, topPos, 0, 0, IMAGE_WIDTH, IMAGE_HEIGHT);
         renderProgressIcon(guiGraphics);
     }
