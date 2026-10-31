@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.client.timeline;
 
+import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.timeline.CommitNode;
 import io.github.tofithepuppycat.temporalindustries.timeline.JumpCostBreakdown;
 import net.minecraft.core.BlockPos;
@@ -128,6 +129,17 @@ public final class TimelineProjectionManager {
     /** Deselects the current node, e.g. when the user clicks blank space in the graph. */
     public static void clearSelectedCommit() {
         selectedCommitId = -1L;
+        previewTargetStates = new HashMap<>();
+        previewEntities = new ArrayList<>();
+        invalidateEntries();
+    }
+
+    /**
+     * Selects the changes a commit would record rather than a commit, which the server resolves
+     * against the head even before any commit graph has arrived.
+     */
+    public static void selectPendingChanges() {
+        selectedCommitId = TimelineViewProvider.PENDING_CHANGES;
         previewTargetStates = new HashMap<>();
         previewEntities = new ArrayList<>();
         invalidateEntries();

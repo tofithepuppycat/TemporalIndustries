@@ -29,7 +29,7 @@ import java.util.function.BooleanSupplier;
 /**
  * Selection wheel of the Chrono Remote Control: opens while right-click is held, the slice the
  * cursor points at runs when the button is released (or on left-click). The same screen shows the
- * main wheel, the settings wheel and the jump confirmation.
+ * main wheel, the settings wheel and the jump and commit confirmations.
  */
 public class ChronoRemoteWheelScreen extends Screen {
     private static final int INNER_RADIUS = 38;
@@ -103,7 +103,7 @@ public class ChronoRemoteWheelScreen extends Screen {
         return new ChronoRemoteWheelScreen(List.of(
                 new Option("gui.temporalindustries.chrono_remote.commit",
                         "gui.temporalindustries.chrono_remote.hint.commit",
-                        () -> send(ChronoRemoteActionPacket.Action.COMMIT)),
+                        ChronoRemoteWheelScreen::openCommitReview),
                 new Option("gui.temporalindustries.chrono_remote.select_chunks",
                         "gui.temporalindustries.chrono_remote.hint.select_chunks",
                         ChronoRemoteWheelScreen::openChunkSelection),
@@ -137,6 +137,14 @@ public class ChronoRemoteWheelScreen extends Screen {
     }
 
     private static ChronoRemoteWheelScreen confirmWheel() {
+        if (ChronoRemoteClientState.isCommitReview()) {
+            return new ChronoRemoteWheelScreen(List.of(
+                    new Option("gui.temporalindustries.chrono_remote.cancel", null, ChronoRemoteClientState::endSession),
+                    new Option("gui.temporalindustries.chrono_remote.commit", null, () -> {
+                        send(ChronoRemoteActionPacket.Action.COMMIT);
+                        ChronoRemoteClientState.endSession();
+                    })));
+        }
         return new ChronoRemoteWheelScreen(List.of(
                 new Option("gui.temporalindustries.chrono_remote.cancel", null, ChronoRemoteClientState::endSession),
                 new Option("gui.temporalindustries.chrono_remote.jump", null, () -> {
@@ -166,6 +174,20 @@ public class ChronoRemoteWheelScreen extends Screen {
         // The reply closes the screen again if the machine can't have chunks selected.
         send(ChronoRemoteActionPacket.Action.SYNC);
         minecraft.setScreen(new ChronoRemoteChunkScreen(linked.pos()));
+    }
+
+    private static void openCommitReview() {
+        Minecraft minecraft = Minecraft.getInstance();
+        GlobalPos linked = minecraft.player == null ? null : ChronoRemoteControlItem.findHeldLink(minecraft.player);
+        if (linked == null) return;
+        if (minecraft.level == null || !linked.dimension().equals(minecraft.level.dimension())) {
+            minecraft.player.displayClientMessage(
+                    Component.translatable("gui.temporalindustries.chrono_remote.msg.wrong_dimension"), true);
+            return;
+        }
+
+        ChronoRemoteClientState.startCommitReview(linked.pos());
+        minecraft.setScreen(null);
     }
 
     private static void openRepository() {

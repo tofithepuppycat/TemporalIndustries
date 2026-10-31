@@ -584,6 +584,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     @Override
+    public Map<BlockPos, BlockState> previewPendingStates(ChunkPos origin, int limit) {
+        TemporalWorldData data = worldData();
+        UUID repoId = getRepositoryId();
+        return data == null || repoId == null || !(level instanceof ServerLevel serverLevel)
+                ? Map.of() : data.getPendingHeadStates(repoId, serverLevel, origin, limit);
+    }
+
+    @Override
     public Map<java.util.UUID, net.minecraft.nbt.CompoundTag> previewEntityStates(long targetCommitId) {
         TemporalRepository repo = getRepository();
         return repo == null || !saveEntities ? Map.of() : repo.previewEntityStates(targetCommitId);

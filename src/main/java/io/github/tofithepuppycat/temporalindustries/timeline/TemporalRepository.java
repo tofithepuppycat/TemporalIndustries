@@ -408,6 +408,30 @@ public final class TemporalRepository {
     }
 
     /**
+     * The head's state of every block in chunk that the loaded world no longer matches, whatever
+     * changed it; empty while the chunk is unloaded or has no recorded state to compare against.
+     */
+    public Map<BlockPos, BlockState> previewUncommittedStates(ServerLevel level, ChunkPos chunk) {
+        ChunkState state = chunkStates.get(chunk.toLong());
+        if (headCommitId == RepoCommit.NO_PARENT || state == null || !state.hasBaseline
+                || level.getChunkSource().getChunkNow(chunk.x, chunk.z) == null) {
+            return Map.of();
+        }
+
+        List<BlockChangeDelta> changes = diffAgainstHead(ancestryChain(headCommitId), chunk.toLong(),
+                ChunkSnapshot.capture(level, chunk));
+        if (changes == null) return Map.of();
+
+        Map<BlockPos, BlockState> out = new HashMap<>();
+        for (BlockChangeDelta change : changes) {
+            if (!change.getPreviousState().equals(change.getNewState())) {
+                out.put(change.getPos(), change.getPreviousState());
+            }
+        }
+        return out;
+    }
+
+    /**
      * Ensures this repository has at least a root commit, baselining every chunk in chunks that
      * doesn't already have one.
      */

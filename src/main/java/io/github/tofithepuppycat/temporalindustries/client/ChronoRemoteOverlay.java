@@ -42,6 +42,12 @@ public final class ChronoRemoteOverlay implements LayeredDraw.Layer {
                             ChronosphereClientState.getSelectedCount())
             };
             colors = new int[] {TEXT_COLOR, INCLUDED_COLOR};
+        } else if (ChronoRemoteClientState.isCommitReview()) {
+            title = Component.translatable("gui.temporalindustries.chrono_remote.overlay.commit_title");
+            lines = new Component[] {
+                    Component.translatable("gui.temporalindustries.chrono_remote.overlay.commit_hint")
+            };
+            colors = new int[] {TEXT_COLOR};
         } else {
             long commitId = ChronoRemoteClientState.getPreviewCommitId();
             String hash = "";

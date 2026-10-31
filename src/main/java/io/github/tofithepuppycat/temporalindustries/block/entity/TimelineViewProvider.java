@@ -23,6 +23,12 @@ public interface TimelineViewProvider {
      */
     enum JumpResult { SUCCESS, CHARGING, BUSY }
 
+    /**
+     * Stands in for a commit id when previewing the changes a commit would record, which are those
+     * between the head and the live world.
+     */
+    long PENDING_CHANGES = -2L;
+
     /** Every commit in this machine's repository. */
     List<RepoCommit> getRepositoryCommits();
 
@@ -38,7 +44,7 @@ public interface TimelineViewProvider {
     /** commitId -> energy cost of jumping there from the current head. */
     Map<Long, JumpCostBreakdown> getJumpCosts(long selectedCommitId);
 
-    /** Chunks this machine has claimed, home chunk first. */
+    /** Chunks this machine has claimed. */
     List<ChunkPos> getClaimedChunks();
 
     long getPlacedGameTime();
@@ -61,6 +67,12 @@ public interface TimelineViewProvider {
      * machine saves and loads entities.
      */
     Map<java.util.UUID, net.minecraft.nbt.CompoundTag> previewEntityStates(long targetCommitId);
+
+    /**
+     * The state at the head commit of every block changed since it, nearest origin first and
+     * capped at limit, for previewing what a commit would record.
+     */
+    Map<BlockPos, BlockState> previewPendingStates(ChunkPos origin, int limit);
 
     /** Whether jumps on this machine also save and load entities. */
     boolean isSaveEntities();

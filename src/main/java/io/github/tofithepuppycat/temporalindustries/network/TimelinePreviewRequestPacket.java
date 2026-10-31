@@ -107,7 +107,12 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
             long headCommitId = machine.getHeadCommitId();
             // Measured in the background, so it may not be ready yet; the version flips once it is.
             Map<Long, JumpCostBreakdown> jumpCosts = machine.getJumpCosts(packet.selectedCommitId);
-            long previewVersion = computePreviewVersion(sender, machine, packet.selectedCommitId, !jumpCosts.isEmpty());
+            // Edits that raise no block event only show up by comparing the world, so the pending
+            // changes are resolved on every poll and their contents are part of the version.
+            boolean pending = packet.selectedCommitId == TimelineViewProvider.PENDING_CHANGES;
+            Map<BlockPos, BlockState> pendingBlocks = pending ? resolvePreview(machine, packet.selectedCommitId, sender) : null;
+            long previewVersion = computePreviewVersion(sender, machine, packet.selectedCommitId, !jumpCosts.isEmpty(),
+                    pendingBlocks == null ? 0L : pendingBlocks.hashCode());
             if (headCommitId == packet.lastKnownHeadCommitId && previewVersion == packet.lastKnownPreviewVersion) {
                 return;
             }
@@ -125,7 +130,7 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
                     machine.getCurrentNamedBranch(),
                     headCommitId,
                     jumpCosts,
-                    resolvePreview(machine, packet.selectedCommitId, sender),
+                    pending ? pendingBlocks : resolvePreview(machine, packet.selectedCommitId, sender),
                     machine.getClaimedChunks(),
                     resolveEntityPreview(machine, packet.selectedCommitId, sender),
                     previewVersion));
@@ -139,6 +144,15 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
      */
     private static Map<BlockPos, BlockState> resolvePreview(TimelineViewProvider machine, long selectedCommitId,
                                                               ServerPlayer viewer) {
+        if (selectedCommitId == TimelineViewProvider.PENDING_CHANGES) {
+            Map<BlockPos, BlockState> out = new HashMap<>();
+            for (Map.Entry<BlockPos, BlockState> entry : machine.previewPendingStates(viewer.chunkPosition(), MAX_PREVIEW_ENTRIES).entrySet()) {
+                if (machine.isGluedPos(entry.getKey())) continue;
+                if (viewer.level().getBlockState(entry.getKey()).equals(entry.getValue())) continue;
+                out.put(entry.getKey(), entry.getValue());
+            }
+            return out;
+        }
         if (selectedCommitId < 0) return Map.of();
         net.minecraft.world.level.Level level = viewer.level();
 
@@ -204,10 +218,11 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
      * so changes invisible to headCommitId alone still invalidate the client's cache.
      */
     private static long computePreviewVersion(ServerPlayer sender, TimelineViewProvider machine, long selectedCommitId,
-                                              boolean costsReady) {
+                                              boolean costsReady, long pendingHash) {
         long combined = machine.getHeadCommitId();
         combined = combined * 1_000_003L + selectedCommitId;
         combined = combined * 1_000_003L + (costsReady ? 1L : 0L);
+        combined = combined * 1_000_003L + pendingHash;
         combined = combined * 1_000_003L + (machine.isSaveEntities() ? 1L : 0L);
         for (ChunkPos chunk : machine.getClaimedChunks()) {
             combined = combined * 1_000_003L + chunk.toLong();

@@ -20,6 +20,7 @@ import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.level.levelgen.structure.BoundingBox;
 import net.minecraft.world.level.saveddata.SavedData;
@@ -385,6 +386,24 @@ public class TemporalWorldData extends SavedData {
         return matches.size() > limit ? new ArrayList<>(matches.subList(0, limit)) : matches;
     }
 
+    /** What a repository holds, for choosing between the ones a machine could switch to. */
+    public record RepositoryStats(int commits, int branches, String currentBranch, int chunks, long lastCommitTime) {}
+
+    /** The stats of the unowned repository called name in dimension, or null if there is none. */
+    @Nullable
+    public RepositoryStats availableRepositoryStats(String name, ResourceLocation dimension) {
+        UUID id = findRepositoryByName(name.trim());
+        if (id == null || repositoryOwners.containsKey(id)) return null;
+        TemporalRepository repo = repositories.get(id);
+        if (!repo.getDimension().equals(dimension)) return null;
+
+        long lastCommitTime = -1L;
+        for (RepoCommit commit : repo.getAllCommits()) lastCommitTime = Math.max(lastCommitTime, commit.getGameTime());
+        String branch = repo.getCurrentBranchName();
+        return new RepositoryStats(repo.getAllCommits().size(), repo.getBranchTips().size(), branch == null ? "" : branch,
+                getClaimedChunks(id).size(), lastCommitTime);
+    }
+
     /** Creates a fresh, empty repository called name. */
     public UUID createRepository(String name, ResourceLocation dimension) {
         UUID id = UUID.randomUUID();
@@ -525,6 +544,42 @@ public class TemporalWorldData extends SavedData {
         } else {
             chunkMap.put(delta.getPos(), delta);
         }
+    }
+
+    /**
+     * The state each block that changed since repoId's last commit had at it, nearest to origin
+     * first, up to limit entries. Every claimed chunk is compared against its recorded state, so
+     * edits that raised no block event are found too.
+     */
+    public Map<BlockPos, BlockState> getPendingHeadStates(UUID repoId, ServerLevel level, ChunkPos origin, int limit) {
+        TemporalRepository repo = repositories.get(repoId);
+        if (repo == null) return Collections.emptyMap();
+
+        Map<Long, Map<BlockPos, BlockChangeDelta>> pending = repoPendingBlockDeltas.getOrDefault(repoId, Collections.emptyMap());
+        Set<Long> chunkKeys = new HashSet<>(pending.keySet());
+        for (ChunkPos claimed : getClaimedChunks(repoId)) chunkKeys.add(claimed.toLong());
+
+        List<Long> ordered = new ArrayList<>(chunkKeys);
+        ordered.sort(Comparator.comparingLong(key -> {
+            ChunkPos chunk = new ChunkPos(key);
+            long dx = chunk.x - origin.x, dz = chunk.z - origin.z;
+            return dx * dx + dz * dz;
+        }));
+
+        Map<BlockPos, BlockState> out = new HashMap<>();
+        for (long key : ordered) {
+            if (out.size() >= limit) break;
+            Map<BlockPos, BlockState> compared = repo.previewUncommittedStates(level, new ChunkPos(key));
+            out.putAll(compared);
+            if (compared.isEmpty()) {
+                for (BlockChangeDelta delta : pending.getOrDefault(key, Collections.emptyMap()).values()) {
+                    if (!delta.getPreviousState().equals(delta.getNewState())) {
+                        out.put(delta.getPos(), delta.getPreviousState());
+                    }
+                }
+            }
+        }
+        return out;
     }
 
     public void recordRepoEntityDelta(UUID repoId, ChunkPos chunkPos, EntityDelta delta) {
