@@ -29,6 +29,8 @@ public class ChronoRemoteChunkScreen extends Screen {
     private static final int BUTTON_GAP = 6;
     private static final int LINE_HEIGHT = 11;
     private static final int LEGEND_SWATCH = 7;
+    /** Lines reserved for the prompt shown while nothing is selected, so the layout never shifts. */
+    private static final int EMPTY_HINT_LINES = 2;
 
     private static final int COLOR_HOME = 0xFFFFD166;
     private static final int COLOR_SELECTED = 0xFF3D9BE0;
@@ -84,7 +86,8 @@ public class ChronoRemoteChunkScreen extends Screen {
     private int sidebarContentHeight() {
         int controlLines = font.split(Component.translatable("gui.temporalindustries.chrono_remote.chunks.controls"),
                 SIDEBAR_WIDTH - 2 * PADDING).size();
-        return PADDING + LINE_HEIGHT * 2 + 6 + LINE_HEIGHT * 3 + 6 + controlLines * font.lineHeight + PADDING;
+        return PADDING + LINE_HEIGHT * 2 + EMPTY_HINT_LINES * font.lineHeight + 6 + LINE_HEIGHT * 3 + 6
+                + controlLines * font.lineHeight + PADDING;
     }
 
     private int sidebarLeft() {
@@ -137,9 +140,9 @@ public class ChronoRemoteChunkScreen extends Screen {
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, width, height, BACKDROP_COLOR);
-        drawPanel(guiGraphics, panelLeft, panelTop, panelWidth, panelHeight, PANEL_COLOR, PANEL_BORDER_COLOR);
+        drawBackground(guiGraphics, panelLeft, panelTop, panelWidth, panelHeight);
 
-        guiGraphics.drawString(font, title, panelLeft + PADDING + 2, panelTop + (HEADER_HEIGHT - font.lineHeight) / 2, ACCENT_COLOR);
+        text(guiGraphics, font, title, panelLeft + PADDING + 2, panelTop + (HEADER_HEIGHT - font.lineHeight) / 2, TEXT_PRIMARY);
 
         mapView.layout(mapLeft(), mapTop(), mapView.gridPixels());
         mapView.render(guiGraphics, mouseX, mouseY);
@@ -151,33 +154,38 @@ public class ChronoRemoteChunkScreen extends Screen {
         int left = sidebarLeft();
         int top = areaTop();
         int sidebarWidth = sidebarWidth();
-        drawPanel(guiGraphics, left, top, sidebarWidth, areaHeight, SIDEBAR_COLOR, DIVIDER_COLOR);
+        drawInset(guiGraphics, left, top, sidebarWidth, areaHeight);
 
         int x = left + PADDING;
         int y = top + PADDING;
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.selected"), x, y, TEXT_MUTED);
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.selected"), x, y, TEXT_MUTED);
         y += LINE_HEIGHT;
-        guiGraphics.drawString(font, mapView.selectedCount() + "/" + mapView.totalClaimable(), x, y, ACCENT_COLOR);
-        y += LINE_HEIGHT + 6;
+        text(guiGraphics, font, mapView.selectedCount() + "/" + mapView.totalClaimable(), x, y, ACCENT_COLOR);
+        y += LINE_HEIGHT;
+        if (mapView.selectedCount() == 0) {
+            wrapped(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.empty_hint"),
+                    x, y, sidebarWidth - 2 * PADDING, ACCENT_COLOR);
+        }
+        y += EMPTY_HINT_LINES * font.lineHeight + 6;
 
         y = legend(guiGraphics, x, y, COLOR_HOME, "home");
         y = legend(guiGraphics, x, y, COLOR_SELECTED, "selected");
         y = legend(guiGraphics, x, y, COLOR_BLOCKED, "blocked");
 
         y += 6;
-        guiGraphics.drawWordWrap(font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.controls"),
+        wrapped(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.controls"),
                 x, y, sidebarWidth - 2 * PADDING, TEXT_MUTED);
     }
 
     private int legend(GuiGraphics guiGraphics, int x, int y, int color, String key) {
         guiGraphics.fill(x, y + 1, x + LEGEND_SWATCH, y + 1 + LEGEND_SWATCH, color);
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.legend." + key),
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.chunks.legend." + key),
                 x + LEGEND_SWATCH + 4, y, TEXT_SECONDARY);
         return y + LINE_HEIGHT;
     }
 
     private void renderFooter(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.fill(panelLeft + 1, footerTop(), panelLeft + panelWidth - 1, footerTop() + 1, DIVIDER_COLOR);
+        guiGraphics.fill(panelLeft + 3, footerTop(), panelLeft + panelWidth - 3, footerTop() + 1, DIVIDER_COLOR);
 
         drawButton(guiGraphics, font, previewButtonLeft(), buttonTop(), PREVIEW_BUTTON_WIDTH, previewLabel(), true, false, mouseX, mouseY);
         drawButton(guiGraphics, font, doneButtonLeft(), buttonTop(), DONE_BUTTON_WIDTH,

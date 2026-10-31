@@ -21,10 +21,10 @@ import net.neoforged.neoforge.network.PacketDistributor;
  * history deletion. The rows scroll when taller than the window.
  */
 public final class TimelineSettingsWindow extends GuiWindow {
-    private static final ResourceLocation ICON_TRUE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/icon_true.png");
-    private static final ResourceLocation ICON_FALSE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/icon_false.png");
+    private static final ResourceLocation ICON_ON_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_on.png");
+    private static final ResourceLocation ICON_OFF_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_off.png");
 
     private static final int DELETE_BUTTON_WIDTH = 140;
     private static final int DELETE_BUTTON_HEIGHT = 20;
@@ -150,7 +150,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
         int toggleY = rowY(rowOffset);
         guiGraphics.drawString(font, Component.translatable(labelKey), x + INSET,
                 toggleY + (TOGGLE_SIZE - font.lineHeight) / 2, TEXT_PRIMARY, false);
-        IconButtonRenderer.renderToggle(guiGraphics, enabled ? ICON_TRUE_TEXTURE : ICON_FALSE_TEXTURE, enabled,
+        IconButtonRenderer.renderToggle(guiGraphics, enabled ? ICON_ON_TEXTURE : ICON_OFF_TEXTURE, enabled,
                 isOver(mouseX, mouseY, toggleX(), toggleY, TOGGLE_SIZE, TOGGLE_SIZE), toggleX(), toggleY);
     }
 

@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.client.screen;
 
+import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState;
 import io.github.tofithepuppycat.temporalindustries.client.ShortEnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
@@ -10,6 +11,7 @@ import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
+import net.minecraft.resources.ResourceLocation;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
@@ -31,13 +33,13 @@ public class ChronoRemoteTimelineScreen extends Screen {
     private static final int HEADER_HEIGHT = 26;
     private static final int FOOTER_HEIGHT = 32;
     private static final int SIDEBAR_WIDTH = 150;
-    private static final int PRIMARY_BUTTON_WIDTH = 112;
-    private static final int SECONDARY_BUTTON_WIDTH = 64;
+    private static final ResourceLocation ICON_JUMP_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            TemporalIndustries.MODID, "textures/gui/icon_jump.png");
     private static final int LINE_HEIGHT = 11;
 
     private static final int SYNC_INTERVAL_TICKS = 20;
 
-    private static final int COST_COLOR = 0xFFFFD166;
+    private static final int COST_COLOR = 0xFFB06A00;
 
     private final BlockPos machinePos;
     private final TimelineGraphWidget graphWidget = new TimelineGraphWidget();
@@ -130,15 +132,15 @@ public class ChronoRemoteTimelineScreen extends Screen {
     }
 
     private int previewButtonLeft() {
-        return panelLeft + panelWidth - PADDING - PRIMARY_BUTTON_WIDTH;
+        return panelLeft + panelWidth - PADDING - MACHINE_BUTTON_WIDTH;
     }
 
     private int closeButtonLeft() {
-        return previewButtonLeft() - 6 - SECONDARY_BUTTON_WIDTH;
+        return previewButtonLeft() - 6 - MACHINE_BUTTON_WIDTH;
     }
 
     private int buttonTop() {
-        return footerTop() + (FOOTER_HEIGHT - BUTTON_HEIGHT) / 2;
+        return footerTop() + (FOOTER_HEIGHT - MACHINE_BUTTON_HEIGHT) / 2;
     }
 
     /** Whether a commit other than the one the world already reflects is selected. */
@@ -157,12 +159,12 @@ public class ChronoRemoteTimelineScreen extends Screen {
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, width, height, BACKDROP_COLOR);
-        drawPanel(guiGraphics, panelLeft, panelTop, panelWidth, panelHeight, PANEL_COLOR, PANEL_BORDER_COLOR);
+        drawBackground(guiGraphics, panelLeft, panelTop, panelWidth, panelHeight);
 
         renderHeader(guiGraphics);
         graphWidget.render(guiGraphics, font, graphLeft(), graphTop(), graphWidth(), graphHeight());
         if (TimelineProjectionManager.getCommits().isEmpty()) {
-            guiGraphics.drawCenteredString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.loading"),
+            centered(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.loading"),
                     graphLeft() + graphWidth() / 2, graphTop() + graphHeight() / 2 - font.lineHeight / 2, TEXT_MUTED);
         }
         renderSidebar(guiGraphics);
@@ -176,33 +178,33 @@ public class ChronoRemoteTimelineScreen extends Screen {
 
     private void renderHeader(GuiGraphics guiGraphics) {
         int textY = panelTop + (HEADER_HEIGHT - font.lineHeight) / 2;
-        guiGraphics.drawString(font, title, panelLeft + PADDING + 2, textY, ACCENT_COLOR);
+        text(guiGraphics, font, title, panelLeft + PADDING + 2, textY, TEXT_PRIMARY);
 
         String branch = TimelineProjectionManager.getCurrentBranch();
         Component now = Component.translatable("gui.temporalindustries.chrono_remote.timeline.now",
                 formatGameDayTime(TimelineProjectionManager.getCurrentGameTime()));
         Component right = branch.isEmpty() ? now : Component.literal(branch + "  ·  ").append(now);
-        guiGraphics.drawString(font, right, panelLeft + panelWidth - PADDING - 2 - font.width(right), textY, TEXT_SECONDARY);
+        text(guiGraphics, font, right, panelLeft + panelWidth - PADDING - 2 - font.width(right), textY, TEXT_SECONDARY);
     }
 
     private void renderSidebar(GuiGraphics guiGraphics) {
         int left = sidebarLeft();
         int top = graphTop();
         int sidebarWidth = SIDEBAR_WIDTH - PADDING;
-        drawPanel(guiGraphics, left, top, sidebarWidth, graphHeight(), SIDEBAR_COLOR, DIVIDER_COLOR);
+        drawInset(guiGraphics, left, top, sidebarWidth, graphHeight());
 
         int x = left + PADDING;
         int y = top + PADDING;
         CommitNode selected = selectedCommit();
         if (selected == null) {
-            guiGraphics.drawWordWrap(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.select_hint"),
+            wrapped(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.select_hint"),
                     x, y, sidebarWidth - 2 * PADDING, TEXT_MUTED);
             return;
         }
 
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.commit"), x, y, TEXT_MUTED);
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.commit"), x, y, TEXT_MUTED);
         y += LINE_HEIGHT;
-        guiGraphics.drawString(font, selected.shortHash(), x, y, ACCENT_COLOR);
+        text(guiGraphics, font, selected.shortHash(), x, y, ACCENT_COLOR);
         y += LINE_HEIGHT + 4;
 
         long now = TimelineProjectionManager.getCurrentGameTime();
@@ -215,35 +217,36 @@ public class ChronoRemoteTimelineScreen extends Screen {
 
         y += 4;
         if (selected.id() == TimelineProjectionManager.getHeadCommitId()) {
-            guiGraphics.drawWordWrap(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.is_current"),
+            wrapped(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.is_current"),
                     x, y, sidebarWidth - 2 * PADDING, TEXT_SECONDARY);
             return;
         }
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.cost"), x, y, TEXT_MUTED);
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.cost"), x, y, TEXT_MUTED);
         y += LINE_HEIGHT;
         String cost = TimelineProjectionManager.getJumpCost(selected.id())
                 .map(c -> ShortEnergyDisplay.format(c.total())).orElse("...");
-        guiGraphics.drawString(font, cost, x, y, COST_COLOR);
+        text(guiGraphics, font, cost, x, y, COST_COLOR);
     }
 
     /** A small muted label with its value beneath; returns the y below it. */
     private int detail(GuiGraphics guiGraphics, int x, int y, String key, String value) {
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline." + key), x, y, TEXT_MUTED);
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline." + key), x, y, TEXT_MUTED);
         y += LINE_HEIGHT;
-        guiGraphics.drawString(font, value, x, y, TEXT_PRIMARY);
+        text(guiGraphics, font, value, x, y, TEXT_PRIMARY);
         return y + LINE_HEIGHT + 3;
     }
 
     private void renderFooter(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        guiGraphics.fill(panelLeft + 1, footerTop(), panelLeft + panelWidth - 1, footerTop() + 1, DIVIDER_COLOR);
+        guiGraphics.fill(panelLeft + 3, footerTop(), panelLeft + panelWidth - 3, footerTop() + 1, DIVIDER_COLOR);
 
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.controls"),
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.timeline.controls"),
                 panelLeft + PADDING + 2, footerTop() + (FOOTER_HEIGHT - font.lineHeight) / 2, TEXT_MUTED);
 
-        RemoteUi.drawButton(guiGraphics, font, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
-                Component.translatable("gui.temporalindustries.chrono_remote.close"), true, false, mouseX, mouseY);
-        RemoteUi.drawButton(guiGraphics, font, previewButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH,
-                Component.translatable("gui.temporalindustries.chrono_remote.timeline.preview"), canPreview(), true, mouseX, mouseY);
+        drawMachineButton(guiGraphics, font, closeButtonLeft(), buttonTop(),
+                Component.translatable("gui.temporalindustries.chrono_remote.close"), null, true, mouseX, mouseY);
+        drawMachineButton(guiGraphics, font, previewButtonLeft(), buttonTop(),
+                Component.translatable("gui.temporalindustries.chrono_remote.timeline.preview"), ICON_JUMP_TEXTURE,
+                canPreview(), mouseX, mouseY);
     }
 
     private CommitNode selectedCommit() {
@@ -257,11 +260,11 @@ public class ChronoRemoteTimelineScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
-            if (isOver(mouseX, mouseY, previewButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+            if (isOver(mouseX, mouseY, previewButtonLeft(), buttonTop(), MACHINE_BUTTON_WIDTH, MACHINE_BUTTON_HEIGHT)) {
                 startPreview();
                 return true;
             }
-            if (isOver(mouseX, mouseY, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH, BUTTON_HEIGHT)) {
+            if (isOver(mouseX, mouseY, closeButtonLeft(), buttonTop(), MACHINE_BUTTON_WIDTH, MACHINE_BUTTON_HEIGHT)) {
                 onClose();
                 return true;
             }

@@ -208,9 +208,17 @@ public class ChronoRemoteWheelScreen extends Screen {
         return 2.0D * Math.PI / options.size();
     }
 
-    /** Center angle of option index's slice; option 0 sits at the top, the rest clockwise. */
+    /**
+     * Center angle of the first slice: at the top, except that a pair sits side by side with the
+     * first on the left.
+     */
+    private double firstSliceAngle() {
+        return options.size() == 2 ? Math.PI : -Math.PI / 2.0D;
+    }
+
+    /** Center angle of option index's slice; the rest follow the first clockwise. */
     private double sliceAngle(int index) {
-        return -Math.PI / 2.0D + sliceStep() * index;
+        return firstSliceAngle() + sliceStep() * index;
     }
 
     @Nullable
@@ -220,7 +228,7 @@ public class ChronoRemoteWheelScreen extends Screen {
         if (dx * dx + dy * dy < INNER_RADIUS * INNER_RADIUS) return null;
 
         double step = sliceStep();
-        double angle = Math.atan2(dy, dx) + Math.PI / 2.0D + step / 2.0D;
+        double angle = Math.atan2(dy, dx) - firstSliceAngle() + step / 2.0D;
         angle = ((angle % (2.0D * Math.PI)) + 2.0D * Math.PI) % (2.0D * Math.PI);
         return options.get((int) (angle / step) % options.size());
     }

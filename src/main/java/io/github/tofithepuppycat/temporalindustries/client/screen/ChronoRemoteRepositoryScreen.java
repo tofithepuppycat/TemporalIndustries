@@ -34,7 +34,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     private static final int SECONDARY_BUTTON_WIDTH = 64;
     private static final int BUTTON_GAP = 6;
 
-    private static final int SUGGESTION_HOVER_COLOR = 0xFF2C2C42;
+    private static final int SUGGESTION_HOVER_COLOR = 0xFFD8D8D8;
 
     private EditBox nameBox;
     private String lastRequested = null;
@@ -122,6 +122,11 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     }
 
     @Override
+    public void renderBackground(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
+        // The backdrop is drawn in render without the menu blur.
+    }
+
+    @Override
     public void removed() {
         ChronosphereClientState.clearSuggestions();
     }
@@ -129,20 +134,20 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     @Override
     public void render(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY, float partialTick) {
         guiGraphics.fill(0, 0, width, height, BACKDROP_COLOR);
-        drawPanel(guiGraphics, panelLeft, panelTop, PANEL_WIDTH, panelHeight, PANEL_COLOR, PANEL_BORDER_COLOR);
+        drawBackground(guiGraphics, panelLeft, panelTop, PANEL_WIDTH, panelHeight);
 
-        guiGraphics.drawString(font, title, panelLeft + PADDING + 2, panelTop + (HEADER_HEIGHT - font.lineHeight) / 2, ACCENT_COLOR);
+        text(guiGraphics, font, title, panelLeft + PADDING + 2, panelTop + (HEADER_HEIGHT - font.lineHeight) / 2, TEXT_PRIMARY);
 
         int y = panelTop + HEADER_HEIGHT + PADDING;
         String current = ChronoRemoteClientState.getRepositoryName();
-        guiGraphics.drawString(font, Component.translatable("gui.temporalindustries.chrono_remote.repository.current"),
+        text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.repository.current"),
                 panelLeft + PADDING + 2, y, TEXT_MUTED);
-        guiGraphics.drawString(font, current.isEmpty()
+        text(guiGraphics, font, current.isEmpty()
                         ? Component.translatable("gui.temporalindustries.chrono_remote.repository.none") : Component.literal(current),
                 panelLeft + PADDING + 2, y + LINE_HEIGHT, TEXT_PRIMARY);
 
         renderSuggestions(guiGraphics, mouseX, mouseY);
-        guiGraphics.fill(panelLeft + 1, footerTop(), panelLeft + PANEL_WIDTH - 1, footerTop() + 1, DIVIDER_COLOR);
+        guiGraphics.fill(panelLeft + 3, footerTop(), panelLeft + PANEL_WIDTH - 3, footerTop() + 1, DIVIDER_COLOR);
         drawButton(guiGraphics, font, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
                 Component.translatable("gui.temporalindustries.chrono_remote.close"), true, false, mouseX, mouseY);
         drawButton(guiGraphics, font, changeButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH,
@@ -155,11 +160,11 @@ public class ChronoRemoteRepositoryScreen extends Screen {
         int top = suggestionsTop();
         int left = panelLeft + PADDING;
         int width = PANEL_WIDTH - 2 * PADDING;
-        drawPanel(guiGraphics, left, top, width, SUGGESTION_ROWS * SUGGESTION_HEIGHT, SIDEBAR_COLOR, DIVIDER_COLOR);
+        drawInset(guiGraphics, left, top, width, SUGGESTION_ROWS * SUGGESTION_HEIGHT);
 
         List<String> names = suggestions();
         if (names.isEmpty()) {
-            guiGraphics.drawString(font, Component.translatable(nameBox.getValue().isBlank()
+            text(guiGraphics, font, Component.translatable(nameBox.getValue().isBlank()
                             ? "gui.temporalindustries.chrono_remote.repository.type_hint"
                             : "gui.temporalindustries.chrono_remote.repository.no_matches"),
                     left + PADDING, top + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_MUTED);
@@ -170,7 +175,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
             if (isOver(mouseX, mouseY, left + 1, rowTop, width - 2, SUGGESTION_HEIGHT)) {
                 guiGraphics.fill(left + 1, rowTop, left + width - 1, rowTop + SUGGESTION_HEIGHT, SUGGESTION_HOVER_COLOR);
             }
-            guiGraphics.drawString(font, names.get(i), left + PADDING, rowTop + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_PRIMARY);
+            text(guiGraphics, font, names.get(i), left + PADDING, rowTop + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_PRIMARY);
         }
     }
 
