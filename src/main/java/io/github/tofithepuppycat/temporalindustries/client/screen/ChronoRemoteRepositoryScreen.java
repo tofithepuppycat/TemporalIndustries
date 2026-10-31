@@ -30,6 +30,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     private static final int INPUT_HEIGHT = 18;
     private static final int SUGGESTION_ROWS = 5;
     private static final int SUGGESTION_HEIGHT = 14;
+    private static final int STATS_HEIGHT = 2 * LINE_HEIGHT + 8;
     private static final int PRIMARY_BUTTON_WIDTH = 112;
     private static final int SECONDARY_BUTTON_WIDTH = 64;
     private static final int BUTTON_GAP = 6;
@@ -50,7 +51,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     @Override
     protected void init() {
         panelHeight = HEADER_HEIGHT + PADDING + LINE_HEIGHT * 2 + INPUT_HEIGHT + PADDING
-                + SUGGESTION_ROWS * SUGGESTION_HEIGHT + PADDING + FOOTER_HEIGHT;
+                + SUGGESTION_ROWS * SUGGESTION_HEIGHT + PADDING + STATS_HEIGHT + PADDING + FOOTER_HEIGHT;
         panelLeft = (width - PANEL_WIDTH) / 2;
         panelTop = Math.max(0, (height - panelHeight) / 2);
 
@@ -74,6 +75,10 @@ public class ChronoRemoteRepositoryScreen extends Screen {
 
     private int suggestionsTop() {
         return inputTop() + INPUT_HEIGHT + PADDING;
+    }
+
+    private int statsTop() {
+        return suggestionsTop() + SUGGESTION_ROWS * SUGGESTION_HEIGHT + PADDING;
     }
 
     private int footerTop() {
@@ -129,6 +134,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     @Override
     public void removed() {
         ChronosphereClientState.clearSuggestions();
+        ChronoRemoteClientState.updateRepositoryInfo("", null);
     }
 
     @Override
@@ -147,6 +153,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
                 panelLeft + PADDING + 2, y + LINE_HEIGHT, TEXT_PRIMARY);
 
         renderSuggestions(guiGraphics, mouseX, mouseY);
+        renderStats(guiGraphics);
         guiGraphics.fill(panelLeft + 3, footerTop(), panelLeft + PANEL_WIDTH - 3, footerTop() + 1, DIVIDER_COLOR);
         drawButton(guiGraphics, font, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
                 Component.translatable("gui.temporalindustries.chrono_remote.close"), true, false, mouseX, mouseY);
@@ -177,6 +184,47 @@ public class ChronoRemoteRepositoryScreen extends Screen {
             }
             text(guiGraphics, font, names.get(i), left + PADDING, rowTop + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_PRIMARY);
         }
+    }
+
+    /** What the typed repository holds, or that the name would create a new one. */
+    private void renderStats(GuiGraphics guiGraphics) {
+        int left = panelLeft + PADDING;
+        int width = PANEL_WIDTH - 2 * PADDING;
+        int top = statsTop();
+        drawInset(guiGraphics, left, top, width, STATS_HEIGHT);
+
+        int x = left + PADDING;
+        int y = top + 5;
+        String typed = nameBox.getValue();
+        if (typed.isBlank() || !ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)) return;
+
+        TemporalWorldData.RepositoryStats stats = ChronoRemoteClientState.getRepositoryInfo();
+        String prefix = "gui.temporalindustries.chrono_remote.repository.stats_";
+        if (stats == null) {
+            text(guiGraphics, font, Component.translatable(prefix + "new"), x, y, TEXT_MUTED);
+            return;
+        }
+
+        text(guiGraphics, font, Component.translatable(prefix + "counts", stats.commits(), stats.branches(), stats.chunks()),
+                x, y, TEXT_PRIMARY);
+        long now = minecraft != null && minecraft.level != null ? minecraft.level.getGameTime() : 0L;
+        Component last = stats.lastCommitTime() < 0L
+                ? Component.translatable(prefix + "no_commits")
+                : Component.translatable(prefix + "last", formatAge(now - stats.lastCommitTime()));
+        Component detail = stats.currentBranch().isEmpty() ? last
+                : Component.translatable(prefix + "branch", stats.currentBranch(), last);
+        text(guiGraphics, font, detail, x, y + LINE_HEIGHT, TEXT_SECONDARY);
+    }
+
+    private static String formatAge(long ticks) {
+        long totalSeconds = Math.max(0L, ticks) / 20L;
+        long days = totalSeconds / 86400L;
+        long hours = (totalSeconds % 86400L) / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        if (days > 0L) return days + "d " + hours + "h ago";
+        if (hours > 0L) return hours + "h " + minutes + "m ago";
+        if (minutes > 0L) return minutes + "m ago";
+        return totalSeconds + "s ago";
     }
 
     @Override

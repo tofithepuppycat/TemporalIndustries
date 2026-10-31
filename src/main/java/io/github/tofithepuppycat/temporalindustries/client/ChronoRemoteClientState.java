@@ -3,9 +3,11 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronoRemoteChunkScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
+import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import net.minecraft.client.Minecraft;
-import net.minecraft.network.chat.Component;
 import net.minecraft.core.BlockPos;
+import net.minecraft.network.chat.Component;
+import org.jetbrains.annotations.Nullable;
 
 /**
  * What the Chrono Remote Control is doing on the client between wheel selections: outlining the
@@ -25,7 +27,26 @@ public final class ChronoRemoteClientState {
     private static boolean chargeContainers;
     private static String repositoryName = "";
 
+    private static String repositoryInfoQuery = "";
+    @Nullable private static TemporalWorldData.RepositoryStats repositoryInfo;
+
     private ChronoRemoteClientState() {}
+
+    /** The query the repository stats answer, so a late reply to text the player has since changed can be told apart. */
+    public static String getRepositoryInfoQuery() {
+        return repositoryInfoQuery;
+    }
+
+    /** What the free repository named by the last query holds, or null if there is none. */
+    @Nullable
+    public static TemporalWorldData.RepositoryStats getRepositoryInfo() {
+        return repositoryInfo;
+    }
+
+    public static void updateRepositoryInfo(String query, @Nullable TemporalWorldData.RepositoryStats stats) {
+        repositoryInfoQuery = query;
+        repositoryInfo = stats;
+    }
 
     public static boolean isChunkPreview() {
         return mode == Mode.CHUNK_PREVIEW;
@@ -58,6 +79,20 @@ public final class ChronoRemoteClientState {
         TimelineProjectionManager.enableShowChanges();
     }
 
+    /** Whether the preview is of the changes a commit would record rather than of a jump. */
+    public static boolean isCommitReview() {
+        return mode == Mode.COMMIT_PREVIEW && previewCommitId == TimelineViewProvider.PENDING_CHANGES;
+    }
+
+    /** Shows how the world differs from the head of machinePos's repository until the player commits or cancels. */
+    public static void startCommitReview(BlockPos machinePos) {
+        endSession();
+        TimelineProjectionManager.clearAll();
+        TimelineProjectionManager.setActiveMachine(machinePos);
+        TimelineProjectionManager.selectPendingChanges();
+        startPreview(TimelineViewProvider.PENDING_CHANGES);
+    }
+
     public static void endSession() {
         if (mode == Mode.COMMIT_PREVIEW) {
             TimelineProjectionManager.clearAll();
@@ -79,20 +114,6 @@ public final class ChronoRemoteClientState {
         saveEntities = saveEntitiesNow;
         chargeContainers = chargeContainersNow;
         repositoryName = repositoryNameNow;
-    /** Whether the preview is of the changes a commit would record rather than of a jump. */
-    public static boolean isCommitReview() {
-        return mode == Mode.COMMIT_PREVIEW && previewCommitId == TimelineViewProvider.PENDING_CHANGES;
-    }
-
-    /** Shows how the world differs from the head of machinePos's repository until the player commits or cancels. */
-    public static void startCommitReview(BlockPos machinePos) {
-        endSession();
-        TimelineProjectionManager.clearAll();
-        TimelineProjectionManager.setActiveMachine(machinePos);
-        TimelineProjectionManager.selectPendingChanges();
-        startPreview(TimelineViewProvider.PENDING_CHANGES);
-    }
-
 
         // Chunk selection only makes sense on a machine that claims more than its own chunk.
         if (chronosphereNow && boundNow) {
@@ -124,5 +145,6 @@ public final class ChronoRemoteClientState {
         saveEntities = false;
         chargeContainers = false;
         repositoryName = "";
+        updateRepositoryInfo("", null);
     }
 }

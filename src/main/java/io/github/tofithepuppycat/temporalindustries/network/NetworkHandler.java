@@ -74,6 +74,11 @@ public class NetworkHandler {
                 RepositorySuggestSyncPacket.STREAM_CODEC,
                 RepositorySuggestSyncPacket::handle);
 
+        registrar.playToClient(
+                RepositoryInfoSyncPacket.TYPE,
+                RepositoryInfoSyncPacket.STREAM_CODEC,
+                RepositoryInfoSyncPacket::handle);
+
         registrar.playToServer(
                 ChronosphereUnbindRepositoryPacket.TYPE,
                 ChronosphereUnbindRepositoryPacket.STREAM_CODEC,

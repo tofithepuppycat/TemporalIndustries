@@ -78,6 +78,8 @@ public class ChronoRemoteRepositoryPacket implements CustomPacketPayload {
         List<String> names = TemporalWorldData.get(sender.server).suggestAvailableRepositoryNames(
                 query, level.dimension().location(), RepositorySuggestRequestPacket.MAX_SUGGESTIONS);
         PacketDistributor.sendToPlayer(sender, new RepositorySuggestSyncPacket(query, names));
+        PacketDistributor.sendToPlayer(sender, new RepositoryInfoSyncPacket(query,
+                TemporalWorldData.get(sender.server).availableRepositoryStats(query, level.dimension().location())));
     }
 
     private static void change(ServerPlayer sender, AbstractTimelineMachineBlockEntity machine, ServerLevel level, String name) {
