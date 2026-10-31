@@ -31,6 +31,7 @@ import org.jetbrains.annotations.Nullable;
 
 import java.util.List;
 import java.util.Optional;
+import java.util.UUID;
 
 /**
  * Handheld tool that picks what a Chronosphere records by area instead of by chunk: link it to a
@@ -45,6 +46,7 @@ public class TemporalGlueItem extends Item {
     private static final String PENDING_X = "Pos1X";
     private static final String PENDING_Y = "Pos1Y";
     private static final String PENDING_Z = "Pos1Z";
+    private static final String LINKED_REPOSITORY = "LinkedRepository";
     private static final String MESSAGE_PREFIX = "item.temporalindustries.temporal_glue.";
 
     public TemporalGlueItem(Properties properties) {
@@ -61,13 +63,19 @@ public class TemporalGlueItem extends Item {
     @Override
     public InteractionResult onItemUseFirst(ItemStack stack, UseOnContext context) {
         Level level = context.getLevel();
-        if (!(level.getBlockEntity(context.getClickedPos()) instanceof ChronosphereBlockEntity)) {
+        if (!(level.getBlockEntity(context.getClickedPos()) instanceof ChronosphereBlockEntity clicked)) {
             return InteractionResult.PASS;
         }
 
         if (!level.isClientSide && context.getPlayer() != null) {
+            UUID repositoryId = clicked.getRepositoryId();
+            if (repositoryId == null) {
+                context.getPlayer().displayClientMessage(Component.translatable(MESSAGE_PREFIX + "not_bound"), true);
+                return InteractionResult.sidedSuccess(false);
+            }
             stack.set(Registration.LINKED_CHRONOSPHERE.get(), GlobalPos.of(level.dimension(), context.getClickedPos()));
             clearPending(stack);
+            setLinkedRepository(stack, repositoryId);
             context.getPlayer().displayClientMessage(Component.translatable(MESSAGE_PREFIX + "linked"), true);
             level.playSound(null, context.getClickedPos(), SoundEvents.AMETHYST_BLOCK_CHIME, SoundSource.PLAYERS, 1.0F, 1.0F);
         }
@@ -104,7 +112,9 @@ public class TemporalGlueItem extends Item {
         clearPending(stack);
         ChronosphereBlockEntity machine = resolveMachine(serverLevel, stack);
         if (machine == null) {
-            player.displayClientMessage(Component.translatable(MESSAGE_PREFIX + "unreachable"), true);
+            boolean lost = isLinkLost(serverLevel, stack);
+            if (lost) unlink(stack);
+            player.displayClientMessage(Component.translatable(MESSAGE_PREFIX + (lost ? "link_lost" : "unreachable")), true);
             return InteractionResult.SUCCESS;
         }
 
@@ -122,13 +132,61 @@ public class TemporalGlueItem extends Item {
         return InteractionResult.SUCCESS;
     }
 
-    /** The Chronosphere stack is linked to, if it is loaded and in level's dimension. */
+    /**
+     * The Chronosphere stack is linked to, if it is loaded, in level's dimension and still bound to
+     * the repository the link was made under. A Chronosphere that was broken and placed again, or
+     * bound to another repository, is a different machine as far as the link is concerned.
+     */
     @Nullable
     public static ChronosphereBlockEntity resolveMachine(ServerLevel level, ItemStack stack) {
+        ChronosphereBlockEntity machine = linkedMachine(level, stack);
+        if (machine == null) return null;
+
+        UUID current = machine.getRepositoryId();
+        UUID linked = getLinkedRepository(stack);
+        if (linked == null) {
+            // A link made before links recorded their repository adopts the one the machine has now.
+            if (current == null) return null;
+            setLinkedRepository(stack, current);
+            return machine;
+        }
+        return linked.equals(current) ? machine : null;
+    }
+
+    /** Whether stack's link can never work again without being remade: its machine is gone or bound elsewhere. */
+    private static boolean isLinkLost(ServerLevel level, ItemStack stack) {
+        GlobalPos linked = getLinkedChronosphere(stack);
+        if (linked == null || !linked.dimension().equals(level.dimension()) || !level.isLoaded(linked.pos())) return false;
+        return !(level.getBlockEntity(linked.pos()) instanceof ChronosphereBlockEntity)
+                || (linkedMachine(level, stack) != null && resolveMachine(level, stack) == null);
+    }
+
+    @Nullable
+    private static ChronosphereBlockEntity linkedMachine(ServerLevel level, ItemStack stack) {
         GlobalPos linked = getLinkedChronosphere(stack);
         if (linked == null || !linked.dimension().equals(level.dimension()) || !level.isLoaded(linked.pos())) return null;
         BlockEntity be = level.getBlockEntity(linked.pos());
         return be instanceof ChronosphereBlockEntity machine ? machine : null;
+    }
+
+    @Nullable
+    private static UUID getLinkedRepository(ItemStack stack) {
+        CompoundTag data = readData(stack);
+        return data.hasUUID(LINKED_REPOSITORY) ? data.getUUID(LINKED_REPOSITORY) : null;
+    }
+
+    private static void setLinkedRepository(ItemStack stack, UUID repositoryId) {
+        CompoundTag data = readData(stack);
+        data.putUUID(LINKED_REPOSITORY, repositoryId);
+        stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
+    }
+
+    private static void unlink(ItemStack stack) {
+        stack.remove(Registration.LINKED_CHRONOSPHERE.get());
+        CompoundTag data = readData(stack);
+        data.remove(LINKED_REPOSITORY);
+        if (data.isEmpty()) stack.remove(DataComponents.CUSTOM_DATA);
+        else stack.set(DataComponents.CUSTOM_DATA, CustomData.of(data));
     }
 
     /**
