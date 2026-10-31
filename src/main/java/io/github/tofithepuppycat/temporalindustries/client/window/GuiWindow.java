@@ -161,15 +161,13 @@ public abstract class GuiWindow {
 
         int closeX = closeX();
         int closeY = closeY();
-        guiGraphics.fill(closeX, closeY, closeX + CLOSE_SIZE, closeY + CLOSE_SIZE, COLOR_BORDER);
-        guiGraphics.fill(closeX + 1, closeY + 1, closeX + CLOSE_SIZE - 1, closeY + CLOSE_SIZE - 1,
+        drawShadedBox(guiGraphics, closeX, closeY, CLOSE_SIZE, CLOSE_SIZE,
                 isOverClose(mouseX, mouseY) ? 0xFFB04A4A : 0xFF6A6A6A);
         drawCenteredNoShadow(guiGraphics, "x", closeX + CLOSE_SIZE / 2 + 1, closeY + 1, 0xFFFFFFFF);
 
         int pinX = pinX();
-        guiGraphics.fill(pinX, closeY, pinX + CLOSE_SIZE, closeY + CLOSE_SIZE, COLOR_BORDER);
         int pinBase = isPinned() ? 0xFF4A9A5A : 0xFF6A6A6A;
-        guiGraphics.fill(pinX + 1, closeY + 1, pinX + CLOSE_SIZE - 1, closeY + CLOSE_SIZE - 1,
+        drawShadedBox(guiGraphics, pinX, closeY, CLOSE_SIZE, CLOSE_SIZE,
                 isOverPin(mouseX, mouseY) ? brighten(pinBase) : pinBase);
         drawCenteredNoShadow(guiGraphics, "P", pinX + CLOSE_SIZE / 2 + 1, closeY + 1, 0xFFFFFFFF);
 
@@ -271,9 +269,29 @@ public abstract class GuiWindow {
     protected final void drawButton(GuiGraphics guiGraphics, int buttonX, int buttonY, int width, int height,
                                     Component label, int baseColor, boolean hovered) {
         int bg = hovered ? brighten(baseColor) : baseColor;
-        guiGraphics.fill(buttonX, buttonY, buttonX + width, buttonY + height, COLOR_BORDER);
-        guiGraphics.fill(buttonX + 1, buttonY + 1, buttonX + width - 1, buttonY + height - 1, bg);
+        drawShadedBox(guiGraphics, buttonX, buttonY, width, height, bg);
         drawCenteredNoShadow(guiGraphics, label, buttonX + width / 2, buttonY + (height - 8) / 2, 0xFFFFFFFF);
+    }
+
+    /**
+     * A button face in the style of the mod's button textures: a black outline, a lighter edge along
+     * the top and left and a darker one along the bottom and right.
+     */
+    private static void drawShadedBox(GuiGraphics guiGraphics, int boxX, int boxY, int width, int height, int fill) {
+        int right = boxX + width;
+        int bottom = boxY + height;
+        guiGraphics.fill(boxX, boxY, right, bottom, COLOR_BORDER);
+        guiGraphics.fill(boxX + 1, boxY + 1, right - 1, bottom - 1, shade(fill, 0.75F));
+        guiGraphics.fill(boxX + 1, boxY + 1, right - 1, boxY + 2, shade(fill, 1.5F));
+        guiGraphics.fill(boxX + 1, boxY + 1, boxX + 2, bottom - 1, shade(fill, 1.5F));
+        guiGraphics.fill(boxX + 2, boxY + 2, right - 2, bottom - 2, fill);
+    }
+
+    private static int shade(int color, float factor) {
+        int r = Math.min(255, Math.round(((color >> 16) & 0xFF) * factor));
+        int g = Math.min(255, Math.round(((color >> 8) & 0xFF) * factor));
+        int b = Math.min(255, Math.round((color & 0xFF) * factor));
+        return 0xFF000000 | (r << 16) | (g << 8) | b;
     }
 
     protected final void drawDivider(GuiGraphics guiGraphics, int dividerY, int inset) {
