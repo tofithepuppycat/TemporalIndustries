@@ -139,6 +139,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private int ticksSinceSync = 0;
     private final WindowManager windows = new WindowManager();
     private final ChronosphereMapWindow mapWindow;
+    /** Set when the machine becomes bound, until the chunk map has been offered to a player with nothing claimed. */
+    private boolean claimPromptPending = false;
     private final TimelineSettingsWindow settingsWindow;
 
     private int bookmarkX;
@@ -235,6 +237,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         nameBox.visible = !bound;
         nameBox.active = !bound;
         if (bound && !boundLastTick) {
+            claimPromptPending = true;
             windows.openPinned(mapWindow, settingsWindow);
             requestTimelineView(true);
             PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
@@ -394,12 +397,23 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         refreshBoundState();
         if (!boundLastTick) return;
 
+        promptToSelectChunks();
         windows.tick();
         ticksSinceSync++;
         if (ticksSinceSync >= SYNC_INTERVAL_TICKS) {
             ticksSinceSync = 0;
             requestTimelineView(false);
             PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
+        }
+    }
+
+    /** Opens the chunk map for a machine that claims nothing yet, once, as soon as the server has said so. */
+    private void promptToSelectChunks() {
+        if (!claimPromptPending || !ChronosphereClientState.hasSynced()) return;
+
+        claimPromptPending = false;
+        if (ChronosphereClientState.getSelectedCount() == 0 && !windows.isOpen(mapWindow)) {
+            windows.open(mapWindow, panelX(), panelY());
         }
     }
 

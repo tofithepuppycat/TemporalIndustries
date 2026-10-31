@@ -16,6 +16,8 @@ public final class ChronosphereClientState {
     private static Set<Long> selectedChunks = new HashSet<>();
     private static Set<Long> blockedChunks = new HashSet<>();
     private static int capturedCount = 0;
+    /** Whether the server has reported this machine's claims since it became the active one. */
+    private static boolean synced = false;
     private static String currentBranch = "";
     private static String suggestionQuery = "";
     private static List<String> suggestions = List.of();
@@ -23,6 +25,7 @@ public final class ChronosphereClientState {
     private ChronosphereClientState() {}
 
     public static void setActiveMachine(BlockPos machinePos) {
+        if (!machinePos.equals(activeMachinePos)) synced = false;
         activeMachinePos = machinePos;
     }
 
@@ -38,6 +41,7 @@ public final class ChronosphereClientState {
         selectedChunks = new HashSet<>();
         blockedChunks = new HashSet<>();
         capturedCount = 0;
+        synced = false;
         currentBranch = "";
         clearSuggestions();
     }
@@ -49,6 +53,12 @@ public final class ChronosphereClientState {
         blockedChunks = serverBlocked;
         capturedCount = serverCapturedCount;
         currentBranch = serverCurrentBranch;
+        synced = true;
+    }
+
+    /** Whether {@link #getSelectedChunks} is the server's answer rather than the empty default. */
+    public static boolean hasSynced() {
+        return synced;
     }
 
     /**

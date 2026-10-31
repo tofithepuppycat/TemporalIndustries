@@ -36,10 +36,10 @@ import java.util.Set;
 import java.util.UUID;
 
 /**
- * Block entity for the Chronosphere and the Chronovault: the player claims a square chunk area
- * (centred on and always including the home chunk), 11x11 for the Chronosphere and 3x3 for the
- * Chronovault, and a single jump moves every claimed chunk to the same target time, paid from one
- * shared energy pool.
+ * Block entity for the Chronosphere and the Chronovault: the player claims chunks within a square
+ * area centred on the machine's chunk, 11x11 for the Chronosphere and 3x3 for the Chronovault. A
+ * machine claims nothing until the player chooses, and a single jump moves every claimed chunk to
+ * the same target time, paid from one shared energy pool.
  */
 public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity {
     /**
@@ -55,11 +55,13 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     private static final int ENERGY_TRANSFER  = 1_000_000_000;
     private static final int CREATIVE_ENERGY_CAPACITY = Integer.MAX_VALUE;
 
-    public enum ToggleResult { ADDED, REMOVED, IS_HOME, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED, REGION_CHUNK }
+    public enum ToggleResult { ADDED, REMOVED, OUT_OF_BOUNDS, ALREADY_CLAIMED_ELSEWHERE, LIMIT_REACHED, NOT_SELECTED, REGION_CHUNK }
 
     public enum RegionResult { ADDED, NOT_BOUND, OUT_OF_BOUNDS, CLAIMED_ELSEWHERE }
 
-    /** Claimed chunks beyond the home chunk (which is always implicitly included). */
+    private static final String EXPLICIT_CLAIMS = "ExplicitClaims";
+
+    /** The chunks the player claimed for this machine. */
     private final Set<Long> additionalChunks = new LinkedHashSet<>();
 
     public ChronosphereBlockEntity(BlockPos blockPos, BlockState blockState) {
@@ -83,10 +85,10 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return radiusFor(getBlockState());
     }
 
-    /** Home chunk plus up to this many additional chunks fills the whole claimable box. */
-    public int getMaxAdditionalChunks() {
+    /** Claiming this many chunks fills the whole claimable box. */
+    public int getMaxClaimedChunks() {
         int side = getMaxRadius() * 2 + 1;
-        return side * side - 1;
+        return side * side;
     }
 
     @Override
@@ -150,11 +152,10 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         return CLAIM_SHAPE.contains(radius, dx, dz);
     }
 
-    /** Every chunk this machine currently controls, home chunk first. */
+    /** Every chunk this machine currently controls. */
     @Override
     public List<ChunkPos> getAllChunks() {
-        List<ChunkPos> chunks = new ArrayList<>(additionalChunks.size() + 1);
-        chunks.add(getHomeChunkPos());
+        List<ChunkPos> chunks = new ArrayList<>(additionalChunks.size());
         for (long key : additionalChunks) chunks.add(new ChunkPos(key));
         TemporalRepository repo = getRepository();
         if (repo != null) {
@@ -174,8 +175,6 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         UUID repoId = getRepositoryId();
         if (repoId == null || !(level instanceof ServerLevel serverLevel) || level.getServer() == null) return ToggleResult.OUT_OF_BOUNDS;
 
-        ChunkPos home = getHomeChunkPos();
-        if (pos.equals(home)) return ToggleResult.IS_HOME;
         if (!isWithinBounds(pos)) return ToggleResult.OUT_OF_BOUNDS;
 
         TemporalWorldData worldData = TemporalWorldData.get(level.getServer());
@@ -186,7 +185,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
 
         if (add) {
             if (additionalChunks.contains(key)) return ToggleResult.ADDED;
-            if (additionalChunks.size() >= getMaxAdditionalChunks()) return ToggleResult.LIMIT_REACHED;
+            if (additionalChunks.size() >= getMaxClaimedChunks()) return ToggleResult.LIMIT_REACHED;
 
             if (regionChunk) {
                 // Already claimed for a glued region; claiming it outright tracks all of it.
@@ -318,6 +317,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         ListTag chunkList = new ListTag();
         for (long key : additionalChunks) chunkList.add(LongTag.valueOf(key));
         tag.put("AdditionalChunks", chunkList);
+        tag.putBoolean(EXPLICIT_CLAIMS, true);
     }
 
     @Override
@@ -328,6 +328,10 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
         ListTag chunkList = tag.getList("AdditionalChunks", Tag.TAG_LONG);
         for (int i = 0; i < chunkList.size(); i++) {
             if (chunkList.get(i) instanceof LongTag longTag) additionalChunks.add(longTag.getAsLong());
+        }
+        // Machines saved before claims were explicit always controlled their own chunk.
+        if (tag.contains("AdditionalChunks") && !tag.contains(EXPLICIT_CLAIMS)) {
+            additionalChunks.add(getHomeChunkPos().toLong());
         }
     }
 }

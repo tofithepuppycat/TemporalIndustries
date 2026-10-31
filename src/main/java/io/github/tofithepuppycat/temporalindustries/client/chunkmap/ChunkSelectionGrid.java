@@ -18,8 +18,12 @@ public final class ChunkSelectionGrid {
     private static final int FRAME_BORDER = 0xFF3A3A3A;
     private static final int HOVER_FILL = 0x30FFFFFF;
     private static final int HOVER_BORDER = 0xFFFFFFFF;
+    private static final int RANGE_BORDER = 0xFFFFFFFF;
+    /** Laid over cells that are drawn for context but can't be selected. */
+    private static final int OUT_OF_RANGE_DIM = 0x90000000;
 
     private final int radius;
+    private final int claimRadius;
     private final ChunkArea.Shape shape;
     private final int cellSize;
     private final int gridSize;
@@ -32,7 +36,16 @@ public final class ChunkSelectionGrid {
 
     /** {@code cellSize} lets a wide-radius grid shrink its cells to stay inside its host panel. */
     public ChunkSelectionGrid(int radius, ChunkArea.Shape shape, int cellSize) {
+        this(radius, radius, shape, cellSize);
+    }
+
+    /**
+     * A grid of {@code radius} whose selectable area is only the inner {@code claimRadius}; the
+     * cells around it are drawn dimmed and can't be selected.
+     */
+    public ChunkSelectionGrid(int radius, int claimRadius, ChunkArea.Shape shape, int cellSize) {
         this.radius = radius;
+        this.claimRadius = Math.min(claimRadius, radius);
         this.shape = shape;
         this.cellSize = cellSize;
         this.gridSize = radius * 2 + 1;
@@ -62,6 +75,15 @@ public final class ChunkSelectionGrid {
 
     /** Whether offset (dx, dz) from the anchor chunk falls within the selectable area. */
     public boolean isWithinRadius(int dx, int dz) {
+        return shape.contains(claimRadius, dx, dz);
+    }
+
+    /** The radius of the selectable area, which may be smaller than the grid's. */
+    public int claimRadius() {
+        return claimRadius;
+    }
+
+    private boolean isWithinGrid(int dx, int dz) {
         return shape.contains(radius, dx, dz);
     }
 
@@ -84,7 +106,7 @@ public final class ChunkSelectionGrid {
             for (int col = 0; col < gridSize; col++) {
                 int dx = col - radius;
                 int dz = row - radius;
-                if (!isWithinRadius(dx, dz)) continue;
+                if (!isWithinGrid(dx, dz)) continue;
 
                 int cellX = gridX + col * cs;
                 int cellY = gridY + row * cs;
@@ -103,8 +125,29 @@ public final class ChunkSelectionGrid {
                 } else {
                     guiGraphics.fill(cellX, cellY, cellX + size, cellY + size, tint);
                 }
+                if (!isWithinRadius(dx, dz)) {
+                    guiGraphics.fill(cellX, cellY, cellX + size, cellY + size, OUT_OF_RANGE_DIM);
+                }
             }
         }
+    }
+
+    /**
+     * Outlines the selectable area when it is smaller than the grid, just outside its outermost
+     * cells so the line never covers one.
+     */
+    public void renderRangeBorder(GuiGraphics guiGraphics, int gridX, int gridY, float zoom) {
+        if (claimRadius >= radius) return;
+
+        int cs = effectiveCellSize(zoom);
+        int x1 = gridX + (radius - claimRadius) * cs;
+        int y1 = gridY + (radius - claimRadius) * cs;
+        int x2 = gridX + (radius + claimRadius + 1) * cs;
+        int y2 = gridY + (radius + claimRadius + 1) * cs;
+        guiGraphics.fill(x1 - 2, y1 - 2, x2 + 2, y1, RANGE_BORDER);
+        guiGraphics.fill(x1 - 2, y2, x2 + 2, y2 + 2, RANGE_BORDER);
+        guiGraphics.fill(x1 - 2, y1, x1, y2, RANGE_BORDER);
+        guiGraphics.fill(x2, y1, x2 + 2, y2, RANGE_BORDER);
     }
 
     /**

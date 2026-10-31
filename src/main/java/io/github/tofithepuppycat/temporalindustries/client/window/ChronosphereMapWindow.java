@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.client.window;
 
+import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereMapRequestPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereToggleChunkPacket;
 import net.minecraft.client.gui.GuiGraphics;
@@ -12,6 +13,7 @@ public final class ChronosphereMapWindow extends GuiWindow {
     private static final int GRID_Y_OFFSET = 18;
     private static final int FOOTER_GAP = 4;
     private static final int FOOTER_LINE_SPACING = 10;
+    private static final int PROMPT_COLOR = 0xFF2A5E8C;
 
     private final ChronosphereMapView view;
 
@@ -51,8 +53,13 @@ public final class ChronosphereMapWindow extends GuiWindow {
         // The block entity the menu holds is the client's stale copy, so ChronosphereClientState
         // (plus this visit's pending toggles) is the only client-accurate source.
         int footerY = y + GRID_Y_OFFSET + view.gridPixels() + FOOTER_GAP;
-        drawCenteredNoShadow(guiGraphics, Component.literal(view.selectedCount() + "/" + view.totalClaimable() + " chunks selected"),
-                x + SIZE / 2, footerY, TEXT_SECONDARY);
+        if (ChronosphereClientState.hasSynced() && view.selectedCount() == 0) {
+            drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.select_prompt"),
+                    x + SIZE / 2, footerY, PROMPT_COLOR);
+        } else {
+            drawCenteredNoShadow(guiGraphics, Component.literal(view.selectedCount() + "/" + view.totalClaimable() + " chunks selected"),
+                    x + SIZE / 2, footerY, TEXT_SECONDARY);
+        }
         drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.map_hint"),
                 x + SIZE / 2, footerY + FOOTER_LINE_SPACING, TEXT_MUTED);
     }

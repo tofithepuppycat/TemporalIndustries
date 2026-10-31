@@ -427,7 +427,8 @@ public class TemporalWorldData extends SavedData {
     public void discardRepositoryIfUnused(UUID repoId) {
         TemporalRepository repo = repositories.get(repoId);
         if (repo == null || activeCommits.containsKey(repoId)) return;
-        if (!repo.getAllCommits().isEmpty() || !repo.getName().equals(defaultRepositoryName(repoId))) return;
+        if (!repo.getAllCommits().isEmpty() || !repo.getTrackedRegions().isEmpty()
+                || !repo.getName().equals(defaultRepositoryName(repoId))) return;
         deleteRepository(repoId);
     }
 

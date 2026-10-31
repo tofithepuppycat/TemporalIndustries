@@ -19,7 +19,9 @@ import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 
 /**
- * The Chronosphere's chunk claim map, drawn and driven inside whatever area its host gives it.
+ * The Chronosphere's chunk claim map, drawn and driven inside whatever area its host gives it. It
+ * always shows the full box a Chronosphere can claim; a machine that claims less has its own range
+ * outlined, with the rest of the map dimmed.
  * Claims and releases made while it is open are held locally and sent to the server as one batch
  * when it closes, rather than one packet per chunk touched.
  */
@@ -31,6 +33,7 @@ public final class ChronosphereMapView {
     private static final int MAP_CELL_SIZE = 15;
 
     private static final int COLOR_HOME = 0xFFFFD166;
+    private static final int COLOR_HOME_UNCLAIMED = 0xFF8A7440;
     private static final int COLOR_SELECTED = 0xFF3D9BE0;
     private static final int COLOR_BLOCKED = 0xFFB55050;
     private static final int COLOR_AVAILABLE = 0xFFAFAFAF;
@@ -47,6 +50,7 @@ public final class ChronosphereMapView {
     private final ChunkPos home;
     private final ChunkSelectionGrid mapGrid;
     private final int totalClaimable;
+    private final int claimRadius;
     private final Runnable requestThumbnails;
     private final Consumer<Map<Long, Boolean>> sendToggles;
 
@@ -86,9 +90,10 @@ public final class ChronosphereMapView {
     /** The map of the machine at machinePos, with the requests it makes left to the caller. */
     public ChronosphereMapView(BlockPos machinePos, Runnable requestThumbnails, Consumer<Map<Long, Boolean>> sendToggles) {
         this.home = new ChunkPos(machinePos);
-        int radius = claimRadiusAt(machinePos);
-        this.mapGrid = new ChunkSelectionGrid(radius, ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
-        this.totalClaimable = countClaimableCells(radius);
+        this.claimRadius = claimRadiusAt(machinePos);
+        this.mapGrid = new ChunkSelectionGrid(ChronosphereBlockEntity.MAX_RADIUS, claimRadius,
+                ChronosphereBlockEntity.CLAIM_SHAPE, MAP_CELL_SIZE);
+        this.totalClaimable = countClaimableCells(claimRadius);
         this.requestThumbnails = requestThumbnails;
         this.sendToggles = sendToggles;
     }
@@ -240,7 +245,7 @@ public final class ChronosphereMapView {
         mapGrid.render(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, home, new ChunkSelectionGrid.CellPainter() {
             @Override
             public int tint(int dx, int dz, long chunkKey) {
-                if (dx == 0 && dz == 0) return COLOR_HOME;
+                if (dx == 0 && dz == 0) return effectiveSelected.contains(chunkKey) ? COLOR_HOME : COLOR_HOME_UNCLAIMED;
                 if (effectiveSelected.contains(chunkKey)) return COLOR_SELECTED;
                 if (ChronosphereClientState.isBlocked(chunkKey)) return COLOR_BLOCKED;
                 return COLOR_AVAILABLE;
@@ -256,6 +261,7 @@ public final class ChronosphereMapView {
                 return (dx == 0 && dz == 0) || effectiveSelected.contains(chunkKey);
             }
         });
+        mapGrid.renderRangeBorder(guiGraphics, zoomedGridX(), zoomedGridY(), zoom);
 
         if (isOverGrid(mouseX, mouseY)) {
             mapGrid.renderHover(guiGraphics, zoomedGridX(), zoomedGridY(), zoom, mouseX, mouseY);
@@ -271,7 +277,7 @@ public final class ChronosphereMapView {
     public void mouseClicked(double mouseX, double mouseY, int button) {
         if (button == 0) {
             if (Screen.hasControlDown()) {
-                int[] start = mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
+                int[] start = clampToClaim(mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom));
                 rectStartDx = rectHoverDx = start[0];
                 rectStartDz = rectHoverDz = start[1];
                 rectDragActive = true;
@@ -280,7 +286,7 @@ public final class ChronosphereMapView {
                 dragAdding = !effectiveSelectedChunks().contains(startKey);
             } else {
                 ChunkPos clicked = cellAt(mouseX, mouseY);
-                if (clicked != null && !clicked.equals(home)) {
+                if (clicked != null) {
                     long key = clicked.toLong();
                     dragActive = true;
                     dragAdding = !effectiveSelectedChunks().contains(key);
@@ -299,15 +305,22 @@ public final class ChronosphereMapView {
             panY -= (int) Math.round(dragY);
             clampPan();
         } else if (button == 0 && rectDragActive) {
-            int[] hover = mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom);
+            int[] hover = clampToClaim(mapGrid.clampedOffsetAt(mouseX, mouseY, zoomedGridX(), zoomedGridY(), zoom));
             rectHoverDx = hover[0];
             rectHoverDz = hover[1];
         } else if (button == 0 && dragActive) {
             ChunkPos hovered = cellAt(mouseX, mouseY);
-            if (hovered != null && !hovered.equals(home)) {
+            if (hovered != null) {
                 applyDragToggle(hovered.toLong());
             }
         }
+    }
+
+    /** Keeps a rectangle's corner within the claimable box, so the preview never spans the dimmed cells. */
+    private int[] clampToClaim(int[] offset) {
+        offset[0] = Math.max(-claimRadius, Math.min(claimRadius, offset[0]));
+        offset[1] = Math.max(-claimRadius, Math.min(claimRadius, offset[1]));
+        return offset;
     }
 
     public void mouseReleased(double mouseX, double mouseY, int button) {
@@ -342,7 +355,6 @@ public final class ChronosphereMapView {
         int maxDz = Math.max(rectStartDz, rectHoverDz);
         for (int dx = minDx; dx <= maxDx; dx++) {
             for (int dz = minDz; dz <= maxDz; dz++) {
-                if (dx == 0 && dz == 0) continue; // home chunk isn't toggleable
                 if (!mapGrid.isWithinRadius(dx, dz)) continue;
                 applyDragToggle(new ChunkPos(home.x + dx, home.z + dz).toLong());
             }

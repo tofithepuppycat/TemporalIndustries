@@ -63,10 +63,13 @@ public class ChronosphereMapRequestPacket implements CustomPacketPayload {
         });
     }
 
-    /** Sends sender the terrain thumbnails of every loaded chunk in machine's claimable area. */
+    /**
+     * Sends sender the terrain thumbnails of every loaded chunk in the map around machine, which
+     * always spans the largest claimable box, whatever the machine itself can claim.
+     */
     public static void sendThumbnails(ServerPlayer sender, ChronosphereBlockEntity machine) {
         ChunkPos home = machine.getHomeChunkPos();
-        int radius = machine.getMaxRadius();
+        int radius = ChronosphereBlockEntity.MAX_RADIUS;
         Map<Long, byte[]> thumbnails = new LinkedHashMap<>();
         for (int dx = -radius; dx <= radius; dx++) {
             for (int dz = -radius; dz <= radius; dz++) {

@@ -379,7 +379,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return repo != null && !repo.isTracked(pos);
     }
 
-    /** Every chunk a jump on this machine moves together, home/primary chunk first. */
+    /** Every chunk a jump on this machine moves together. */
     public abstract List<ChunkPos> getAllChunks();
 
 
@@ -506,8 +506,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                 });
         if (requester == null) return;
         switch (start) {
-            case NOTHING_TO_COMMIT -> requester.displayClientMessage(
-                    Component.translatable("gui.temporalindustries.chrono_remote.msg.nothing_to_commit"), true);
+            case NOTHING_TO_COMMIT -> requester.displayClientMessage(Component.translatable(
+                    getAllChunks().isEmpty()
+                            ? "gui.temporalindustries.chrono_remote.msg.no_chunks"
+                            : "gui.temporalindustries.chrono_remote.msg.nothing_to_commit"), true);
             case ALREADY_RUNNING -> requester.displayClientMessage(
                     Component.translatable("gui.temporalindustries.timeline_view.commit_busy"), true);
             default -> { }

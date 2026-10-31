@@ -123,11 +123,14 @@ public final class TemporalRepository {
     }
 
     /**
-     * Whether pos belongs to what this repository records and restores: any position of a wholly
-     * claimed chunk, but only the glued cuboids within a chunk claimed for them alone.
+     * Whether pos belongs to what this repository records and restores. Once any cuboid is glued,
+     * only the glued cuboids count, in every claimed chunk. Without glue, any position of a wholly
+     * claimed chunk counts, while a chunk claimed only for glue that was since removed counts for
+     * nothing.
      */
     public boolean isTracked(BlockPos pos) {
-        if (regionChunks.isEmpty() || !regionChunks.contains(new ChunkPos(pos).toLong())) return true;
+        boolean regionChunk = !regionChunks.isEmpty() && regionChunks.contains(new ChunkPos(pos).toLong());
+        if (!regionChunk && trackedRegions.isEmpty()) return true;
         for (BoundingBox region : trackedRegions) {
             if (region.isInside(pos)) return true;
         }
