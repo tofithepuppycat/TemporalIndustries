@@ -28,14 +28,19 @@ public final class WindowManager {
         return windows.contains(window);
     }
 
-    /** Opens the window with its corner at (x, y), or just raises it if already open. */
+    /**
+     * Opens the window with its corner at (x, y), or where the player last dragged it to if they
+     * did; just raises it if already open.
+     */
     public void open(GuiWindow window, int x, int y) {
         if (windows.contains(window)) {
             raise(window);
             return;
         }
         window.attach(this);
-        window.moveTo(x, y);
+        int[] dragged = GuiWindow.draggedPosition(window);
+        if (dragged != null) window.moveTo(dragged[0], dragged[1]);
+        else window.moveTo(x, y);
         windows.add(window);
         window.opened();
     }

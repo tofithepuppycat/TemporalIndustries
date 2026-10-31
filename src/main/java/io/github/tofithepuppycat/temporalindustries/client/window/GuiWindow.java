@@ -58,6 +58,8 @@ public abstract class GuiWindow {
 
     /** Pinned window positions by window class, kept for the rest of the client session. */
     private static final Map<String, int[]> PINNED = new HashMap<>();
+    /** Where each window class was last dragged to, pinned or not, until the player leaves the world. */
+    private static final Map<String, int[]> DRAGGED = new HashMap<>();
 
     protected final Font font = Minecraft.getInstance().font;
     protected int x;
@@ -123,6 +125,16 @@ public abstract class GuiWindow {
 
     static int[] pinnedPosition(GuiWindow window) {
         return PINNED.get(window.pinKey());
+    }
+
+    /** Where window was last dragged to, or null if it never was since the world was joined. */
+    static int[] draggedPosition(GuiWindow window) {
+        return DRAGGED.get(window.pinKey());
+    }
+
+    /** Forgets every dragged position, for when the player leaves the world. */
+    public static void clearDraggedPositions() {
+        DRAGGED.clear();
     }
 
     private String pinKey() {
@@ -199,6 +211,7 @@ public abstract class GuiWindow {
     final void release(double mouseX, double mouseY, int button) {
         if (dragging) {
             dragging = false;
+            DRAGGED.put(pinKey(), new int[] {x, y});
             if (isPinned()) PINNED.put(pinKey(), new int[] {x, y});
         } else {
             mouseReleased(mouseX, mouseY, button);

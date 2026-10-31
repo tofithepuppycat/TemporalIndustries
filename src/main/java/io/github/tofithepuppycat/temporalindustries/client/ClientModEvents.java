@@ -14,6 +14,7 @@ import io.github.tofithepuppycat.temporalindustries.client.screen.WithergenicRea
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.resources.ResourceLocation;
+import io.github.tofithepuppycat.temporalindustries.client.window.GuiWindow;
 import net.neoforged.api.distmarker.Dist;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
@@ -106,5 +107,6 @@ public class ClientModEvents {
         EntropyCondenserRangeClientState.clear();
         ChronoRiftClientState.clearAll();
         ChronoRemoteClientState.clearAll();
+        GuiWindow.clearDraggedPositions();
     }
 }
