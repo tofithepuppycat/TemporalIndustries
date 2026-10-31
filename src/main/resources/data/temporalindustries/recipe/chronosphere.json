@@ -2,12 +2,25 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "EAE",
-    "ACA"
+    "ECE",
+    " S "
   ],
   "key": {
-    "E": { "item": "minecraft:echo_shard" },
-    "A": { "item": "minecraft:amethyst_shard" },
-    "C": { "item": "temporalindustries:chronovault" }
+    "E": {
+      "item": "minecraft:echo_shard"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "C": {
+      "item": "temporalindustries:chronovault"
+    },
+    "S": {
+      "item": "minecraft:nether_star"
+    }
   },
-  "result": { "id": "temporalindustries:chronosphere", "count": 1 }
+  "result": {
+    "id": "temporalindustries:chronosphere",
+    "count": 1
+  }
 }

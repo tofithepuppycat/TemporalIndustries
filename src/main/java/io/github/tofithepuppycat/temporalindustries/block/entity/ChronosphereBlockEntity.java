@@ -50,7 +50,7 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     /** The Chronovault's equivalent, a 3x3 box. */
     public static final int CHRONOVAULT_RADIUS = 1;
 
-    private static final int ENERGY_CAPACITY = 500_000;
+    private static final int ENERGY_CAPACITY = 1_000_000;
     private static final int CHRONOVAULT_ENERGY_CAPACITY = 100_000;
     private static final int ENERGY_TRANSFER  = 1_000_000_000;
     private static final int CREATIVE_ENERGY_CAPACITY = Integer.MAX_VALUE;

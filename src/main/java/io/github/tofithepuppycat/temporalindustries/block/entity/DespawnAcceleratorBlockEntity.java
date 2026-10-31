@@ -18,9 +18,15 @@ import org.jetbrains.annotations.NotNull;
  */
 public class DespawnAcceleratorBlockEntity extends AbstractAcceleratorBlockEntity {
     private static final int ORDER_PER_ITEM = 1;
+    private static final int PROCESS_TIME = 200;
 
     public DespawnAcceleratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.DESPAWN_ACCELERATOR_BLOCK_ENTITY.get(), pos, state);
+    }
+
+    @Override
+    public int processTimeTicks() {
+        return PROCESS_TIME;
     }
 
     @Override

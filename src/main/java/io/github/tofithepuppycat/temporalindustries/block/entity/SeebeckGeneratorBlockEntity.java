@@ -77,8 +77,8 @@ public class SeebeckGeneratorBlockEntity extends BlockEntity implements EntropyI
 
     private static final int ENERGY_CAPACITY = 20_000;
     private static final int ENERGY_MAX_EXTRACT = 200;
-    private static final int MIN_GEN_RATE_FE_PER_TICK = 4;
-    private static final int MAX_GEN_RATE_FE_PER_TICK = 40;
+    private static final int MIN_GEN_RATE_FE_PER_TICK = 6;
+    private static final int MAX_GEN_RATE_FE_PER_TICK = 60;
 
     // entropyAccumulator carries the fractional remainder between emissions since an orb needs a whole value of at least 1.
     private static final int ENTROPY_INTERVAL_TICKS = 50;

@@ -661,8 +661,8 @@ public final class TimelineGraphWidget {
                             cost.changedEntities(), ShortEnergyDisplay.format(cost.entities()))));
                 }
                 if (cost.chargesContainers()) {
-                    tooltip.add(formula("Containers", COST_CONTAINERS_COLOR, String.format("%.2f new item slots = %s",
-                            cost.containerSlots(), ShortEnergyDisplay.format(cost.containers()))));
+                    tooltip.add(formula("Containers", COST_CONTAINERS_COLOR, String.format("%+d new items = %s",
+                            cost.containerItems(), ShortEnergyDisplay.format(cost.containers()))));
                 }
                 tooltip.add(formula("Entropy", COST_ENTROPY_COLOR,
                         String.format("%.2f x (e^(%.0f x %.2f) - 1) = %s",

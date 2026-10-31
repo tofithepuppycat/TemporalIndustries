@@ -1,14 +1,26 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    " G ",
+    " D ",
     "GCG",
     " A "
   ],
   "key": {
-    "G": { "item": "minecraft:gold_ingot" },
-    "C": { "item": "minecraft:clock" },
-    "A": { "item": "minecraft:amethyst_shard" }
+    "G": {
+      "item": "minecraft:gold_ingot"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "D": {
+      "item": "minecraft:diamond"
+    }
   },
-  "result": { "id": "temporalindustries:chronodial", "count": 1 }
+  "result": {
+    "id": "temporalindustries:chronodial",
+    "count": 1
+  }
 }

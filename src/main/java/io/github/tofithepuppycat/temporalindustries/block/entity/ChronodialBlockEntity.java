@@ -48,7 +48,7 @@ public class ChronodialBlockEntity extends BlockEntity implements EntropyInfoPro
     public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
     private static final double ENTROPY_COST_SCALE = 1.0;
-    private static final long JUMP_FE_PER_ENTROPY_UNIT = 10; // jump FE cost that moves the balance one unit toward chaos
+    private static final long JUMP_FE_PER_ENTROPY_UNIT = 25; // jump FE cost that moves the balance one unit toward chaos
 
     public enum JumpResult { SUCCESS, ALREADY_AT_MARKER, NO_MARKER, INSUFFICIENT_ENERGY, ENTROPY_MAXED }
 

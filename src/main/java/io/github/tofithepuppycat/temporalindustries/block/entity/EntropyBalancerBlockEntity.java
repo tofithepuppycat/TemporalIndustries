@@ -48,7 +48,7 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
 
     public static final int ENERGY_CAPACITY = 20_000;
     private static final int ENERGY_MAX_RECEIVE = 500;
-    private static final int FE_PER_MB = 5;
+    private static final int FE_PER_MB = 3;
 
     private static final int PULSE_INTERVAL_TICKS = 5;
     private static final int PULSE_AMOUNT = 100;

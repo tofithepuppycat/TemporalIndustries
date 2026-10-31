@@ -32,7 +32,7 @@ public abstract class AbstractAcceleratorMenu extends AbstractContainerMenu {
     private final ContainerData data;
 
     protected AbstractAcceleratorMenu(MenuType<?> type, int id, Inventory playerInventory, AbstractAcceleratorBlockEntity blockEntity) {
-        this(type, id, playerInventory, blockEntity, new SimpleContainerData(1));
+        this(type, id, playerInventory, blockEntity, new SimpleContainerData(2));
     }
 
     protected AbstractAcceleratorMenu(MenuType<?> type, int id, Inventory playerInventory, AbstractAcceleratorBlockEntity blockEntity, ContainerData data) {
@@ -42,7 +42,7 @@ public abstract class AbstractAcceleratorMenu extends AbstractContainerMenu {
         this.access = ContainerLevelAccess.create(playerInventory.player.level(), blockPos);
         this.data = data;
 
-        checkContainerDataCount(data, 1);
+        checkContainerDataCount(data, 2);
         addDataSlots(data);
 
         addSlot(new Slot(blockEntity, AbstractAcceleratorBlockEntity.INPUT_SLOT, INPUT_SLOT_X, INPUT_SLOT_Y) {
@@ -74,14 +74,15 @@ public abstract class AbstractAcceleratorMenu extends AbstractContainerMenu {
     public void broadcastChanges() {
         super.broadcastChanges();
         data.set(0, blockEntity.getProgress());
+        data.set(1, blockEntity.processTimeTicks());
     }
 
     public int getProgress() {
         return data.get(0);
     }
 
-    public static int maxProgress() {
-        return AbstractAcceleratorBlockEntity.PROCESS_TIME_TICKS;
+    public int maxProgress() {
+        return data.get(1);
     }
 
     @Override

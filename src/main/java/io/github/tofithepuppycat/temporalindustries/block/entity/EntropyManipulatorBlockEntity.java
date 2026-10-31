@@ -56,6 +56,10 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     public static final int LIQUID_TANK_CAPACITY = 4_000;
     /** Default progress-bar denominator before any recipe has been resolved. */
     public static final int PROCESS_TICKS = 100;
+    /** Ticks per repair step; damaged items in the input slot are repaired with order, never chaos. */
+    public static final int REPAIR_STEP_TICKS = 4;
+    public static final int REPAIR_POINTS_PER_STEP = 25;
+    public static final int ORDER_MB_PER_DURABILITY = 10;
 
     private static final int SLOT_COUNT = 2;
     public static final int INPUT_SLOT = 0;
@@ -196,6 +200,8 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
     }
 
     private void processTick() {
+        if (repairTick()) return;
+
         EntropyManipulatorRecipe active = resolveActiveRecipe();
         if (active == null) {
             if (progress != 0 || activeType != null) {
@@ -216,6 +222,48 @@ public class EntropyManipulatorBlockEntity extends BlockEntity implements Contai
         }
         setChanged();
         syncToClients();
+    }
+
+    private boolean isRepairable() {
+        ItemStack input = items.get(INPUT_SLOT);
+        return !input.isEmpty() && input.isDamageableItem() && input.isDamaged();
+    }
+
+    /**
+     * Repairs a damaged item in the input slot in fast steps paid for with liquid order, then moves
+     * it to the output slot. @return whether a repair is in progress (or waiting on order/output).
+     */
+    private boolean repairTick() {
+        if (!isRepairable()) return false;
+
+        ItemStack input = items.get(INPUT_SLOT);
+        int points = Math.min(REPAIR_POINTS_PER_STEP, input.getDamageValue());
+        boolean ready = items.get(OUTPUT_SLOT).isEmpty() && orderTank.getFluidAmount() >= points * ORDER_MB_PER_DURABILITY;
+        if (!ready) {
+            if (progress != 0 || activeType != null) {
+                progress = 0;
+                activeType = null;
+                setChanged();
+                syncToClients();
+            }
+            return true;
+        }
+
+        activeType = EntropyType.ORDER;
+        maxProgress = REPAIR_STEP_TICKS;
+        progress++;
+        if (progress >= maxProgress) {
+            progress = 0;
+            orderTank.drain(points * ORDER_MB_PER_DURABILITY, IFluidHandler.FluidAction.EXECUTE);
+            input.setDamageValue(input.getDamageValue() - points);
+            if (!input.isDamaged()) {
+                items.set(OUTPUT_SLOT, input);
+                items.set(INPUT_SLOT, ItemStack.EMPTY);
+            }
+        }
+        setChanged();
+        syncToClients();
+        return true;
     }
 
     private EntropyManipulatorRecipe.Input currentInput() {

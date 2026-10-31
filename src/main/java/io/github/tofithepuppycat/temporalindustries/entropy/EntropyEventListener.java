@@ -68,6 +68,8 @@ public final class EntropyEventListener {
     private static final int COMPOST_HARVEST_ORDER = 2;
     private static final int POTION_BREWED_ORDER = 1;
     private static final int PASSIVE_MOB_DEATH_ORDER = 1;
+    private static final float CROP_GROWTH_ORDER_CHANCE = 0.25F;
+    private static final float PASSIVE_MOB_DEATH_ORDER_CHANCE = 0.5F;
 
     /**
      * Outputs of vanilla furnace recipes that "simplify" a material, identified by the smelted
@@ -99,6 +101,8 @@ public final class EntropyEventListener {
     public static void onCropGrow(CropGrowEvent.Post event) {
         if (!(event.getLevel() instanceof ServerLevel level)) return;
 
+        if (level.random.nextFloat() >= CROP_GROWTH_ORDER_CHANCE) return;
+
         BlockPos pos = event.getPos();
         EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, EntropyType.ORDER, CROP_GROWTH_ORDER);
     }
@@ -122,6 +126,8 @@ public final class EntropyEventListener {
             EntropyOrbEntity.spawn(level, player.getX(), player.getY() + 0.5, player.getZ(), EntropyType.CHAOS, PLAYER_DEATH_CHAOS);
             return;
         }
+
+        if (!(entity instanceof Enemy) && level.random.nextFloat() >= PASSIVE_MOB_DEATH_ORDER_CHANCE) return;
 
         EntropyType type = entity instanceof Enemy ? EntropyType.CHAOS : EntropyType.ORDER;
         int value = entity instanceof Enemy ? HOSTILE_MOB_DEATH_CHAOS : PASSIVE_MOB_DEATH_ORDER;

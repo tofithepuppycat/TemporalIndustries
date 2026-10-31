@@ -41,6 +41,11 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
     private static final int SLOT_COUNT = 1;
     public static final int PROCESS_TIME_TICKS = 100;
 
+    /** Ticks one item takes to process. */
+    public int processTimeTicks() {
+        return PROCESS_TIME_TICKS;
+    }
+
     private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
     private int progress;
@@ -69,7 +74,7 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
         lines.add(getDisplayName().copy().withStyle(ChatFormatting.WHITE));
         boolean processing = progress > 0;
         lines.add((processing
-                ? Component.translatable("overlay.temporalindustries.entropy_glasses.accelerator.progress", progress, PROCESS_TIME_TICKS)
+                ? Component.translatable("overlay.temporalindustries.entropy_glasses.accelerator.progress", progress, processTimeTicks())
                 : Component.translatable("overlay.temporalindustries.entropy_glasses.accelerator.idle"))
                 .withStyle(processing ? ChatFormatting.YELLOW : ChatFormatting.GRAY));
         return lines;
@@ -92,7 +97,7 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
         }
 
         progress++;
-        if (progress < PROCESS_TIME_TICKS) {
+        if (progress < processTimeTicks()) {
             setChanged();
             syncToClients();
             return;

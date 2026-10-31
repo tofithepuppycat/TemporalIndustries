@@ -9,7 +9,7 @@ import net.minecraft.network.FriendlyByteBuf;
  */
 public record JumpCostBreakdown(long time, long blocks, long entities, long containers, long entropy,
                                 double minutes, long changedBlocks, int changedEntities, double entityHealth,
-                                double containerSlots, double chaos, boolean savesEntities, boolean chargesContainers) {
+                                long containerItems, double chaos, boolean savesEntities, boolean chargesContainers) {
     public long total() {
         return time + blocks + entities + containers + entropy;
     }
@@ -24,7 +24,7 @@ public record JumpCostBreakdown(long time, long blocks, long entities, long cont
         buf.writeLong(cost.changedBlocks);
         buf.writeInt(cost.changedEntities);
         buf.writeDouble(cost.entityHealth);
-        buf.writeDouble(cost.containerSlots);
+        buf.writeLong(cost.containerItems);
         buf.writeDouble(cost.chaos);
         buf.writeBoolean(cost.savesEntities);
         buf.writeBoolean(cost.chargesContainers);
@@ -32,7 +32,7 @@ public record JumpCostBreakdown(long time, long blocks, long entities, long cont
 
     public static JumpCostBreakdown decode(FriendlyByteBuf buf) {
         return new JumpCostBreakdown(buf.readLong(), buf.readLong(), buf.readLong(), buf.readLong(), buf.readLong(),
-                buf.readDouble(), buf.readLong(), buf.readInt(), buf.readDouble(), buf.readDouble(),
+                buf.readDouble(), buf.readLong(), buf.readInt(), buf.readDouble(), buf.readLong(),
                 buf.readDouble(), buf.readBoolean(), buf.readBoolean());
     }
 }

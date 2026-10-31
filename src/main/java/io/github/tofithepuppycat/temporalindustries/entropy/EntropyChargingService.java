@@ -22,7 +22,7 @@ import java.util.List;
 public final class EntropyChargingService {
     public static final int CHARGE_INTERVAL_TICKS = 20;
     private static final int CHARGE_RATE = 100; // mB of order per interval per target
-    private static final int MB_PER_DURABILITY = 500; // liquid order spent to repair one durability point
+    private static final int MB_PER_DURABILITY = 100; // liquid order spent to repair one durability point
 
     private EntropyChargingService() {}
 

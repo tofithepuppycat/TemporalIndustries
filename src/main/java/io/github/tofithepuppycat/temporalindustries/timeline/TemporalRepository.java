@@ -892,26 +892,26 @@ public final class TemporalRepository {
     /** How many entities a jump rewrites and their combined health. */
     public record EntityJumpStats(int count, double health) {}
 
-    /** The container-contents cost of a jump and the number of stack slots it was charged for. */
-    public record ContainerJumpStats(long cost, double slots) {
-        public static final ContainerJumpStats NONE = new ContainerJumpStats(0L, 0.0);
+    /** The container-contents cost of a jump and the net number of items it adds (negative when it removes more than it adds). */
+    public record ContainerJumpStats(long cost, long items) {
+        public static final ContainerJumpStats NONE = new ContainerJumpStats(0L, 0L);
     }
 
     /**
      * The cost of the items a jump would add to the world's containers: per item type, the net gain
      * across every affected container in net (items merely moved between containers cost nothing),
-     * charged as stack slots (count / max stack size) times costFn for the item.
+     * charged as the item count times costFn for the item. The signed total across all items is
+     * reported alongside.
      */
     public static ContainerJumpStats containerStats(Map<Item, Long> net, ToLongFunction<Item> costFn) {
-        double slots = 0.0;
+        long items = 0L;
         double cost = 0.0;
         for (Map.Entry<Item, Long> entry : net.entrySet()) {
+            items += entry.getValue();
             if (entry.getValue() <= 0L) continue;
-            double itemSlots = entry.getValue() / (double) Math.max(1, entry.getKey().getDefaultMaxStackSize());
-            slots += itemSlots;
-            cost += itemSlots * costFn.applyAsLong(entry.getKey());
+            cost += (double) entry.getValue() * costFn.applyAsLong(entry.getKey());
         }
-        return new ContainerJumpStats(Math.round(cost), slots);
+        return new ContainerJumpStats(Math.round(cost), items);
     }
 
     /**

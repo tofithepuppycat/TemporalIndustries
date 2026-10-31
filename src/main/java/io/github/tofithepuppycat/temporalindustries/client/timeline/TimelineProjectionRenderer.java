@@ -169,11 +169,6 @@ public class TimelineProjectionRenderer {
         float alpha = BLINK_ALPHA_MIN + (BLINK_ALPHA_MAX - BLINK_ALPHA_MIN)
                 * (0.5F + 0.5F * (float) Math.sin(2.0D * Math.PI * blinkPhase));
 
-        VertexConsumer wallBuffer = bufferSource.getBuffer(WALL_RENDER_TYPE);
-        renderClaimBoundary(poseStack, wallBuffer, level, TimelineProjectionManager.getPreviewChunks(), WALL_COLOR,
-                cameraX, cameraY, cameraZ, alpha * WALL_ALPHA_SCALE);
-        bufferSource.endBatch(WALL_RENDER_TYPE);
-
         if (TimelineProjectionManager.isGhostBlockModeEnabled()) {
             // Ghost models show what will appear; a removal has no target model, so it keeps its marker.
             splitByRemoval(entries);

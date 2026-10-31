@@ -48,7 +48,7 @@ public abstract class AbstractAcceleratorScreen<T extends AbstractAcceleratorMen
 
     private void renderProgressIcon(GuiGraphics guiGraphics) {
         int progress = menu.getProgress();
-        int maxProgress = AbstractAcceleratorMenu.maxProgress();
+        int maxProgress = menu.maxProgress();
         if (progress <= 0 || maxProgress <= 0) return;
 
         int filled = Math.clamp(Math.round((progress / (float) maxProgress) * progressSize), 1, progressSize);
