@@ -18,6 +18,7 @@ import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.color.block.BlockColors;
+import net.minecraft.client.renderer.LevelRenderer;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderStateShard;
@@ -25,7 +26,6 @@ import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.block.model.BakedQuad;
 import net.minecraft.client.resources.model.BakedModel;
 import net.minecraft.client.renderer.texture.OverlayTexture;
-import net.minecraft.client.renderer.texture.TextureAtlas;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
@@ -106,25 +106,40 @@ public class TimelineProjectionRenderer {
     private static final int MARKER_RENDER_LIMIT = 6000;
 
     /**
-     * Ghost-block mode's render type: a copy of vanilla's {@link RenderType#entityTranslucent}, not
-     * the chunk-batching {@link RenderType#translucent()}.
+     * Pulls ghost faces only a little toward the camera, enough to win against the block they
+     * overlap without drawing in front of its neighbours; vanilla's layering offsets by far more.
+     */
+    private static final RenderStateShard.LayeringStateShard GHOST_LAYERING = new RenderStateShard.LayeringStateShard(
+            "temporalindustries_ghost_layering",
+            () -> {
+                RenderSystem.enablePolygonOffset();
+                RenderSystem.polygonOffset(-0.5F, -1.0F);
+            },
+            () -> {
+                RenderSystem.polygonOffset(0.0F, 0.0F);
+                RenderSystem.disablePolygonOffset();
+            });
+
+    /**
+     * Ghost-block mode's render type: the block shader and format of vanilla's {@link
+     * RenderType#translucent()}, so a quad's vertex colors and light are all that shade it, but
+     * drawn immediately instead of batched into chunk meshes.
      */
     private static final RenderType GHOST_BLOCK_RENDER_TYPE = RenderType.create(
             "temporalindustries_ghost_block",
-            DefaultVertexFormat.NEW_ENTITY,
+            DefaultVertexFormat.BLOCK,
             VertexFormat.Mode.QUADS,
             1536,
             true,
             true,
             RenderType.CompositeState.builder()
-                    .setShaderState(RenderStateShard.RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
-                    .setTextureState(new RenderStateShard.TextureStateShard(TextureAtlas.LOCATION_BLOCKS, false, false))
+                    .setShaderState(RenderStateShard.RENDERTYPE_TRANSLUCENT_SHADER)
+                    .setTextureState(RenderStateShard.BLOCK_SHEET_MIPPED)
                     .setTransparencyState(RenderStateShard.TRANSLUCENT_TRANSPARENCY)
                     .setCullState(RenderStateShard.NO_CULL)
                     .setLightmapState(RenderStateShard.LIGHTMAP)
-                    .setOverlayState(RenderStateShard.OVERLAY)
                     .setOutputState(RenderStateShard.MAIN_TARGET)
-                    .setLayeringState(RenderStateShard.POLYGON_OFFSET_LAYERING)
+                    .setLayeringState(GHOST_LAYERING)
                     .createCompositeState(true));
 
     @SubscribeEvent
@@ -248,6 +263,7 @@ public class TimelineProjectionRenderer {
     }
 
     private static final Direction[] DIRECTIONS = Direction.values();
+    private static final BlockPos.MutableBlockPos LIGHT_POS = new BlockPos.MutableBlockPos();
     private static final RandomSource GHOST_RANDOM = RandomSource.create();
 
     /**
@@ -315,25 +331,42 @@ public class TimelineProjectionRenderer {
             float plane = rel + (direction.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0F : 0.0F);
             if (!faceVisible(level, pos, direction, plane)) continue;
 
+            // A face is lit by the space in front of it, as in a real block's flat lighting.
+            int light = LevelRenderer.getLightColor(level, LIGHT_POS.setWithOffset(pos, direction));
             GHOST_RANDOM.setSeed(seed);
-            putQuads(pose, buffer, model.getQuads(state, direction, GHOST_RANDOM, ModelData.EMPTY, null), blockColors, state, level, pos);
+            putQuads(pose, buffer, model.getQuads(state, direction, GHOST_RANDOM, ModelData.EMPTY, null), blockColors, state, level, pos, light);
         }
 
         GHOST_RANDOM.setSeed(seed);
-        putQuads(pose, buffer, model.getQuads(state, null, GHOST_RANDOM, ModelData.EMPTY, null), blockColors, state, level, pos);
+        putQuads(pose, buffer, model.getQuads(state, null, GHOST_RANDOM, ModelData.EMPTY, null), blockColors, state, level, pos,
+                surroundingLight(level, pos));
+    }
+
+    /** The brightest light at pos and the blocks touching it, as a block's own spot may be solid and so dark. */
+    private static int surroundingLight(Level level, BlockPos pos) {
+        int block = LightTexture.block(LevelRenderer.getLightColor(level, pos));
+        int sky = LightTexture.sky(LevelRenderer.getLightColor(level, pos));
+        for (Direction direction : DIRECTIONS) {
+            int light = LevelRenderer.getLightColor(level, LIGHT_POS.setWithOffset(pos, direction));
+            block = Math.max(block, LightTexture.block(light));
+            sky = Math.max(sky, LightTexture.sky(light));
+        }
+        return LightTexture.pack(block, sky);
     }
 
     private static void putQuads(PoseStack.Pose pose, VertexConsumer buffer, List<BakedQuad> quads, BlockColors blockColors,
-                                 BlockState state, Level level, BlockPos pos) {
+                                 BlockState state, Level level, BlockPos pos, int light) {
         for (BakedQuad quad : quads) {
-            float r = 1.0F, g = 1.0F, b = 1.0F;
+            // The same fixed brightness per facing that vanilla gives a block's faces.
+            float shade = level.getShade(quad.getDirection(), quad.isShade());
+            float r = shade, g = shade, b = shade;
             if (quad.isTinted()) {
                 int tint = blockColors.getColor(state, level, pos, quad.getTintIndex());
-                r = (tint >> 16 & 0xFF) / 255.0F;
-                g = (tint >> 8 & 0xFF) / 255.0F;
-                b = (tint & 0xFF) / 255.0F;
+                r *= (tint >> 16 & 0xFF) / 255.0F;
+                g *= (tint >> 8 & 0xFF) / 255.0F;
+                b *= (tint & 0xFF) / 255.0F;
             }
-            buffer.putBulkData(pose, quad, r, g, b, 1.0F, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+            buffer.putBulkData(pose, quad, r, g, b, 1.0F, light, OverlayTexture.NO_OVERLAY);
         }
     }
 
