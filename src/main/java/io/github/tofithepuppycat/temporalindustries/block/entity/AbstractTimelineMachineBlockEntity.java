@@ -70,7 +70,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     public static final int ENTROPY_MAX = 10000;
     private static final int ENTROPY_BALANCED = ENTROPY_MAX / 2;
-    private static final long JUMP_FE_PER_ENTROPY_UNIT = 10; // jump FE cost that moves the balance one unit toward chaos
+    public static final long JUMP_FE_PER_ENTROPY_UNIT = 25; // jump FE cost that moves the balance one unit toward chaos
     public static final double JUMP_TIME_FE_SCALE = 250.0; // FE per natural-log unit of minutes between now and the target commit
     private static final double TICKS_PER_MINUTE = 1200.0;
     public static final double JUMP_ENTROPIC_GROWTH = 8.0; // steepness of the exponential curve; higher keeps low chaos cheaper for longer
@@ -230,6 +230,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     private boolean saveEntities = false;
     private boolean chargeContainers = true;
+    private RedstoneMode redstoneMode = RedstoneMode.IGNORE;
+    /** The commit a redstone trigger returns to, or {@link RepoCommit#NO_PARENT} for none. */
+    private long pinnedCommitId = RepoCommit.NO_PARENT;
+    private boolean wasPowered;
     private boolean charging;
     private long chargeTarget;
     private long chargeCost;
@@ -679,6 +683,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         orphanRepository();
         repositoryId = null;
         repositoryName = "";
+        pinnedCommitId = RepoCommit.NO_PARENT;
 
         if (mintsRepositoryOnDemand()) claimOwnChunks();
         setChanged();
@@ -696,6 +701,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         data.deleteRepository(repositoryId);
         repositoryId = null;
         repositoryName = "";
+        pinnedCommitId = RepoCommit.NO_PARENT;
 
         placedGameTime = level.getGameTime();
         selectedGameTime = placedGameTime;
@@ -714,6 +720,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         data.cancelJumpEstimate(repositoryId);
         boolean deleted = repo.deleteCommit(commitId);
         if (deleted) {
+            if (repo.getCommit(pinnedCommitId) == null) pinnedCommitId = RepoCommit.NO_PARENT;
             data.setDirty();
             setChanged();
             syncToClients();
@@ -736,7 +743,46 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         }
 
         tickCharging();
+        tickRedstone(level);
         drainCaptureEnergy();
+    }
+
+    /** Returns to the pinned commit when the redstone signal changes in the way the mode listens for. */
+    private void tickRedstone(Level level) {
+        boolean powered = level.hasNeighborSignal(worldPosition);
+        if (powered == wasPowered) return;
+        wasPowered = powered;
+        setChanged();
+        if (!redstoneMode.triggersOn(powered) || pinnedCommitId == RepoCommit.NO_PARENT) return;
+
+        TemporalRepository repo = getRepository();
+        if (repo == null || repo.getCommit(pinnedCommitId) == null || pinnedCommitId == repo.getHeadCommitId()) return;
+        applyTimelineView(pinnedCommitId);
+    }
+
+    public RedstoneMode getRedstoneMode() {
+        return redstoneMode;
+    }
+
+    public void setRedstoneMode(RedstoneMode mode) {
+        if (redstoneMode == mode) return;
+        redstoneMode = mode;
+        setChanged();
+        syncToClients();
+    }
+
+    public long getPinnedCommitId() {
+        return pinnedCommitId;
+    }
+
+    /** Pins commitId as the redstone return point; {@link RepoCommit#NO_PARENT} or an unknown commit clears the pin. */
+    public void setPinnedCommit(long commitId) {
+        TemporalRepository repo = getRepository();
+        long value = repo != null && repo.getCommit(commitId) != null ? commitId : RepoCommit.NO_PARENT;
+        if (pinnedCommitId == value) return;
+        pinnedCommitId = value;
+        setChanged();
+        syncToClients();
     }
 
     public boolean isCharging() {
@@ -874,7 +920,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
         if (target == null) return null;
         if (targetCommitId == repo.getHeadCommitId() || isCreative()) {
-            return new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0.0, 0.0,
+            return new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0L, 0.0,
                     savesEntities(), chargesContainers());
         }
 
@@ -914,7 +960,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         double minutes = Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
         return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), estimate.blockCost(),
                 entityCost(entityStats), containerStats.cost(), entropicCost(), minutes, estimate.changedBlocks(),
-                entityStats.count(), entityStats.health(), containerStats.slots(),
+                entityStats.count(), entityStats.health(), containerStats.items(),
                 getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
     }
 
@@ -1131,6 +1177,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.putLong("SelectedGameTime", selectedGameTime);
         if (repositoryId != null) tag.putUUID("RepositoryId", repositoryId);
         tag.putString("RepositoryName", repositoryName);
+        tag.putLong("PinnedCommit", pinnedCommitId);
+        tag.putBoolean("WasPowered", wasPowered);
         tag.putBoolean("Charging", charging);
         tag.putLong("ChargeTarget", chargeTarget);
         tag.putLong("ChargeCost", chargeCost);
@@ -1145,6 +1193,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         tag.putBoolean("SaveEntities", saveEntities);
         tag.putBoolean("ChargeContainers", chargeContainers);
+        tag.putInt("RedstoneMode", redstoneMode.ordinal());
     }
 
     /**
@@ -1184,6 +1233,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
         saveEntities = tag.getBoolean("SaveEntities");
         chargeContainers = !tag.contains("ChargeContainers") || tag.getBoolean("ChargeContainers");
+        redstoneMode = RedstoneMode.byOrdinal(tag.getInt("RedstoneMode"));
+        pinnedCommitId = tag.contains("PinnedCommit") ? tag.getLong("PinnedCommit") : RepoCommit.NO_PARENT;
+        wasPowered = tag.getBoolean("WasPowered");
         charging = tag.getBoolean("Charging");
         chargeTarget = tag.getLong("ChargeTarget");
         chargeCost = tag.getLong("ChargeCost");

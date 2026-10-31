@@ -6,7 +6,10 @@ import org.jetbrains.annotations.NotNull;
 
 import org.lwjgl.glfw.GLFW;
 
+import io.github.tofithepuppycat.temporalindustries.block.entity.RedstoneMode;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import io.github.tofithepuppycat.temporalindustries.network.TimelineMachinePinCommitPacket;
+import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
 import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
@@ -14,6 +17,7 @@ import io.github.tofithepuppycat.temporalindustries.client.IconTabRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineGraphWidget;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.client.window.ChronosphereMapWindow;
+import io.github.tofithepuppycat.temporalindustries.client.window.RedstoneSettingsWindow;
 import io.github.tofithepuppycat.temporalindustries.client.window.TimelineSettingsWindow;
 import io.github.tofithepuppycat.temporalindustries.client.window.WindowManager;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
@@ -53,6 +57,9 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final ResourceLocation ICON_TRASHCAN_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             io.github.tofithepuppycat.temporalindustries.TemporalIndustries.MODID, "textures/gui/icon_trashcan.png");
     private static final int ICON_CONFIG_SIZE = 26;
+    private static final ResourceLocation ICON_REDSTONE_TEXTURE = ResourceLocation.fromNamespaceAndPath(
+            "minecraft", "textures/item/redstone.png");
+    private static final int ICON_REDSTONE_SIZE = 16;
 
     private static final int IMAGE_WIDTH = 256;
     private static final int IMAGE_HEIGHT = 256;
@@ -109,6 +116,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int BOOKMARK_Y_OFFSET = 40;
     private static final int TAB_ROW_SPACING = 4;
     private static final int SETTINGS_Y_OFFSET = BOOKMARK_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
+    private static final int REDSTONE_Y_OFFSET = SETTINGS_Y_OFFSET + TAB_ROW_SIZE + TAB_ROW_SPACING;
     private static final int DELETE_BUTTON_HEIGHT = 20;
     private static final int BIND_TEXT_INSET = 20;
     private static final int COLOR_BORDER = 0xFF000000;
@@ -142,11 +150,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     /** Set when the machine becomes bound, until the chunk map has been offered to a player with nothing claimed. */
     private boolean claimPromptPending = false;
     private final TimelineSettingsWindow settingsWindow;
+    private final RedstoneSettingsWindow redstoneWindow;
 
     private int bookmarkX;
     private int bookmarkY;
     private int settingsX;
     private int settingsY;
+    private int redstoneX;
+    private int redstoneY;
+    private int pinX;
+    private int pinY;
     private int showChangesX;
     private int showChangesY;
     private int jumpX;
@@ -163,6 +176,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         inventoryLabelY = imageHeight + 100; // Push off-screen to hide inventory
         mapWindow = new ChronosphereMapWindow(menu.getBlockPos());
         settingsWindow = new TimelineSettingsWindow(menu.getBlockPos(), menu::getBlockEntity, mapWindow::discardPendingToggles);
+        redstoneWindow = new RedstoneSettingsWindow(menu.getBlockPos(), menu::getBlockEntity);
     }
 
     /**
@@ -184,6 +198,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         bookmarkY = panelY() + BOOKMARK_Y_OFFSET;
         settingsX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
         settingsY = panelY() + SETTINGS_Y_OFFSET;
+        redstoneX = panelX() + CONTENT_SIZE - TAB_OVERLAP;
+        redstoneY = panelY() + REDSTONE_Y_OFFSET;
 
         // Show Changes in the left corner with Commit right beside it, Delete Branch in the right
         // corner, and the wide Jump button centered.
@@ -196,6 +212,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         showChangesY = panelY() + BUTTON_ROW_Y_OFFSET;
         jumpY = showChangesY;
         commitY = showChangesY;
+        pinX = commitX + ACTION_BUTTON_SIZE + ACTION_BUTTON_GAP;
+        pinY = showChangesY;
         deleteCommitY = showChangesY;
 
         TimelineProjectionManager.setActiveMachine(menu.getBlockPos());
@@ -238,7 +256,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         nameBox.active = !bound;
         if (bound && !boundLastTick) {
             claimPromptPending = true;
-            windows.openPinned(mapWindow, settingsWindow);
+            windows.openPinned(mapWindow, settingsWindow, redstoneWindow);
             requestTimelineView(true);
             PacketDistributor.sendToServer(new ChronosphereStateRequestPacket(menu.getBlockPos()));
         }
@@ -522,6 +540,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         IconButtonRenderer.renderBackground(guiGraphics, commitX, commitY, commitTint);
         IconButtonRenderer.renderIcon(guiGraphics, ICON_PUSH_TEXTURE, commitX, commitY);
 
+        if (isPinButtonVisible()) {
+            int pinTint = isSelectedCommitPinned() ? 0xB0CC5555 : (isMouseOverPinButton(mouseX, mouseY) ? 0x40FFFFFF : 0);
+            IconButtonRenderer.renderBackground(guiGraphics, pinX, pinY, pinTint);
+            IconButtonRenderer.renderIcon(guiGraphics, ICON_REDSTONE_TEXTURE, pinX, pinY);
+        }
+
         // Hidden entirely until a deletable commit is selected.
         if (TimelineProjectionManager.isSelectedCommitDeletable()) {
             int deleteTint = isMouseOverDeleteCommitButton(mouseX, mouseY) ? 0x40FFFFFF : 0;
@@ -630,6 +654,36 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
                 && mouseY >= settingsY && mouseY <= settingsY + TAB_ROW_SIZE;
     }
 
+    private void renderRedstoneTab(GuiGraphics guiGraphics) {
+        IconTabRenderer.renderBackground(guiGraphics, redstoneX, redstoneY, 0);
+        IconTabRenderer.renderIcon(guiGraphics, ICON_REDSTONE_TEXTURE, ICON_REDSTONE_SIZE, redstoneX, redstoneY);
+    }
+
+    private boolean isMouseOverRedstoneTab(double mouseX, double mouseY) {
+        return mouseX >= redstoneX && mouseX <= redstoneX + TAB_ROW_SIZE
+                && mouseY >= redstoneY && mouseY <= redstoneY + TAB_ROW_SIZE;
+    }
+
+    /** The pin button only exists while redstone is listened to and a commit is selected. */
+    private boolean isPinButtonVisible() {
+        return menu.getBlockEntity().getRedstoneMode() != RedstoneMode.IGNORE && TimelineProjectionManager.hasSelection();
+    }
+
+    private boolean isSelectedCommitPinned() {
+        return TimelineProjectionManager.getSelectedCommitId() == menu.getBlockEntity().getPinnedCommitId();
+    }
+
+    private boolean isMouseOverPinButton(double mouseX, double mouseY) {
+        return isPinButtonVisible()
+                && mouseX >= pinX && mouseX <= pinX + ACTION_BUTTON_SIZE
+                && mouseY >= pinY && mouseY <= pinY + ACTION_BUTTON_SIZE;
+    }
+
+    private void togglePinnedCommit() {
+        long commitId = isSelectedCommitPinned() ? RepoCommit.NO_PARENT : TimelineProjectionManager.getSelectedCommitId();
+        PacketDistributor.sendToServer(new TimelineMachinePinCommitPacket(menu.getBlockPos(), commitId));
+    }
+
     private void drawOverlayButton(GuiGraphics guiGraphics, int x, int y, int width, int height,
                                    Component label, int baseColor, boolean hovered) {
         int bg = hovered ? brighten(baseColor) : baseColor;
@@ -680,6 +734,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (isBound()) {
             renderBookmark(guiGraphics, mouseX, mouseY);
             renderSettingsTab(guiGraphics, mouseX, mouseY);
+            renderRedstoneTab(guiGraphics);
         }
 
         renderBg(guiGraphics, partialTick, mouseX, mouseY);
@@ -715,6 +770,12 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.chronosphere.map_tooltip"), mouseX, mouseY);
         } else if (isMouseOverSettingsTab(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.settings_tooltip"), mouseX, mouseY);
+        } else if (isMouseOverRedstoneTab(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable("gui.temporalindustries.timeline_machine.redstone_tooltip"), mouseX, mouseY);
+        } else if (isMouseOverPinButton(mouseX, mouseY)) {
+            guiGraphics.renderTooltip(font, Component.translatable(isSelectedCommitPinned()
+                    ? "gui.temporalindustries.timeline_machine.unpin_tooltip"
+                    : "gui.temporalindustries.timeline_machine.pin_tooltip"), mouseX, mouseY);
         } else if (isMouseOverShowChangesButton(mouseX, mouseY)) {
             guiGraphics.renderTooltip(font, showChangesLabel(TimelineProjectionManager.isShowChangesEnabled()), mouseX, mouseY);
         } else if (isMouseOverJumpButton(mouseX, mouseY)) {
@@ -784,6 +845,16 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
 
         if (button == 0 && isMouseOverSettingsTab(mouseX, mouseY)) {
             windows.toggle(settingsWindow, panelX(), panelY());
+            return true;
+        }
+
+        if (button == 0 && isMouseOverRedstoneTab(mouseX, mouseY)) {
+            windows.toggle(redstoneWindow, panelX(), panelY());
+            return true;
+        }
+
+        if (button == 0 && isMouseOverPinButton(mouseX, mouseY)) {
+            togglePinnedCommit();
             return true;
         }
 

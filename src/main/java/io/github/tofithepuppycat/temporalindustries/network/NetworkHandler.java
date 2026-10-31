@@ -90,6 +90,16 @@ public class NetworkHandler {
                 ChronosphereSetSaveEntitiesPacket::handle);
 
         registrar.playToServer(
+                TimelineMachineSetRedstoneModePacket.TYPE,
+                TimelineMachineSetRedstoneModePacket.STREAM_CODEC,
+                TimelineMachineSetRedstoneModePacket::handle);
+
+        registrar.playToServer(
+                TimelineMachinePinCommitPacket.TYPE,
+                TimelineMachinePinCommitPacket.STREAM_CODEC,
+                TimelineMachinePinCommitPacket::handle);
+
+        registrar.playToServer(
                 ChronosphereSetChargeContainersPacket.TYPE,
                 ChronosphereSetChargeContainersPacket.STREAM_CODEC,
                 ChronosphereSetChargeContainersPacket::handle);
