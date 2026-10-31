@@ -582,6 +582,14 @@ public class TemporalWorldData extends SavedData {
         return out;
     }
 
+    /** Forgets repoId's uncommitted changes in chunk, for when it stops recording that chunk. */
+    public void discardPendingChunk(UUID repoId, ChunkPos chunk) {
+        Map<Long, Map<BlockPos, BlockChangeDelta>> blocks = repoPendingBlockDeltas.get(repoId);
+        if (blocks != null) blocks.remove(chunk.toLong());
+        Map<Long, List<EntityDelta>> entities = repoPendingEntityDeltas.get(repoId);
+        if (entities != null) entities.remove(chunk.toLong());
+    }
+
     public void recordRepoEntityDelta(UUID repoId, ChunkPos chunkPos, EntityDelta delta) {
         List<EntityDelta> chunkDeltas = repoPendingEntityDeltas
                 .computeIfAbsent(repoId, id -> new HashMap<>())

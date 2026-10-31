@@ -276,8 +276,8 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
     }
 
     /**
-     * Gives up a chunk that was claimed only for glued regions once none of them touches it. A
-     * chunk with recorded history stays: a jump would otherwise restore all of it.
+     * Gives up a chunk that was claimed only for glued regions once none of them touches it, so
+     * another machine can claim it and commits stop visiting it.
      */
     private boolean releaseRegionChunkIfUnused(TemporalRepository repo, TemporalWorldData worldData,
                                                ResourceLocation dimension, UUID repoId, ChunkPos chunk) {
@@ -287,10 +287,10 @@ public class ChronosphereBlockEntity extends AbstractTimelineMachineBlockEntity 
                 return false;
             }
         }
-        if (repo.hasBaseline(chunk)) return false;
 
         repo.removeRegionChunk(chunk.toLong());
         worldData.releaseChunk(dimension, chunk, repoId);
+        worldData.discardPendingChunk(repoId, chunk);
         worldData.setDirty();
         setChanged();
         return true;
