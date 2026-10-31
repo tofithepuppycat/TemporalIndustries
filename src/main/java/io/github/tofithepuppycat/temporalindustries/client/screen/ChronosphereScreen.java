@@ -412,7 +412,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         if (!claimPromptPending || !ChronosphereClientState.hasSynced()) return;
 
         claimPromptPending = false;
-        if (ChronosphereClientState.getSelectedCount() == 0 && !windows.isOpen(mapWindow)) {
+        if (ChronosphereClientState.getSelectedCount() == 0 && !ChronosphereClientState.hasGluedRegions()
+                && !windows.isOpen(mapWindow)) {
             windows.open(mapWindow, panelX(), panelY());
         }
     }

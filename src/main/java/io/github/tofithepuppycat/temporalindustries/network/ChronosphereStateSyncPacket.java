@@ -32,15 +32,18 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
     private final int capturedCount;
     /** The named branch currently checked out for this machine's repository. */
     private final String currentBranch;
+    /** Whether temporal glue has marked regions for this machine to record. */
+    private final boolean hasGluedRegions;
 
     public ChronosphereStateSyncPacket(BlockPos machinePos, List<Long> selectedChunkKeys,
                                        List<Long> blockedChunkKeys, int capturedCount,
-                                       String currentBranch) {
+                                       String currentBranch, boolean hasGluedRegions) {
         this.machinePos = machinePos;
         this.selectedChunkKeys = selectedChunkKeys;
         this.blockedChunkKeys = blockedChunkKeys;
         this.capturedCount = capturedCount;
         this.currentBranch = currentBranch;
+        this.hasGluedRegions = hasGluedRegions;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereStateSyncPacket packet) {
@@ -51,6 +54,7 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         for (long key : packet.blockedChunkKeys) buf.writeLong(key);
         buf.writeVarInt(packet.capturedCount);
         buf.writeUtf(packet.currentBranch, 64);
+        buf.writeBoolean(packet.hasGluedRegions);
     }
 
     public static ChronosphereStateSyncPacket decode(RegistryFriendlyByteBuf buf) {
@@ -63,7 +67,8 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
         for (int i = 0; i < blockedCount; i++) blocked.add(buf.readLong());
         int capturedCount = buf.readVarInt();
         String currentBranch = buf.readUtf(64);
-        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, capturedCount, currentBranch);
+        boolean hasGluedRegions = buf.readBoolean();
+        return new ChronosphereStateSyncPacket(machinePos, selected, blocked, capturedCount, currentBranch, hasGluedRegions);
     }
 
     public static void handle(ChronosphereStateSyncPacket packet, IPayloadContext context) {
@@ -71,7 +76,7 @@ public class ChronosphereStateSyncPacket implements CustomPacketPayload {
             Set<Long> selected = new HashSet<>(packet.selectedChunkKeys);
             Set<Long> blocked = new HashSet<>(packet.blockedChunkKeys);
             ChronosphereClientState.updateFromServer(packet.machinePos, selected, blocked,
-                    packet.capturedCount, packet.currentBranch);
+                    packet.capturedCount, packet.currentBranch, packet.hasGluedRegions);
         });
     }
 

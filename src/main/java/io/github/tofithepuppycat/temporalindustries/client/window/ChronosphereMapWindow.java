@@ -53,7 +53,7 @@ public final class ChronosphereMapWindow extends GuiWindow {
         // The block entity the menu holds is the client's stale copy, so ChronosphereClientState
         // (plus this visit's pending toggles) is the only client-accurate source.
         int footerY = y + GRID_Y_OFFSET + view.gridPixels() + FOOTER_GAP;
-        if (ChronosphereClientState.hasSynced() && view.selectedCount() == 0) {
+        if (ChronosphereClientState.hasSynced() && view.selectedCount() == 0 && !ChronosphereClientState.hasGluedRegions()) {
             drawCenteredNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.select_prompt"),
                     x + SIZE / 2, footerY, PROMPT_COLOR);
         } else {

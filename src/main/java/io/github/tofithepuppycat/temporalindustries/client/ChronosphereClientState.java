@@ -18,6 +18,7 @@ public final class ChronosphereClientState {
     private static int capturedCount = 0;
     /** Whether the server has reported this machine's claims since it became the active one. */
     private static boolean synced = false;
+    private static boolean hasGluedRegions = false;
     private static String currentBranch = "";
     private static String suggestionQuery = "";
     private static List<String> suggestions = List.of();
@@ -42,18 +43,26 @@ public final class ChronosphereClientState {
         blockedChunks = new HashSet<>();
         capturedCount = 0;
         synced = false;
+        hasGluedRegions = false;
         currentBranch = "";
         clearSuggestions();
     }
 
     public static void updateFromServer(BlockPos machinePos, Set<Long> serverSelected, Set<Long> serverBlocked,
-                                        int serverCapturedCount, String serverCurrentBranch) {
+                                        int serverCapturedCount, String serverCurrentBranch,
+                                        boolean serverHasGluedRegions) {
         activeMachinePos = machinePos;
         selectedChunks = serverSelected;
         blockedChunks = serverBlocked;
         capturedCount = serverCapturedCount;
         currentBranch = serverCurrentBranch;
+        hasGluedRegions = serverHasGluedRegions;
         synced = true;
+    }
+
+    /** Whether temporal glue has marked regions for this machine, which stand in for a chunk selection. */
+    public static boolean hasGluedRegions() {
+        return hasGluedRegions;
     }
 
     /** Whether {@link #getSelectedChunks} is the server's answer rather than the empty default. */

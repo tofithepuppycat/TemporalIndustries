@@ -95,7 +95,8 @@ public class ChronosphereStateRequestPacket implements CustomPacketPayload {
 
         PacketDistributor.sendToPlayer(sender, new ChronosphereStateSyncPacket(
                 machinePos, new ArrayList<>(selected), blocked, capturedCount,
-                machine.getCurrentNamedBranch()));
+                machine.getCurrentNamedBranch(),
+                machine.getRepository() != null && !machine.getRepository().getTrackedRegions().isEmpty()));
     }
 
     @Override
