@@ -14,7 +14,9 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.InteractionHand;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.InteractionResultHolder;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.Item;
@@ -89,13 +91,28 @@ public class TemporalGlueItem extends Item {
         if (!(context.getPlayer() instanceof ServerPlayer player)) return InteractionResult.PASS;
         if (!(level instanceof ServerLevel serverLevel)) return InteractionResult.PASS;
 
-        ItemStack stack = context.getItemInHand();
+        return select(serverLevel, player, context.getItemInHand(), context.getClickedPos().immutable());
+    }
+
+    /** Right-click with nothing solid in reach: the corner is the air block at the end of the player's reach. */
+    @Override
+    public InteractionResultHolder<ItemStack> use(Level level, Player player, InteractionHand hand) {
+        ItemStack stack = player.getItemInHand(hand);
+        Optional<BlockPos> target = GlueTargeting.airTarget(level, player);
+        if (target.isEmpty()) return InteractionResultHolder.pass(stack);
+        if (level instanceof ServerLevel serverLevel && player instanceof ServerPlayer serverPlayer) {
+            select(serverLevel, serverPlayer, stack, target.get());
+        }
+        return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
+    private InteractionResult select(ServerLevel serverLevel, ServerPlayer player, ItemStack stack, BlockPos clicked) {
+        Level level = serverLevel;
         if (getLinkedChronosphere(stack) == null) {
             player.displayClientMessage(Component.translatable(MESSAGE_PREFIX + "not_linked"), true);
             return InteractionResult.SUCCESS;
         }
 
-        BlockPos clicked = context.getClickedPos().immutable();
         Optional<BlockPos> first = getPendingCorner(stack);
         if (first.isEmpty()) {
             CompoundTag data = readData(stack);
