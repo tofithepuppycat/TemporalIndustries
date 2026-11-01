@@ -74,7 +74,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public static final double JUMP_TIME_FE_SCALE = 250.0; // FE per natural-log unit of minutes between now and the target commit
     private static final double TICKS_PER_MINUTE = 1200.0;
     public static final double JUMP_ENTROPIC_GROWTH = 8.0; // steepness of the exponential curve; higher keeps low chaos cheaper for longer
-    public static final double JUMP_ENTROPIC_MAX_MULTIPLIER = 20.0; // what the summed jump cost is multiplied by at full chaos
+    public static final double JUMP_ENTROPIC_MAX_MULTIPLIER = 100.0; // what the summed jump cost is multiplied by at full chaos
 
     public static final double JUMP_PRICE_MULTIPLIER = 10.0; // scales the price of every block and item a jump rewrites or adds
     public static final double JUMP_ENTITY_FE_PER_HEALTH = 100.0; // FE per health point of every entity a jump restores or removes
