@@ -35,7 +35,7 @@ public final class JumpCostTooltipHandler {
 
         long total = AbstractTimelineMachineBlockEntity.scaledPrice(cost.getAsInt()) * event.getItemStack().getCount();
         event.getToolTip().add(Component.translatable("tooltip.temporalindustries.jump_cost",
-                EnergyDisplay.format(total)).withStyle(ChatFormatting.YELLOW));
+                ShortEnergyDisplay.format(total, 2)).withStyle(ChatFormatting.YELLOW));
         event.getToolTip().add(Component.translatable("tooltip.temporalindustries.jump_entropy",
                 String.format(Locale.ROOT, "%.2f",
                         total / (double) AbstractTimelineMachineBlockEntity.JUMP_FE_PER_ENTROPY_UNIT / 100.0))

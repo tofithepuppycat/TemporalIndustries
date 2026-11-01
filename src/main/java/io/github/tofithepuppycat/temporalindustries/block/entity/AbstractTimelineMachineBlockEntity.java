@@ -186,8 +186,17 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             super(capacity, transfer, transfer);
         }
 
+        /**
+         * While a jump is charging, incoming energy goes straight to the jump's payment, so the
+         * rate it can be fed at is not limited by the size of the buffer.
+         */
         @Override public int receiveEnergy(int max, boolean simulate) {
-            int v = super.receiveEnergy(max, simulate);
+            int direct = 0;
+            if (charging && charged < chargeCost) {
+                direct = (int) Math.min(Math.min(Math.max(0, max), maxReceive), chargeCost - charged);
+                if (!simulate) charged += direct;
+            }
+            int v = direct + super.receiveEnergy(max - direct, simulate);
             if (!simulate && v > 0) setChanged();
             return v;
         }

@@ -12,15 +12,20 @@ public final class ShortEnergyDisplay {
 
     /** Shortened amount followed by its prefixed unit, e.g. "17.0 kFE". */
     public static String format(long fe) {
-        return format(fe, true);
+        return format(fe, true, 1);
+    }
+
+    /** Like {@link #format(long)} with the given number of decimals, e.g. "10.21 kFE" for 2. */
+    public static String format(long fe, int decimals) {
+        return format(fe, true, decimals);
     }
 
     /** Shortened amount with the prefix but no FE unit, e.g. "17.0k". */
     public static String formatPlain(long fe) {
-        return format(fe, false);
+        return format(fe, false, 1);
     }
 
-    private static String format(long fe, boolean withUnit) {
+    private static String format(long fe, boolean withUnit, int decimals) {
         double value = Math.abs((double) fe);
         int unit = 0;
         while (value >= 1000 && unit < PREFIXES.length - 1) {
@@ -28,14 +33,14 @@ public final class ShortEnergyDisplay {
             unit++;
         }
         // Rounding to one decimal can reach 1000 (e.g. 999,999 FE); promote to the next unit.
-        if (unit > 0 && unit < PREFIXES.length - 1 && Math.round(value * 10) >= 10000) {
+        if (unit > 0 && unit < PREFIXES.length - 1 && Math.round(value * Math.pow(10, decimals)) >= 1000 * Math.pow(10, decimals)) {
             value /= 1000;
             unit++;
         }
         String sign = fe < 0 ? "-" : "";
         String number = unit == 0
                 ? String.valueOf((long) value)
-                : String.format(Locale.ROOT, "%.1f", value);
+                : String.format(Locale.ROOT, "%." + decimals + "f", value);
         if (withUnit) {
             return sign + number + " " + PREFIXES[unit] + "FE";
         }

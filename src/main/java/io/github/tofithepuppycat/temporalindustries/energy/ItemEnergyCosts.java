@@ -274,7 +274,7 @@ public final class ItemEnergyCosts {
             }
             if (!resolvable || knownCount == 0) continue;
 
-            int perItem = Math.max(1, (int) Math.ceil(total / (double) result.getCount()));
+            int perItem = perItemCost(total, result.getCount());
             costs.put(result.getItem(), perItem);
             priced++;
         }
@@ -317,8 +317,13 @@ public final class ItemEnergyCosts {
             bestTotal = total;
         }
         if (best == null) return 0;
-        costs.put(bestResult.getItem(), Math.max(1, (int) Math.ceil(bestTotal / (double) bestResult.getCount())));
+        costs.put(bestResult.getItem(), perItemCost(bestTotal, bestResult.getCount()));
         return 1;
+    }
+
+    /** A recipe's summed ingredient cost shared out over its result, kept within an int. */
+    private static int perItemCost(long total, int resultCount) {
+        return (int) Math.max(1L, Math.min(Integer.MAX_VALUE, (long) Math.ceil(total / (double) resultCount)));
     }
 
     private static boolean hasCraftableOption(Ingredient ingredient, Set<Item> craftable) {
