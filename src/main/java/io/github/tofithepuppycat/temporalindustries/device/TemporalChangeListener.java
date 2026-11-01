@@ -187,26 +187,6 @@ public final class TemporalChangeListener {
         }
     }
 
-    /**
-     * Same gesture as {@link #onLeftClickGlue}, for when the player's sight line doesn't land on a
-     * block at all.
-     */
-    @SubscribeEvent
-    public static void onLeftClickEmptyGlue(PlayerInteractEvent.LeftClickEmpty event) {
-        if (!(event.getEntity() instanceof ServerPlayer player)) return;
-        if (!(player.level() instanceof ServerLevel level)) return;
-        for (ItemStack stack : new ItemStack[] {player.getMainHandItem(), player.getOffhandItem()}) {
-            if (stack.getItem() instanceof AntiTemporalGlueItem) {
-                AntiTemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
-                return;
-            }
-            if (stack.getItem() instanceof TemporalGlueItem) {
-                TemporalGlueItem.deleteRegionsAlongSight(level, player, stack);
-                return;
-            }
-        }
-    }
-
     // Entity events
 
     @SubscribeEvent

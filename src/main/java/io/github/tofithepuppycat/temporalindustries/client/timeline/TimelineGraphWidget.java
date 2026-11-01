@@ -661,13 +661,13 @@ public final class TimelineGraphWidget {
                             cost.changedEntities(), ShortEnergyDisplay.format(cost.entities()))));
                 }
                 if (cost.chargesContainers()) {
-                    tooltip.add(formula("Containers", COST_CONTAINERS_COLOR, String.format("%+d new items = %s",
+                    tooltip.add(formula("Items", COST_ITEMS_COLOR, String.format("%+d new items = %s",
                             cost.containerItems(), ShortEnergyDisplay.format(cost.containers()))));
                 }
                 tooltip.add(formula("Entropy", COST_ENTROPY_COLOR,
-                        String.format("%.2f x (e^(%.0f x %.2f) - 1) = %s",
-                        AbstractTimelineMachineBlockEntity.JUMP_ENTROPIC_FE_SCALE,
-                        AbstractTimelineMachineBlockEntity.JUMP_ENTROPIC_GROWTH, cost.chaos(),
+                        String.format("%s x (%.2f - 1) = %s",
+                        ShortEnergyDisplay.format(cost.total() - cost.entropy()),
+                        AbstractTimelineMachineBlockEntity.entropicMultiplier(cost.chaos()),
                         ShortEnergyDisplay.format(cost.entropy()))));
             }
         }
@@ -682,7 +682,7 @@ public final class TimelineGraphWidget {
     private static final ChatFormatting COST_TIME_COLOR = ChatFormatting.AQUA;
     private static final ChatFormatting COST_BLOCKS_COLOR = ChatFormatting.GREEN;
     private static final ChatFormatting COST_ENTITIES_COLOR = ChatFormatting.GOLD;
-    private static final ChatFormatting COST_CONTAINERS_COLOR = ChatFormatting.YELLOW;
+    private static final ChatFormatting COST_ITEMS_COLOR = ChatFormatting.YELLOW;
     private static final ChatFormatting COST_ENTROPY_COLOR = ChatFormatting.LIGHT_PURPLE;
 
     private static Component labeled(String label, String value, ChatFormatting valueColor) {

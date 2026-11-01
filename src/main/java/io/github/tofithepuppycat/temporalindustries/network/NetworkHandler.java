@@ -124,6 +124,11 @@ public class NetworkHandler {
                 GlueRegionRequestPacket.STREAM_CODEC,
                 GlueRegionRequestPacket::handle);
 
+        registrar.playToServer(
+                GlueUnglueRequestPacket.TYPE,
+                GlueUnglueRequestPacket.STREAM_CODEC,
+                GlueUnglueRequestPacket::handle);
+
         registrar.playToClient(
                 GlueRegionSyncPacket.TYPE,
                 GlueRegionSyncPacket.STREAM_CODEC,

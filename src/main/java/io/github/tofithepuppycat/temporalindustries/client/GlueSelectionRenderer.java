@@ -3,7 +3,9 @@ package io.github.tofithepuppycat.temporalindustries.client;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.AntiTemporalGlueItem;
+import io.github.tofithepuppycat.temporalindustries.item.GlueTargeting;
 import io.github.tofithepuppycat.temporalindustries.item.TemporalGlueItem;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
@@ -34,16 +36,13 @@ import java.util.Optional;
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class GlueSelectionRenderer {
-    private static final float[] FILL_COLOR = {0.55F, 0.85F, 1.0F};
     private static final float FILL_ALPHA = 0.12F;
-    private static final float[] OUTLINE_COLOR = {0.35F, 0.75F, 1.0F};
     private static final float OUTLINE_ALPHA = 0.9F;
     private static final float OUTLINE_THICKNESS = 0.02F;
 
-    private static final float[] TRACKED_FILL_COLOR = {0.55F, 1.0F, 0.65F};
-    private static final float[] TRACKED_OUTLINE_COLOR = {0.35F, 0.9F, 0.45F};
+    private static final float[] ORDER_COLOR = rgb(EntropyType.ORDER.color());
+    private static final float[] CHAOS_COLOR = rgb(EntropyType.CHAOS.color());
 
-    private static final float[] PREVIEW_COLOR = {1.0F, 0.85F, 0.25F};
     private static final float PREVIEW_FILL_ALPHA = 0.10F;
     private static final float PREVIEW_OUTLINE_ALPHA = 0.85F;
     private static final float PREVIEW_THICKNESS = 0.025F;
@@ -73,7 +72,7 @@ public class GlueSelectionRenderer {
                 ? TemporalGlueItem.getPendingCorner(heldStack) : AntiTemporalGlueItem.getPendingCorner(heldStack);
         BoundingBox preview = null;
         if (pendingCorner.isPresent()) {
-            BlockPos lookedAt = currentLookedAtBlock(minecraft);
+            BlockPos lookedAt = currentTarget(minecraft, level);
             preview = BoundingBox.fromCorners(pendingCorner.get(), lookedAt != null ? lookedAt : pendingCorner.get());
         }
 
@@ -91,14 +90,14 @@ public class GlueSelectionRenderer {
         VertexConsumer quadBuffer = bufferSource.getBuffer(RenderType.debugQuads());
         Matrix4f matrix = poseStack.last().pose();
 
+        float[] glueColor = tracked ? CHAOS_COLOR : ORDER_COLOR;
         for (BoundingBox region : regions) {
             renderBox(matrix, quadBuffer, region, camX, camY, camZ,
-                    tracked ? TRACKED_FILL_COLOR : FILL_COLOR, FILL_ALPHA,
-                    tracked ? TRACKED_OUTLINE_COLOR : OUTLINE_COLOR, OUTLINE_ALPHA, OUTLINE_THICKNESS);
+                    glueColor, FILL_ALPHA, glueColor, OUTLINE_ALPHA, OUTLINE_THICKNESS);
         }
         if (preview != null) {
             renderBox(matrix, quadBuffer, preview, camX, camY, camZ,
-                    PREVIEW_COLOR, PREVIEW_FILL_ALPHA, PREVIEW_COLOR, PREVIEW_OUTLINE_ALPHA, PREVIEW_THICKNESS);
+                    glueColor, PREVIEW_FILL_ALPHA, glueColor, PREVIEW_OUTLINE_ALPHA, PREVIEW_THICKNESS);
         }
 
         bufferSource.endBatch(RenderType.debugQuads());
@@ -111,12 +110,17 @@ public class GlueSelectionRenderer {
         return null;
     }
 
+    /** The block a click would pick: the one looked at, or the air block at the end of reach. */
     @Nullable
-    private static BlockPos currentLookedAtBlock(Minecraft minecraft) {
+    private static BlockPos currentTarget(Minecraft minecraft, Level level) {
         if (minecraft.hitResult instanceof BlockHitResult blockHit && blockHit.getType() == HitResult.Type.BLOCK) {
             return blockHit.getBlockPos();
         }
-        return null;
+        return GlueTargeting.airTarget(level, minecraft.player).orElse(null);
+    }
+
+    private static float[] rgb(int color) {
+        return new float[] {((color >> 16) & 0xFF) / 255.0F, ((color >> 8) & 0xFF) / 255.0F, (color & 0xFF) / 255.0F};
     }
 
     private static void renderBox(Matrix4f matrix, VertexConsumer buffer, BoundingBox region,

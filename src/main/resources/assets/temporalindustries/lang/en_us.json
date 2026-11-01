@@ -221,7 +221,6 @@
 	"gui.temporalindustries.chronosphere.save_entities_label": "Save and Load Entities",
 	"gui.temporalindustries.timeline_machine.charge_containers_label": "Charge Containers",
 	"gui.temporalindustries.timeline_machine.charge_containers_hint": "Charges for items added to containers; can lag",
-    "gui.temporalindustries.timeline_machine.ghost_preview_hint": "Real blocks instead of markers (nearest %s)",
 	"item.temporalindustries.temporal_glue": "Temporal Glue",
 	"item.temporalindustries.temporal_glue.linked": "Linked to Chronosphere",
 	"item.temporalindustries.temporal_glue.not_linked": "Not linked - right-click a Chronosphere first",

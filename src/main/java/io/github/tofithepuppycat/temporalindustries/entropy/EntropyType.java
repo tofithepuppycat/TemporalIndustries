@@ -10,8 +10,8 @@ import java.util.Locale;
 
 /** ORD (order) and CHS (chaos), the two xp-like substances from IDEAS.md. */
 public enum EntropyType implements StringRepresentable {
-    ORDER(0xfecbe6, 0x54398a),
-    CHAOS(0x87f3fb, 0x009295);
+    ORDER(0x8d6acc, 0x54398a),
+    CHAOS(0x0a5060, 0x009295);
 
     public static final Codec<EntropyType> CODEC = StringRepresentable.fromEnum(EntropyType::values);
     public static final StreamCodec<ByteBuf, EntropyType> STREAM_CODEC = ByteBufCodecs.VAR_INT.map(i -> values()[i], Enum::ordinal);

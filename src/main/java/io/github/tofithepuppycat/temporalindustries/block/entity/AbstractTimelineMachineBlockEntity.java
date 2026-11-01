@@ -74,12 +74,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     public static final double JUMP_TIME_FE_SCALE = 250.0; // FE per natural-log unit of minutes between now and the target commit
     private static final double TICKS_PER_MINUTE = 1200.0;
     public static final double JUMP_ENTROPIC_GROWTH = 8.0; // steepness of the exponential curve; higher keeps low chaos cheaper for longer
-    public static final long JUMP_ENTROPIC_MAX_FE = 5_000_000L;
-    /**
-     * Coefficient of the entropic curve, chosen so full chaos costs exactly JUMP_ENTROPIC_MAX_FE; zero
-     * at full order.
-     */
-    public static final double JUMP_ENTROPIC_FE_SCALE = JUMP_ENTROPIC_MAX_FE / Math.expm1(JUMP_ENTROPIC_GROWTH);
+    public static final double JUMP_ENTROPIC_MAX_MULTIPLIER = 20.0; // what the summed jump cost is multiplied by at full chaos
+
+    public static final double JUMP_PRICE_MULTIPLIER = 10.0; // scales the price of every block and item a jump rewrites or adds
     public static final double JUMP_ENTITY_FE_PER_HEALTH = 100.0; // FE per health point of every entity a jump restores or removes
 
     protected long placedGameTime = UNSET_TIME;
@@ -364,12 +361,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     /**
-     * Flat cost that scales exponentially with chaos: free at full order, capped at
-     * Integer.MAX_VALUE.
+     * Factor the summed jump cost is multiplied by: 1 at full order, rising exponentially with chaos
+     * to JUMP_ENTROPIC_MAX_MULTIPLIER at full chaos.
      */
-    private long entropicCost() {
-        double chaos = getEntropy() / (double) ENTROPY_MAX;
-        return Math.min(JUMP_ENTROPIC_MAX_FE, Math.round(JUMP_ENTROPIC_FE_SCALE * Math.expm1(JUMP_ENTROPIC_GROWTH * chaos)));
+    public static double entropicMultiplier(double chaos) {
+        return 1.0 + (JUMP_ENTROPIC_MAX_MULTIPLIER - 1.0) * Math.expm1(JUMP_ENTROPIC_GROWTH * chaos) / Math.expm1(JUMP_ENTROPIC_GROWTH);
+    }
+
+    /** What the machine's entropy adds on top of base, the summed cost of the other parts. */
+    private long entropicSurcharge(long base) {
+        return Math.round(base * (entropicMultiplier(getEntropy() / (double) ENTROPY_MAX) - 1.0));
     }
 
     /**
@@ -947,24 +948,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (job != null) data.startJumpJob(repoId, job);
     }
 
-    /**
-     * Whether target is where the head already is: such a jump only undoes changes made since, so
-     * it pays for the blocks it rewrites but not for travelling in time or for the entropic upkeep.
-     */
-    private boolean isHeadJump(RepoCommit target) {
-        TemporalRepository repo = getRepository();
-        return repo != null && target.getId() == repo.getHeadCommitId();
-    }
-
     private JumpCostBreakdown breakdown(ServerLevel serverLevel, RepoCommit target, JumpJob.Estimate estimate) {
         TemporalRepository.EntityJumpStats entityStats =
                 new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth());
         TemporalRepository.ContainerJumpStats containerStats =
                 TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf);
-        boolean toHead = isHeadJump(target);
-        double minutes = toHead ? 0.0 : Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
-        return new JumpCostBreakdown(toHead ? 0L : timeDistanceCost(target, serverLevel.getGameTime()), estimate.blockCost(),
-                entityCost(entityStats), containerStats.cost(), toHead ? 0L : entropicCost(), minutes, estimate.changedBlocks(),
+        double minutes = Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
+        long time = timeDistanceCost(target, serverLevel.getGameTime());
+        long base = time + estimate.blockCost() + entityCost(entityStats) + containerStats.cost();
+        return new JumpCostBreakdown(time, estimate.blockCost(),
+                entityCost(entityStats), containerStats.cost(), entropicSurcharge(base), minutes, estimate.changedBlocks(),
                 entityStats.count(), entityStats.health(), containerStats.items(),
                 getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
     }
@@ -1088,10 +1081,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         TemporalRepository.ContainerJumpStats containers = chargesContainers()
                 ? TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf)
                 : TemporalRepository.ContainerJumpStats.NONE;
-        boolean toHead = isHeadJump(target);
-        long totalCost = (toHead ? 0L : timeDistanceCost(target, serverLevel.getGameTime())) + estimate.blockCost()
+        long baseCost = timeDistanceCost(target, serverLevel.getGameTime()) + estimate.blockCost()
                 + entityCost(new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth()))
-                + containers.cost() + (toHead ? 0L : entropicCost());
+                + containers.cost();
+        long totalCost = baseCost + entropicSurcharge(baseCost);
 
         if (totalCost > energyStorage.getEnergyStored()) {
             beginCharging(target.getId(), totalCost);
@@ -1162,11 +1155,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     protected static long costOf(BlockState state) {
-        return ItemEnergyCosts.getCost(state.getBlock()).orElse(0);
+        return scaledPrice(ItemEnergyCosts.getCost(state.getBlock()).orElse(0));
     }
 
     protected static long itemCostOf(Item item) {
-        return ItemEnergyCosts.getCost(item).orElse(0);
+        return scaledPrice(ItemEnergyCosts.getCost(item).orElse(0));
+    }
+
+    /** A block or item's base price as a jump charges it. */
+    public static long scaledPrice(long basePrice) {
+        return Math.round(basePrice * JUMP_PRICE_MULTIPLIER);
     }
 
     @Override

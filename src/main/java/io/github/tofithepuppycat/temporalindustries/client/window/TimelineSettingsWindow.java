@@ -36,7 +36,8 @@ public final class TimelineSettingsWindow extends GuiWindow {
     private static final int INSET = 12;
     private static final int LINE_HEIGHT = 9;
     private static final int TITLE_DIVIDER_Y_OFFSET = 16;
-    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = 24;
+    private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 24;
+    private static final int SAVE_ENTITIES_ROW_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
     private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
     private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + TOGGLE_SIZE + 3;
     private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 2 * LINE_HEIGHT;
@@ -93,6 +94,8 @@ public final class TimelineSettingsWindow extends GuiWindow {
         int toggleX = toggleX();
         AbstractTimelineMachineBlockEntity be = machine.get();
 
+        renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.timeline_machine.ghost_preview_label",
+                GHOST_TOGGLE_ROW_Y_OFFSET, TimelineProjectionManager.isGhostBlockModeEnabled());
         renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_entities_label",
                 SAVE_ENTITIES_ROW_Y_OFFSET, be.isSaveEntities());
         renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.timeline_machine.charge_containers_label",
@@ -149,7 +152,9 @@ public final class TimelineSettingsWindow extends GuiWindow {
         }
         AbstractTimelineMachineBlockEntity be = machine.get();
 
-        if (isOverToggle(mouseX, mouseY, SAVE_ENTITIES_ROW_Y_OFFSET)) {
+        if (isOverToggle(mouseX, mouseY, GHOST_TOGGLE_ROW_Y_OFFSET)) {
+            TimelineProjectionManager.toggleGhostBlockMode();
+        } else if (isOverToggle(mouseX, mouseY, SAVE_ENTITIES_ROW_Y_OFFSET)) {
             PacketDistributor.sendToServer(new ChronosphereSetSaveEntitiesPacket(machinePos, !be.isSaveEntities()));
         } else if (isOverToggle(mouseX, mouseY, CHARGE_CONTAINERS_ROW_Y_OFFSET)) {
             PacketDistributor.sendToServer(new ChronosphereSetChargeContainersPacket(machinePos, !be.isChargeContainers()));
