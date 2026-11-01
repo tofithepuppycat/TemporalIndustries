@@ -486,28 +486,38 @@ public final class TemporalRepository {
         final List<RepoCommit> targetChain;
         /** Every chunk some commit on the path touched. */
         final Set<Long> chunks;
+        /** Whether each chunk is restored wholesale to the target's recorded state, rather than by replaying commits. */
+        final boolean restoreWhole;
         private final Map<Long, ResolvedChunk> resolved = new HashMap<>();
 
         private JumpPlan(long fromCommitId, long toCommitId, List<RepoCommit> undo, List<RepoCommit> forward,
-                         List<RepoCommit> targetChain, Set<Long> chunks) {
+                         List<RepoCommit> targetChain, Set<Long> chunks, boolean restoreWhole) {
             this.fromCommitId = fromCommitId;
             this.toCommitId = toCommitId;
             this.undo = undo;
             this.forward = forward;
             this.targetChain = targetChain;
             this.chunks = chunks;
+            this.restoreWhole = restoreWhole;
         }
     }
 
     /**
-     * The plan for moving the head to targetCommitId, or null if that is where it already is or no
-     * such commit exists. Plans are reused until the history changes, so a cost estimate, a preview
-     * and the jump itself share one resolve per chunk.
+     * The plan for moving the head to targetCommitId, or null if no such commit exists. Plans are reused until the history changes, so a cost estimate,
+     * a preview and the jump itself share one resolve per chunk.
      */
     @Nullable
     JumpPlan planJump(long targetCommitId) {
-        if (targetCommitId == headCommitId || !commits.containsKey(targetCommitId)) return null;
+        if (!commits.containsKey(targetCommitId)) return null;
         if (planCache != null && planCache.fromCommitId == headCommitId && planCache.toCommitId == targetCommitId) {
+            return planCache;
+        }
+
+        if (targetCommitId == headCommitId) {
+            List<RepoCommit> chain = ancestryChain(headCommitId);
+            Set<Long> allChunks = new HashSet<>(claimBaselines.keySet());
+            for (RepoCommit c : chain) allChunks.addAll(c.getChunkEntries().keySet());
+            planCache = new JumpPlan(headCommitId, targetCommitId, List.of(), List.of(), chain, allChunks, true);
             return planCache;
         }
 
@@ -524,7 +534,7 @@ public final class TemporalRepository {
         for (RepoCommit c : undo) chunks.addAll(c.getChunkEntries().keySet());
         for (RepoCommit c : forward) chunks.addAll(c.getChunkEntries().keySet());
 
-        planCache = new JumpPlan(headCommitId, targetCommitId, undo, forward, toChain, chunks);
+        planCache = new JumpPlan(headCommitId, targetCommitId, undo, forward, toChain, chunks, false);
         return planCache;
     }
 
@@ -581,6 +591,7 @@ public final class TemporalRepository {
      * path makes the sparse form unsound, so that chunk resolves from its whole target history.
      */
     private ResolvedChunk resolveJumpDiff(JumpPlan plan, long chunkKey, LevelHeightAccessor height) {
+        if (plan.restoreWhole) return resolveChunkStateAt(plan.targetChain, chunkKey);
         Map<BlockPos, BlockState> states = new HashMap<>();
         Map<BlockPos, CompoundTag> beTags = new HashMap<>();
 

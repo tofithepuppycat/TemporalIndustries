@@ -1,4 +1,9 @@
 {
+  "jump": {
+    "sounds": [
+      "temporalindustries:jump"
+    ]
+  },
   "return_by_death": {
     "sounds": [
       "temporalindustries:return_by_death"

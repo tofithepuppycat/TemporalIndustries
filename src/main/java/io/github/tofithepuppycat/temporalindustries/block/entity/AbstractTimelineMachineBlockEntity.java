@@ -81,8 +81,6 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      */
     public static final double JUMP_ENTROPIC_FE_SCALE = JUMP_ENTROPIC_MAX_FE / Math.expm1(JUMP_ENTROPIC_GROWTH);
     public static final double JUMP_ENTITY_FE_PER_HEALTH = 100.0; // FE per health point of every entity a jump restores or removes
-    private static final int CAPTURE_BASE_FE_PER_TICK = 1;
-    private static final double CAPTURE_ENTROPY_SCALE = 4.0; // additional FE/tick at max distance from balance
 
     protected long placedGameTime = UNSET_TIME;
     protected long selectedGameTime = UNSET_TIME;
@@ -728,7 +726,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return deleted;
     }
 
-    /** Clamps placed/selected game time and drains capture energy. */
+    /** Clamps placed/selected game time, advances charging and redstone, and keeps creative machines full. */
     protected final void commonTick(Level level) {
         if (placedGameTime == UNSET_TIME) {
             placedGameTime = level.getGameTime();
@@ -744,7 +742,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
         tickCharging();
         tickRedstone(level);
-        drainCaptureEnergy();
+        refillCreativeEnergy();
     }
 
     /** Returns to the pinned commit when the redstone signal changes in the way the mode listens for. */
@@ -756,7 +754,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (!redstoneMode.triggersOn(powered) || pinnedCommitId == RepoCommit.NO_PARENT) return;
 
         TemporalRepository repo = getRepository();
-        if (repo == null || repo.getCommit(pinnedCommitId) == null || pinnedCommitId == repo.getHeadCommitId()) return;
+        if (repo == null || repo.getCommit(pinnedCommitId) == null) return;
         applyTimelineView(pinnedCommitId);
     }
 
@@ -835,18 +833,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         launchJump(repo, target, chargeTarget, paid, false);
     }
 
-    /**
-     * Per-tick FE drain for keeping claimed chunks under capture, scaled by distance from entropy
-     * balance.
-     */
-    private void drainCaptureEnergy() {
-        if (isCreative()) {
-            energyStorage.fillInternal();
-            return;
-        }
-        double distance = Math.abs(getEntropy() - ENTROPY_BALANCED) / (double) ENTROPY_BALANCED;
-        int feThisTick = (int) Math.round(CAPTURE_BASE_FE_PER_TICK + CAPTURE_ENTROPY_SCALE * distance);
-        energyStorage.consumeInternal(Math.min(feThisTick, energyStorage.getEnergyStored()));
+    private void refillCreativeEnergy() {
+        if (isCreative()) energyStorage.fillInternal();
     }
 
     private void syncToClients() {
@@ -901,7 +889,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
     /** A background estimate for the cost display, valid for as long as its inputs are unchanged. */
     private record CachedEstimate(long target, long head, boolean saveEntities, boolean chargeContainers,
-                                  JumpJob.Estimate estimate) {}
+                                  JumpJob.Estimate estimate, long measuredAt) {}
+
+    private static final long HEAD_ESTIMATE_MAX_AGE_TICKS = 20L;
 
     @Nullable private CachedEstimate cachedEstimate;
     /** Who asked for the jump in flight, so they can be told if it has to charge first. */
@@ -919,7 +909,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         TemporalRepository repo = getRepository();
         RepoCommit target = repo == null ? null : repo.getCommit(targetCommitId);
         if (target == null) return null;
-        if (targetCommitId == repo.getHeadCommitId() || isCreative()) {
+        if (isCreative()) {
             return new JumpCostBreakdown(0L, 0L, 0L, 0L, 0L, 0.0, 0L, 0, 0.0, 0L, 0.0,
                     savesEntities(), chargesContainers());
         }
@@ -927,6 +917,11 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         CachedEstimate cached = cachedEstimate;
         if (cached != null && cached.target() == targetCommitId && cached.head() == repo.getHeadCommitId()
                 && cached.saveEntities() == savesEntities() && cached.chargeContainers() == chargesContainers()) {
+            // The world keeps changing under a jump to the head, so its measurement is refreshed
+            // in the background while the last one stays on display.
+            if (targetCommitId == repo.getHeadCommitId() && serverLevel.getGameTime() - cached.measuredAt() >= HEAD_ESTIMATE_MAX_AGE_TICKS) {
+                startEstimate(repo, serverLevel, targetCommitId);
+            }
             return breakdown(serverLevel, target, cached.estimate());
         }
         startEstimate(repo, serverLevel, targetCommitId);
@@ -947,9 +942,18 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                 gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveEntitiesNow, chargeContainersNow,
                 true, false, false,
                 finished -> cachedEstimate = new CachedEstimate(targetCommitId, head, saveEntitiesNow,
-                        chargeContainersNow, finished.estimate()),
+                        chargeContainersNow, finished.estimate(), serverLevel.getGameTime()),
                 finished -> { }));
         if (job != null) data.startJumpJob(repoId, job);
+    }
+
+    /**
+     * Whether target is where the head already is: such a jump only undoes changes made since, so
+     * it pays for the blocks it rewrites but not for travelling in time or for the entropic upkeep.
+     */
+    private boolean isHeadJump(RepoCommit target) {
+        TemporalRepository repo = getRepository();
+        return repo != null && target.getId() == repo.getHeadCommitId();
     }
 
     private JumpCostBreakdown breakdown(ServerLevel serverLevel, RepoCommit target, JumpJob.Estimate estimate) {
@@ -957,9 +961,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
                 new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth());
         TemporalRepository.ContainerJumpStats containerStats =
                 TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf);
-        double minutes = Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
-        return new JumpCostBreakdown(timeDistanceCost(target, serverLevel.getGameTime()), estimate.blockCost(),
-                entityCost(entityStats), containerStats.cost(), entropicCost(), minutes, estimate.changedBlocks(),
+        boolean toHead = isHeadJump(target);
+        double minutes = toHead ? 0.0 : Math.abs(serverLevel.getGameTime() - target.getGameTime()) / TICKS_PER_MINUTE;
+        return new JumpCostBreakdown(toHead ? 0L : timeDistanceCost(target, serverLevel.getGameTime()), estimate.blockCost(),
+                entityCost(entityStats), containerStats.cost(), toHead ? 0L : entropicCost(), minutes, estimate.changedBlocks(),
                 entityStats.count(), entityStats.health(), containerStats.items(),
                 getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
     }
@@ -1042,8 +1047,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (target == null) return JumpResult.SUCCESS;
 
         jumpRequester = requester;
-        // Nothing to pay: either the head is already there, or the machine is creative.
-        boolean free = targetCommitId == repo.getHeadCommitId() || isCreative();
+        // Nothing to pay for a creative machine.
+        boolean free = isCreative();
         if (free) cancelCharging();
         launchJump(repo, target, targetCommitId, 0L, !free);
         return JumpResult.SUCCESS;
@@ -1083,9 +1088,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         TemporalRepository.ContainerJumpStats containers = chargesContainers()
                 ? TemporalRepository.containerStats(estimate.containerNet(), AbstractTimelineMachineBlockEntity::itemCostOf)
                 : TemporalRepository.ContainerJumpStats.NONE;
-        long totalCost = timeDistanceCost(target, serverLevel.getGameTime()) + estimate.blockCost()
+        boolean toHead = isHeadJump(target);
+        long totalCost = (toHead ? 0L : timeDistanceCost(target, serverLevel.getGameTime())) + estimate.blockCost()
                 + entityCost(new TemporalRepository.EntityJumpStats(estimate.entityCount(), estimate.entityHealth()))
-                + containers.cost() + entropicCost();
+                + containers.cost() + (toHead ? 0L : entropicCost());
 
         if (totalCost > energyStorage.getEnergyStored()) {
             beginCharging(target.getId(), totalCost);
@@ -1120,7 +1126,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         setChanged();
         syncToClients();
 
-        serverLevel.playSound(null, worldPosition, SoundEvents.PORTAL_TRAVEL, SoundSource.BLOCKS, 1.0F, 1.0F);
+        serverLevel.playSound(null, worldPosition, Registration.JUMP_SOUND.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
         PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
                 new TimelineJumpEffectPacket(worldPosition, intoFuture));
         broadcastBlockChangeFlashes(serverLevel, changedPositions, intoFuture);

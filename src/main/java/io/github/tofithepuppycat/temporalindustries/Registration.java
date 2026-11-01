@@ -522,6 +522,9 @@ public class Registration {
     public static final DeferredHolder<MenuType<?>, MenuType<WithergenicReactorMenu>> WITHERGENIC_REACTOR_MENU = MENUS.register("withergenic_reactor",
             () -> IMenuTypeExtension.create(WithergenicReactorMenu::new));
 
+    public static final DeferredHolder<SoundEvent, SoundEvent> JUMP_SOUND = SOUND_EVENTS.register("jump",
+            () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "jump")));
+
     public static final DeferredHolder<SoundEvent, SoundEvent> RETURN_BY_DEATH_SOUND = SOUND_EVENTS.register("return_by_death",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "return_by_death")));
 
