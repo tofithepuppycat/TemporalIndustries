@@ -55,7 +55,7 @@ public class EntropyCondenserBlockEntity extends BlockEntity implements Containe
     private static final int ENERGY_MAX_RECEIVE = 500;
 
     private static final int TANK_CAPACITY = 8_000;
-    private static final int FE_PER_UNIT = 40;
+    public static final int FE_PER_UNIT = 40;
     private static final int CELL_DRAIN_PER_TICK = 50; // mB moved between a slotted cell and the tanks per tick
     private static final int OUTPUT_FILL_PER_TICK = 50;
     private static final int SLOT_COUNT = 2;

@@ -50,35 +50,35 @@ import java.util.Set;
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID)
 public final class EntropyEventListener {
-    private static final int OBSIDIAN_ORDER = 2;
-    private static final int BASALT_ORDER = 1;
-    private static final int COBBLESTONE_ORDER = 1;
-    private static final int CROP_GROWTH_ORDER = 1;
-    private static final int ITEM_DESPAWN_ORDER = 1;
+    public static final int OBSIDIAN_ORDER = 2;
+    public static final int BASALT_ORDER = 1;
+    public static final int COBBLESTONE_ORDER = 1;
+    public static final int CROP_GROWTH_ORDER = 1;
+    public static final int ITEM_DESPAWN_ORDER = 1;
 
-    private static final int PLAYER_DEATH_CHAOS = 3;
-    private static final int SPLASH_POTION_CHAOS = 1;
-    private static final int LINGERING_POTION_CHAOS = 2;
-    private static final int HOSTILE_MOB_DEATH_CHAOS = 1;
-    private static final int LIGHTNING_CHAOS = 4;
-    private static final int LEAF_DECAY_CHAOS = 1;
-    private static final float LEAF_DECAY_CHAOS_CHANCE = 0.25F;
-    private static final int BLOCKS_PER_EXPLOSION_CHAOS = 10;
-    private static final int MAX_EXPLOSION_CHAOS = 8;
-    private static final int COMPOST_HARVEST_ORDER = 2;
-    private static final int POTION_BREWED_ORDER = 1;
-    private static final int PASSIVE_MOB_DEATH_ORDER = 1;
-    private static final float CROP_GROWTH_ORDER_CHANCE = 0.25F;
-    private static final float PASSIVE_MOB_DEATH_ORDER_CHANCE = 0.5F;
+    public static final int PLAYER_DEATH_CHAOS = 3;
+    public static final int SPLASH_POTION_CHAOS = 1;
+    public static final int LINGERING_POTION_CHAOS = 2;
+    public static final int HOSTILE_MOB_DEATH_CHAOS = 1;
+    public static final int LIGHTNING_CHAOS = 4;
+    public static final int LEAF_DECAY_CHAOS = 1;
+    public static final float LEAF_DECAY_CHAOS_CHANCE = 0.25F;
+    public static final int BLOCKS_PER_EXPLOSION_CHAOS = 10;
+    public static final int MAX_EXPLOSION_CHAOS = 8;
+    public static final int COMPOST_HARVEST_ORDER = 2;
+    public static final int POTION_BREWED_ORDER = 1;
+    public static final int PASSIVE_MOB_DEATH_ORDER = 1;
+    public static final float CROP_GROWTH_ORDER_CHANCE = 0.25F;
+    public static final float PASSIVE_MOB_DEATH_ORDER_CHANCE = 0.5F;
 
     /**
      * Outputs of vanilla furnace recipes that "simplify" a material, identified by the smelted
      * result alone since each is unique to one vanilla smelting recipe.
      */
-    private static final Set<Item> SIMPLIFICATION_RESULTS = Set.of(
+    public static final Set<Item> SIMPLIFICATION_RESULTS = Set.of(
             Items.STONE, Items.SMOOTH_STONE, Items.GLASS, Items.BRICK,
             Items.SMOOTH_SANDSTONE, Items.SMOOTH_RED_SANDSTONE, Items.SMOOTH_QUARTZ, Items.DEEPSLATE);
-    private static final float SMELT_ORDER_CHANCE = 0.15F;
+    public static final float SMELT_ORDER_CHANCE = 0.15F;
 
     private EntropyEventListener() {}
 

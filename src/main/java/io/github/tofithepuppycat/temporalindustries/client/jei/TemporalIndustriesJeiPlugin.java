@@ -45,6 +45,14 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
     public static final RecipeType<EntropyManipulatorChain> ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE =
             RecipeType.create(TemporalIndustries.MODID, "entropy_manipulator_chain", EntropyManipulatorChain.class);
 
+    /** The Entropy Manipulator repairing damaged items; see {@link EntropyRepair}. */
+    public static final RecipeType<EntropyRepair> ENTROPY_REPAIR_RECIPE_TYPE =
+            RecipeType.create(TemporalIndustries.MODID, "entropy_repair", EntropyRepair.class);
+
+    /** Every way of obtaining Order and Chaos; see {@link EntropySource}. */
+    public static final RecipeType<EntropySource> ENTROPY_SOURCE_RECIPE_TYPE =
+            RecipeType.create(TemporalIndustries.MODID, "entropy_source", EntropySource.class);
+
     @Override
     public ResourceLocation getPluginUid() {
         return PLUGIN_UID;
@@ -53,12 +61,16 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
     @Override
     public void registerCategories(IRecipeCategoryRegistration registration) {
         registration.addRecipeCategories(
+                new EntropySourceRecipeCategory(registration.getJeiHelpers().getGuiHelper()),
                 new EntropyManipulatorRecipeCategory(registration.getJeiHelpers().getGuiHelper()),
-                new EntropyManipulatorChainRecipeCategory(registration.getJeiHelpers().getGuiHelper()));
+                new EntropyManipulatorChainRecipeCategory(registration.getJeiHelpers().getGuiHelper()),
+                new EntropyRepairRecipeCategory(registration.getJeiHelpers().getGuiHelper()));
     }
 
     @Override
     public void registerRecipes(IRecipeRegistration registration) {
+        registration.addRecipes(ENTROPY_SOURCE_RECIPE_TYPE, EntropySource.all());
+
         var level = Minecraft.getInstance().level;
         if (level == null) return;
 
@@ -66,6 +78,7 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
                 level.getRecipeManager().getAllRecipesFor(Registration.ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
         registration.addRecipes(ENTROPY_MANIPULATOR_RECIPE_TYPE.get(), recipes);
         registration.addRecipes(ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE, buildChains(recipes, level.registryAccess()));
+        registration.addRecipes(ENTROPY_REPAIR_RECIPE_TYPE, List.of(EntropyRepair.ofAllDamageableItems()));
     }
 
     /**
@@ -159,8 +172,14 @@ public class TemporalIndustriesJeiPlugin implements IModPlugin {
 
     @Override
     public void registerRecipeCatalysts(IRecipeCatalystRegistration registration) {
+        for (Item machine : List.of(Registration.ENTROPY_CONDENSER_ITEM.get(), Registration.DECAY_ACCELERATOR_ITEM.get(),
+                Registration.DESPAWN_ACCELERATOR_ITEM.get(), Registration.SCHRODINGER_GENERATOR_ITEM.get(),
+                Registration.SEEBECK_GENERATOR_ITEM.get())) {
+            registration.addRecipeCatalyst(machine.getDefaultInstance(), ENTROPY_SOURCE_RECIPE_TYPE);
+        }
         registration.addRecipeCatalyst(Registration.ENTROPY_MANIPULATOR_ITEM.get().getDefaultInstance(), ENTROPY_MANIPULATOR_RECIPE_TYPE.get());
         registration.addRecipeCatalyst(Registration.ENTROPY_MANIPULATOR_ITEM.get().getDefaultInstance(), ENTROPY_MANIPULATOR_CHAIN_RECIPE_TYPE);
+        registration.addRecipeCatalyst(Registration.ENTROPY_MANIPULATOR_ITEM.get().getDefaultInstance(), ENTROPY_REPAIR_RECIPE_TYPE);
     }
 
     @Override

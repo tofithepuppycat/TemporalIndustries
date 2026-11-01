@@ -17,8 +17,8 @@ import org.jetbrains.annotations.NotNull;
  * compostables, and destroys it for a flat ORDER payout.
  */
 public class DespawnAcceleratorBlockEntity extends AbstractAcceleratorBlockEntity {
-    private static final int ORDER_PER_ITEM = 1;
-    private static final int PROCESS_TIME = 200;
+    public static final int ORDER_PER_ITEM = 1;
+    public static final int PROCESS_TIME = 200;
 
     public DespawnAcceleratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.DESPAWN_ACCELERATOR_BLOCK_ENTITY.get(), pos, state);

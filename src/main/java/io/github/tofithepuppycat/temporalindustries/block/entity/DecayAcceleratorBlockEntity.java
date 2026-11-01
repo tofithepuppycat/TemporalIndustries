@@ -18,8 +18,8 @@ import org.jetbrains.annotations.NotNull;
  * orb sized by how compostable the item is ({@link ComposterBlock#getValue(ItemStack)}).
  */
 public class DecayAcceleratorBlockEntity extends AbstractAcceleratorBlockEntity {
-    private static final int MIN_CHAOS = 1;
-    private static final int MAX_CHAOS = 3;
+    public static final int MIN_CHAOS = 1;
+    public static final int MAX_CHAOS = 3;
 
     public DecayAcceleratorBlockEntity(BlockPos pos, BlockState state) {
         super(Registration.DECAY_ACCELERATOR_BLOCK_ENTITY.get(), pos, state);

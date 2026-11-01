@@ -37,8 +37,8 @@ import java.util.List;
 public class SchrodingerGeneratorBlockEntity extends BlockEntity implements EntropyInfoProvider {
     // entropyAccumulator carries the fractional remainder between checks since an orb can't be
     // spawned with a value below 1.
-    private static final int CHS_INTERVAL_TICKS = 50;
-    private static final double CHS_PER_INTERVAL = 0.5;
+    public static final int CHS_INTERVAL_TICKS = 50;
+    public static final double CHS_PER_INTERVAL = 0.5;
 
     private static final int ENERGY_CAPACITY = 4_000;
     private static final int ENERGY_MAX_EXTRACT = 400;
