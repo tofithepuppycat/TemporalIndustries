@@ -8,8 +8,12 @@ import java.util.Set;
 
 import it.unimi.dsi.fastutil.ints.IntArrayList;
 import com.mojang.blaze3d.systems.RenderSystem;
+import com.mojang.blaze3d.vertex.BufferBuilder;
+import com.mojang.blaze3d.vertex.ByteBufferBuilder;
 import com.mojang.blaze3d.vertex.DefaultVertexFormat;
+import com.mojang.blaze3d.vertex.MeshData;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.mojang.blaze3d.vertex.VertexBuffer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.vertex.VertexFormat;
 import org.joml.Matrix4f;
@@ -29,11 +33,13 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.api.distmarker.Dist;
+import org.jetbrains.annotations.Nullable;
 import net.neoforged.bus.api.SubscribeEvent;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
@@ -102,8 +108,8 @@ public class TimelineProjectionRenderer {
                     .setDepthTestState(RenderStateShard.LEQUAL_DEPTH_TEST)
                     .createCompositeState(false));
 
-    /** Most marker decals drawn per frame; the rest, being farthest from the camera, are skipped. */
-    private static final int MARKER_RENDER_LIMIT = 6000;
+    /** Most marker decals baked into the marker mesh; the rest, being farthest from the camera, are skipped. */
+    private static final int MARKER_RENDER_LIMIT = 50_000;
 
     /**
      * Pulls ghost faces only a little toward the camera, enough to win against the block they
@@ -151,6 +157,7 @@ public class TimelineProjectionRenderer {
         Minecraft minecraft = Minecraft.getInstance();
         Level level = minecraft.level;
         if (level == null || !TimelineProjectionManager.hasActivePreview()) {
+            closeMeshes();
             return;
         }
 
@@ -172,10 +179,13 @@ public class TimelineProjectionRenderer {
         if (TimelineProjectionManager.isGhostBlockModeEnabled()) {
             // Ghost models show what will appear; a removal has no target model, so it keeps its marker.
             splitByRemoval(entries);
-            renderGhostBlocks(poseStack, bufferSource, level, additionsAndChanges, cameraX, cameraY, cameraZ, alpha);
-            renderMarkers(poseStack, bufferSource, level, removals, cameraX, cameraY, cameraZ, alpha);
+            renderGhostBlocks(poseStack, bufferSource, level, additionsAndChanges,
+                    event.getModelViewMatrix(), event.getProjectionMatrix(), cameraX, cameraY, cameraZ);
+            renderMarkers(level, removals, event.getModelViewMatrix(), event.getProjectionMatrix(), cameraX, cameraY, cameraZ, alpha);
         } else {
-            renderMarkers(poseStack, bufferSource, level, entries, cameraX, cameraY, cameraZ, alpha);
+            GHOST_MESH.close();
+            ghostEntityBlocks.clear();
+            renderMarkers(level, entries, event.getModelViewMatrix(), event.getProjectionMatrix(), cameraX, cameraY, cameraZ, alpha);
         }
     }
 
@@ -212,16 +222,42 @@ public class TimelineProjectionRenderer {
         bufferSource.endBatch(WALL_RENDER_TYPE);
     }
 
-    private static void renderMarkers(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
-                                       Level level, List<TimelineProjectionManager.ProjectionEntry> entries,
+    /**
+     * Draws a blinking decal on each exposed face of the nearest {@link #MARKER_RENDER_LIMIT}
+     * entries, as one cached vertex buffer like the ghost blocks; the blink is the draw's color
+     * modulation, so the buffer itself never changes with it.
+     */
+    private static void renderMarkers(Level level, List<TimelineProjectionManager.ProjectionEntry> entries,
+                                       Matrix4f modelView, Matrix4f projection,
                                        double cameraX, double cameraY, double cameraZ, float alpha) {
-        VertexConsumer quadBuffer = bufferSource.getBuffer(MARKER_RENDER_TYPE);
+        List<TimelineProjectionManager.ProjectionEntry> nearest = cachedNearest(MARKER_CACHE, entries,
+                cameraX, cameraY, cameraZ, MARKER_RENDER_LIMIT, MESH_REUSE_DISTANCE_SQR);
+        MARKER_MESH.ensure(level, nearest, cameraX, cameraY, cameraZ, DefaultVertexFormat.POSITION_COLOR,
+                TimelineProjectionRenderer::markerSignature, (builder, origin) -> buildMarkerMesh(level, nearest, builder, origin));
 
-        for (TimelineProjectionManager.ProjectionEntry entry : cachedNearest(MARKER_CACHE, entries, cameraX, cameraY, cameraZ, MARKER_RENDER_LIMIT)) {
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
+        MARKER_MESH.draw(MARKER_RENDER_TYPE, modelView, projection, cameraX, cameraY, cameraZ);
+        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
+    }
+
+    private static long markerSignature(List<TimelineProjectionManager.ProjectionEntry> entries) {
+        long hash = entries.size();
+        for (TimelineProjectionManager.ProjectionEntry entry : entries) {
+            hash = hash * 31L + entry.getPos().asLong();
+            hash = hash * 31L + entry.getType().ordinal();
+            hash = hash * 31L + Block.getId(entry.getCurrentState());
+        }
+        return hash;
+    }
+
+    private static void buildMarkerMesh(Level level, List<TimelineProjectionManager.ProjectionEntry> selected,
+                                        BufferBuilder builder, BlockPos origin) {
+        Matrix4f identity = new Matrix4f();
+        for (TimelineProjectionManager.ProjectionEntry entry : selected) {
             BlockPos pos = entry.getPos();
-            double relX = pos.getX() - cameraX;
-            double relY = pos.getY() - cameraY;
-            double relZ = pos.getZ() - cameraZ;
+            float x = pos.getX() - origin.getX();
+            float y = pos.getY() - origin.getY();
+            float z = pos.getZ() - origin.getZ();
 
             float[] color = switch (entry.getType()) {
                 case REMOVE -> REMOVE_COLOR;
@@ -230,13 +266,11 @@ public class TimelineProjectionRenderer {
             };
             if (entry.getCurrentState().isAir()) {
                 // Nothing to decal faces onto yet, so float a small cube in the middle instead.
-                renderCenterCube(poseStack, quadBuffer, relX, relY, relZ, color[0], color[1], color[2], alpha);
+                putCenterCube(identity, builder, x, y, z, color[0], color[1], color[2]);
             } else {
-                renderFaceMarkers(poseStack, quadBuffer, level, pos, relX, relY, relZ, color[0], color[1], color[2], alpha);
+                putFaceMarkers(identity, builder, level, pos, x, y, z, color[0], color[1], color[2]);
             }
         }
-
-        bufferSource.endBatch(MARKER_RENDER_TYPE);
     }
 
     private static List<TimelineProjectionManager.ProjectionEntry> splitSource;
@@ -261,70 +295,180 @@ public class TimelineProjectionRenderer {
     private static final BlockPos.MutableBlockPos LIGHT_POS = new BlockPos.MutableBlockPos();
     private static final RandomSource GHOST_RANDOM = RandomSource.create();
 
-    /**
-     * Renders real, translucent block models instead of colored decals, capped to the {@link
-     * TimelineProjectionManager#GHOST_BLOCK_RENDER_LIMIT} positions nearest the camera — full block
-     * models cost far more to draw than the decals' flat quads, so previewing every affected
-     * position across a large claim would tank the framerate. Only faces the camera can see are
-     * drawn.
-     */
-    private static void renderGhostBlocks(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, Level level,
-                                           List<TimelineProjectionManager.ProjectionEntry> entries,
-                                           double cameraX, double cameraY, double cameraZ, float alpha) {
-        List<TimelineProjectionManager.ProjectionEntry> nearest =
-                cachedNearest(GHOST_CACHE, entries, cameraX, cameraY, cameraZ, TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT);
-        if (nearest.isEmpty()) return;
+    /** Selections are rebuilt around the camera once it has moved this far from where they were made. */
+    private static final double MESH_REUSE_DISTANCE_SQR = 16.0 * 16.0;
+    private static final long MESH_MAX_AGE_TICKS = 400L;
 
-        Minecraft minecraft = Minecraft.getInstance();
-        VertexConsumer ghostBuffer = bufferSource.getBuffer(GHOST_BLOCK_RENDER_TYPE);
-        MultiBufferSource forcedGhost = renderType -> ghostBuffer;
+    private static final CachedMesh GHOST_MESH = new CachedMesh();
+    private static final CachedMesh MARKER_MESH = new CachedMesh();
+    /** Previewed blocks that only their item renderer can draw, which cannot go into the mesh. */
+    private static final List<TimelineProjectionManager.ProjectionEntry> ghostEntityBlocks = new java.util.ArrayList<>();
+    private static final NearestCache GHOST_MESH_SELECTION = new NearestCache();
 
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, alpha);
-        for (TimelineProjectionManager.ProjectionEntry entry : nearest) {
-            BlockState renderState = entry.getTargetState();
-            if (renderState.isAir()) continue;
+    /** A vertex buffer baked from a selection of entries, kept until the selection or the camera's place in it changes. */
+    private static final class CachedMesh {
+        @Nullable private VertexBuffer buffer;
+        private BlockPos origin = BlockPos.ZERO;
+        @Nullable private List<TimelineProjectionManager.ProjectionEntry> source;
+        @Nullable private Level level;
+        private long signature;
+        private long builtTick;
 
-            BlockPos pos = entry.getPos();
-            double relX = pos.getX() - cameraX;
-            double relY = pos.getY() - cameraY;
-            double relZ = pos.getZ() - cameraZ;
-
-            poseStack.pushPose();
-            poseStack.translate(relX, relY, relZ);
-            if (renderState.getRenderShape() == RenderShape.MODEL) {
-                renderVisibleFaces(poseStack, ghostBuffer, level, pos, renderState, (float) relX, (float) relY, (float) relZ);
-            } else {
-                minecraft.getBlockRenderer().renderSingleBlock(
-                        renderState, poseStack, forcedGhost, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
-            }
-            poseStack.popPose();
+        /** Fills the builder with quads positioned relative to origin. */
+        interface Filler {
+            void fill(BufferBuilder builder, BlockPos origin);
         }
 
-        RenderSystem.setShaderColor(1.0F, 1.0F, 1.0F, 1.0F);
-        bufferSource.endBatch(GHOST_BLOCK_RENDER_TYPE);
+        /**
+         * Rebuilds the mesh with filler unless selected is what it was built from, or only differs
+         * in identity and not in content (judged by signature) and is not stale.
+         */
+        void ensure(Level level, List<TimelineProjectionManager.ProjectionEntry> selected, double cameraX, double cameraY,
+                    double cameraZ, VertexFormat format, java.util.function.ToLongFunction<List<TimelineProjectionManager.ProjectionEntry>> signer,
+                    Filler filler) {
+            if (source == selected && this.level == level) return;
+
+            long now = level.getGameTime();
+            long newSignature = signer.applyAsLong(selected);
+            if (this.level == level && newSignature == signature && now >= builtTick && now - builtTick < MESH_MAX_AGE_TICKS) {
+                source = selected;
+                return;
+            }
+
+            close();
+            this.level = level;
+            source = selected;
+            signature = newSignature;
+            builtTick = now;
+            origin = BlockPos.containing(cameraX, cameraY, cameraZ);
+
+            try (ByteBufferBuilder bytes = new ByteBufferBuilder(1 << 20)) {
+                BufferBuilder builder = new BufferBuilder(bytes, VertexFormat.Mode.QUADS, format);
+                filler.fill(builder, origin);
+                MeshData mesh = builder.build();
+                if (mesh == null) return;
+                buffer = new VertexBuffer(VertexBuffer.Usage.STATIC);
+                buffer.bind();
+                buffer.upload(mesh);
+                VertexBuffer.unbind();
+            }
+        }
+
+        void draw(RenderType type, Matrix4f modelView, Matrix4f projection, double cameraX, double cameraY, double cameraZ) {
+            if (buffer == null) return;
+            Matrix4f meshModelView = new Matrix4f(modelView).translate(
+                    (float) (origin.getX() - cameraX), (float) (origin.getY() - cameraY), (float) (origin.getZ() - cameraZ));
+            type.setupRenderState();
+            buffer.bind();
+            buffer.drawWithShader(meshModelView, projection, RenderSystem.getShader());
+            VertexBuffer.unbind();
+            type.clearRenderState();
+        }
+
+        void close() {
+            if (buffer != null) {
+                buffer.close();
+                buffer = null;
+            }
+            source = null;
+            level = null;
+        }
+    }
+
+    private static void closeMeshes() {
+        GHOST_MESH.close();
+        ghostEntityBlocks.clear();
+        MARKER_MESH.close();
     }
 
     /**
-     * Submits the quads of state's model that the camera can see: each side's quads only while that
-     * side faces the camera and is not buried against an opaque block, plus the model's interior
-     * quads, which have no side to test.
+     * Draws the previewed blocks as real, opaque block models instead of colored decals. The faces
+     * of the {@link TimelineProjectionManager#GHOST_BLOCK_RENDER_LIMIT} positions nearest the
+     * camera are baked once into a vertex buffer, so every frame is a single draw however many
+     * blocks it holds; the buffer is rebuilt only when the preview changes or the camera has moved
+     * well away from where it was built. Only faces not buried against a block of the target world
+     * are baked.
      */
-    private static void renderVisibleFaces(PoseStack poseStack, VertexConsumer buffer, Level level, BlockPos pos,
-                                           BlockState state, float relX, float relY, float relZ) {
+    private static void renderGhostBlocks(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource, Level level,
+                                           List<TimelineProjectionManager.ProjectionEntry> entries,
+                                           Matrix4f modelView, Matrix4f projection,
+                                           double cameraX, double cameraY, double cameraZ) {
+        List<TimelineProjectionManager.ProjectionEntry> nearest = cachedNearest(GHOST_MESH_SELECTION, entries,
+                cameraX, cameraY, cameraZ, TimelineProjectionManager.GHOST_BLOCK_RENDER_LIMIT, MESH_REUSE_DISTANCE_SQR);
+        GHOST_MESH.ensure(level, nearest, cameraX, cameraY, cameraZ, DefaultVertexFormat.BLOCK,
+                TimelineProjectionRenderer::ghostSignature, (builder, origin) -> buildGhostMesh(level, nearest, builder, origin));
+        GHOST_MESH.draw(GHOST_BLOCK_RENDER_TYPE, modelView, projection, cameraX, cameraY, cameraZ);
+
+        renderEntityGhostBlocks(poseStack, bufferSource, cameraX, cameraY, cameraZ);
+    }
+
+    /**
+     * Blocks drawn by their item renderer (chests, beds, banners and the like) use entity textures
+     * of their own, so they are drawn each frame through the real buffers instead of the mesh.
+     */
+    private static void renderEntityGhostBlocks(PoseStack poseStack, MultiBufferSource.BufferSource bufferSource,
+                                                double cameraX, double cameraY, double cameraZ) {
+        if (ghostEntityBlocks.isEmpty()) return;
+
+        Set<RenderType> entityTypes = new HashSet<>();
+        MultiBufferSource entityRendered = renderType -> {
+            entityTypes.add(renderType);
+            return bufferSource.getBuffer(renderType);
+        };
+        for (TimelineProjectionManager.ProjectionEntry entry : ghostEntityBlocks) {
+            BlockPos pos = entry.getPos();
+            poseStack.pushPose();
+            poseStack.translate(pos.getX() - cameraX, pos.getY() - cameraY, pos.getZ() - cameraZ);
+            Minecraft.getInstance().getBlockRenderer().renderSingleBlock(
+                    entry.getTargetState(), poseStack, entityRendered, LightTexture.FULL_BRIGHT, OverlayTexture.NO_OVERLAY);
+            poseStack.popPose();
+        }
+        for (RenderType type : entityTypes) bufferSource.endBatch(type);
+    }
+
+    private static long ghostSignature(List<TimelineProjectionManager.ProjectionEntry> entries) {
+        long hash = entries.size();
+        for (TimelineProjectionManager.ProjectionEntry entry : entries) {
+            hash = hash * 31L + entry.getPos().asLong();
+            hash = hash * 31L + Block.getId(entry.getTargetState());
+        }
+        return hash;
+    }
+
+    private static void buildGhostMesh(Level level, List<TimelineProjectionManager.ProjectionEntry> selected,
+                                       BufferBuilder builder, BlockPos origin) {
+        ghostEntityBlocks.clear();
+        PoseStack poseStack = new PoseStack();
+        for (TimelineProjectionManager.ProjectionEntry entry : selected) {
+            BlockState state = entry.getTargetState();
+            if (state.isAir()) continue;
+            if (state.getRenderShape() == RenderShape.ENTITYBLOCK_ANIMATED) {
+                ghostEntityBlocks.add(entry);
+                continue;
+            }
+            if (state.getRenderShape() != RenderShape.MODEL) continue;
+
+            BlockPos pos = entry.getPos();
+            poseStack.pushPose();
+            poseStack.translate(pos.getX() - origin.getX(), pos.getY() - origin.getY(), pos.getZ() - origin.getZ());
+            putVisibleFaces(poseStack.last(), builder, level, pos, state);
+            poseStack.popPose();
+        }
+    }
+
+    /**
+     * Submits the quads of state's model that are not buried: each side's quads only while that side
+     * is not covered by a block of the target world, plus the model's interior quads, which have no
+     * side to test.
+     */
+    private static void putVisibleFaces(PoseStack.Pose pose, VertexConsumer buffer, Level level, BlockPos pos, BlockState state) {
         Minecraft minecraft = Minecraft.getInstance();
         BakedModel model = minecraft.getBlockRenderer().getBlockModel(state);
         BlockColors blockColors = minecraft.getBlockColors();
-        PoseStack.Pose pose = poseStack.last();
         long seed = state.getSeed(pos);
 
         for (Direction direction : DIRECTIONS) {
-            float rel = switch (direction.getAxis()) {
-                case X -> relX;
-                case Y -> relY;
-                case Z -> relZ;
-            };
-            float plane = rel + (direction.getAxisDirection() == Direction.AxisDirection.POSITIVE ? 1.0F : 0.0F);
-            if (!faceVisible(level, pos, direction, plane)) continue;
+            if (!ghostFaceExposed(level, pos, state, direction)) continue;
 
             // A face is lit by the space in front of it, as in a real block's flat lighting.
             int light = LevelRenderer.getLightColor(level, LIGHT_POS.setWithOffset(pos, direction));
@@ -382,11 +526,17 @@ public class TimelineProjectionRenderer {
     private static List<TimelineProjectionManager.ProjectionEntry> cachedNearest(
             NearestCache cache, List<TimelineProjectionManager.ProjectionEntry> entries,
             double cameraX, double cameraY, double cameraZ, int limit) {
+        return cachedNearest(cache, entries, cameraX, cameraY, cameraZ, limit, NEAREST_REUSE_DISTANCE_SQR);
+    }
+
+    private static List<TimelineProjectionManager.ProjectionEntry> cachedNearest(
+            NearestCache cache, List<TimelineProjectionManager.ProjectionEntry> entries,
+            double cameraX, double cameraY, double cameraZ, int limit, double reuseDistanceSqr) {
         if (entries.size() <= limit) return entries;
 
         double dx = cameraX - cache.x, dy = cameraY - cache.y, dz = cameraZ - cache.z;
         if (cache.source == entries && cache.limit == limit
-                && dx * dx + dy * dy + dz * dz < NEAREST_REUSE_DISTANCE_SQR) {
+                && dx * dx + dy * dy + dz * dz < reuseDistanceSqr) {
             return cache.result;
         }
         cache.result = nearestEntries(entries, cameraX, cameraY, cameraZ, limit);
@@ -508,77 +658,69 @@ public class TimelineProjectionRenderer {
 
     private static final BlockPos.MutableBlockPos NEIGHBOUR = new BlockPos.MutableBlockPos();
 
-    /**
-     * Whether a face is worth drawing: it must face the camera and not sit against an opaque
-     * neighbour, which would hide it anyway. {@code planeOffset} is the face's coordinate relative to
-     * the camera along its axis.
-     */
-    private static boolean faceVisible(Level level, BlockPos pos, Direction direction, float planeOffset) {
-        boolean facesCamera = direction.getAxisDirection() == Direction.AxisDirection.POSITIVE ? planeOffset < 0.0F : planeOffset > 0.0F;
-        if (!facesCamera) return false;
+    /** Whether a decal on a block's face can be seen: the face does not sit against an opaque neighbour. */
+    private static boolean markerFaceExposed(Level level, BlockPos pos, Direction direction) {
         NEIGHBOUR.setWithOffset(pos, direction);
         return !level.getBlockState(NEIGHBOUR).isSolidRender(level, NEIGHBOUR);
     }
 
     /**
-     * Draws a small square decal centered on each of the block's faces that the camera can see,
-     * just outside the surface.
+     * Whether a ghost block's face is worth drawing: what hides it is the neighbour as it will be
+     * after the jump, so a face between two ghost blocks is skipped and one against a block that is
+     * about to be removed is kept.
      */
-    private static void renderFaceMarkers(PoseStack poseStack, VertexConsumer buffer, Level level, BlockPos pos,
-                                          double relX, double relY, double relZ,
-                                          float r, float g, float b, float a) {
-        Matrix4f matrix = poseStack.last().pose();
-        float x = (float) relX;
-        float y = (float) relY;
-        float z = (float) relZ;
+    private static boolean ghostFaceExposed(Level level, BlockPos pos, BlockState state, Direction direction) {
+        NEIGHBOUR.setWithOffset(pos, direction);
+        BlockState neighbour = TimelineProjectionManager.getTargetStateAt(level, NEIGHBOUR);
+        if (state.skipRendering(neighbour, direction)) return false;
+        return !neighbour.isSolidRender(level, NEIGHBOUR);
+    }
+
+    /** Adds a small square decal centered on each of the block's exposed faces, just outside the surface. */
+    private static void putFaceMarkers(Matrix4f matrix, VertexConsumer buffer, Level level, BlockPos pos,
+                                       float x, float y, float z, float r, float g, float b) {
         float lo = 0.5F - MARKER_SIZE / 2.0F;
         float hi = 0.5F + MARKER_SIZE / 2.0F;
 
-        if (faceVisible(level, pos, Direction.WEST, x)) {
-            quad(matrix, buffer, r, g, b, a, x - FACE_INSET, y + lo, z + lo, x - FACE_INSET, y + lo, z + hi,
+        if (markerFaceExposed(level, pos, Direction.WEST)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x - FACE_INSET, y + lo, z + lo, x - FACE_INSET, y + lo, z + hi,
                     x - FACE_INSET, y + hi, z + hi, x - FACE_INSET, y + hi, z + lo);
         }
-        if (faceVisible(level, pos, Direction.EAST, x + 1)) {
-            quad(matrix, buffer, r, g, b, a, x + 1 + FACE_INSET, y + lo, z + hi, x + 1 + FACE_INSET, y + lo, z + lo,
+        if (markerFaceExposed(level, pos, Direction.EAST)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x + 1 + FACE_INSET, y + lo, z + hi, x + 1 + FACE_INSET, y + lo, z + lo,
                     x + 1 + FACE_INSET, y + hi, z + lo, x + 1 + FACE_INSET, y + hi, z + hi);
         }
-        if (faceVisible(level, pos, Direction.DOWN, y)) {
-            quad(matrix, buffer, r, g, b, a, x + lo, y - FACE_INSET, z + hi, x + lo, y - FACE_INSET, z + lo,
+        if (markerFaceExposed(level, pos, Direction.DOWN)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x + lo, y - FACE_INSET, z + hi, x + lo, y - FACE_INSET, z + lo,
                     x + hi, y - FACE_INSET, z + lo, x + hi, y - FACE_INSET, z + hi);
         }
-        if (faceVisible(level, pos, Direction.UP, y + 1)) {
-            quad(matrix, buffer, r, g, b, a, x + lo, y + 1 + FACE_INSET, z + lo, x + lo, y + 1 + FACE_INSET, z + hi,
+        if (markerFaceExposed(level, pos, Direction.UP)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x + lo, y + 1 + FACE_INSET, z + lo, x + lo, y + 1 + FACE_INSET, z + hi,
                     x + hi, y + 1 + FACE_INSET, z + hi, x + hi, y + 1 + FACE_INSET, z + lo);
         }
-        if (faceVisible(level, pos, Direction.NORTH, z)) {
-            quad(matrix, buffer, r, g, b, a, x + hi, y + lo, z - FACE_INSET, x + lo, y + lo, z - FACE_INSET,
+        if (markerFaceExposed(level, pos, Direction.NORTH)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x + hi, y + lo, z - FACE_INSET, x + lo, y + lo, z - FACE_INSET,
                     x + lo, y + hi, z - FACE_INSET, x + hi, y + hi, z - FACE_INSET);
         }
-        if (faceVisible(level, pos, Direction.SOUTH, z + 1)) {
-            quad(matrix, buffer, r, g, b, a, x + lo, y + lo, z + 1 + FACE_INSET, x + hi, y + lo, z + 1 + FACE_INSET,
+        if (markerFaceExposed(level, pos, Direction.SOUTH)) {
+            quad(matrix, buffer, r, g, b, 1.0F, x + lo, y + lo, z + 1 + FACE_INSET, x + hi, y + lo, z + 1 + FACE_INSET,
                     x + hi, y + hi, z + 1 + FACE_INSET, x + lo, y + hi, z + 1 + FACE_INSET);
         }
     }
 
-    /** Draws the faces of a small cube floating in the middle of the block that point at the camera. */
-    private static void renderCenterCube(PoseStack poseStack, VertexConsumer buffer, double relX, double relY, double relZ,
-                                         float r, float g, float b, float a) {
-        Matrix4f matrix = poseStack.last().pose();
-        float x = (float) relX;
-        float y = (float) relY;
-        float z = (float) relZ;
+    /** Adds the faces of a small cube floating in the middle of the block. */
+    private static void putCenterCube(Matrix4f matrix, VertexConsumer buffer, float x, float y, float z,
+                                      float r, float g, float b) {
         float minX = x + 0.5F - MARKER_SIZE / 2.0F, maxX = x + 0.5F + MARKER_SIZE / 2.0F;
         float minY = y + 0.5F - MARKER_SIZE / 2.0F, maxY = y + 0.5F + MARKER_SIZE / 2.0F;
         float minZ = z + 0.5F - MARKER_SIZE / 2.0F, maxZ = z + 0.5F + MARKER_SIZE / 2.0F;
 
-        // Coordinates are camera-relative, so a face points at the camera when its plane lies on the
-        // camera's side of the origin.
-        if (minX > 0) quad(matrix, buffer, r, g, b, a, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ);
-        if (maxX < 0) quad(matrix, buffer, r, g, b, a, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ);
-        if (minY > 0) quad(matrix, buffer, r, g, b, a, minX, minY, maxZ, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ);
-        if (maxY < 0) quad(matrix, buffer, r, g, b, a, minX, maxY, minZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ);
-        if (minZ > 0) quad(matrix, buffer, r, g, b, a, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ);
-        if (maxZ < 0) quad(matrix, buffer, r, g, b, a, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ);
+        quad(matrix, buffer, r, g, b, 1.0F, minX, minY, minZ, minX, minY, maxZ, minX, maxY, maxZ, minX, maxY, minZ);
+        quad(matrix, buffer, r, g, b, 1.0F, maxX, minY, maxZ, maxX, minY, minZ, maxX, maxY, minZ, maxX, maxY, maxZ);
+        quad(matrix, buffer, r, g, b, 1.0F, minX, minY, maxZ, minX, minY, minZ, maxX, minY, minZ, maxX, minY, maxZ);
+        quad(matrix, buffer, r, g, b, 1.0F, minX, maxY, minZ, minX, maxY, maxZ, maxX, maxY, maxZ, maxX, maxY, minZ);
+        quad(matrix, buffer, r, g, b, 1.0F, maxX, minY, minZ, minX, minY, minZ, minX, maxY, minZ, maxX, maxY, minZ);
+        quad(matrix, buffer, r, g, b, 1.0F, minX, minY, maxZ, maxX, minY, maxZ, maxX, maxY, maxZ, minX, maxY, maxZ);
     }
 
     private static void quad(Matrix4f matrix, VertexConsumer buffer, float r, float g, float b, float a,

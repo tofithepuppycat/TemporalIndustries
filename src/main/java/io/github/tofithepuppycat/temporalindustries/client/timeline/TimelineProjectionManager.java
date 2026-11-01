@@ -83,7 +83,7 @@ public final class TimelineProjectionManager {
     /**
      * Hard cap on how many actual block models the ghost-block preview mode will render per frame.
      */
-    public static final int GHOST_BLOCK_RENDER_LIMIT = 800;
+    public static final int GHOST_BLOCK_RENDER_LIMIT = 50_000;
 
     private TimelineProjectionManager() {}
 
@@ -284,6 +284,12 @@ public final class TimelineProjectionManager {
      * Diffs the server's resolved target states against the live world, at most once every few
      * ticks; the returned list is stable between refreshes so callers can cache work against it.
      */
+    /** What stands at pos once the preview's jump has run: the previewed state if it changes, else what is there now. */
+    public static BlockState getTargetStateAt(Level level, BlockPos pos) {
+        BlockState previewed = previewTargetStates.get(pos);
+        return previewed != null ? previewed : level.getBlockState(pos);
+    }
+
     public static List<ProjectionEntry> getProjectionEntries(Level level) {
         if (!hasActivePreview()) return List.of();
 
