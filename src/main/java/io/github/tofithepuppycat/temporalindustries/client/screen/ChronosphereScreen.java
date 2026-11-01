@@ -10,6 +10,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.RedstoneMode;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachinePinCommitPacket;
 import io.github.tofithepuppycat.temporalindustries.timeline.RepoCommit;
+import io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState;
 import io.github.tofithepuppycat.temporalindustries.client.ChronosphereClientState;
 import io.github.tofithepuppycat.temporalindustries.client.EnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
@@ -129,6 +130,8 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
     private static final int BIND_BOX_HEIGHT = 20;
     private static final int BIND_BUTTON_Y_OFFSET = 142;
     private static final int BIND_BUTTON_WIDTH = 100;
+    /** Below the suggestion list, which can reach down to the button row's lower edge. */
+    private static final int BIND_STATS_Y_OFFSET = 198;
     private static final int SUGGEST_ROW_HEIGHT = 12;
     private static final int TITLE_HOVER_X_OFFSET = 60;
     private static final int TITLE_HOVER_WIDTH = 96;
@@ -247,6 +250,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
             // Suggestions cached while this block was unbound earlier may name a repository that
             // has since been deleted, so start the selection screen from a clean slate.
             ChronosphereClientState.clearSuggestions();
+            ChronoRemoteClientState.updateRepositoryInfo("", null);
             nameBox.setValue("");
         }
         if (!bound) {
@@ -270,6 +274,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         acceptedName = null;
         if (text.trim().isEmpty()) {
             ChronosphereClientState.clearSuggestions();
+            ChronoRemoteClientState.updateRepositoryInfo("", null);
             return;
         }
         PacketDistributor.sendToServer(new RepositorySuggestRequestPacket(menu.getBlockPos(), text));
@@ -305,6 +310,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         acceptedName = names.get(row);
         nameBox.setValue(acceptedName);
         nameBox.setFocused(true);
+        PacketDistributor.sendToServer(new RepositorySuggestRequestPacket(menu.getBlockPos(), acceptedName));
     }
 
     private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -346,11 +352,48 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.chronosphere.bind_hint"),
                 panelX() + BIND_TEXT_INSET, panelY() + BIND_HINT_Y_OFFSET, CONTENT_SIZE - 2 * BIND_TEXT_INSET, TEXT_MUTED);
 
+        renderRepositoryStats(guiGraphics);
+
         boolean canSubmit = !nameBox.getValue().trim().isEmpty();
         int baseColor = canSubmit ? 0xFF3A6A3A : 0xFF555555;
         boolean hovered = canSubmit && isMouseOverRect(mouseX, mouseY, bindButtonX(), bindButtonY(), BIND_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT);
         drawOverlayButton(guiGraphics, bindButtonX(), bindButtonY(), BIND_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
                 Component.translatable("gui.temporalindustries.chronosphere.bind_button"), baseColor, hovered);
+    }
+
+    /** What the repository named in the box holds, or that typing the name starts a new one. */
+    private void renderRepositoryStats(GuiGraphics guiGraphics) {
+        String typed = nameBox.getValue();
+        if (typed.isBlank() || !ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)) return;
+
+        int x = panelX() + BIND_TEXT_INSET;
+        int y = panelY() + BIND_STATS_Y_OFFSET;
+        TemporalWorldData.RepositoryStats stats = ChronoRemoteClientState.getRepositoryInfo();
+        String prefix = "gui.temporalindustries.chrono_remote.repository.stats_";
+        if (stats == null) {
+            guiGraphics.drawString(font, Component.translatable(prefix + "new"), x, y, TEXT_MUTED, false);
+            return;
+        }
+
+        guiGraphics.drawString(font, Component.translatable(prefix + "counts", stats.commits(), stats.branches(), stats.chunks()),
+                x, y, TEXT_PRIMARY, false);
+        Component last = stats.lastCommitTime() < 0L
+                ? Component.translatable(prefix + "no_commits")
+                : Component.translatable(prefix + "last", formatSinceCommit(getCurrentGameTime() - stats.lastCommitTime()));
+        Component detail = stats.currentBranch().isEmpty() ? last
+                : Component.translatable(prefix + "branch", stats.currentBranch(), last);
+        guiGraphics.drawString(font, detail, x, y + font.lineHeight + 1, TEXT_SECONDARY, false);
+    }
+
+    private static String formatSinceCommit(long ticks) {
+        long totalSeconds = Math.max(0L, ticks) / 20L;
+        long days = totalSeconds / 86400L;
+        long hours = (totalSeconds % 86400L) / 3600L;
+        long minutes = (totalSeconds % 3600L) / 60L;
+        if (days > 0L) return days + "d " + hours + "h ago";
+        if (hours > 0L) return hours + "h " + minutes + "m ago";
+        if (minutes > 0L) return minutes + "m ago";
+        return totalSeconds + "s ago";
     }
 
     @Override

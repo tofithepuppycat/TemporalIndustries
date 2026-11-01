@@ -17,7 +17,7 @@ import java.util.List;
 
 /**
  * Client -> server: asks which existing repositories an unbound Chronosphere or Chronovault could adopt whose
- * names match the text typed so far.
+ * names match the text typed so far, and what the repository named exactly that holds.
  */
 public class RepositorySuggestRequestPacket implements CustomPacketPayload {
     public static final Type<RepositorySuggestRequestPacket> TYPE =
@@ -60,6 +60,8 @@ public class RepositorySuggestRequestPacket implements CustomPacketPayload {
             List<String> names = data.suggestAvailableRepositoryNames(
                     packet.query, sender.level().dimension().location(), MAX_SUGGESTIONS);
             PacketDistributor.sendToPlayer(sender, new RepositorySuggestSyncPacket(packet.query, names));
+            PacketDistributor.sendToPlayer(sender, new RepositoryInfoSyncPacket(packet.query,
+                    data.availableRepositoryStats(packet.query, sender.level().dimension().location())));
         });
     }
 
