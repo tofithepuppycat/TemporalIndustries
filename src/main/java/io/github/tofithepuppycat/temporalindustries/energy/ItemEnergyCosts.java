@@ -20,6 +20,7 @@ import net.minecraft.world.item.ItemStack;
 import net.minecraft.world.item.crafting.Ingredient;
 import net.minecraft.world.item.crafting.Recipe;
 import net.minecraft.world.item.crafting.RecipeHolder;
+import net.minecraft.world.item.crafting.SmithingRecipe;
 import net.minecraft.world.level.ItemLike;
 import net.minecraft.world.level.storage.LevelResource;
 import org.slf4j.Logger;
@@ -255,7 +256,7 @@ public final class ItemEnergyCosts {
             ItemStack result = recipe.getResultItem(registries);
             if (result.isEmpty() || costs.containsKey(result.getItem())) continue;
 
-            NonNullList<Ingredient> ingredients = recipe.getIngredients();
+            List<Ingredient> ingredients = ingredientsOf(recipe);
             if (ingredients.isEmpty()) continue;
 
             long total = 0;
@@ -300,7 +301,7 @@ public final class ItemEnergyCosts {
             long total = 0;
             int knownCount = 0;
             int blocked = 0;
-            for (Ingredient ingredient : recipe.getIngredients()) {
+            for (Ingredient ingredient : ingredientsOf(recipe)) {
                 if (ingredient.isEmpty()) continue;
                 OptionalInt cheapest = cheapestKnownOption(ingredient, costs);
                 if (cheapest.isPresent()) {
@@ -319,6 +320,31 @@ public final class ItemEnergyCosts {
         if (best == null) return 0;
         costs.put(bestResult.getItem(), perItemCost(bestTotal, bestResult.getCount()));
         return 1;
+    }
+
+    /**
+     * What a recipe consumes. A smithing recipe does not list its ingredients, so they are the items
+     * its template, base and addition slots accept.
+     */
+    private static List<Ingredient> ingredientsOf(Recipe<?> recipe) {
+        if (!(recipe instanceof SmithingRecipe smithing)) return recipe.getIngredients();
+
+        List<ItemStack> templates = new ArrayList<>();
+        List<ItemStack> bases = new ArrayList<>();
+        List<ItemStack> additions = new ArrayList<>();
+        for (Item item : BuiltInRegistries.ITEM) {
+            ItemStack stack = item.getDefaultInstance();
+            if (stack.isEmpty()) continue;
+            if (smithing.isTemplateIngredient(stack)) templates.add(stack);
+            if (smithing.isBaseIngredient(stack)) bases.add(stack);
+            if (smithing.isAdditionIngredient(stack)) additions.add(stack);
+        }
+
+        List<Ingredient> ingredients = new ArrayList<>();
+        for (List<ItemStack> options : List.of(templates, bases, additions)) {
+            if (!options.isEmpty()) ingredients.add(Ingredient.of(options.stream()));
+        }
+        return ingredients;
     }
 
     /** A recipe's summed ingredient cost shared out over its result, kept within an int. */
@@ -362,7 +388,7 @@ public final class ItemEnergyCosts {
                 .sorted()
                 .toList();
 
-        StringBuilder sb = new StringBuilder("algorithm-v4|");
+        StringBuilder sb = new StringBuilder("algorithm-v5|");
         recipeIds.forEach(sb::append);
         sb.append('|');
         baseEntries.forEach(sb::append);

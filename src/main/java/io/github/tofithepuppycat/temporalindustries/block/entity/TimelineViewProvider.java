@@ -77,6 +77,12 @@ public interface TimelineViewProvider {
     /** Whether jumps on this machine also save and load entities. */
     boolean isSaveEntities();
 
+    /** Whether, with entities saved, dropped items are among them. */
+    boolean isSaveItemEntities();
+
+    /** Whether, with entities saved, entities other than dropped items are among them. */
+    boolean isSaveMobEntities();
+
     /** Whether pos is glued, and so would be skipped by a jump (and by the ghost preview). */
     boolean isGluedPos(BlockPos pos);
 

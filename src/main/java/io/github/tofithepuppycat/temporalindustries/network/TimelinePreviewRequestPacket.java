@@ -224,6 +224,8 @@ public class TimelinePreviewRequestPacket implements CustomPacketPayload {
         combined = combined * 1_000_003L + (costsReady ? 1L : 0L);
         combined = combined * 1_000_003L + pendingHash;
         combined = combined * 1_000_003L + (machine.isSaveEntities() ? 1L : 0L);
+        combined = combined * 1_000_003L + (machine.isSaveItemEntities() ? 1L : 0L);
+        combined = combined * 1_000_003L + (machine.isSaveMobEntities() ? 1L : 0L);
         for (ChunkPos chunk : machine.getClaimedChunks()) {
             combined = combined * 1_000_003L + chunk.toLong();
         }

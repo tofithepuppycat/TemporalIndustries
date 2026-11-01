@@ -14,11 +14,10 @@ import net.neoforged.fml.ModList;
 import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.event.entity.player.ItemTooltipEvent;
 
-import java.util.Locale;
 import java.util.OptionalInt;
 
 /**
- * Adds the base timeline jump cost and the entropy it moves to item tooltips (inventory and JEI)
+ * Adds the base timeline jump cost to item tooltips (inventory and JEI)
  * while Entropy Glasses are worn.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
@@ -36,9 +35,5 @@ public final class JumpCostTooltipHandler {
         long total = AbstractTimelineMachineBlockEntity.scaledPrice(cost.getAsInt()) * event.getItemStack().getCount();
         event.getToolTip().add(Component.translatable("tooltip.temporalindustries.jump_cost",
                 ShortEnergyDisplay.format(total, 2)).withStyle(ChatFormatting.YELLOW));
-        event.getToolTip().add(Component.translatable("tooltip.temporalindustries.jump_entropy",
-                String.format(Locale.ROOT, "%.2f",
-                        total / (double) AbstractTimelineMachineBlockEntity.JUMP_FE_PER_ENTROPY_UNIT / 100.0))
-                .withStyle(ChatFormatting.GRAY));
     }
 }

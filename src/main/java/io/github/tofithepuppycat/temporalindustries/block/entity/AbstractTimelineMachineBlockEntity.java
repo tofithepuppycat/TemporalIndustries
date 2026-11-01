@@ -233,6 +233,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
      * moved into {@link #charged} until {@link #chargeCost} is covered, then the jump runs.
      */
     private boolean saveEntities = false;
+    /** Which kinds of entity are saved and loaded while saveEntities is on. */
+    private boolean saveItemEntities = true;
+    private boolean saveMobEntities = true;
     private boolean chargeContainers = true;
     private RedstoneMode redstoneMode = RedstoneMode.IGNORE;
     /** The commit a redstone trigger returns to, or {@link RepoCommit#NO_PARENT} for none. */
@@ -606,7 +609,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     @Override
     public Map<java.util.UUID, net.minecraft.nbt.CompoundTag> previewEntityStates(long targetCommitId) {
         TemporalRepository repo = getRepository();
-        return repo == null || !saveEntities ? Map.of() : repo.previewEntityStates(targetCommitId);
+        if (repo == null || !savesEntities()) return Map.of();
+
+        Map<java.util.UUID, net.minecraft.nbt.CompoundTag> states = new java.util.HashMap<>();
+        for (Map.Entry<java.util.UUID, net.minecraft.nbt.CompoundTag> entry : repo.previewEntityStates(targetCommitId).entrySet()) {
+            boolean item = JumpJob.isItemEntityTag(entry.getValue());
+            if (item ? savesItemEntities() : savesMobEntities()) states.put(entry.getKey(), entry.getValue());
+        }
+        return states;
     }
 
     @Override
@@ -898,7 +908,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     /** A background estimate for the cost display, valid for as long as its inputs are unchanged. */
-    private record CachedEstimate(long target, long head, boolean saveEntities, boolean chargeContainers,
+    private record CachedEstimate(long target, long head, boolean saveItems, boolean saveMobs, boolean chargeContainers,
                                   JumpJob.Estimate estimate, long measuredAt) {}
 
     private static final long HEAD_ESTIMATE_MAX_AGE_TICKS = 20L;
@@ -926,7 +936,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
         CachedEstimate cached = cachedEstimate;
         if (cached != null && cached.target() == targetCommitId && cached.head() == repo.getHeadCommitId()
-                && cached.saveEntities() == savesEntities() && cached.chargeContainers() == chargesContainers()) {
+                && cached.saveItems() == savesItemEntities() && cached.saveMobs() == savesMobEntities()
+                && cached.chargeContainers() == chargesContainers()) {
             // The world keeps changing under a jump to the head, so its measurement is refreshed
             // in the background while the last one stays on display.
             if (targetCommitId == repo.getHeadCommitId() && serverLevel.getGameTime() - cached.measuredAt() >= HEAD_ESTIMATE_MAX_AGE_TICKS) {
@@ -946,12 +957,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (running != null && !running.isOver() && running.targetCommitId() == targetCommitId) return;
 
         long head = repo.getHeadCommitId();
-        boolean saveEntitiesNow = savesEntities();
+        boolean saveItemsNow = savesItemEntities();
+        boolean saveMobsNow = savesMobEntities();
         boolean chargeContainersNow = chargesContainers();
         JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
-                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveEntitiesNow, chargeContainersNow,
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveItemsNow, saveMobsNow, chargeContainersNow,
                 true, false, false,
-                finished -> cachedEstimate = new CachedEstimate(targetCommitId, head, saveEntitiesNow,
+                finished -> cachedEstimate = new CachedEstimate(targetCommitId, head, saveItemsNow, saveMobsNow,
                         chargeContainersNow, finished.estimate(), serverLevel.getGameTime()),
                 finished -> { }));
         if (job != null) data.startJumpJob(repoId, job);
@@ -968,7 +980,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return new JumpCostBreakdown(time, estimate.blockCost(),
                 entityCost(entityStats), containerStats.cost(), entropicSurcharge(base), minutes, estimate.changedBlocks(),
                 entityStats.count(), entityStats.health(), containerStats.items(),
-                getEntropy() / (double) ENTROPY_MAX, savesEntities(), chargesContainers());
+                getEntropy() / (double) ENTROPY_MAX, savesMobEntities(), chargesContainers());
     }
 
     /** Creative machines jump for free, never lose energy, and never shift entropy. */
@@ -976,13 +988,43 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return false;
     }
 
-    /** Whether jumps on this machine also restore the entities recorded in the target commit. */
+    /** Whether jumps on this machine also restore any of the entities recorded in the target commit. */
     protected boolean savesEntities() {
-        return saveEntities;
+        return saveEntities && (saveItemEntities || saveMobEntities);
+    }
+
+    /** Whether jumps on this machine restore dropped items. */
+    protected boolean savesItemEntities() {
+        return saveEntities && saveItemEntities;
+    }
+
+    /** Whether jumps on this machine restore entities other than dropped items. */
+    protected boolean savesMobEntities() {
+        return saveEntities && saveMobEntities;
     }
 
     public boolean isSaveEntities() {
         return saveEntities;
+    }
+
+    @Override
+    public boolean isSaveItemEntities() {
+        return saveItemEntities;
+    }
+
+    @Override
+    public boolean isSaveMobEntities() {
+        return saveMobEntities;
+    }
+
+    public void setEntityKinds(boolean items, boolean mobs) {
+        if (saveItemEntities == items && saveMobEntities == mobs) return;
+        saveItemEntities = items;
+        saveMobEntities = mobs;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
     }
 
     public void setSaveEntities(boolean value) {
@@ -1068,7 +1110,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long[] totalPaid = {paid};
 
         JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
-                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, savesEntities(), chargesContainers(),
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, savesItemEntities(), savesMobEntities(), chargesContainers(),
                 false, !measureCost, true,
                 estimated -> onJumpEstimated(estimated, target, totalPaid),
                 finished -> onJumpFinished(target, totalPaid[0], finished.changedPositions())));
@@ -1205,6 +1247,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         tag.putBoolean("SaveEntities", saveEntities);
+        tag.putBoolean("SaveItemEntities", saveItemEntities);
+        tag.putBoolean("SaveMobEntities", saveMobEntities);
         tag.putBoolean("ChargeContainers", chargeContainers);
         tag.putInt("RedstoneMode", redstoneMode.ordinal());
     }
@@ -1245,6 +1289,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (tag.contains("PlacedGameTime"))   placedGameTime   = tag.getLong("PlacedGameTime");
         if (tag.contains("SelectedGameTime")) selectedGameTime = tag.getLong("SelectedGameTime");
         saveEntities = tag.getBoolean("SaveEntities");
+        saveItemEntities = !tag.contains("SaveItemEntities") || tag.getBoolean("SaveItemEntities");
+        saveMobEntities = !tag.contains("SaveMobEntities") || tag.getBoolean("SaveMobEntities");
         chargeContainers = !tag.contains("ChargeContainers") || tag.getBoolean("ChargeContainers");
         redstoneMode = RedstoneMode.byOrdinal(tag.getInt("RedstoneMode"));
         pinnedCommitId = tag.contains("PinnedCommit") ? tag.getLong("PinnedCommit") : RepoCommit.NO_PARENT;

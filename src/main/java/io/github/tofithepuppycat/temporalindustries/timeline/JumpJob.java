@@ -58,9 +58,14 @@ public final class JumpJob {
      *                    or {@link #cancel}; a job left waiting is cancelled
      * @param onFinished called once the head has moved
      */
-    public record Options(Predicate<BlockPos> isGlued, ToLongFunction<BlockState> blockCost, boolean restoreEntities,
-                          boolean countContainers, boolean loadedOnly, boolean skipEstimate, boolean applies,
+    public record Options(Predicate<BlockPos> isGlued, ToLongFunction<BlockState> blockCost, boolean restoreItems,
+                          boolean restoreMobs, boolean countContainers, boolean loadedOnly, boolean skipEstimate, boolean applies,
                           Consumer<JumpJob> onEstimated, Consumer<JumpJob> onFinished) {}
+
+    /** Whether tag is the recorded state of a dropped item. */
+    public static boolean isItemEntityTag(@Nullable CompoundTag tag) {
+        return tag != null && tag.contains("Item", Tag.TAG_COMPOUND);
+    }
 
     /** Neighbour updates run per unit of work. */
     private static final int SETTLE_BATCH = 128;
@@ -197,7 +202,7 @@ public final class JumpJob {
     }
 
     private void estimateUnit() {
-        if (options.restoreEntities() && !entitiesResolved) {
+        if (restoresEntities() && !entitiesResolved) {
             resolveEntities();
             return;
         }
@@ -243,8 +248,17 @@ public final class JumpJob {
         }
     }
 
+    private boolean restoresEntities() {
+        return options.restoreItems() || options.restoreMobs();
+    }
+
     private void resolveEntities() {
-        desiredEntities = repo.resolveJumpEntities(plan);
+        desiredEntities = new HashMap<>();
+        for (Map.Entry<UUID, CompoundTag> entry : repo.resolveJumpEntities(plan).entrySet()) {
+            if (isItemEntity(entry.getValue(), level.getEntity(entry.getKey())) ? options.restoreItems() : options.restoreMobs()) {
+                desiredEntities.put(entry.getKey(), entry.getValue());
+            }
+        }
         double health = 0.0;
         int entities = 0;
         for (Map.Entry<UUID, CompoundTag> entry : desiredEntities.entrySet()) {
@@ -317,7 +331,7 @@ public final class JumpJob {
     }
 
     private void entityUnit() {
-        if (!options.restoreEntities()) {
+        if (!restoresEntities()) {
             finish();
             return;
         }

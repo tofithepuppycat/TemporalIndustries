@@ -7,6 +7,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelin
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetChargeContainersPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetEntityKindsPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetSaveEntitiesPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereUnbindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
@@ -38,6 +39,12 @@ public final class TimelineSettingsWindow extends GuiWindow {
     private static final int TITLE_DIVIDER_Y_OFFSET = 16;
     private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 24;
     private static final int SAVE_ENTITIES_ROW_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
+    // The item and mob toggles sit under "Save and Load Entities" while it is on, pushing the rows
+    // beneath down by their combined height.
+    private static final int SUB_ROW_STRIDE = TOGGLE_SIZE + 3;
+    private static final int SUB_ROW_INDENT = 10;
+    private static final int SAVE_ITEMS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + SUB_ROW_STRIDE;
+    private static final int SAVE_MOBS_ROW_Y_OFFSET = SAVE_ITEMS_ROW_Y_OFFSET + SUB_ROW_STRIDE;
     private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
     private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + TOGGLE_SIZE + 3;
     private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 2 * LINE_HEIGHT;
@@ -81,11 +88,11 @@ public final class TimelineSettingsWindow extends GuiWindow {
     protected void renderContents(GuiGraphics guiGraphics, int mouseX, int mouseY) {
         drawDivider(guiGraphics, y + TITLE_DIVIDER_Y_OFFSET, INSET);
 
-        scroll.update(CONTENT_HEIGHT, VIEWPORT_HEIGHT);
+        scroll.update(contentHeight(), VIEWPORT_HEIGHT);
         guiGraphics.enableScissor(x, y + VIEWPORT_TOP, x + panelWidth, y + VIEWPORT_TOP + VIEWPORT_HEIGHT);
         renderRows(guiGraphics, mouseX, mouseY);
         guiGraphics.disableScissor();
-        scroll.renderBar(guiGraphics, x + panelWidth - INSET / 2 - 2, y + VIEWPORT_TOP, CONTENT_HEIGHT, VIEWPORT_HEIGHT);
+        scroll.renderBar(guiGraphics, x + panelWidth - INSET / 2 - 2, y + VIEWPORT_TOP, contentHeight(), VIEWPORT_HEIGHT);
     }
 
     private void renderRows(GuiGraphics guiGraphics, int mouseX, int mouseY) {
@@ -98,25 +105,31 @@ public final class TimelineSettingsWindow extends GuiWindow {
                 GHOST_TOGGLE_ROW_Y_OFFSET, TimelineProjectionManager.isGhostBlockModeEnabled());
         renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_entities_label",
                 SAVE_ENTITIES_ROW_Y_OFFSET, be.isSaveEntities());
+        if (be.isSaveEntities()) {
+            renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_items_label",
+                    SAVE_ITEMS_ROW_Y_OFFSET, be.isSaveItemEntities(), SUB_ROW_INDENT);
+            renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_mobs_label",
+                    SAVE_MOBS_ROW_Y_OFFSET, be.isSaveMobEntities(), SUB_ROW_INDENT);
+        }
         renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.timeline_machine.charge_containers_label",
-                CHARGE_CONTAINERS_ROW_Y_OFFSET, be.isChargeContainers());
+                lowerOffset(CHARGE_CONTAINERS_ROW_Y_OFFSET), be.isChargeContainers());
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_hint"),
-                textX, rowY(CHARGE_CONTAINERS_HINT_Y_OFFSET), textWidth, COLOR_WARNING);
+                textX, rowY(lowerOffset(CHARGE_CONTAINERS_HINT_Y_OFFSET)), textWidth, COLOR_WARNING);
 
-        drawDivider(guiGraphics, rowY(SAVE_ENTITIES_DIVIDER_Y_OFFSET), INSET);
+        drawDivider(guiGraphics, rowY(lowerOffset(SAVE_ENTITIES_DIVIDER_Y_OFFSET)), INSET);
 
         int changeX = centeredX(DELETE_BUTTON_WIDTH);
-        int changeY = rowY(CHANGE_REPOSITORY_BUTTON_Y_OFFSET);
+        int changeY = rowY(lowerOffset(CHANGE_REPOSITORY_BUTTON_Y_OFFSET));
         drawButton(guiGraphics, changeX, changeY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
                 Component.translatable("gui.temporalindustries.chronosphere.change_repository_button"), 0xFF3A5A8A,
                 isOver(mouseX, mouseY, changeX, changeY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
 
-        drawDivider(guiGraphics, rowY(DANGER_DIVIDER_Y_OFFSET), INSET);
+        drawDivider(guiGraphics, rowY(lowerOffset(DANGER_DIVIDER_Y_OFFSET)), INSET);
 
-        int buttonY = rowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
+        int buttonY = rowY(lowerOffset(DELETE_HISTORY_BUTTON_Y_OFFSET));
         if (deleteHistoryConfirmPending) {
             drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_confirm_prompt"),
-                    textX, rowY(DELETE_HISTORY_HINT_Y_OFFSET), textWidth, 0xFFB03030);
+                    textX, rowY(lowerOffset(DELETE_HISTORY_HINT_Y_OFFSET)), textWidth, 0xFFB03030);
             int confirmX = confirmButtonX();
             int cancelX = cancelButtonX();
             drawButton(guiGraphics, confirmX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
@@ -127,7 +140,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
                     isOver(mouseX, mouseY, cancelX, buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT));
         } else {
             drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.delete_history_hint"),
-                    textX, rowY(DELETE_HISTORY_HINT_Y_OFFSET), textWidth, TEXT_MUTED);
+                    textX, rowY(lowerOffset(DELETE_HISTORY_HINT_Y_OFFSET)), textWidth, TEXT_MUTED);
             int buttonX = centeredX(DELETE_BUTTON_WIDTH);
             drawButton(guiGraphics, buttonX, buttonY, DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT,
                     Component.translatable("gui.temporalindustries.timeline_machine.delete_history_button"), 0xFF8A3A3A,
@@ -138,8 +151,13 @@ public final class TimelineSettingsWindow extends GuiWindow {
     /** A label on the left with a two-layer icon toggle (backing plus true/false icon) on the right. */
     private void renderToggleRow(GuiGraphics guiGraphics, int mouseX, int mouseY, String labelKey, int rowOffset,
                                  boolean enabled) {
+        renderToggleRow(guiGraphics, mouseX, mouseY, labelKey, rowOffset, enabled, 0);
+    }
+
+    private void renderToggleRow(GuiGraphics guiGraphics, int mouseX, int mouseY, String labelKey, int rowOffset,
+                                 boolean enabled, int indent) {
         int toggleY = rowY(rowOffset);
-        guiGraphics.drawString(font, Component.translatable(labelKey), x + INSET,
+        guiGraphics.drawString(font, Component.translatable(labelKey), x + INSET + indent,
                 toggleY + (TOGGLE_SIZE - font.lineHeight) / 2, TEXT_PRIMARY, false);
         IconButtonRenderer.renderToggle(guiGraphics, enabled ? ICON_ON_TEXTURE : ICON_OFF_TEXTURE, enabled,
                 isOver(mouseX, mouseY, toggleX(), toggleY, TOGGLE_SIZE, TOGGLE_SIZE), toggleX(), toggleY);
@@ -156,20 +174,24 @@ public final class TimelineSettingsWindow extends GuiWindow {
             TimelineProjectionManager.toggleGhostBlockMode();
         } else if (isOverToggle(mouseX, mouseY, SAVE_ENTITIES_ROW_Y_OFFSET)) {
             PacketDistributor.sendToServer(new ChronosphereSetSaveEntitiesPacket(machinePos, !be.isSaveEntities()));
-        } else if (isOverToggle(mouseX, mouseY, CHARGE_CONTAINERS_ROW_Y_OFFSET)) {
+        } else if (be.isSaveEntities() && isOverToggle(mouseX, mouseY, SAVE_ITEMS_ROW_Y_OFFSET)) {
+            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, !be.isSaveItemEntities(), be.isSaveMobEntities()));
+        } else if (be.isSaveEntities() && isOverToggle(mouseX, mouseY, SAVE_MOBS_ROW_Y_OFFSET)) {
+            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, be.isSaveItemEntities(), !be.isSaveMobEntities()));
+        } else if (isOverToggle(mouseX, mouseY, lowerOffset(CHARGE_CONTAINERS_ROW_Y_OFFSET))) {
             PacketDistributor.sendToServer(new ChronosphereSetChargeContainersPacket(machinePos, !be.isChargeContainers()));
-        } else if (isOver(mouseX, mouseY, centeredX(DELETE_BUTTON_WIDTH), rowY(CHANGE_REPOSITORY_BUTTON_Y_OFFSET),
+        } else if (isOver(mouseX, mouseY, centeredX(DELETE_BUTTON_WIDTH), rowY(lowerOffset(CHANGE_REPOSITORY_BUTTON_Y_OFFSET)),
                 DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
             changeRepository();
         } else if (deleteHistoryConfirmPending) {
-            int buttonY = rowY(DELETE_HISTORY_BUTTON_Y_OFFSET);
+            int buttonY = rowY(lowerOffset(DELETE_HISTORY_BUTTON_Y_OFFSET));
             if (isOver(mouseX, mouseY, confirmButtonX(), buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
                 PacketDistributor.sendToServer(new TimelineMachineDeleteHistoryPacket(machinePos));
                 close();
             } else if (isOver(mouseX, mouseY, cancelButtonX(), buttonY, CONFIRM_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
                 deleteHistoryConfirmPending = false;
             }
-        } else if (isOver(mouseX, mouseY, centeredX(DELETE_BUTTON_WIDTH), rowY(DELETE_HISTORY_BUTTON_Y_OFFSET),
+        } else if (isOver(mouseX, mouseY, centeredX(DELETE_BUTTON_WIDTH), rowY(lowerOffset(DELETE_HISTORY_BUTTON_Y_OFFSET)),
                 DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
             deleteHistoryConfirmPending = true;
         }
@@ -178,7 +200,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
 
     @Override
     protected boolean mouseScrolled(double mouseX, double mouseY, double scrollY) {
-        scroll.scroll(scrollY, CONTENT_HEIGHT, VIEWPORT_HEIGHT);
+        scroll.scroll(scrollY, contentHeight(), VIEWPORT_HEIGHT);
         return true;
     }
 
@@ -188,6 +210,15 @@ public final class TimelineSettingsWindow extends GuiWindow {
         TimelineProjectionManager.clearSelectedCommit();
         onRepositoryDetached.run();
         close();
+    }
+
+    /** A row below the entity toggles: its offset moved down by the item and mob rows while they show. */
+    private int lowerOffset(int offset) {
+        return offset + (machine.get().isSaveEntities() ? 2 * SUB_ROW_STRIDE : 0);
+    }
+
+    private int contentHeight() {
+        return lowerOffset(CONTENT_HEIGHT);
     }
 
     private boolean isOverToggle(double mouseX, double mouseY, int rowOffset) {
