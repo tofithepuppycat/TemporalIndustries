@@ -106,7 +106,7 @@ public class Chronodial extends BaseEntityBlock {
 
         ChronodialBlockEntity.JumpResult result = chronodial.jumpToMarker();
         switch (result) {
-            case SUCCESS -> level.playSound(null, pos, Registration.JUMP_SOUND.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
+            case SUCCESS -> level.playSound(null, pos, Registration.JUMP_SOUND.get(), SoundSource.BLOCKS, 1.0F, Registration.randomJumpPitch(level.random));
             case ALREADY_AT_MARKER, NO_MARKER -> { }
             case INSUFFICIENT_ENERGY, ENTROPY_MAXED ->
                     level.playSound(null, pos, SoundEvents.VILLAGER_NO, SoundSource.BLOCKS, 1.0F, 1.0F);

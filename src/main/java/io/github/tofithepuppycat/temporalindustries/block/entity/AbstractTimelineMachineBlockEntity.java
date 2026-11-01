@@ -1170,7 +1170,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         setChanged();
         syncToClients();
 
-        serverLevel.playSound(null, worldPosition, Registration.JUMP_SOUND.get(), SoundSource.BLOCKS, 1.0F, 1.0F);
+        serverLevel.playSound(null, worldPosition, Registration.JUMP_SOUND.get(), SoundSource.BLOCKS, 1.0F, Registration.randomJumpPitch(serverLevel.random));
         PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
                 new TimelineJumpEffectPacket(worldPosition, intoFuture));
         broadcastBlockChangeFlashes(serverLevel, changedPositions, intoFuture);

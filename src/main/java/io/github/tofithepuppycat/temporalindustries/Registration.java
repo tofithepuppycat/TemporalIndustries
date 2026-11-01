@@ -525,6 +525,14 @@ public class Registration {
     public static final DeferredHolder<SoundEvent, SoundEvent> JUMP_SOUND = SOUND_EVENTS.register("jump",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "jump")));
 
+    private static final float JUMP_PITCH_MIN = 0.85F;
+    private static final float JUMP_PITCH_RANGE = 0.3F;
+
+    /** A pitch for one playing of {@link #JUMP_SOUND}, varied so repeated jumps do not sound identical. */
+    public static float randomJumpPitch(net.minecraft.util.RandomSource random) {
+        return JUMP_PITCH_MIN + random.nextFloat() * JUMP_PITCH_RANGE;
+    }
+
     public static final DeferredHolder<SoundEvent, SoundEvent> RETURN_BY_DEATH_SOUND = SOUND_EVENTS.register("return_by_death",
             () -> SoundEvent.createVariableRangeEvent(ResourceLocation.fromNamespaceAndPath(MODID, "return_by_death")));
 
