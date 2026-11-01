@@ -181,9 +181,17 @@ public abstract class GuiWindow {
         int pinBase = isPinned() ? 0xFF4A9A5A : 0xFF6A6A6A;
         drawShadedBox(guiGraphics, pinX, closeY, CLOSE_SIZE, CLOSE_SIZE,
                 isOverPin(mouseX, mouseY) ? brighten(pinBase) : pinBase);
-        drawCenteredNoShadow(guiGraphics, "P", pinX + CLOSE_SIZE / 2 + 1, closeY + 1, 0xFFFFFFFF);
+        drawPinGlyph(guiGraphics, pinX + 2, closeY + 2, 0xFFFFFFFF);
 
         renderContents(guiGraphics, mouseX, mouseY);
+    }
+
+    /** A 5x5 drawing pin: a rounded head over a crossbar, with the needle pointing down. */
+    private static void drawPinGlyph(GuiGraphics guiGraphics, int glyphX, int glyphY, int color) {
+        guiGraphics.fill(glyphX + 1, glyphY, glyphX + 4, glyphY + 1, color);
+        guiGraphics.fill(glyphX + 2, glyphY + 1, glyphX + 3, glyphY + 2, color);
+        guiGraphics.fill(glyphX, glyphY + 2, glyphX + 5, glyphY + 3, color);
+        guiGraphics.fill(glyphX + 2, glyphY + 3, glyphX + 3, glyphY + 5, color);
     }
 
     final void press(double mouseX, double mouseY, int button) {

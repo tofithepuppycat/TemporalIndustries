@@ -1,0 +1,16 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    " E ",
+    "ACA",
+    "GRG"
+  ],
+  "key": {
+    "E": { "item": "minecraft:echo_shard" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "C": { "item": "minecraft:clock" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "R": { "item": "minecraft:redstone" }
+  },
+  "result": { "id": "temporalindustries:time_dilator", "count": 1 }
+}

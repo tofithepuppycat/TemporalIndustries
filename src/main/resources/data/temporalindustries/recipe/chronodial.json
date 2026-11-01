@@ -3,7 +3,7 @@
   "pattern": [
     " D ",
     "GCG",
-    " A "
+    "SAS"
   ],
   "key": {
     "G": {
@@ -17,6 +17,9 @@
     },
     "D": {
       "item": "minecraft:diamond"
+    },
+    "S": {
+      "item": "minecraft:deepslate"
     }
   },
   "result": {
