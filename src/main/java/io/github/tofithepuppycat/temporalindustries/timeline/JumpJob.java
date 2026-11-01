@@ -3,9 +3,12 @@ package io.github.tofithepuppycat.temporalindustries.timeline;
 import it.unimi.dsi.fastutil.longs.LongArrayList;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
+import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
+import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -243,17 +246,41 @@ public final class JumpJob {
     private void resolveEntities() {
         desiredEntities = repo.resolveJumpEntities(plan);
         double health = 0.0;
+        int entities = 0;
         for (Map.Entry<UUID, CompoundTag> entry : desiredEntities.entrySet()) {
             CompoundTag tag = entry.getValue();
+            Entity live = level.getEntity(entry.getKey());
+            if (isItemEntity(tag, live)) {
+                if (options.countContainers()) tallyItemEntity(tag, live);
+                continue;
+            }
+            entities++;
             if (tag != null) {
                 health += tag.getFloat("Health");
-            } else if (level.getEntity(entry.getKey()) instanceof LivingEntity living) {
+            } else if (live instanceof LivingEntity living) {
                 health += living.getHealth();
             }
         }
-        entityCount = desiredEntities.size();
+        entityCount = entities;
         entityHealth = health;
         entitiesResolved = true;
+    }
+
+    private static boolean isItemEntity(CompoundTag desired, Entity live) {
+        if (desired != null) return desired.contains("Item", Tag.TAG_COMPOUND);
+        return live instanceof ItemEntity;
+    }
+
+    /**
+     * Counts the stack an item entity gains or loses in the jump like the contents of a container:
+     * what the target holds is added and what is lying there now is taken away, so a stack that is
+     * only restored to where it already is costs nothing.
+     */
+    private void tallyItemEntity(CompoundTag desired, Entity live) {
+        if (desired != null) ContainerContents.tally(desired.getCompound("Item"), containerNet, 1);
+        if (live instanceof ItemEntity item && !item.getItem().isEmpty()) {
+            ContainerContents.tally(item.getItem().save(level.registryAccess()), containerNet, -1);
+        }
     }
 
     private void finishEstimate() {
