@@ -42,6 +42,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyBalancerItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
+import io.github.tofithepuppycat.temporalindustries.item.CreativeChronosphereItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
 import io.github.tofithepuppycat.temporalindustries.item.WrenchItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
@@ -218,7 +219,7 @@ public class Registration {
             () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).noOcclusion().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> CREATIVE_CHRONOSPHERE_ITEM = ITEMS.register("creative_chronosphere",
-            () -> new ChronoBlockItem(CREATIVE_CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
+            () -> new CreativeChronosphereItem(CREATIVE_CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredBlock<TemporalLifeline> TEMPORAL_LIFELINE_BLOCK =BLOCKS.register("temporal_lifeline",
             () -> new TemporalLifeline(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 1200.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 7)));

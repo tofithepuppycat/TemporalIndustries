@@ -69,7 +69,7 @@ public final class EntropyMachineNameColors {
                     Registration.ENTROPY_BALANCER_ITEM.get(), Registration.ENTROPY_MANIPULATOR_ITEM.get(),
                     Registration.ENTROPIC_PYLON_ITEM.get(), Registration.SCHRODINGER_GENERATOR_ITEM.get(),
                     Registration.SEEBECK_GENERATOR_ITEM.get(), Registration.CHRONODIAL_ITEM.get(),
-                    Registration.CHRONOSPHERE_ITEM.get(), Registration.CREATIVE_CHRONOSPHERE_ITEM.get(),
+                    Registration.CHRONOSPHERE_ITEM.get(),
                     Registration.CHRONOVAULT_ITEM.get(), Registration.DUAL_ENTROPY_CELL_ITEM.get(),
                     Registration.RESONANT_DUAL_ENTROPY_CELL_ITEM.get(), Registration.ENTROPY_GLASSES_ITEM.get())) {
                 map.put(item, null);
