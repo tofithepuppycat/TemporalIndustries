@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "temporalindustries:block/decay_accelerator" }
+    "facing=north": { "model": "temporalindustries:block/decay_accelerator" },
+    "facing=east": { "model": "temporalindustries:block/decay_accelerator", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/decay_accelerator", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/decay_accelerator", "y": 270 }
   }
 }

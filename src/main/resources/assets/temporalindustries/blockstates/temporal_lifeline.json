@@ -1,5 +1,8 @@
 {
   "variants": {
-    "": { "model": "temporalindustries:block/temporal_lifeline" }
+    "facing=north": { "model": "temporalindustries:block/temporal_lifeline" },
+    "facing=east": { "model": "temporalindustries:block/temporal_lifeline", "y": 90 },
+    "facing=south": { "model": "temporalindustries:block/temporal_lifeline", "y": 180 },
+    "facing=west": { "model": "temporalindustries:block/temporal_lifeline", "y": 270 }
   }
 }

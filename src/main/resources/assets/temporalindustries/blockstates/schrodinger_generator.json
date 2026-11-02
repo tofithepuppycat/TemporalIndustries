@@ -1,6 +1,12 @@
 {
   "variants": {
-    "occupied=false": { "model": "temporalindustries:block/schrodinger_generator" },
-    "occupied=true": { "model": "temporalindustries:block/schrodinger_generator_occupied" }
+    "facing=north,occupied=false": { "model": "temporalindustries:block/schrodinger_generator" },
+    "facing=east,occupied=false": { "model": "temporalindustries:block/schrodinger_generator", "y": 90 },
+    "facing=south,occupied=false": { "model": "temporalindustries:block/schrodinger_generator", "y": 180 },
+    "facing=west,occupied=false": { "model": "temporalindustries:block/schrodinger_generator", "y": 270 },
+    "facing=north,occupied=true": { "model": "temporalindustries:block/schrodinger_generator_occupied" },
+    "facing=east,occupied=true": { "model": "temporalindustries:block/schrodinger_generator_occupied", "y": 90 },
+    "facing=south,occupied=true": { "model": "temporalindustries:block/schrodinger_generator_occupied", "y": 180 },
+    "facing=west,occupied=true": { "model": "temporalindustries:block/schrodinger_generator_occupied", "y": 270 }
   }
 }
