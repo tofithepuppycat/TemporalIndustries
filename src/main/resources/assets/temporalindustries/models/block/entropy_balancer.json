@@ -1,8 +1,12 @@
 {
-  "parent": "minecraft:block/cube_bottom_top",
+  "parent": "minecraft:block/cube",
   "textures": {
-    "top": "temporalindustries:block/machine_base_up",
-    "bottom": "temporalindustries:block/machine_base_down",
-    "side": "temporalindustries:block/machine_base"
+    "particle": "temporalindustries:block/entropy_balancer_front",
+    "north": "temporalindustries:block/entropy_balancer_front",
+    "south": "temporalindustries:block/machine_base",
+    "east": "temporalindustries:block/machine_base",
+    "west": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down"
   }
 }

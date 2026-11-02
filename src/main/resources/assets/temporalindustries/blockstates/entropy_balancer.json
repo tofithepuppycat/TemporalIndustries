@@ -1,5 +1,12 @@
 {
   "variants": {
-    "": { "model": "temporalindustries:block/entropy_balancer" }
+    "facing=north,lit=false": { "model": "temporalindustries:block/entropy_balancer" },
+    "facing=east,lit=false": { "model": "temporalindustries:block/entropy_balancer", "y": 90 },
+    "facing=south,lit=false": { "model": "temporalindustries:block/entropy_balancer", "y": 180 },
+    "facing=west,lit=false": { "model": "temporalindustries:block/entropy_balancer", "y": 270 },
+    "facing=north,lit=true": { "model": "temporalindustries:block/entropy_balancer_on" },
+    "facing=east,lit=true": { "model": "temporalindustries:block/entropy_balancer_on", "y": 90 },
+    "facing=south,lit=true": { "model": "temporalindustries:block/entropy_balancer_on", "y": 180 },
+    "facing=west,lit=true": { "model": "temporalindustries:block/entropy_balancer_on", "y": 270 }
   }
 }

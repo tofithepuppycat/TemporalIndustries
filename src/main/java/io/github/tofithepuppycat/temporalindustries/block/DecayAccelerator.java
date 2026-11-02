@@ -36,7 +36,7 @@ public class DecayAccelerator extends BaseEntityBlock {
 
     public DecayAccelerator(Properties properties) {
         super(properties);
-        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH));
+        registerDefaultState(stateDefinition.any().setValue(FACING, Direction.NORTH).setValue(BlockStateProperties.LIT, false));
     }
 
     @Override
@@ -46,7 +46,7 @@ public class DecayAccelerator extends BaseEntityBlock {
 
     @Override
     protected void createBlockStateDefinition(StateDefinition.Builder<Block, BlockState> builder) {
-        builder.add(FACING);
+        builder.add(FACING, BlockStateProperties.LIT);
     }
 
     @Override

@@ -23,6 +23,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.items.IItemHandler;
 import net.neoforged.neoforge.items.wrapper.InvWrapper;
 import org.jetbrains.annotations.NotNull;
@@ -93,22 +94,39 @@ public abstract class AbstractAcceleratorBlockEntity extends BlockEntity impleme
                 setChanged();
                 syncToClients();
             }
+            setActive(level, pos, false);
             return;
         }
 
         progress++;
         if (progress < processTimeTicks()) {
+            setActive(level, pos, true);
             setChanged();
             syncToClients();
             return;
         }
 
         progress = 0;
+        setActive(level, pos, shrinkLeavesInput(stack));
         int value = entropyValue(stack);
         stack.shrink(1);
         EntropyOrbEntity.spawn(level, pos.getX() + 0.5, pos.getY() + 0.5, pos.getZ() + 0.5, entropyType(), value);
         setChanged();
         syncToClients();
+    }
+
+    /** The blockstate property the accelerator blocks use to show they are processing. */
+    private void setActive(ServerLevel level, BlockPos pos, boolean active) {
+        BlockState state = getBlockState();
+        if (state.hasProperty(BlockStateProperties.LIT)
+                && state.getValue(BlockStateProperties.LIT) != active) {
+            level.setBlock(pos, state.setValue(BlockStateProperties.LIT, active), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** Whether the input slot still holds a valid item once one has been consumed. */
+    private boolean shrinkLeavesInput(ItemStack stack) {
+        return stack.getCount() > 1 && isValidInput(stack);
     }
 
     private void syncToClients() {

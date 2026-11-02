@@ -1,7 +1,6 @@
 {
   "variants": {
-    "": {
-      "model": "temporalindustries:block/echo_projector"
-    }
+    "lit=true": { "model": "temporalindustries:block/echo_projector" },
+    "lit=false": { "model": "temporalindustries:block/echo_projector_off" }
   }
 }

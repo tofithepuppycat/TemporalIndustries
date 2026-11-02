@@ -1,8 +1,12 @@
 {
   "variants": {
-    "facing=north": { "model": "temporalindustries:block/despawn_accelerator" },
-    "facing=east": { "model": "temporalindustries:block/despawn_accelerator", "y": 90 },
-    "facing=south": { "model": "temporalindustries:block/despawn_accelerator", "y": 180 },
-    "facing=west": { "model": "temporalindustries:block/despawn_accelerator", "y": 270 }
+    "facing=north,lit=false": { "model": "temporalindustries:block/despawn_accelerator" },
+    "facing=east,lit=false": { "model": "temporalindustries:block/despawn_accelerator", "y": 90 },
+    "facing=south,lit=false": { "model": "temporalindustries:block/despawn_accelerator", "y": 180 },
+    "facing=west,lit=false": { "model": "temporalindustries:block/despawn_accelerator", "y": 270 },
+    "facing=north,lit=true": { "model": "temporalindustries:block/despawn_accelerator_active" },
+    "facing=east,lit=true": { "model": "temporalindustries:block/despawn_accelerator_active", "y": 90 },
+    "facing=south,lit=true": { "model": "temporalindustries:block/despawn_accelerator_active", "y": 180 },
+    "facing=west,lit=true": { "model": "temporalindustries:block/despawn_accelerator_active", "y": 270 }
   }
 }

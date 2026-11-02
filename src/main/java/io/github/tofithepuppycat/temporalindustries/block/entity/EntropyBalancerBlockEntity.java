@@ -22,6 +22,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
 import net.neoforged.neoforge.energy.IEnergyStorage;
@@ -219,6 +220,7 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
         BlockPos out = outputPos;
         if (out == null) {
             status = OutputStatus.UNBOUND;
+            updateLit();
             return;
         }
 
@@ -226,9 +228,11 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
                 ? level.getCapability(Capabilities.FluidHandler.BLOCK, out, null) : null;
         if (handler == null || !(level.getBlockEntity(out) instanceof EntropyInfoProvider provider) || !provider.hasEntropyBalance()) {
             status = OutputStatus.UNREACHABLE;
+            updateLit();
             return;
         }
         status = OutputStatus.ACTIVE;
+        updateLit();
 
         int max = provider.getEntropyBalanceMax();
         int current = provider.getEntropyBalance();
@@ -264,6 +268,16 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
                 Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
                         EntropyDisplay.formatFluid(chaosTank.getFluidAmount()), EntropyDisplay.formatFluid(TANK_CAPACITY))
                         .withStyle(ChatFormatting.GRAY).append(EntropyDisplay.unit(EntropyType.CHAOS)));
+    }
+
+    /** Shows the balancer as online in its blockstate while its output is bound and reachable. */
+    private void updateLit() {
+        if (level == null || level.isClientSide) return;
+        BlockState state = getBlockState();
+        boolean online = status == OutputStatus.ACTIVE;
+        if (state.hasProperty(BlockStateProperties.LIT) && state.getValue(BlockStateProperties.LIT) != online) {
+            level.setBlock(worldPosition, state.setValue(BlockStateProperties.LIT, online), Block.UPDATE_CLIENTS);
+        }
     }
 
     private void syncToClients() {

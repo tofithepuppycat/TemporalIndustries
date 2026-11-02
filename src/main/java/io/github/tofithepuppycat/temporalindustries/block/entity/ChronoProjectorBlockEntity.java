@@ -27,6 +27,7 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.block.state.properties.BlockStateProperties;
 import net.minecraft.util.FastColor;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.energy.EnergyStorage;
@@ -380,6 +381,10 @@ public class ChronoProjectorBlockEntity extends BlockEntity implements Container
 
     private void syncToClients() {
         if (level != null && !level.isClientSide) {
+            BlockState state = getBlockState();
+            if (state.hasProperty(BlockStateProperties.LIT) && state.getValue(BlockStateProperties.LIT) != active) {
+                level.setBlock(worldPosition, state.setValue(BlockStateProperties.LIT, active), Block.UPDATE_CLIENTS);
+            }
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
     }
