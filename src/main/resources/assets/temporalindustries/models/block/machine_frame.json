@@ -30,7 +30,7 @@
           "temporalindustries:chaos_pylon",
           "temporalindustries:order_pylon"
         ],
-        "properties": { "formed": "true" }
+        "properties": { "extended": "true" }
       }
     ]
   }

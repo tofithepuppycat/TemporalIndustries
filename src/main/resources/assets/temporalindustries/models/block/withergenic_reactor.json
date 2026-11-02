@@ -2,7 +2,7 @@
   "parent": "minecraft:block/cube",
   "textures": {
     "particle": "temporalindustries:block/machine_base",
-    "north": "temporalindustries:block/chaos_pylon",
+    "north": "temporalindustries:block/wither_formed",
     "south": "temporalindustries:block/machine_base",
     "east": "temporalindustries:block/machine_base",
     "west": "temporalindustries:block/machine_base",

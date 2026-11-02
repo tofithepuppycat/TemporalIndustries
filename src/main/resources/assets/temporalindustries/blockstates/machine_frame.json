@@ -1,6 +1,52 @@
 {
   "variants": {
-    "connected=true": { "model": "temporalindustries:block/machine_frame" },
-    "connected=false": { "model": "temporalindustries:block/machine_frame_disconnected" }
+    "connected=true,pylon=none,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame"
+    },
+    "connected=true,pylon=none,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame"
+    },
+    "connected=true,pylon=entropic,pylon_base=true": {
+      "model": "temporalindustries:block/pylon_frame_base"
+    },
+    "connected=true,pylon=entropic,pylon_base=false": {
+      "model": "temporalindustries:block/pylon_frame_column"
+    },
+    "connected=true,pylon=chaos,pylon_base=true": {
+      "model": "temporalindustries:block/pylon_frame_base"
+    },
+    "connected=true,pylon=chaos,pylon_base=false": {
+      "model": "temporalindustries:block/pylon_frame_column"
+    },
+    "connected=true,pylon=order,pylon_base=true": {
+      "model": "temporalindustries:block/pylon_frame_base"
+    },
+    "connected=true,pylon=order,pylon_base=false": {
+      "model": "temporalindustries:block/pylon_frame_column"
+    },
+    "connected=false,pylon=none,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=none,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=entropic,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=entropic,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=chaos,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=chaos,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=order,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=false,pylon=order,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    }
   }
 }

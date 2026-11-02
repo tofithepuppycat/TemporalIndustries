@@ -2,16 +2,154 @@
   "parent": "minecraft:block/cube",
   "textures": {
     "particle": "temporalindustries:block/chronodial_front",
-    "up": "temporalindustries:block/chronodial_front",
-    "down": "temporalindustries:block/machine_base_down",
-    "north": "temporalindustries:block/machine_base",
-    "south": "temporalindustries:block/machine_base",
-    "west": "temporalindustries:block/machine_base",
-    "east": "temporalindustries:block/machine_base",
-    "glow_up": "temporalindustries:block/chronodial_front_e"
+    "t_machine_base": "temporalindustries:block/machine_base",
+    "t_machine_base_down": "temporalindustries:block/machine_base_down",
+    "t_machine_base_up": "temporalindustries:block/machine_base_up",
+    "front": "temporalindustries:block/chronodial_front",
+    "glow": "temporalindustries:block/chronodial_front_e"
   },
   "render_type": "minecraft:cutout",
   "elements": [
+    {
+      "from": [
+        0,
+        13,
+        14
+      ],
+      "to": [
+        16,
+        16,
+        16
+      ],
+      "faces": {
+        "up": {
+          "texture": "#t_machine_base",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#t_machine_base_down"
+        },
+        "east": {
+          "texture": "#t_machine_base",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#t_machine_base",
+          "cullface": "west"
+        },
+        "south": {
+          "texture": "#t_machine_base",
+          "cullface": "south"
+        },
+        "north": {
+          "texture": "#t_machine_base"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        13,
+        0
+      ],
+      "to": [
+        16,
+        16,
+        2
+      ],
+      "faces": {
+        "up": {
+          "texture": "#t_machine_base",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#t_machine_base_down"
+        },
+        "east": {
+          "texture": "#t_machine_base",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#t_machine_base",
+          "cullface": "west"
+        },
+        "south": {
+          "texture": "#t_machine_base"
+        },
+        "north": {
+          "texture": "#t_machine_base",
+          "cullface": "north"
+        }
+      }
+    },
+    {
+      "from": [
+        0,
+        13,
+        2
+      ],
+      "to": [
+        2,
+        16,
+        14
+      ],
+      "faces": {
+        "up": {
+          "texture": "#t_machine_base",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#t_machine_base_down"
+        },
+        "east": {
+          "texture": "#t_machine_base"
+        },
+        "west": {
+          "texture": "#t_machine_base",
+          "cullface": "west"
+        },
+        "south": {
+          "texture": "#t_machine_base"
+        },
+        "north": {
+          "texture": "#t_machine_base"
+        }
+      }
+    },
+    {
+      "from": [
+        14,
+        13,
+        2
+      ],
+      "to": [
+        16,
+        16,
+        14
+      ],
+      "faces": {
+        "up": {
+          "texture": "#t_machine_base",
+          "cullface": "up"
+        },
+        "down": {
+          "texture": "#t_machine_base_down"
+        },
+        "east": {
+          "texture": "#t_machine_base",
+          "cullface": "east"
+        },
+        "west": {
+          "texture": "#t_machine_base"
+        },
+        "south": {
+          "texture": "#t_machine_base"
+        },
+        "north": {
+          "texture": "#t_machine_base"
+        }
+      }
+    },
     {
       "from": [
         0,
@@ -20,58 +158,97 @@
       ],
       "to": [
         16,
-        16,
+        13,
         16
       ],
       "faces": {
-        "north": {
-          "texture": "#north",
-          "cullface": "north"
+        "up": {
+          "texture": "#t_machine_base_up"
         },
-        "south": {
-          "texture": "#south",
-          "cullface": "south"
+        "down": {
+          "texture": "#t_machine_base_down",
+          "cullface": "down"
         },
         "east": {
-          "texture": "#east",
+          "texture": "#t_machine_base",
           "cullface": "east"
         },
         "west": {
-          "texture": "#west",
+          "texture": "#t_machine_base",
           "cullface": "west"
         },
-        "up": {
-          "texture": "#up",
-          "cullface": "up"
+        "south": {
+          "texture": "#t_machine_base",
+          "cullface": "south"
         },
-        "down": {
-          "texture": "#down",
-          "cullface": "down"
+        "north": {
+          "texture": "#t_machine_base",
+          "cullface": "north"
         }
       }
     },
     {
       "from": [
-        -0.01,
-        -0.01,
-        -0.01
+        3,
+        13,
+        3
       ],
       "to": [
-        16.01,
-        16.01,
-        16.01
+        13,
+        15,
+        13
       ],
-      "shade": false,
       "faces": {
         "up": {
-          "texture": "#glow_up",
-          "cullface": "up",
+          "texture": "#front",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ]
+        },
+        "east": {
+          "texture": "#t_machine_base"
+        },
+        "west": {
+          "texture": "#t_machine_base"
+        },
+        "south": {
+          "texture": "#t_machine_base"
+        },
+        "north": {
+          "texture": "#t_machine_base"
+        }
+      }
+    },
+    {
+      "from": [
+        3,
+        15.01,
+        3
+      ],
+      "to": [
+        13,
+        15.01,
+        13
+      ],
+      "faces": {
+        "up": {
+          "texture": "#glow",
+          "uv": [
+            3,
+            3,
+            13,
+            13
+          ],
           "neoforge_data": {
             "block_light": 15,
             "sky_light": 15
           }
         }
-      }
+      },
+      "shade": false
     }
   ]
 }

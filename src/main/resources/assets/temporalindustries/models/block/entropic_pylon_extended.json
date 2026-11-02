@@ -1,0 +1,145 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "temporalindustries:block/entropic_pylon",
+    "pylon": "temporalindustries:block/entropic_pylon",
+    "glow": "temporalindustries:block/entropic_pylon_e",
+    "side": "temporalindustries:block/machine_base",
+    "up": "temporalindustries:block/machine_base_up",
+    "down": "temporalindustries:block/machine_base_down",
+    "open": "temporalindustries:block/machine_open"
+  },
+  "render_type": "minecraft:cutout",
+  "elements": [
+    {
+      "from": [
+        5,
+        0,
+        5
+      ],
+      "to": [
+        11,
+        12,
+        11
+      ],
+      "faces": {
+        "north": {
+          "texture": "#open"
+        },
+        "south": {
+          "texture": "#open"
+        },
+        "east": {
+          "texture": "#open"
+        },
+        "west": {
+          "texture": "#open"
+        }
+      }
+    },
+    {
+      "from": [
+        4,
+        12,
+        4
+      ],
+      "to": [
+        12,
+        13,
+        12
+      ],
+      "faces": {
+        "north": {
+          "texture": "#side"
+        },
+        "south": {
+          "texture": "#side"
+        },
+        "east": {
+          "texture": "#side"
+        },
+        "west": {
+          "texture": "#side"
+        },
+        "up": {
+          "texture": "#up"
+        },
+        "down": {
+          "texture": "#down"
+        }
+      }
+    },
+    {
+      "from": [
+        6,
+        13,
+        6
+      ],
+      "to": [
+        10,
+        16,
+        10
+      ],
+      "faces": {
+        "north": {
+          "texture": "#pylon"
+        },
+        "south": {
+          "texture": "#pylon"
+        },
+        "east": {
+          "texture": "#pylon"
+        },
+        "west": {
+          "texture": "#pylon"
+        },
+        "up": {
+          "texture": "#pylon"
+        }
+      }
+    },
+    {
+      "from": [
+        5.99,
+        13,
+        5.99
+      ],
+      "to": [
+        10.01,
+        16.01,
+        10.01
+      ],
+      "faces": {
+        "north": {
+          "texture": "#glow",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "south": {
+          "texture": "#glow",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "east": {
+          "texture": "#glow",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        },
+        "west": {
+          "texture": "#glow",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
+        }
+      },
+      "shade": false
+    }
+  ]
+}
