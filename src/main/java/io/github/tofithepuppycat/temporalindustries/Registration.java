@@ -42,7 +42,6 @@ import io.github.tofithepuppycat.temporalindustries.entropy.BottleContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyContents;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyOrbEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.item.EntropyBalancerItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.CreativeChronosphereItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
@@ -50,7 +49,6 @@ import io.github.tofithepuppycat.temporalindustries.item.WrenchItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicBatteryItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
-import io.github.tofithepuppycat.temporalindustries.item.EnergyPylonItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
@@ -366,7 +364,7 @@ public class Registration {
             () -> new EntropyBalancer(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> ENTROPY_BALANCER_ITEM = ITEMS.register("entropy_balancer",
-            () -> new EntropyBalancerItem(ENTROPY_BALANCER_BLOCK.get(), new Item.Properties()));
+            () -> new DescribedBlockItem(ENTROPY_BALANCER_BLOCK.get(), new Item.Properties()));
 
     // --- Decay Accelerator: early/mid game CHAOS generator, feed it compostable items ---
 
@@ -447,7 +445,7 @@ public class Registration {
             () -> new EnergyPylon(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> ENERGY_PYLON_ITEM = ITEMS.register("energy_pylon",
-            () -> new EnergyPylonItem(ENERGY_PYLON_BLOCK.get(), new Item.Properties()));
+            () -> new EntropicPylonItem(ENERGY_PYLON_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));

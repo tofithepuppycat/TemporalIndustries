@@ -48,9 +48,17 @@ public class WrenchItem extends Item {
         BlockEntity clickedEntity = level.getBlockEntity(clickedController);
         BlockPos selected = getSelected(stack, level);
         boolean clickedConfigurable = clickedEntity instanceof WrenchConfigurable;
+        boolean selectionGone = selected != null && !selected.equals(clickedController) && isGone(level, selected);
 
         if (selected == null && !clickedConfigurable) return InteractionResult.PASS;
         if (level.isClientSide) return InteractionResult.SUCCESS;
+
+        if (selectionGone) {
+            deselect(stack);
+            player.displayClientMessage(Component.translatable(MESSAGE_PREFIX + "lost"), true);
+            if (!clickedConfigurable) return InteractionResult.CONSUME;
+            selected = null;
+        }
 
         if (selected == null) {
             select(stack, level, clickedController);
@@ -87,6 +95,24 @@ public class WrenchItem extends Item {
             }
         }
         return InteractionResultHolder.sidedSuccess(stack, level.isClientSide);
+    }
+
+    /** Whether the selected block is loaded and no longer a configurable block, e.g. mined away. */
+    private static boolean isGone(Level level, BlockPos pos) {
+        return level.isLoaded(pos) && !(level.getBlockEntity(pos) instanceof WrenchConfigurable);
+    }
+
+    /** Drops the selection once the selected block has been mined or replaced. */
+    @Override
+    public void inventoryTick(ItemStack stack, Level level, net.minecraft.world.entity.Entity entity, int slot, boolean selected) {
+        super.inventoryTick(stack, level, entity, slot, selected);
+        if (level.isClientSide || level.getGameTime() % 10 != 0) return;
+        BlockPos pos = getSelected(stack, level);
+        if (pos == null || !isGone(level, pos)) return;
+        deselect(stack);
+        if (entity instanceof Player player && selected) {
+            player.displayClientMessage(Component.translatable(MESSAGE_PREFIX + "lost"), true);
+        }
     }
 
     /** A machine frame forwards to the controller it belongs to. */

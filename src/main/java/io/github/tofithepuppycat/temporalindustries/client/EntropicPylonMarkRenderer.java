@@ -2,30 +2,18 @@ package io.github.tofithepuppycat.temporalindustries.client;
 
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
-import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
-import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import net.minecraft.client.Camera;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.entity.player.Player;
-import net.minecraft.world.item.ItemStack;
-import net.minecraft.world.level.Level;
-import net.neoforged.api.distmarker.Dist;
-import net.neoforged.bus.api.SubscribeEvent;
-import net.neoforged.fml.common.EventBusSubscriber;
 import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Matrix4f;
 
 import java.util.List;
 
-/**
- * Renders {@link EntropicPylonItem}'s currently marked positions in-world while held: a red outline
- * for each input, blue for each output.
- */
-@EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
+/** Draws linked inputs in red and outputs in blue in the world; used for the wrench's selection. */
 public class EntropicPylonMarkRenderer {
     private static final float[] INPUT_COLOR = {1.0F, 0.25F, 0.25F};
     private static final float[] OUTPUT_COLOR = {0.35F, 0.55F, 1.0F};
@@ -34,26 +22,6 @@ public class EntropicPylonMarkRenderer {
     private static final float OUTLINE_THICKNESS = 0.03F;
     private static final double LINK_HALF_WIDTH = 0.03D;
     private static final float LINK_ALPHA = 0.9F;
-
-    @SubscribeEvent
-    public static void onRenderLevelStage(RenderLevelStageEvent event) {
-        if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS) {
-            return;
-        }
-
-        Minecraft minecraft = Minecraft.getInstance();
-        Level level = minecraft.level;
-        if (level == null || minecraft.player == null) {
-            return;
-        }
-
-        ItemStack heldStack = holdingPylon(minecraft.player);
-        if (heldStack == null) {
-            return;
-        }
-
-        renderMarks(event, minecraft, EntropicPylonItem.getInputs(heldStack), EntropicPylonItem.getOutputs(heldStack));
-    }
 
     /** Draws a red outline for each input and a blue one for each output. */
     static void renderMarks(RenderLevelStageEvent event, Minecraft minecraft, List<BlockPos> inputs, List<BlockPos> outputs) {
@@ -96,12 +64,6 @@ public class EntropicPylonMarkRenderer {
         }
 
         bufferSource.endBatch(RenderType.debugQuads());
-    }
-
-    private static ItemStack holdingPylon(Player player) {
-        if (player.getMainHandItem().getItem() instanceof EntropicPylonItem) return player.getMainHandItem();
-        if (player.getOffhandItem().getItem() instanceof EntropicPylonItem) return player.getOffhandItem();
-        return null;
     }
 
     /** A flat ribbon between two block centres that always turns its face towards the camera. */

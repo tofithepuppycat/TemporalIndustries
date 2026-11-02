@@ -26,21 +26,14 @@ public class EntropicBatteryItem extends BlockItem {
     public void appendHoverText(ItemStack stack, Item.TooltipContext context, List<Component> tooltip, TooltipFlag flag) {
         super.appendHoverText(stack, context, tooltip, flag);
         CustomData data = stack.get(DataComponents.BLOCK_ENTITY_DATA);
-        if (data == null) return;
-        CompoundTag tag = data.copyTag();
+        CompoundTag tag = data == null ? new CompoundTag() : data.copyTag();
 
         int energy = tag.getInt("Energy");
         int order = tag.getCompound("OrderTank").getInt("amount");
         int chaos = tag.getCompound("ChaosTank").getInt("amount");
-        if (energy > 0) {
-            tooltip.add(stored("block.temporalindustries.entropic_battery.stored_energy", ShortEnergyDisplay.formatPlain(energy)));
-        }
-        if (order > 0) {
-            tooltip.add(stored("block.temporalindustries.entropic_battery.stored_order", EntropyDisplay.formatFluid(order)));
-        }
-        if (chaos > 0) {
-            tooltip.add(stored("block.temporalindustries.entropic_battery.stored_chaos", EntropyDisplay.formatFluid(chaos)));
-        }
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_energy", ShortEnergyDisplay.formatPlain(energy)));
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_order", EntropyDisplay.formatFluid(order)));
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_chaos", EntropyDisplay.formatFluid(chaos)));
     }
 
     private static Component stored(String key, String amount) {
