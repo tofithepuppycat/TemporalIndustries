@@ -4,7 +4,8 @@ import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
-import io.github.tofithepuppycat.temporalindustries.menu.EntropyBatteryMenu;
+import io.github.tofithepuppycat.temporalindustries.menu.EntropicBatteryMenu;
+import net.minecraft.ChatFormatting;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.screens.inventory.AbstractContainerScreen;
 import net.minecraft.network.chat.Component;
@@ -12,11 +13,14 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.entity.player.Inventory;
 import org.jetbrains.annotations.NotNull;
 
-/** Textured GUI for the Entropy Battery: a cell input slot, a cell output slot, two fluid tank bars, and the player inventory. */
+import java.util.ArrayList;
+import java.util.List;
+
+/** Textured GUI for the Entropic Battery: a cell input slot, a cell output slot, two fluid tank bars, and the player inventory. */
 @SuppressWarnings("null")
-public class EntropyBatteryScreen extends AbstractContainerScreen<EntropyBatteryMenu> {
+public class EntropicBatteryScreen extends AbstractContainerScreen<EntropicBatteryMenu> {
     private static final ResourceLocation TEXTURE = ResourceLocation.fromNamespaceAndPath(
-            TemporalIndustries.MODID, "textures/gui/entropy_battery.png");
+            TemporalIndustries.MODID, "textures/gui/entropic_battery.png");
 
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
@@ -27,7 +31,7 @@ public class EntropyBatteryScreen extends AbstractContainerScreen<EntropyBattery
     private static final int TANK_BAR_WIDTH = 11;
     private static final int TANK_BAR_HEIGHT = 48;
 
-    public EntropyBatteryScreen(EntropyBatteryMenu menu, Inventory playerInventory, Component title) {
+    public EntropicBatteryScreen(EntropicBatteryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);
         imageWidth = IMAGE_WIDTH;
         imageHeight = IMAGE_HEIGHT;
@@ -47,7 +51,7 @@ public class EntropyBatteryScreen extends AbstractContainerScreen<EntropyBattery
 
     @Override
     protected void renderLabels(@NotNull GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        Component machineTitle = Component.translatable("block.temporalindustries.entropy_battery");
+        Component machineTitle = Component.translatable("block.temporalindustries.entropic_battery");
         guiGraphics.drawString(font, machineTitle, (imageWidth - font.width(machineTitle)) / 2, 6, 0xFF3F3F3F, false);
         guiGraphics.drawString(font, playerInventoryTitle, 8, inventoryLabelY, 0xFF3F3F3F, false);
     }
@@ -57,15 +61,21 @@ public class EntropyBatteryScreen extends AbstractContainerScreen<EntropyBattery
         super.render(guiGraphics, mouseX, mouseY, partialTick);
 
         if (isHovering(ORDER_BAR_X, TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT, mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
+            guiGraphics.renderComponentTooltip(font, fluidTooltip(menu.getOrderFluidAmount(), menu.getTankCapacity(), EntropyType.ORDER), mouseX, mouseY);
         } else if (isHovering(CHAOS_BAR_X, TANK_BAR_Y, TANK_BAR_WIDTH, TANK_BAR_HEIGHT, mouseX, mouseY)) {
-            guiGraphics.renderTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
+            guiGraphics.renderComponentTooltip(font, fluidTooltip(menu.getChaosFluidAmount(), menu.getTankCapacity(), EntropyType.CHAOS), mouseX, mouseY);
         }
         renderTooltip(guiGraphics, mouseX, mouseY);
     }
 
-    private static Component fluidTooltip(int amount, int capacity, EntropyType type) {
-        return Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
-                .append(EntropyDisplay.unit(type));
+    private List<Component> fluidTooltip(int amount, int capacity, EntropyType type) {
+        List<Component> lines = new ArrayList<>();
+        lines.add(Component.literal(EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(capacity))
+                .append(EntropyDisplay.unit(type)));
+        if (menu.getBatteryCount() > 1) {
+            lines.add(Component.translatable("block.temporalindustries.entropic_battery.combined", menu.getBatteryCount())
+                    .withStyle(ChatFormatting.DARK_GRAY));
+        }
+        return lines;
     }
 }

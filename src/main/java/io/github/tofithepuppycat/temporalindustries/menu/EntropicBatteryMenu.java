@@ -1,8 +1,9 @@
 package io.github.tofithepuppycat.temporalindustries.menu;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
-import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBatteryBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicBatteryBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyReceptacle;
+import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.RegistryFriendlyByteBuf;
 import net.minecraft.world.entity.player.Inventory;
@@ -16,11 +17,11 @@ import net.minecraft.world.item.ItemStack;
 import org.jetbrains.annotations.NotNull;
 
 /**
- * Container menu for the Entropy Battery GUI: a Cell input slot, an output slot the tanks slowly
+ * Container menu for the Entropic Battery GUI: a Cell input slot, an output slot the tanks slowly
  * fill an inserted Cell back out of, and both tanks' fill/capacity.
  */
 @SuppressWarnings("null")
-public class EntropyBatteryMenu extends AbstractContainerMenu {
+public class EntropicBatteryMenu extends AbstractContainerMenu {
     private static final int CELL_SLOT_X = 80;
     private static final int CELL_SLOT_Y = 20;
     private static final int OUTPUT_SLOT_X = 80;
@@ -29,35 +30,38 @@ public class EntropyBatteryMenu extends AbstractContainerMenu {
     private static final int INVENTORY_Y = 84;
     private static final int HOTBAR_Y = 142;
 
-    private final EntropyBatteryBlockEntity blockEntity;
+    /** Container data is synced as 16-bit values, so each int is sent as a low and a high half. */
+    private static final int DATA_COUNT = 7;
+
+    private final EntropicBatteryBlockEntity blockEntity;
     private final BlockPos blockPos;
     private final ContainerLevelAccess access;
     private final ContainerData data;
 
-    public EntropyBatteryMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
+    public EntropicBatteryMenu(int id, Inventory playerInventory, RegistryFriendlyByteBuf dataBuffer) {
         this(id, playerInventory, getBlockEntity(playerInventory, dataBuffer.readBlockPos()));
     }
 
-    public EntropyBatteryMenu(int id, Inventory playerInventory, EntropyBatteryBlockEntity blockEntity) {
-        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(3));
+    public EntropicBatteryMenu(int id, Inventory playerInventory, EntropicBatteryBlockEntity blockEntity) {
+        this(id, playerInventory, blockEntity, ContainerLevelAccess.create(playerInventory.player.level(), blockEntity.getBlockPos()), new SimpleContainerData(DATA_COUNT));
     }
 
-    public EntropyBatteryMenu(int id, Inventory playerInventory, EntropyBatteryBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
-        super(Registration.ENTROPY_BATTERY_MENU.get(), id);
+    public EntropicBatteryMenu(int id, Inventory playerInventory, EntropicBatteryBlockEntity blockEntity, ContainerLevelAccess access, ContainerData data) {
+        super(Registration.ENTROPIC_BATTERY_MENU.get(), id);
         this.blockEntity = blockEntity;
         this.blockPos = blockEntity.getBlockPos();
         this.access = access;
         this.data = data;
 
-        checkContainerDataCount(data, 3);
+        checkContainerDataCount(data, DATA_COUNT);
         addDataSlots(data);
 
-        addSlot(new Slot(blockEntity, EntropyBatteryBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
+        addSlot(new Slot(blockEntity, EntropicBatteryBlockEntity.CELL_SLOT, CELL_SLOT_X, CELL_SLOT_Y) {
             @Override public boolean mayPlace(@NotNull ItemStack stack) {
                 return stack.getItem() instanceof EntropyReceptacle;
             }
         });
-        addSlot(new Slot(blockEntity, EntropyBatteryBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
+        addSlot(new Slot(blockEntity, EntropicBatteryBlockEntity.OUTPUT_SLOT, OUTPUT_SLOT_X, OUTPUT_SLOT_Y) {
             @Override public boolean mayPlace(@NotNull ItemStack stack) {
                 return stack.getItem() instanceof EntropyReceptacle;
             }
@@ -73,32 +77,46 @@ public class EntropyBatteryMenu extends AbstractContainerMenu {
         }
     }
 
-    private static EntropyBatteryBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
-        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof EntropyBatteryBlockEntity be) {
+    private static EntropicBatteryBlockEntity getBlockEntity(Inventory playerInventory, BlockPos blockPos) {
+        if (playerInventory.player.level().getBlockEntity(blockPos) instanceof EntropicBatteryBlockEntity be) {
             return be;
         }
-        throw new IllegalStateException("Expected EntropyBatteryBlockEntity at " + blockPos);
+        throw new IllegalStateException("Expected EntropicBatteryBlockEntity at " + blockPos);
     }
 
     @Override
     public void broadcastChanges() {
         super.broadcastChanges();
-        data.set(0, blockEntity.getOrderTank().getFluidAmount());
-        data.set(1, blockEntity.getChaosTank().getFluidAmount());
-        // Capacity is fixed and identical for both tanks, so one slot covers both.
-        data.set(2, blockEntity.getOrderTank().getCapacity());
+        setInt(0, blockEntity.groupAmount(EntropyType.ORDER));
+        setInt(2, blockEntity.groupAmount(EntropyType.CHAOS));
+        setInt(4, blockEntity.groupCapacity());
+        data.set(6, blockEntity.getGroupSize());
+    }
+
+    private void setInt(int slot, int value) {
+        data.set(slot, value & 0xFFFF);
+        data.set(slot + 1, value >>> 16);
+    }
+
+    private int getInt(int slot) {
+        return (data.get(slot) & 0xFFFF) | ((data.get(slot + 1) & 0xFFFF) << 16);
     }
 
     public int getOrderFluidAmount() {
-        return data.get(0);
+        return getInt(0);
     }
 
     public int getChaosFluidAmount() {
-        return data.get(1);
+        return getInt(2);
     }
 
+    /** Capacity of one tank across the whole multiblock battery. */
     public int getTankCapacity() {
-        return data.get(2);
+        return getInt(4);
+    }
+
+    public int getBatteryCount() {
+        return data.get(6);
     }
 
     @Override
@@ -109,8 +127,8 @@ public class EntropyBatteryMenu extends AbstractContainerMenu {
         ItemStack stackInSlot = slot.getItem();
         ItemStack result = stackInSlot.copy();
 
-        int cellSlot = EntropyBatteryBlockEntity.CELL_SLOT;
-        int outputSlot = EntropyBatteryBlockEntity.OUTPUT_SLOT;
+        int cellSlot = EntropicBatteryBlockEntity.CELL_SLOT;
+        int outputSlot = EntropicBatteryBlockEntity.OUTPUT_SLOT;
         int inventoryStart = outputSlot + 1;
         int inventoryEnd = inventoryStart + 36;
 
@@ -132,7 +150,7 @@ public class EntropyBatteryMenu extends AbstractContainerMenu {
 
     @Override
     public boolean stillValid(@NotNull Player player) {
-        return stillValid(access, player, Registration.ENTROPY_BATTERY_BLOCK.get());
+        return stillValid(access, player, Registration.ENTROPIC_BATTERY_BLOCK.get());
     }
 
     public BlockPos getBlockPos() {

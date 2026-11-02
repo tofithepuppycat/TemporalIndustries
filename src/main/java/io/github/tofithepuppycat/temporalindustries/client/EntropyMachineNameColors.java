@@ -65,7 +65,7 @@ public final class EntropyMachineNameColors {
                 map.put(item, EntropyType.CHAOS.color());
             }
             map.put(Registration.TIME_DILATOR_ITEM.get(), ChatFormatting.GOLD.getColor());
-            for (Item item : List.of(Registration.ENTROPY_CONDENSER_ITEM.get(), Registration.ENTROPY_BATTERY_ITEM.get(),
+            for (Item item : List.of(Registration.ENTROPY_CONDENSER_ITEM.get(), Registration.ENTROPIC_BATTERY_ITEM.get(),
                     Registration.ENTROPY_BALANCER_ITEM.get(), Registration.ENTROPY_MANIPULATOR_ITEM.get(),
                     Registration.ENTROPIC_PYLON_ITEM.get(), Registration.SCHRODINGER_GENERATOR_ITEM.get(),
                     Registration.SEEBECK_GENERATOR_ITEM.get(), Registration.CHRONODIAL_ITEM.get(),
