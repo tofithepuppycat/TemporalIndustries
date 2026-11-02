@@ -171,8 +171,12 @@ public class ChronoRemoteRepositoryScreen extends Screen {
 
         List<String> names = suggestions();
         if (names.isEmpty()) {
-            text(guiGraphics, font, Component.translatable(nameBox.getValue().isBlank()
+            String typed = nameBox.getValue();
+            boolean exists = !typed.isBlank() && ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)
+                    && ChronoRemoteClientState.getRepositoryInfo() != null;
+            text(guiGraphics, font, Component.translatable(typed.isBlank()
                             ? "gui.temporalindustries.chrono_remote.repository.type_hint"
+                            : exists ? "gui.temporalindustries.chrono_remote.repository.in_use"
                             : "gui.temporalindustries.chrono_remote.repository.no_matches"),
                     left + PADDING, top + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_MUTED);
             return;

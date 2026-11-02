@@ -57,6 +57,24 @@ public final class EntropyDisplay {
         MutableComponent result = Component.empty();
         int i = 0;
         while (i < text.length()) {
+            int open = text.indexOf('{', i);
+            int close = open == -1 ? -1 : text.indexOf('}', open);
+            MutableComponent glyph = close == -1 ? null : InputGlyphs.get(text.substring(open + 1, close));
+            if (glyph == null) {
+                result.append(colorEntropyTokens(text.substring(i), baseColor));
+                break;
+            }
+            if (open > i) result.append(colorEntropyTokens(text.substring(i, open), baseColor));
+            result.append(glyph);
+            i = close + 1;
+        }
+        return result;
+    }
+
+    private static MutableComponent colorEntropyTokens(String text, ChatFormatting baseColor) {
+        MutableComponent result = Component.empty();
+        int i = 0;
+        while (i < text.length()) {
             int matchIdx = -1;
             String matchToken = null;
             for (String token : TOKEN_COLORS.keySet()) {
