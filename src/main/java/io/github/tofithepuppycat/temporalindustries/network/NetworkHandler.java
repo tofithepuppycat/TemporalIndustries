@@ -170,6 +170,11 @@ public class NetworkHandler {
                 AnchorRewindEffectPacket::handle);
 
         registrar.playToClient(
+                PylonBoltPacket.TYPE,
+                PylonBoltPacket.STREAM_CODEC,
+                PylonBoltPacket::handle);
+
+        registrar.playToClient(
                 TimelineJumpEffectPacket.TYPE,
                 TimelineJumpEffectPacket.STREAM_CODEC,
                 TimelineJumpEffectPacket::handle);

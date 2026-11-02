@@ -24,6 +24,7 @@ import net.neoforged.neoforge.client.event.RegisterGuiLayersEvent;
 import net.neoforged.neoforge.client.event.RegisterItemDecorationsEvent;
 import net.neoforged.neoforge.client.event.RegisterMenuScreensEvent;
 import net.neoforged.neoforge.client.event.RegisterParticleProvidersEvent;
+import net.neoforged.neoforge.client.event.RegisterShadersEvent;
 import net.neoforged.neoforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.neoforged.neoforge.client.extensions.common.RegisterClientExtensionsEvent;
 import net.neoforged.neoforge.client.gui.VanillaGuiLayers;
@@ -86,6 +87,11 @@ public class ClientModEvents {
     }
 
     @SubscribeEvent
+    public static void onRegisterShaders(RegisterShadersEvent event) throws java.io.IOException {
+        LightningShader.register(event);
+    }
+
+    @SubscribeEvent
     public static void onRegisterGuiLayers(RegisterGuiLayersEvent event) {
         event.registerAbove(VanillaGuiLayers.HOTBAR,
                 ResourceLocation.fromNamespaceAndPath(TemporalIndustries.MODID, "entropy_glasses_overlay"),
@@ -109,5 +115,6 @@ public class ClientModEvents {
         ChronoRiftClientState.clearAll();
         ChronoRemoteClientState.clearAll();
         GuiWindow.clearDraggedPositions();
+        PylonBoltRenderer.clear();
     }
 }

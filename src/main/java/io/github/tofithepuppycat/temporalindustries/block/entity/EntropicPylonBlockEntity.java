@@ -8,10 +8,10 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
+import io.github.tofithepuppycat.temporalindustries.network.PylonBoltPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
-import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
@@ -23,8 +23,8 @@ import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.protocol.game.ClientboundBlockEntityDataPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.util.RandomSource;
 import net.minecraft.world.InteractionResult;
+import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -35,6 +35,7 @@ import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.items.IItemHandler;
+import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
@@ -52,17 +53,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final int TRANSFER_RATE_MB = 50;
 
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
-    /**
-     * Spark texture so the flow of fluid along a leg reads as distinct from the structure outlines.
-     */
-    private static final ColorParticleOption ORDER_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.ORDER);
-    private static final ColorParticleOption CHAOS_TRANSMIT_PARTICLE = buildColorParticle(EntropyType.CHAOS);
-    /** Interior joints in the jagged transmit bolt, not counting its two fixed endpoints. */
-    private static final int LIGHTNING_SEGMENTS = 6;
-    /** Max perpendicular displacement of an interior joint off the straight line, in blocks. */
-    private static final double LIGHTNING_JITTER = 0.25D;
-    /** Target distance between consecutive particles along each jagged segment, in blocks. */
-    private static final double LIGHTNING_PARTICLE_SPACING = 0.15D;
+    /** Ticks between refreshes of a link's bolt on clients; the bolt outlasts the gap. */
+    private static final int BOLT_INTERVAL_TICKS = 2;
 
     private static DustParticleOptions buildParticle(EntropyType type, float scale) {
         return buildParticle(type.color(), scale);
@@ -73,14 +65,6 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
         return new DustParticleOptions(new Vector3f(r, g, b), scale);
-    }
-
-    private static ColorParticleOption buildColorParticle(EntropyType type) {
-        int color = type.color();
-        float r = ((color >> 16) & 0xFF) / 255F;
-        float g = ((color >> 8) & 0xFF) / 255F;
-        float b = (color & 0xFF) / 255F;
-        return ColorParticleOption.create(Registration.TRANSMIT_SPARK.get(), r, g, b);
     }
 
     private List<BlockPos> inputs = new ArrayList<>();
@@ -353,70 +337,19 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
             EntropyType type = EntropyFluids.typeOf(drained.getFluid());
             if (type != null && level instanceof ServerLevel serverLevel) {
-                spawnTransmitParticles(serverLevel, type, inPos, worldPosition);
-                spawnTransmitParticles(serverLevel, type, worldPosition, outPos);
+                sendBolt(serverLevel, type.color(), inPos, worldPosition);
+                sendBolt(serverLevel, type.color(), worldPosition, outPos);
             }
         }
     }
 
     /**
-     * A jagged bolt from {@code from} to {@code to}, colored by {@code type}, drawn every tick a
-     * transfer moves fluid so the flow direction reads at a glance.
+     * Tells clients tracking this pylon to show a bolt of {@code color} along the link from
+     * {@code from} to {@code to}; sent every few ticks while a transfer keeps moving something.
      */
-    private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
-        spawnBolt(serverLevel, type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE, from, to);
-    }
-
-    /** The same bolt in any colour. */
-    protected void spawnBolt(ServerLevel serverLevel, ColorParticleOption particle, BlockPos from, BlockPos to) {
-        Vector3f start = centerOf(from);
-        Vector3f end = centerOf(to);
-        for (Vector3f point : lightningArc(start, end, serverLevel.getRandom())) {
-            serverLevel.sendParticles(particle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
-        }
-    }
-
-    /**
-     * Builds a jagged path from {@code start} to {@code end}: straight sub-segments with jittered
-     * interior joints, densely resampled so the zigzag reads as a continuous bolt.
-     */
-    private static List<Vector3f> lightningArc(Vector3f start, Vector3f end, RandomSource random) {
-        Vector3f direction = new Vector3f(end).sub(start);
-        if (direction.lengthSquared() < 1.0E-6F) return List.of(start);
-        direction.normalize();
-
-        Vector3f reference = Math.abs(direction.y()) > 0.99F ? new Vector3f(1, 0, 0) : new Vector3f(0, 1, 0);
-        Vector3f right = new Vector3f(direction).cross(reference).normalize();
-        Vector3f up = new Vector3f(direction).cross(right).normalize();
-
-        Vector3f[] joints = new Vector3f[LIGHTNING_SEGMENTS + 1];
-        joints[0] = start;
-        joints[LIGHTNING_SEGMENTS] = end;
-        for (int i = 1; i < LIGHTNING_SEGMENTS; i++) {
-            float t = i / (float) LIGHTNING_SEGMENTS;
-            float rightOffset = (random.nextFloat() - 0.5F) * 2F * (float) LIGHTNING_JITTER;
-            float upOffset = (random.nextFloat() - 0.5F) * 2F * (float) LIGHTNING_JITTER;
-            joints[i] = new Vector3f(start).lerp(end, t)
-                    .add(new Vector3f(right).mul(rightOffset))
-                    .add(new Vector3f(up).mul(upOffset));
-        }
-
-        List<Vector3f> points = new ArrayList<>();
-        for (int i = 0; i < LIGHTNING_SEGMENTS; i++) {
-            Vector3f a = joints[i];
-            Vector3f b = joints[i + 1];
-            double segmentLength = new Vector3f(b).sub(a).length();
-            int steps = Math.max(1, (int) Math.round(segmentLength / LIGHTNING_PARTICLE_SPACING));
-            for (int s = (i == 0 ? 0 : 1); s <= steps; s++) {
-                float t = s / (float) steps;
-                points.add(new Vector3f(a).lerp(b, t));
-            }
-        }
-        return points;
-    }
-
-    private static Vector3f centerOf(BlockPos pos) {
-        return new Vector3f(pos.getX() + 0.5F, pos.getY() + 0.5F, pos.getZ() + 0.5F);
+    protected void sendBolt(ServerLevel serverLevel, int color, BlockPos from, BlockPos to) {
+        if (serverLevel.getGameTime() % BOLT_INTERVAL_TICKS != 0) return;
+        PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition), new PylonBoltPacket(from, to, color));
     }
 
     // The pylon isn't itself an item/fluid container, only a router; a click just reports status.

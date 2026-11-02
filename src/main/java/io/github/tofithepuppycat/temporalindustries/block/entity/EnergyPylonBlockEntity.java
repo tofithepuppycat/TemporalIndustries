@@ -1,10 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
-import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
-import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.particles.ColorParticleOption;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
@@ -17,12 +14,11 @@ public class EnergyPylonBlockEntity extends EntropicPylonBlockEntity {
     /** FE moved per input to output pair each tick. */
     public static final int TRANSFER_RATE_FE = 20_000;
 
-    private static final int FE_COLOR = EntropyDisplay.FE_COLOR.getValue();
-    private static final ColorParticleOption BOLT_PARTICLE = ColorParticleOption.create(Registration.TRANSMIT_SPARK.get(),
-            ((FE_COLOR >> 16) & 0xFF) / 255F, ((FE_COLOR >> 8) & 0xFF) / 255F, (FE_COLOR & 0xFF) / 255F);
+    /** The green of the pylon's own glow. */
+    public static final int COLOR = 0x53E159;
 
     public EnergyPylonBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state) {
-        super(type, pos, state, null, FE_COLOR);
+        super(type, pos, state, null, COLOR);
     }
 
     @Override
@@ -62,8 +58,8 @@ public class EnergyPylonBlockEntity extends EntropicPylonBlockEntity {
             dest.receiveEnergy(taken, false);
 
             if (level instanceof ServerLevel serverLevel) {
-                spawnBolt(serverLevel, BOLT_PARTICLE, inPos, worldPosition);
-                spawnBolt(serverLevel, BOLT_PARTICLE, worldPosition, outPos);
+                sendBolt(serverLevel, COLOR, inPos, worldPosition);
+                sendBolt(serverLevel, COLOR, worldPosition, outPos);
             }
         }
     }
