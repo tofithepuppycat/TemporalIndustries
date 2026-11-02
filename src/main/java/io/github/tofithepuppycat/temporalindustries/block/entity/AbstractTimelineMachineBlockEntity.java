@@ -128,40 +128,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
             return 0;
         }
 
-        /**
-         * Draining one tank grows the other by the same amount, same fixed-sum invariant as {@link
-         * #fill}.
-         */
+        /** The Order/Chaos balance can only be changed by filling; nothing can pull it back out. */
         @Override public @NotNull FluidStack drain(FluidStack resource, FluidAction action) {
-            if (!orderTank.getFluid().isEmpty() && orderTank.getFluid().getFluid().isSame(resource.getFluid())) {
-                return drainOrder(resource.getAmount(), action);
-            }
-            if (!chaosTank.getFluid().isEmpty() && chaosTank.getFluid().getFluid().isSame(resource.getFluid())) {
-                return drainChaos(resource.getAmount(), action);
-            }
             return FluidStack.EMPTY;
         }
 
         @Override public @NotNull FluidStack drain(int maxDrain, FluidAction action) {
-            if (!orderTank.getFluid().isEmpty()) return drainOrder(maxDrain, action);
-            if (!chaosTank.getFluid().isEmpty()) return drainChaos(maxDrain, action);
             return FluidStack.EMPTY;
-        }
-
-        private FluidStack drainOrder(int amount, FluidAction action) {
-            FluidStack drained = orderTank.drain(amount, action);
-            if (!drained.isEmpty() && action.execute()) {
-                chaosTank.fill(new FluidStack(Registration.CHAOS_FLUID.get(), drained.getAmount()), FluidAction.EXECUTE);
-            }
-            return drained;
-        }
-
-        private FluidStack drainChaos(int amount, FluidAction action) {
-            FluidStack drained = chaosTank.drain(amount, action);
-            if (!drained.isEmpty() && action.execute()) {
-                orderTank.fill(new FluidStack(Registration.ORDER_FLUID.get(), drained.getAmount()), FluidAction.EXECUTE);
-            }
-            return drained;
         }
     }
 
