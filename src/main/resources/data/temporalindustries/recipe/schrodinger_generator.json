@@ -2,7 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "DAD",
-    "GWG"
+    "GWG",
+    "DAD"
   ],
   "key": {
     "D": { "item": "minecraft:deepslate" },

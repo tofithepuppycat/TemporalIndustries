@@ -2,7 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "SAS",
-    "NFN"
+    "NFN",
+    "NNN"
   ],
   "key": {
     "N": { "item": "minecraft:netherite_ingot" },

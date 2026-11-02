@@ -2,7 +2,8 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "CEC",
-    "GMG"
+    "GMG",
+    "CCC"
   ],
   "key": {
     "G": { "item": "minecraft:gold_ingot" },
