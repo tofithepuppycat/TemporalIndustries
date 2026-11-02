@@ -9,6 +9,7 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.MutableComponent;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.InteractionResult;
@@ -147,8 +148,10 @@ public class WithergenicReactor extends BaseEntityBlock {
         MachineFrame.fillFromInventory(level, be.findMissingGlass(), player, Items.TINTED_GLASS, Blocks.TINTED_GLASS);
         if (be.checkStructure()) return InteractionResult.CONSUME;
 
-        List<BlockPos> missing = new ArrayList<>(be.findMissingFrames());
-        missing.addAll(be.findMissingGlass());
+        List<BlockPos> missingFrames = be.findMissingFrames();
+        List<BlockPos> missingGlass = be.findMissingGlass();
+        List<BlockPos> missing = new ArrayList<>(missingFrames);
+        missing.addAll(missingGlass);
         if (missing.isEmpty()) {
             List<BlockPos> blocked = be.findObstructions();
             highlight((ServerLevel) level, blocked, player);
@@ -156,7 +159,16 @@ public class WithergenicReactor extends BaseEntityBlock {
             return InteractionResult.CONSUME;
         }
         highlight((ServerLevel) level, missing, player);
-        player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame", missing.size()), true);
+        MutableComponent parts = Component.empty();
+        if (!missingFrames.isEmpty()) {
+            parts.append(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame."
+                    + (missingFrames.size() == 1 ? "one" : "many"), missingFrames.size()));
+        }
+        if (!missingGlass.isEmpty()) {
+            if (!missingFrames.isEmpty()) parts.append(", ");
+            parts.append(Component.translatable("block.temporalindustries.withergenic_reactor.missing_glass", missingGlass.size()));
+        }
+        player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing", parts), true);
         return InteractionResult.CONSUME;
     }
 

@@ -129,6 +129,6 @@ public class LootGenerator extends BaseEntityBlock {
                 level.sendParticles(MISSING_FRAME_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
             }
         }
-        player.displayClientMessage(Component.translatable("block.temporalindustries.loot_generator.missing_frame", missing.size()), true);
+        player.displayClientMessage(Component.translatable("block.temporalindustries.loot_generator.missing_frame." + (missing.size() == 1 ? "one" : "many"), missing.size()), true);
     }
 }
