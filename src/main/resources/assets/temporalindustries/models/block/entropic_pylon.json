@@ -1,12 +1,13 @@
 {
   "parent": "minecraft:block/cube",
   "textures": {
-    "particle": "temporalindustries:block/entropic_pylon",
-    "pylon": "temporalindustries:block/entropic_pylon",
-    "glow": "temporalindustries:block/entropic_pylon_e",
+    "particle": "temporalindustries:block/pylon_entropic",
+    "pylon": "temporalindustries:block/pylon_entropic",
+    "glow": "temporalindustries:block/pylon_entropic_e",
     "side": "temporalindustries:block/machine_base",
     "up": "temporalindustries:block/machine_base_up",
-    "down": "temporalindustries:block/machine_base_down"
+    "down": "temporalindustries:block/machine_base_down",
+    "top": "temporalindustries:block/machine_base_fulldark"
   },
   "render_type": "minecraft:cutout",
   "elements": [
@@ -157,20 +158,20 @@
           "texture": "#pylon"
         },
         "up": {
-          "texture": "#pylon"
+          "texture": "#top"
         }
       }
     },
     {
       "from": [
-        5.99,
-        13,
-        5.99
+        4.99,
+        4,
+        4.99
       ],
       "to": [
-        10.01,
-        16.01,
-        10.01
+        11.01,
+        12,
+        11.01
       ],
       "faces": {
         "north": {
