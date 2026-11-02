@@ -1,15 +1,17 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "DAD",
+    "ANA",
     "GCG",
-    "DAD"
+    "DSD"
   ],
   "key": {
-    "D": { "item": "minecraft:deepslate" },
-    "G": { "item": "minecraft:gold_ingot" },
     "A": { "item": "minecraft:amethyst_shard" },
-    "C": { "item": "minecraft:chest" }
+    "N": { "item": "minecraft:netherite_ingot" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "C": { "item": "minecraft:chest" },
+    "D": { "item": "minecraft:deepslate" },
+    "S": { "item": "temporalindustries:chronoscope" }
   },
   "result": { "id": "temporalindustries:loot_generator", "count": 1 }
 }
