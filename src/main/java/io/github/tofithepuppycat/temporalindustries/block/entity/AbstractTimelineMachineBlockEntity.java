@@ -209,7 +209,10 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     /** Which kinds of entity are saved and loaded while saveEntities is on. */
     private boolean saveItemEntities = true;
     private boolean saveMobEntities = true;
+    private boolean saveOtherEntities = true;
     private boolean chargeContainers = true;
+    /** Whether a jump also sets the time of day to the one the target commit was made at. */
+    private boolean rollTimeOfDay = false;
     private RedstoneMode redstoneMode = RedstoneMode.IGNORE;
     /** The commit a redstone trigger returns to, or {@link RepoCommit#NO_PARENT} for none. */
     private long pinnedCommitId = RepoCommit.NO_PARENT;
@@ -586,8 +589,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
         Map<java.util.UUID, net.minecraft.nbt.CompoundTag> states = new java.util.HashMap<>();
         for (Map.Entry<java.util.UUID, net.minecraft.nbt.CompoundTag> entry : repo.previewEntityStates(targetCommitId).entrySet()) {
-            boolean item = JumpJob.isItemEntityTag(entry.getValue());
-            if (item ? savesItemEntities() : savesMobEntities()) states.put(entry.getKey(), entry.getValue());
+            boolean restored = switch (JumpJob.kindOf(entry.getValue(), null)) {
+                case ITEM -> savesItemEntities();
+                case MOB -> savesMobEntities();
+                case OTHER -> savesOtherEntities();
+            };
+            if (restored) states.put(entry.getKey(), entry.getValue());
         }
         return states;
     }
@@ -881,8 +888,8 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
     }
 
     /** A background estimate for the cost display, valid for as long as its inputs are unchanged. */
-    private record CachedEstimate(long target, long head, boolean saveItems, boolean saveMobs, boolean chargeContainers,
-                                  JumpJob.Estimate estimate, long measuredAt) {}
+    private record CachedEstimate(long target, long head, boolean saveItems, boolean saveMobs, boolean saveOthers,
+                                  boolean chargeContainers, JumpJob.Estimate estimate, long measuredAt) {}
 
     private static final long HEAD_ESTIMATE_MAX_AGE_TICKS = 20L;
 
@@ -910,6 +917,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         CachedEstimate cached = cachedEstimate;
         if (cached != null && cached.target() == targetCommitId && cached.head() == repo.getHeadCommitId()
                 && cached.saveItems() == savesItemEntities() && cached.saveMobs() == savesMobEntities()
+                && cached.saveOthers() == savesOtherEntities()
                 && cached.chargeContainers() == chargesContainers()) {
             // The world keeps changing under a jump to the head, so its measurement is refreshed
             // in the background while the last one stays on display.
@@ -932,12 +940,13 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long head = repo.getHeadCommitId();
         boolean saveItemsNow = savesItemEntities();
         boolean saveMobsNow = savesMobEntities();
+        boolean saveOthersNow = savesOtherEntities();
         boolean chargeContainersNow = chargesContainers();
         JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
-                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveItemsNow, saveMobsNow, chargeContainersNow,
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, saveItemsNow, saveMobsNow, saveOthersNow, chargeContainersNow,
                 true, false, false,
                 finished -> cachedEstimate = new CachedEstimate(targetCommitId, head, saveItemsNow, saveMobsNow,
-                        chargeContainersNow, finished.estimate(), serverLevel.getGameTime()),
+                        saveOthersNow, chargeContainersNow, finished.estimate(), serverLevel.getGameTime()),
                 finished -> { }));
         if (job != null) data.startJumpJob(repoId, job);
     }
@@ -963,7 +972,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
 
     /** Whether jumps on this machine also restore any of the entities recorded in the target commit. */
     protected boolean savesEntities() {
-        return saveEntities && (saveItemEntities || saveMobEntities);
+        return saveEntities && (saveItemEntities || saveMobEntities || saveOtherEntities);
     }
 
     /** Whether jumps on this machine restore dropped items. */
@@ -971,9 +980,14 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return saveEntities && saveItemEntities;
     }
 
-    /** Whether jumps on this machine restore entities other than dropped items. */
+    /** Whether jumps on this machine restore mobs. */
     protected boolean savesMobEntities() {
         return saveEntities && saveMobEntities;
+    }
+
+    /** Whether jumps on this machine restore entities that are neither dropped items nor mobs. */
+    protected boolean savesOtherEntities() {
+        return saveEntities && saveOtherEntities;
     }
 
     public boolean isSaveEntities() {
@@ -990,10 +1004,16 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return saveMobEntities;
     }
 
-    public void setEntityKinds(boolean items, boolean mobs) {
-        if (saveItemEntities == items && saveMobEntities == mobs) return;
+    @Override
+    public boolean isSaveOtherEntities() {
+        return saveOtherEntities;
+    }
+
+    public void setEntityKinds(boolean items, boolean mobs, boolean others) {
+        if (saveItemEntities == items && saveMobEntities == mobs && saveOtherEntities == others) return;
         saveItemEntities = items;
         saveMobEntities = mobs;
+        saveOtherEntities = others;
         setChanged();
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
@@ -1025,6 +1045,26 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (level != null && !level.isClientSide) {
             level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
         }
+    }
+
+    public boolean isRollTimeOfDay() {
+        return rollTimeOfDay;
+    }
+
+    public void setRollTimeOfDay(boolean value) {
+        if (rollTimeOfDay == value) return;
+        rollTimeOfDay = value;
+        setChanged();
+        if (level != null && !level.isClientSide) {
+            level.sendBlockUpdated(worldPosition, getBlockState(), getBlockState(), Block.UPDATE_CLIENTS);
+        }
+    }
+
+    /** Keeps the current day and sets only the time within it to the commit's. */
+    private void rollTimeOfDayTo(ServerLevel serverLevel, RepoCommit target) {
+        if (!rollTimeOfDay || target.getDayTime() == RepoCommit.NO_DAY_TIME || serverLevel.dimensionType().hasFixedTime()) return;
+        long current = serverLevel.getDayTime();
+        serverLevel.setDayTime(current - Math.floorMod(current, 24000L) + Math.floorMod(target.getDayTime(), 24000L));
     }
 
     private static long entityCost(TemporalRepository.EntityJumpStats stats) {
@@ -1083,7 +1123,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         long[] totalPaid = {paid};
 
         JumpJob job = repo.beginJump(targetCommitId, serverLevel, new ChunkPos(worldPosition), new JumpJob.Options(
-                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, savesItemEntities(), savesMobEntities(), chargesContainers(),
+                gluePredicate(), AbstractTimelineMachineBlockEntity::costOf, savesItemEntities(), savesMobEntities(), savesOtherEntities(), chargesContainers(),
                 false, !measureCost, true,
                 estimated -> onJumpEstimated(estimated, target, totalPaid),
                 finished -> onJumpFinished(target, totalPaid[0], finished.changedPositions())));
@@ -1140,6 +1180,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         boolean intoFuture = targetGameTime > previousSelectedGameTime;
         selectedGameTime = clampToPlacedWindow(targetGameTime);
         shiftEntropyToward((int) Math.min(ENTROPY_MAX, totalCost / JUMP_FE_PER_ENTROPY_UNIT));
+        rollTimeOfDayTo(serverLevel, target);
         setChanged();
         syncToClients();
 
@@ -1222,7 +1263,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         tag.putBoolean("SaveEntities", saveEntities);
         tag.putBoolean("SaveItemEntities", saveItemEntities);
         tag.putBoolean("SaveMobEntities", saveMobEntities);
+        tag.putBoolean("SaveOtherEntities", saveOtherEntities);
         tag.putBoolean("ChargeContainers", chargeContainers);
+        tag.putBoolean("RollTimeOfDay", rollTimeOfDay);
         tag.putInt("RedstoneMode", redstoneMode.ordinal());
     }
 
@@ -1264,7 +1307,9 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         saveEntities = tag.getBoolean("SaveEntities");
         saveItemEntities = !tag.contains("SaveItemEntities") || tag.getBoolean("SaveItemEntities");
         saveMobEntities = !tag.contains("SaveMobEntities") || tag.getBoolean("SaveMobEntities");
+        saveOtherEntities = tag.contains("SaveOtherEntities") ? tag.getBoolean("SaveOtherEntities") : saveMobEntities;
         chargeContainers = !tag.contains("ChargeContainers") || tag.getBoolean("ChargeContainers");
+        rollTimeOfDay = tag.getBoolean("RollTimeOfDay");
         redstoneMode = RedstoneMode.byOrdinal(tag.getInt("RedstoneMode"));
         pinnedCommitId = tag.contains("PinnedCommit") ? tag.getLong("PinnedCommit") : RepoCommit.NO_PARENT;
         wasPowered = tag.getBoolean("WasPowered");

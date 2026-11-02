@@ -110,6 +110,11 @@ public class NetworkHandler {
                 ChronosphereSetChargeContainersPacket::handle);
 
         registrar.playToServer(
+                ChronosphereSetRollTimeOfDayPacket.TYPE,
+                ChronosphereSetRollTimeOfDayPacket.STREAM_CODEC,
+                ChronosphereSetRollTimeOfDayPacket::handle);
+
+        registrar.playToServer(
                 TimelineMachineDeleteHistoryPacket.TYPE,
                 TimelineMachineDeleteHistoryPacket.STREAM_CODEC,
                 TimelineMachineDeleteHistoryPacket::handle);

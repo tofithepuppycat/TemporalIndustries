@@ -7,6 +7,8 @@ import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
+import net.minecraft.world.entity.EntityType;
+import net.minecraft.world.entity.MobCategory;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.item.ItemEntity;
 import net.minecraft.world.item.Item;
@@ -59,12 +61,25 @@ public final class JumpJob {
      * @param onFinished called once the head has moved
      */
     public record Options(Predicate<BlockPos> isGlued, ToLongFunction<BlockState> blockCost, boolean restoreItems,
-                          boolean restoreMobs, boolean countContainers, boolean loadedOnly, boolean skipEstimate, boolean applies,
+                          boolean restoreMobs, boolean restoreOthers, boolean countContainers, boolean loadedOnly, boolean skipEstimate, boolean applies,
                           Consumer<JumpJob> onEstimated, Consumer<JumpJob> onFinished) {}
 
     /** Whether tag is the recorded state of a dropped item. */
     public static boolean isItemEntityTag(@Nullable CompoundTag tag) {
         return tag != null && tag.contains("Item", Tag.TAG_COMPOUND);
+    }
+
+    /** The groups of entity a machine can restore separately. */
+    public enum EntityKind { ITEM, MOB, OTHER }
+
+    /** The group of the entity recorded as tag, falling back on the live entity when the tag has no type. */
+    public static EntityKind kindOf(@Nullable CompoundTag tag, @Nullable Entity live) {
+        if (tag != null && tag.contains("Item", Tag.TAG_COMPOUND)) return EntityKind.ITEM;
+        if (tag == null && live instanceof ItemEntity) return EntityKind.ITEM;
+        EntityType<?> type = tag != null && tag.contains("id", Tag.TAG_STRING)
+                ? EntityType.byString(tag.getString("id")).orElse(null) : null;
+        if (type == null && live != null) type = live.getType();
+        return type != null && type.getCategory() != MobCategory.MISC ? EntityKind.MOB : EntityKind.OTHER;
     }
 
     /** Neighbour updates run per unit of work. */
@@ -249,13 +264,21 @@ public final class JumpJob {
     }
 
     private boolean restoresEntities() {
-        return options.restoreItems() || options.restoreMobs();
+        return options.restoreItems() || options.restoreMobs() || options.restoreOthers();
+    }
+
+    private boolean restores(EntityKind kind) {
+        return switch (kind) {
+            case ITEM -> options.restoreItems();
+            case MOB -> options.restoreMobs();
+            case OTHER -> options.restoreOthers();
+        };
     }
 
     private void resolveEntities() {
         desiredEntities = new HashMap<>();
         for (Map.Entry<UUID, CompoundTag> entry : repo.resolveJumpEntities(plan).entrySet()) {
-            if (isItemEntity(entry.getValue(), level.getEntity(entry.getKey())) ? options.restoreItems() : options.restoreMobs()) {
+            if (restores(kindOf(entry.getValue(), level.getEntity(entry.getKey())))) {
                 desiredEntities.put(entry.getKey(), entry.getValue());
             }
         }

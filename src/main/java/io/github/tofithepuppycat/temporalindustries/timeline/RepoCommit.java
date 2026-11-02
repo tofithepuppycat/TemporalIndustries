@@ -13,17 +13,21 @@ import java.util.UUID;
 /** One node in a {@link TemporalRepository}'s commit tree. */
 public final class RepoCommit {
     public static final long NO_PARENT = -1L;
+    /** Day time of a commit saved before the time of day was recorded. */
+    public static final long NO_DAY_TIME = -1L;
 
     private final long id;
     private final long parentId;
     private final long gameTime;
+    private final long dayTime;
     @Nullable private final UUID author;
     private final Map<Long, ChunkEntry> chunkEntries;
 
-    public RepoCommit(long id, long parentId, long gameTime, @Nullable UUID author, Map<Long, ChunkEntry> chunkEntries) {
+    public RepoCommit(long id, long parentId, long gameTime, long dayTime, @Nullable UUID author, Map<Long, ChunkEntry> chunkEntries) {
         this.id = id;
         this.parentId = parentId;
         this.gameTime = gameTime;
+        this.dayTime = dayTime;
         this.author = author;
         this.chunkEntries = Collections.unmodifiableMap(new HashMap<>(chunkEntries));
     }
@@ -31,6 +35,8 @@ public final class RepoCommit {
     public long getId() { return id; }
     public long getParentId() { return parentId; }
     public long getGameTime() { return gameTime; }
+    /** The level's day time when the commit was made, or {@link #NO_DAY_TIME}. */
+    public long getDayTime() { return dayTime; }
     @Nullable public UUID getAuthor() { return author; }
     public Map<Long, ChunkEntry> getChunkEntries() { return chunkEntries; }
 
@@ -53,6 +59,7 @@ public final class RepoCommit {
         tag.putLong("Id", id);
         tag.putLong("ParentId", parentId);
         tag.putLong("GameTime", gameTime);
+        tag.putLong("DayTime", dayTime);
         if (author != null) tag.putUUID("Author", author);
 
         ListTag entries = new ListTag();
@@ -70,6 +77,7 @@ public final class RepoCommit {
         long id = tag.getLong("Id");
         long parentId = tag.getLong("ParentId");
         long gameTime = tag.getLong("GameTime");
+        long dayTime = tag.contains("DayTime") ? tag.getLong("DayTime") : NO_DAY_TIME;
         UUID author = tag.hasUUID("Author") ? tag.getUUID("Author") : null;
 
         Map<Long, ChunkEntry> chunkEntries = new HashMap<>();
@@ -79,6 +87,6 @@ public final class RepoCommit {
             chunkEntries.put(entryTag.getLong("Chunk"), ChunkEntry.fromTag(entryTag.getCompound("Entry"), pool));
         }
 
-        return new RepoCommit(id, parentId, gameTime, author, chunkEntries);
+        return new RepoCommit(id, parentId, gameTime, dayTime, author, chunkEntries);
     }
 }

@@ -25,21 +25,24 @@ public class ChronosphereSetEntityKindsPacket implements CustomPacketPayload {
     private final BlockPos machinePos;
     private final boolean items;
     private final boolean mobs;
+    private final boolean others;
 
-    public ChronosphereSetEntityKindsPacket(BlockPos machinePos, boolean items, boolean mobs) {
+    public ChronosphereSetEntityKindsPacket(BlockPos machinePos, boolean items, boolean mobs, boolean others) {
         this.machinePos = machinePos;
         this.items = items;
         this.mobs = mobs;
+        this.others = others;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, ChronosphereSetEntityKindsPacket packet) {
         buf.writeBlockPos(packet.machinePos);
         buf.writeBoolean(packet.items);
         buf.writeBoolean(packet.mobs);
+        buf.writeBoolean(packet.others);
     }
 
     public static ChronosphereSetEntityKindsPacket decode(RegistryFriendlyByteBuf buf) {
-        return new ChronosphereSetEntityKindsPacket(buf.readBlockPos(), buf.readBoolean(), buf.readBoolean());
+        return new ChronosphereSetEntityKindsPacket(buf.readBlockPos(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean());
     }
 
     public static void handle(ChronosphereSetEntityKindsPacket packet, IPayloadContext context) {
@@ -52,7 +55,7 @@ public class ChronosphereSetEntityKindsPacket implements CustomPacketPayload {
             if (!menu.getBlockPos().equals(packet.machinePos)) return;
             if (!(sender.level().getBlockEntity(packet.machinePos) instanceof AbstractTimelineMachineBlockEntity machine)) return;
 
-            machine.setEntityKinds(packet.items, packet.mobs);
+            machine.setEntityKinds(packet.items, packet.mobs, packet.others);
         });
     }
 

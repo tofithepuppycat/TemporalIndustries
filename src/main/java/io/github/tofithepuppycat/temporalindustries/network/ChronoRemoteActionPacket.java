@@ -34,6 +34,7 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
         COMMIT,
         TOGGLE_SAVE_ENTITIES,
         TOGGLE_CHARGE_CONTAINERS,
+        TOGGLE_ROLL_TIME_OF_DAY,
         /** Replies with the machine's settings, claim state and the terrain thumbnails for its chunk map. */
         MAP,
         /** Jumps to the commit id carried as the argument. */
@@ -105,6 +106,10 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
                 machine.setChargeContainers(!machine.isChargeContainers());
                 sendState(sender, machine, level);
             }
+            case TOGGLE_ROLL_TIME_OF_DAY -> {
+                machine.setRollTimeOfDay(!machine.isRollTimeOfDay());
+                sendState(sender, machine, level);
+            }
             case MAP -> sendMap(sender, machine, level);
             case JUMP -> jump(sender, machine, argument);
             case SYNC -> { }
@@ -148,7 +153,7 @@ public class ChronoRemoteActionPacket implements CustomPacketPayload {
         boolean chronosphere = machine instanceof ChronosphereBlockEntity;
         PacketDistributor.sendToPlayer(sender, new ChronoRemoteStateSyncPacket(
                 machine.isRepositoryBound() && machine.getRepository() != null, chronosphere,
-                machine.isSaveEntities(), machine.isChargeContainers(),
+                machine.isSaveEntities(), machine.isChargeContainers(), machine.isRollTimeOfDay(),
                 machine.getRepository() == null ? "" : machine.getRepository().getName()));
 
         if (machine instanceof ChronosphereBlockEntity sphere && sender.level() == level) {

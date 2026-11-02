@@ -128,6 +128,9 @@ public class ChronoRemoteWheelScreen extends Screen {
                 new Option(prefix + "charge_containers", hints + "charge_containers",
                         () -> send(ChronoRemoteActionPacket.Action.TOGGLE_CHARGE_CONTAINERS))
                         .toggle(ChronoRemoteClientState::isChargeContainers),
+                new Option(prefix + "roll_time_of_day", hints + "roll_time_of_day",
+                        () -> send(ChronoRemoteActionPacket.Action.TOGGLE_ROLL_TIME_OF_DAY))
+                        .toggle(ChronoRemoteClientState::isRollTimeOfDay),
                 new Option("gui.temporalindustries.chrono_remote.back", null,
                         () -> Minecraft.getInstance().setScreen(mainWheel())),
                 new Option(prefix + "change_repository", hints + "change_repository",

@@ -23,14 +23,16 @@ public class ChronoRemoteStateSyncPacket implements CustomPacketPayload {
     private final boolean chronosphere;
     private final boolean saveEntities;
     private final boolean chargeContainers;
+    private final boolean rollTimeOfDay;
     private final String repositoryName;
 
     public ChronoRemoteStateSyncPacket(boolean bound, boolean chronosphere, boolean saveEntities, boolean chargeContainers,
-                                     String repositoryName) {
+                                     boolean rollTimeOfDay, String repositoryName) {
         this.bound = bound;
         this.chronosphere = chronosphere;
         this.saveEntities = saveEntities;
         this.chargeContainers = chargeContainers;
+        this.rollTimeOfDay = rollTimeOfDay;
         this.repositoryName = repositoryName;
     }
 
@@ -39,17 +41,19 @@ public class ChronoRemoteStateSyncPacket implements CustomPacketPayload {
         buf.writeBoolean(packet.chronosphere);
         buf.writeBoolean(packet.saveEntities);
         buf.writeBoolean(packet.chargeContainers);
+        buf.writeBoolean(packet.rollTimeOfDay);
         buf.writeUtf(packet.repositoryName, NAME_MAX_BYTES);
     }
 
     public static ChronoRemoteStateSyncPacket decode(RegistryFriendlyByteBuf buf) {
         return new ChronoRemoteStateSyncPacket(buf.readBoolean(), buf.readBoolean(), buf.readBoolean(), buf.readBoolean(),
-                buf.readUtf(NAME_MAX_BYTES));
+                buf.readBoolean(), buf.readUtf(NAME_MAX_BYTES));
     }
 
     public static void handle(ChronoRemoteStateSyncPacket packet, IPayloadContext context) {
         context.enqueueWork(() -> ChronoRemoteClientState.onSettingsSynced(
-                packet.bound, packet.chronosphere, packet.saveEntities, packet.chargeContainers, packet.repositoryName));
+                packet.bound, packet.chronosphere, packet.saveEntities, packet.chargeContainers, packet.rollTimeOfDay,
+                packet.repositoryName));
     }
 
     @Override

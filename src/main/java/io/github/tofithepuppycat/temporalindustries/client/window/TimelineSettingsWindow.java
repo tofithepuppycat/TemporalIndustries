@@ -8,6 +8,7 @@ import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetChargeContainersPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetEntityKindsPacket;
+import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetRollTimeOfDayPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereSetSaveEntitiesPacket;
 import io.github.tofithepuppycat.temporalindustries.network.ChronosphereUnbindRepositoryPacket;
 import io.github.tofithepuppycat.temporalindustries.network.TimelineMachineDeleteHistoryPacket;
@@ -39,16 +40,18 @@ public final class TimelineSettingsWindow extends GuiWindow {
     private static final int TITLE_DIVIDER_Y_OFFSET = 16;
     private static final int GHOST_TOGGLE_ROW_Y_OFFSET = 24;
     private static final int SAVE_ENTITIES_ROW_Y_OFFSET = GHOST_TOGGLE_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
-    // The item and mob toggles sit under "Save and Load Entities" while it is on, pushing the rows
+    // The item, mob and other toggles sit under "Save and Load Entities" while it is on, pushing the rows
     // beneath down by their combined height.
     private static final int SUB_ROW_STRIDE = TOGGLE_SIZE + 3;
     private static final int SUB_ROW_INDENT = 10;
     private static final int SAVE_ITEMS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + SUB_ROW_STRIDE;
     private static final int SAVE_MOBS_ROW_Y_OFFSET = SAVE_ITEMS_ROW_Y_OFFSET + SUB_ROW_STRIDE;
+    private static final int SAVE_OTHERS_ROW_Y_OFFSET = SAVE_MOBS_ROW_Y_OFFSET + SUB_ROW_STRIDE;
     private static final int CHARGE_CONTAINERS_ROW_Y_OFFSET = SAVE_ENTITIES_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
     private static final int CHARGE_CONTAINERS_HINT_Y_OFFSET = CHARGE_CONTAINERS_ROW_Y_OFFSET + TOGGLE_SIZE + 3;
     private static final int CHARGE_CONTAINERS_HINT_HEIGHT = 2 * LINE_HEIGHT;
-    private static final int SAVE_ENTITIES_DIVIDER_Y_OFFSET = CHARGE_CONTAINERS_HINT_Y_OFFSET + CHARGE_CONTAINERS_HINT_HEIGHT + 2;
+    private static final int ROLL_TIME_ROW_Y_OFFSET = CHARGE_CONTAINERS_HINT_Y_OFFSET + CHARGE_CONTAINERS_HINT_HEIGHT + 4;
+    private static final int SAVE_ENTITIES_DIVIDER_Y_OFFSET = ROLL_TIME_ROW_Y_OFFSET + TOGGLE_SIZE + 6;
     private static final int CHANGE_REPOSITORY_BUTTON_Y_OFFSET = SAVE_ENTITIES_DIVIDER_Y_OFFSET + 4;
     private static final int DANGER_DIVIDER_Y_OFFSET = CHANGE_REPOSITORY_BUTTON_Y_OFFSET + DELETE_BUTTON_HEIGHT + 6;
     private static final int DELETE_HISTORY_HINT_Y_OFFSET = DANGER_DIVIDER_Y_OFFSET + 4;
@@ -110,11 +113,16 @@ public final class TimelineSettingsWindow extends GuiWindow {
                     SAVE_ITEMS_ROW_Y_OFFSET, be.isSaveItemEntities(), SUB_ROW_INDENT);
             renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_mobs_label",
                     SAVE_MOBS_ROW_Y_OFFSET, be.isSaveMobEntities(), SUB_ROW_INDENT);
+            renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.chronosphere.save_others_label",
+                    SAVE_OTHERS_ROW_Y_OFFSET, be.isSaveOtherEntities(), SUB_ROW_INDENT);
         }
         renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.timeline_machine.charge_containers_label",
                 lowerOffset(CHARGE_CONTAINERS_ROW_Y_OFFSET), be.isChargeContainers());
         drawWordWrapNoShadow(guiGraphics, Component.translatable("gui.temporalindustries.timeline_machine.charge_containers_hint"),
                 textX, rowY(lowerOffset(CHARGE_CONTAINERS_HINT_Y_OFFSET)), textWidth, COLOR_WARNING);
+
+        renderToggleRow(guiGraphics, mouseX, mouseY, "gui.temporalindustries.timeline_machine.roll_time_label",
+                lowerOffset(ROLL_TIME_ROW_Y_OFFSET), be.isRollTimeOfDay());
 
         drawDivider(guiGraphics, rowY(lowerOffset(SAVE_ENTITIES_DIVIDER_Y_OFFSET)), INSET);
 
@@ -175,11 +183,15 @@ public final class TimelineSettingsWindow extends GuiWindow {
         } else if (isOverToggle(mouseX, mouseY, SAVE_ENTITIES_ROW_Y_OFFSET)) {
             PacketDistributor.sendToServer(new ChronosphereSetSaveEntitiesPacket(machinePos, !be.isSaveEntities()));
         } else if (be.isSaveEntities() && isOverToggle(mouseX, mouseY, SAVE_ITEMS_ROW_Y_OFFSET)) {
-            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, !be.isSaveItemEntities(), be.isSaveMobEntities()));
+            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, !be.isSaveItemEntities(), be.isSaveMobEntities(), be.isSaveOtherEntities()));
         } else if (be.isSaveEntities() && isOverToggle(mouseX, mouseY, SAVE_MOBS_ROW_Y_OFFSET)) {
-            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, be.isSaveItemEntities(), !be.isSaveMobEntities()));
+            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, be.isSaveItemEntities(), !be.isSaveMobEntities(), be.isSaveOtherEntities()));
+        } else if (be.isSaveEntities() && isOverToggle(mouseX, mouseY, SAVE_OTHERS_ROW_Y_OFFSET)) {
+            PacketDistributor.sendToServer(new ChronosphereSetEntityKindsPacket(machinePos, be.isSaveItemEntities(), be.isSaveMobEntities(), !be.isSaveOtherEntities()));
         } else if (isOverToggle(mouseX, mouseY, lowerOffset(CHARGE_CONTAINERS_ROW_Y_OFFSET))) {
             PacketDistributor.sendToServer(new ChronosphereSetChargeContainersPacket(machinePos, !be.isChargeContainers()));
+        } else if (isOverToggle(mouseX, mouseY, lowerOffset(ROLL_TIME_ROW_Y_OFFSET))) {
+            PacketDistributor.sendToServer(new ChronosphereSetRollTimeOfDayPacket(machinePos, !be.isRollTimeOfDay()));
         } else if (isOver(mouseX, mouseY, centeredX(DELETE_BUTTON_WIDTH), rowY(lowerOffset(CHANGE_REPOSITORY_BUTTON_Y_OFFSET)),
                 DELETE_BUTTON_WIDTH, DELETE_BUTTON_HEIGHT)) {
             changeRepository();
@@ -214,7 +226,7 @@ public final class TimelineSettingsWindow extends GuiWindow {
 
     /** A row below the entity toggles: its offset moved down by the item and mob rows while they show. */
     private int lowerOffset(int offset) {
-        return offset + (machine.get().isSaveEntities() ? 2 * SUB_ROW_STRIDE : 0);
+        return offset + (machine.get().isSaveEntities() ? 3 * SUB_ROW_STRIDE : 0);
     }
 
     private int contentHeight() {

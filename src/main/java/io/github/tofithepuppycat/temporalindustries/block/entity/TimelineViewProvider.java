@@ -80,8 +80,11 @@ public interface TimelineViewProvider {
     /** Whether, with entities saved, dropped items are among them. */
     boolean isSaveItemEntities();
 
-    /** Whether, with entities saved, entities other than dropped items are among them. */
+    /** Whether, with entities saved, mobs are among them. */
     boolean isSaveMobEntities();
+
+    /** Whether, with entities saved, entities that are neither dropped items nor mobs are among them. */
+    boolean isSaveOtherEntities();
 
     /** Whether pos is glued, and so would be skipped by a jump (and by the ghost preview). */
     boolean isGluedPos(BlockPos pos);

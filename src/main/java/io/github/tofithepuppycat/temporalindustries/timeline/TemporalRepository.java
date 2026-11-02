@@ -188,6 +188,7 @@ public final class TemporalRepository {
         private final List<RepoCommit> headChain;
         private final boolean firstCommit;
         private final long gameTime;
+        private final long dayTime;
         @Nullable private final UUID author;
 
         private CommitJob(ServerLevel level, Collection<Long> chunkKeys, Map<Long, List<EntityDelta>> pendingEntityChanges,
@@ -199,6 +200,7 @@ public final class TemporalRepository {
             this.headChain = headChain;
             this.firstCommit = firstCommit;
             this.gameTime = gameTime;
+            this.dayTime = level.getDayTime();
             this.author = author;
         }
 
@@ -277,12 +279,13 @@ public final class TemporalRepository {
     public RepoCommit finishCommit(CommitJob job) {
         Map<Long, ChunkEntry> entries = job.entries;
         long gameTime = job.gameTime;
+        long dayTime = job.dayTime;
         UUID author = job.author;
         if (entries.isEmpty()) return null;
 
         long parentId = headCommitId;
         long id = nextId++;
-        RepoCommit newCommit = new RepoCommit(id, parentId, gameTime, author, entries);
+        RepoCommit newCommit = new RepoCommit(id, parentId, gameTime, dayTime, author, entries);
         commits.put(id, newCommit);
 
         if (parentId == RepoCommit.NO_PARENT) {

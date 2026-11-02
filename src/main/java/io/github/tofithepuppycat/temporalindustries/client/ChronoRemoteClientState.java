@@ -25,6 +25,7 @@ public final class ChronoRemoteClientState {
     private static boolean chronosphere;
     private static boolean saveEntities;
     private static boolean chargeContainers;
+    private static boolean rollTimeOfDay;
     private static String repositoryName = "";
 
     private static String repositoryInfoQuery = "";
@@ -105,14 +106,16 @@ public final class ChronoRemoteClientState {
     public static boolean isChronosphere() { return chronosphere; }
     public static boolean isSaveEntities() { return saveEntities; }
     public static boolean isChargeContainers() { return chargeContainers; }
+    public static boolean isRollTimeOfDay() { return rollTimeOfDay; }
     public static String getRepositoryName() { return repositoryName; }
 
     public static void onSettingsSynced(boolean boundNow, boolean chronosphereNow, boolean saveEntitiesNow,
-                                        boolean chargeContainersNow, String repositoryNameNow) {
+                                        boolean chargeContainersNow, boolean rollTimeOfDayNow, String repositoryNameNow) {
         bound = boundNow;
         chronosphere = chronosphereNow;
         saveEntities = saveEntitiesNow;
         chargeContainers = chargeContainersNow;
+        rollTimeOfDay = rollTimeOfDayNow;
         repositoryName = repositoryNameNow;
 
         // Chunk selection only makes sense on a machine that claims more than its own chunk.
@@ -144,6 +147,7 @@ public final class ChronoRemoteClientState {
         chronosphere = false;
         saveEntities = false;
         chargeContainers = false;
+        rollTimeOfDay = false;
         repositoryName = "";
         updateRepositoryInfo("", null);
     }
