@@ -1,5 +1,270 @@
 {
-  "variants": {
-    "": { "model": "temporalindustries:block/entropic_battery" }
-  }
+  "multipart": [
+    {
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_core"
+      }
+    },
+    {
+      "when": {
+        "up": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_plate_top"
+      }
+    },
+    {
+      "when": {
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_core_up"
+      }
+    },
+    {
+      "when": {
+        "down": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_plate_bottom"
+      }
+    },
+    {
+      "when": {
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_core_down"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "east": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_ne_mid"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "east": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_ne_top"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "east": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_ne_bottom"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "west": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_nw_mid"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "west": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_nw_top"
+      }
+    },
+    {
+      "when": {
+        "north": "false",
+        "west": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_nw_bottom"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "east": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_se_mid"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "east": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_se_top"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "east": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_se_bottom"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "west": "false"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_sw_mid"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "west": "false",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_sw_top"
+      }
+    },
+    {
+      "when": {
+        "south": "false",
+        "west": "false",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_pillar_sw_bottom"
+      }
+    },
+    {
+      "when": {
+        "north": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_mid"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_top"
+      }
+    },
+    {
+      "when": {
+        "north": "true",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_bottom"
+      }
+    },
+    {
+      "when": {
+        "east": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_mid",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_top",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "east": "true",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_bottom",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_mid",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_top",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "south": "true",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_bottom",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_mid",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "up": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_top",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "west": "true",
+        "down": "true"
+      },
+      "apply": {
+        "model": "temporalindustries:block/entropic_battery_link_bottom",
+        "y": 270
+      }
+    }
+  ]
 }

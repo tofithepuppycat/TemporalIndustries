@@ -349,7 +349,7 @@ public class Registration {
     // --- Entropic Battery: unpowered lower tier that drains Cells instead of catching orbs ---
 
     public static final DeferredBlock<EntropicBattery> ENTROPIC_BATTERY_BLOCK = BLOCKS.register("entropic_battery",
-            () -> new EntropicBattery(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+            () -> new EntropicBattery(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> ENTROPIC_BATTERY_ITEM = ITEMS.register("entropic_battery",
             () -> new DescribedBlockItem(ENTROPIC_BATTERY_BLOCK.get(), new Item.Properties()));
@@ -657,6 +657,8 @@ public class Registration {
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.FluidHandler.BLOCK, ENTROPIC_BATTERY_BLOCK_ENTITY.get(),
                 (be, side) -> be.getFluidHandler());
+        event.registerBlockEntity(Capabilities.EnergyStorage.BLOCK, ENTROPIC_BATTERY_BLOCK_ENTITY.get(),
+                (be, side) -> be.getEnergyStorage());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DECAY_ACCELERATOR_BLOCK_ENTITY.get(),
                 (be, side) -> be.getItemHandler());
         event.registerBlockEntity(Capabilities.ItemHandler.BLOCK, DESPAWN_ACCELERATOR_BLOCK_ENTITY.get(),

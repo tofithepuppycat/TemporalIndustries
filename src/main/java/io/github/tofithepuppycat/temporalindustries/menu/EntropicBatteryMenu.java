@@ -31,7 +31,7 @@ public class EntropicBatteryMenu extends AbstractContainerMenu {
     private static final int HOTBAR_Y = 142;
 
     /** Container data is synced as 16-bit values, so each int is sent as a low and a high half. */
-    private static final int DATA_COUNT = 7;
+    private static final int DATA_COUNT = 11;
 
     private final EntropicBatteryBlockEntity blockEntity;
     private final BlockPos blockPos;
@@ -91,6 +91,8 @@ public class EntropicBatteryMenu extends AbstractContainerMenu {
         setInt(2, blockEntity.groupAmount(EntropyType.CHAOS));
         setInt(4, blockEntity.groupCapacity());
         data.set(6, blockEntity.getGroupSize());
+        setInt(7, blockEntity.groupEnergy());
+        setInt(9, blockEntity.groupEnergyCapacity());
     }
 
     private void setInt(int slot, int value) {
@@ -113,6 +115,14 @@ public class EntropicBatteryMenu extends AbstractContainerMenu {
     /** Capacity of one tank across the whole multiblock battery. */
     public int getTankCapacity() {
         return getInt(4);
+    }
+
+    public int getEnergyStored() {
+        return getInt(7);
+    }
+
+    public int getEnergyCapacity() {
+        return getInt(9);
     }
 
     public int getBatteryCount() {

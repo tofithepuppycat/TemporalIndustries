@@ -21,6 +21,10 @@
           "properties": { "formed": "true" }
         },
         {
+          "type": "match_block",
+          "block": "temporalindustries:entropic_battery"
+        },
+        {
           "type": "match_state",
           "blocks": [
             "temporalindustries:entropic_pylon",

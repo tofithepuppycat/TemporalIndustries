@@ -1,6 +1,7 @@
 package io.github.tofithepuppycat.temporalindustries.block.entity;
 
 import io.github.tofithepuppycat.temporalindustries.Registration;
+import io.github.tofithepuppycat.temporalindustries.client.ShortEnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
@@ -29,6 +30,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import org.jetbrains.annotations.Nullable;
+import net.neoforged.neoforge.energy.IEnergyStorage;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.capability.IFluidHandler;
 import net.neoforged.neoforge.fluids.capability.templates.FluidTank;
@@ -49,13 +51,17 @@ import java.util.concurrent.atomic.AtomicInteger;
  * liquid Order/Chaos out of a cell in its input slot into its tanks and fills a cell in its
  * output slot from them, no power involved. Batteries that touch face to face form one multiblock
  * battery whose tanks act as a single pool: every member's menu, fluid handler and cell slots work
- * on the combined contents and capacity.
+ * on the combined contents and capacity. The battery also stores FE, pooled the same way.
  */
 @SuppressWarnings("null")
 public class EntropicBatteryBlockEntity extends BlockEntity implements Container, MenuProvider, EntropyInfoProvider {
     public static final int TANK_CAPACITY = 16_000;
     /** Most batteries a single multiblock battery will include. */
     public static final int MAX_GROUP_SIZE = 256;
+    /** FE each battery in a multiblock contributes to the pool. */
+    public static final int ENERGY_CAPACITY = 1_000_000;
+    /** FE per tick each battery in a multiblock lets through when charging or discharging. */
+    private static final int ENERGY_TRANSFER_PER_BATTERY = 20_000;
     private static final AtomicInteger TOPOLOGY_VERSION = new AtomicInteger();
     private static final int DRAIN_PER_TICK = 25; // mB pulled out of the slotted cell per tick
     private static final int OUTPUT_FILL_PER_TICK = 25; // mB pushed from each tank into the output cell per tick
@@ -113,6 +119,24 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
     };
     private final CondenserFluidHandler fluidHandler = new CondenserFluidHandler();
 
+    private final class PooledEnergyStorage implements IEnergyStorage {
+        @Override public int receiveEnergy(int toReceive, boolean simulate) {
+            return groupReceive(Math.min(toReceive, ENERGY_TRANSFER_PER_BATTERY * getGroupSize()), simulate);
+        }
+
+        @Override public int extractEnergy(int toExtract, boolean simulate) {
+            return groupExtract(Math.min(toExtract, ENERGY_TRANSFER_PER_BATTERY * getGroupSize()), simulate);
+        }
+
+        @Override public int getEnergyStored() { return groupEnergy(); }
+        @Override public int getMaxEnergyStored() { return groupEnergyCapacity(); }
+        @Override public boolean canExtract() { return true; }
+        @Override public boolean canReceive() { return true; }
+    }
+
+    private final PooledEnergyStorage energyStorage = new PooledEnergyStorage();
+    private int energy;
+
     private final NonNullList<ItemStack> items = NonNullList.withSize(SLOT_COUNT, ItemStack.EMPTY);
     private final IItemHandler inventory = new InvWrapper(this);
 
@@ -126,6 +150,10 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
 
     public IFluidHandler getFluidHandler() {
         return fluidHandler;
+    }
+
+    public IEnergyStorage getEnergyStorage() {
+        return energyStorage;
     }
 
     public FluidTank getOrderTank() {
@@ -225,6 +253,46 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
         return amount - remaining;
     }
 
+    public int groupEnergy() {
+        long total = 0;
+        for (EntropicBatteryBlockEntity member : getGroup()) total += member.energy;
+        return (int) Math.min(Integer.MAX_VALUE, total);
+    }
+
+    public int groupEnergyCapacity() {
+        return getGroup().size() * ENERGY_CAPACITY;
+    }
+
+    private int groupReceive(int amount, boolean simulate) {
+        int remaining = Math.max(0, amount);
+        for (EntropicBatteryBlockEntity member : getGroup()) {
+            if (remaining <= 0) break;
+            int accepted = Math.min(remaining, ENERGY_CAPACITY - member.energy);
+            if (accepted <= 0) continue;
+            if (!simulate) {
+                member.energy += accepted;
+                member.setChanged();
+            }
+            remaining -= accepted;
+        }
+        return Math.max(0, amount) - remaining;
+    }
+
+    private int groupExtract(int amount, boolean simulate) {
+        int remaining = Math.max(0, amount);
+        for (EntropicBatteryBlockEntity member : getGroup()) {
+            if (remaining <= 0) break;
+            int taken = Math.min(remaining, member.energy);
+            if (taken <= 0) continue;
+            if (!simulate) {
+                member.energy -= taken;
+                member.setChanged();
+            }
+            remaining -= taken;
+        }
+        return Math.max(0, amount) - remaining;
+    }
+
     private void markTanksChanged() {
         setChanged();
         syncToClients();
@@ -237,6 +305,8 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
         if (getGroupSize() > 1) {
             lines.add(Component.translatable("block.temporalindustries.entropic_battery.combined", getGroupSize()).withStyle(ChatFormatting.DARK_GRAY));
         }
+        lines.add(Component.literal(ShortEnergyDisplay.format(groupEnergy()) + "/" + ShortEnergyDisplay.format(groupEnergyCapacity()))
+                .withStyle(ChatFormatting.GREEN));
         lines.addAll(List.of(
                 Component.translatable("overlay.temporalindustries.entropy_glasses.liquid",
                         EntropyDisplay.formatFluid(groupAmount(EntropyType.ORDER)), EntropyDisplay.formatFluid(groupCapacity()))
@@ -365,6 +435,7 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
         super.saveAdditional(tag, registries);
         tag.put("OrderTank", orderTank.writeToNBT(registries, new CompoundTag()));
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
+        tag.putInt("Energy", energy);
         ContainerHelper.saveAllItems(tag, items, registries);
     }
 
@@ -373,6 +444,7 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
         super.loadAdditional(tag, registries);
         if (tag.contains("OrderTank")) orderTank.readFromNBT(registries, tag.getCompound("OrderTank"));
         if (tag.contains("ChaosTank")) chaosTank.readFromNBT(registries, tag.getCompound("ChaosTank"));
+        energy = Math.clamp(tag.getInt("Energy"), 0, ENERGY_CAPACITY);
         items.clear();
         ContainerHelper.loadAllItems(tag, items, registries);
     }

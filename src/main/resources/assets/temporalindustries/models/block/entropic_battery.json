@@ -5,7 +5,8 @@
     "side": "temporalindustries:block/machine_base",
     "up": "temporalindustries:block/machine_base_up",
     "down": "temporalindustries:block/machine_base_down",
-    "energy": "temporalindustries:block/machine_base_energy"
+    "energy": "temporalindustries:block/machine_base_energy",
+    "frame": "temporalindustries:block/machine_frame"
   },
   "elements": [
     {
@@ -21,26 +22,26 @@
       ],
       "faces": {
         "north": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "north"
         },
         "south": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "south"
         },
         "east": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "east"
         },
         "west": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "west"
         },
         "up": {
-          "texture": "#up"
+          "texture": "#frame"
         },
         "down": {
-          "texture": "#down",
+          "texture": "#frame",
           "cullface": "down"
         }
       }
@@ -58,27 +59,27 @@
       ],
       "faces": {
         "north": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "north"
         },
         "south": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "south"
         },
         "east": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "east"
         },
         "west": {
-          "texture": "#side",
+          "texture": "#frame",
           "cullface": "west"
         },
         "up": {
-          "texture": "#up",
+          "texture": "#frame",
           "cullface": "up"
         },
         "down": {
-          "texture": "#down"
+          "texture": "#frame"
         }
       }
     },
@@ -95,16 +96,32 @@
       ],
       "faces": {
         "north": {
-          "texture": "#energy"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "south": {
-          "texture": "#energy"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "east": {
-          "texture": "#energy"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "west": {
-          "texture": "#energy"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "up": {
           "texture": "#side"
@@ -112,7 +129,8 @@
         "down": {
           "texture": "#side"
         }
-      }
+      },
+      "shade": false
     },
     {
       "from": [
