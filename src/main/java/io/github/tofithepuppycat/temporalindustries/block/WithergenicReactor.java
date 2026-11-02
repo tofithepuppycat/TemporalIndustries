@@ -3,6 +3,7 @@ package io.github.tofithepuppycat.temporalindustries.block;
 import com.mojang.serialization.MapCodec;
 import io.github.tofithepuppycat.temporalindustries.Registration;
 import io.github.tofithepuppycat.temporalindustries.block.entity.WithergenicReactorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.timeline.TemporalRepository;
 import io.github.tofithepuppycat.temporalindustries.capture.CapturedMob;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
@@ -103,7 +104,8 @@ public class WithergenicReactor extends BaseEntityBlock {
     @Override
     public void onRemove(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos,
                           @NotNull BlockState newState, boolean isMoving) {
-        if (state.getBlock() != newState.getBlock() && level.getBlockEntity(pos) instanceof WithergenicReactorBlockEntity be) {
+        if (state.getBlock() != newState.getBlock() && !TemporalRepository.isRestoringBlocks()
+                && level.getBlockEntity(pos) instanceof WithergenicReactorBlockEntity be) {
             be.release();
         }
         super.onRemove(state, level, pos, newState, isMoving);

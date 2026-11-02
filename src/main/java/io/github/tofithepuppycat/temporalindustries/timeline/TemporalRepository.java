@@ -933,6 +933,22 @@ public final class TemporalRepository {
      * written.
      */
     static void applyChanges(ResolvedChunk state, List<BlockPos> positions, ServerLevel level, LongConsumer onBlockSet) {
+        restoreDepth++;
+        try {
+            applyChangesUnguarded(state, positions, level, onBlockSet);
+        } finally {
+            restoreDepth--;
+        }
+    }
+
+    /** Whether blocks are currently being rewritten to a point in time, as opposed to being broken or replaced in play. */
+    public static boolean isRestoringBlocks() {
+        return restoreDepth > 0;
+    }
+
+    private static int restoreDepth;
+
+    private static void applyChangesUnguarded(ResolvedChunk state, List<BlockPos> positions, ServerLevel level, LongConsumer onBlockSet) {
         for (BlockPos pos : positions) {
             BlockState desiredState = state.targetState(pos);
             if (!level.getBlockState(pos).equals(desiredState)) {
