@@ -1,0 +1,10 @@
+{
+  "variants": {
+    "extended=true": {
+      "model": "temporalindustries:block/energy_pylon_extended"
+    },
+    "extended=false": {
+      "model": "temporalindustries:block/energy_pylon"
+    }
+  }
+}

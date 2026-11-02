@@ -65,7 +65,10 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     private static final double LIGHTNING_PARTICLE_SPACING = 0.15D;
 
     private static DustParticleOptions buildParticle(EntropyType type, float scale) {
-        int color = type.color();
+        return buildParticle(type.color(), scale);
+    }
+
+    protected static DustParticleOptions buildParticle(int color, float scale) {
         float r = ((color >> 16) & 0xFF) / 255F;
         float g = ((color >> 8) & 0xFF) / 255F;
         float b = (color & 0xFF) / 255F;
@@ -100,9 +103,14 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     }
 
     public EntropicPylonBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state, @Nullable EntropyType filter) {
+        this(type, pos, state, filter, (filter != null ? filter : EntropyType.ORDER).color());
+    }
+
+    protected EntropicPylonBlockEntity(BlockEntityType<?> type, BlockPos pos, BlockState state, @Nullable EntropyType filter,
+                                       int formedColor) {
         super(type, pos, state);
         this.filter = filter;
-        this.formedParticle = buildParticle(filter != null ? filter : EntropyType.ORDER, 2.0F);
+        this.formedParticle = buildParticle(formedColor, 2.0F);
     }
 
     public List<BlockPos> getInputs() {
@@ -151,9 +159,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         String prefix = "item.temporalindustries.wrench.pylon.";
         String role = output ? "output" : "input";
         int range = getRange();
-        if (level == null || target.equals(worldPosition)
-                || level.getCapability(Capabilities.FluidHandler.BLOCK, target, null) == null) {
-            return Component.translatable(prefix + "invalid");
+        if (level == null || target.equals(worldPosition) || !isLinkable(target)) {
+            return Component.translatable(prefix + invalidLinkKey());
         }
         if (!inRange(target)) {
             return Component.translatable(prefix + "too_far", range);
@@ -194,7 +201,17 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return Component.translatable("item.temporalindustries.wrench.pylon.cleared");
     }
 
-    private MachineFrame.PylonStyle pylonStyle() {
+    /** Whether the block at target holds what this pylon routes. */
+    protected boolean isLinkable(BlockPos target) {
+        return level.getCapability(Capabilities.FluidHandler.BLOCK, target, null) != null;
+    }
+
+    /** Wrench message key, under the pylon prefix, for a link target that holds nothing this pylon routes. */
+    protected String invalidLinkKey() {
+        return "invalid";
+    }
+
+    protected MachineFrame.PylonStyle pylonStyle() {
         if (filter == EntropyType.CHAOS) return MachineFrame.PylonStyle.CHAOS;
         if (filter == EntropyType.ORDER) return MachineFrame.PylonStyle.ORDER;
         return MachineFrame.PylonStyle.ENTROPIC;
@@ -281,11 +298,18 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * One transfer attempt per marked input, against the next marked output in rotation, so every
      * pair gets visited over time instead of always favoring the first output.
      */
-    private boolean isReachable(BlockPos target) {
+    protected boolean isReachable(BlockPos target) {
         return inRange(target) && level.isLoaded(target);
     }
 
-    private void transferOnce() {
+    /** The next linked output in rotation, or null when none is linked. */
+    @Nullable
+    protected BlockPos nextOutput() {
+        if (outputs.isEmpty()) return null;
+        return outputs.get(outputCursor++ % outputs.size());
+    }
+
+    protected void transferOnce() {
         for (BlockPos inPos : inputs) {
             if (!isReachable(inPos)) continue;
             IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
@@ -340,7 +364,11 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * transfer moves fluid so the flow direction reads at a glance.
      */
     private void spawnTransmitParticles(ServerLevel serverLevel, EntropyType type, BlockPos from, BlockPos to) {
-        ColorParticleOption particle = type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE;
+        spawnBolt(serverLevel, type == EntropyType.ORDER ? ORDER_TRANSMIT_PARTICLE : CHAOS_TRANSMIT_PARTICLE, from, to);
+    }
+
+    /** The same bolt in any colour. */
+    protected void spawnBolt(ServerLevel serverLevel, ColorParticleOption particle, BlockPos from, BlockPos to) {
         Vector3f start = centerOf(from);
         Vector3f end = centerOf(to);
         for (Vector3f point : lightningArc(start, end, serverLevel.getRandom())) {

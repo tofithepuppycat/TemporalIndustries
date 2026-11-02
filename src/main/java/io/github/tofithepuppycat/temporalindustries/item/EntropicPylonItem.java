@@ -70,7 +70,7 @@ public class EntropicPylonItem extends BlockItem {
         return InteractionResult.PASS;
     }
 
-    private static boolean isValidTarget(Level level, BlockPos pos) {
+    protected boolean isValidTarget(Level level, BlockPos pos) {
         return level.getCapability(Capabilities.FluidHandler.BLOCK, pos, null) != null;
     }
 

@@ -1,0 +1,13 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "GAG",
+    "DGD"
+  ],
+  "key": {
+    "D": { "item": "minecraft:deepslate" },
+    "G": { "item": "minecraft:gold_ingot" },
+    "A": { "item": "minecraft:redstone_block" }
+  },
+  "result": { "id": "temporalindustries:energy_pylon", "count": 1 }
+}

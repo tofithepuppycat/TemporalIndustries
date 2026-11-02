@@ -13,6 +13,8 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.NonNullList;
+import net.minecraft.core.component.DataComponentMap;
+import net.minecraft.core.component.DataComponents;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
@@ -25,6 +27,7 @@ import net.minecraft.world.entity.player.Inventory;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.component.CustomData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
@@ -437,6 +440,17 @@ public class EntropicBatteryBlockEntity extends BlockEntity implements Container
         tag.put("ChaosTank", chaosTank.writeToNBT(registries, new CompoundTag()));
         tag.putInt("Energy", energy);
         ContainerHelper.saveAllItems(tag, items, registries);
+    }
+
+    /** Carries the tanks, energy and slotted cells onto the dropped item. */
+    @Override
+    protected void collectImplicitComponents(@NotNull DataComponentMap.Builder components) {
+        super.collectImplicitComponents(components);
+        if (level == null) return;
+        CompoundTag data = new CompoundTag();
+        saveAdditional(data, level.registryAccess());
+        BlockEntity.addEntityType(data, getType());
+        components.set(DataComponents.BLOCK_ENTITY_DATA, CustomData.of(data));
     }
 
     @Override

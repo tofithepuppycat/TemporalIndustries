@@ -55,7 +55,7 @@ public class MachineFrame extends BaseEntityBlock {
     private static final VoxelShape PYLON_COLUMN_SHAPE = Block.box(5, 0, 5, 11, 16, 11);
 
     public enum PylonStyle implements StringRepresentable {
-        NONE("none"), ENTROPIC("entropic"), CHAOS("chaos"), ORDER("order");
+        NONE("none"), ENTROPIC("entropic"), CHAOS("chaos"), ORDER("order"), ENERGY("energy");
 
         private final String name;
 

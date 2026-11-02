@@ -47,6 +47,18 @@
     },
     "connected=false,pylon=order,pylon_base=false": {
       "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=true,pylon=energy,pylon_base=true": {
+      "model": "temporalindustries:block/pylon_frame_base"
+    },
+    "connected=false,pylon=energy,pylon_base=true": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
+    },
+    "connected=true,pylon=energy,pylon_base=false": {
+      "model": "temporalindustries:block/pylon_frame_column"
+    },
+    "connected=false,pylon=energy,pylon_base=false": {
+      "model": "temporalindustries:block/machine_frame_disconnected"
     }
   }
 }

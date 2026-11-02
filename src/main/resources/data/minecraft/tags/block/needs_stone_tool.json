@@ -18,6 +18,7 @@
     "temporalindustries:machine_frame",
     "temporalindustries:entropic_pylon",
     "temporalindustries:chaos_pylon",
-    "temporalindustries:order_pylon"
+    "temporalindustries:order_pylon",
+    "temporalindustries:energy_pylon"
   ]
 }

@@ -9,6 +9,7 @@ import io.github.tofithepuppycat.temporalindustries.block.EntropicBattery;
 import io.github.tofithepuppycat.temporalindustries.block.DecayAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.DespawnAccelerator;
 import io.github.tofithepuppycat.temporalindustries.block.ChaosPylon;
+import io.github.tofithepuppycat.temporalindustries.block.EnergyPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropicPylon;
 import io.github.tofithepuppycat.temporalindustries.block.OrderPylon;
 import io.github.tofithepuppycat.temporalindustries.block.EntropyManipulator;
@@ -26,6 +27,7 @@ import io.github.tofithepuppycat.temporalindustries.block.entity.TemporalLifelin
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicBatteryBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DecayAcceleratorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.DespawnAcceleratorBlockEntity;
+import io.github.tofithepuppycat.temporalindustries.block.entity.EnergyPylonBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicPylonBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyManipulatorBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.block.entity.EntropyBalancerBlockEntity;
@@ -46,7 +48,9 @@ import io.github.tofithepuppycat.temporalindustries.item.CreativeChronosphereIte
 import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
 import io.github.tofithepuppycat.temporalindustries.item.WrenchItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropicBatteryItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
+import io.github.tofithepuppycat.temporalindustries.item.EnergyPylonItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
@@ -88,6 +92,7 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.sounds.SoundEvent;
+import net.minecraft.world.item.BlockItem;
 import net.minecraft.world.item.BucketItem;
 import net.minecraft.world.item.CreativeModeTab;
 import net.minecraft.world.item.Item;
@@ -353,7 +358,7 @@ public class Registration {
             () -> new EntropicBattery(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.0F, 5.0F).sound(SoundType.METAL).requiresCorrectToolForDrops().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> ENTROPIC_BATTERY_ITEM = ITEMS.register("entropic_battery",
-            () -> new DescribedBlockItem(ENTROPIC_BATTERY_BLOCK.get(), new Item.Properties()));
+            () -> new EntropicBatteryItem(ENTROPIC_BATTERY_BLOCK.get(), new Item.Properties()));
 
     // --- Entropy Balancer: buffers ORD/CHS and doses a bound machine toward a target balance ---
 
@@ -408,7 +413,7 @@ public class Registration {
             () -> new MachineFrame(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
 
     public static final DeferredItem<Item> MACHINE_FRAME_ITEM = ITEMS.register("machine_frame",
-            () -> new DescribedBlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
+            () -> new BlockItem(MACHINE_FRAME_BLOCK.get(), new Item.Properties()));
 
     // --- Withergenic Reactor: late-game Chaos generator that needs a captured Wither and liquid Order to stay balanced ---
 
@@ -437,6 +442,12 @@ public class Registration {
 
     public static final DeferredItem<Item> ORDER_PYLON_ITEM = ITEMS.register("order_pylon",
             () -> new EntropicPylonItem(ORDER_PYLON_BLOCK.get(), new Item.Properties()));
+
+    public static final DeferredBlock<EnergyPylon> ENERGY_PYLON_BLOCK = BLOCKS.register("energy_pylon",
+            () -> new EnergyPylon(BlockBehaviour.Properties.of().mapColor(MapColor.METAL).strength(3.5F, 6.0F).sound(SoundType.METAL).requiresCorrectToolForDrops()));
+
+    public static final DeferredItem<Item> ENERGY_PYLON_ITEM = ITEMS.register("energy_pylon",
+            () -> new EnergyPylonItem(ENERGY_PYLON_BLOCK.get(), new Item.Properties()));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<ChronosphereBlockEntity>> CHRONOVAULT_BLOCK_ENTITY = BLOCK_ENTITIES.register("chronovault",
             () -> BlockEntityType.Builder.of(ChronosphereBlockEntity::new, CHRONOVAULT_BLOCK.get()).build(null));
@@ -493,12 +504,16 @@ public class Registration {
     // the field being initialized from within its own initializer is a compile error.
     private static BlockEntityType<EntropicPylonBlockEntity> chaosPylonBlockEntityType;
     private static BlockEntityType<EntropicPylonBlockEntity> orderPylonBlockEntityType;
+    private static BlockEntityType<EntropicPylonBlockEntity> energyPylonBlockEntityType;
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> CHAOS_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("chaos_pylon",
             () -> chaosPylonBlockEntityType = BlockEntityType.Builder.of((pos, state) -> new EntropicPylonBlockEntity(chaosPylonBlockEntityType, pos, state, EntropyType.CHAOS), CHAOS_PYLON_BLOCK.get()).build(null));
 
     public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ORDER_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("order_pylon",
             () -> orderPylonBlockEntityType = BlockEntityType.Builder.of((pos, state) -> new EntropicPylonBlockEntity(orderPylonBlockEntityType, pos, state, EntropyType.ORDER), ORDER_PYLON_BLOCK.get()).build(null));
+
+    public static final DeferredHolder<BlockEntityType<?>, BlockEntityType<EntropicPylonBlockEntity>> ENERGY_PYLON_BLOCK_ENTITY = BLOCK_ENTITIES.register("energy_pylon",
+            () -> energyPylonBlockEntityType = BlockEntityType.Builder.<EntropicPylonBlockEntity>of((pos, state) -> new EnergyPylonBlockEntity(energyPylonBlockEntityType, pos, state), ENERGY_PYLON_BLOCK.get()).build(null));
 
     public static final DeferredHolder<MenuType<?>, MenuType<ChronosphereMenu>> CHRONOSPHERE_MENU = MENUS.register("chronosphere",
             () -> IMenuTypeExtension.create(ChronosphereMenu::new));
@@ -569,6 +584,7 @@ public class Registration {
                         output.accept(ENTROPIC_PYLON_ITEM);
                         output.accept(CHAOS_PYLON_ITEM);
                         output.accept(ORDER_PYLON_ITEM);
+                        output.accept(ENERGY_PYLON_ITEM);
                         output.accept(TEMPORAL_ANCHOR_ITEM);
                         output.accept(ECHO_RECORD_ITEM);
                         output.accept(CHRONO_REMOTE_CONTROL_ITEM);
