@@ -43,6 +43,7 @@ import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyBalancerItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.ChronoscopeItem;
+import io.github.tofithepuppycat.temporalindustries.item.WrenchItem;
 import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
@@ -192,6 +193,9 @@ public class Registration {
     public static final DeferredItem<Item> CHRONOSCOPE_ITEM = ITEMS.register("chronoscope",
             () -> new ChronoscopeItem(new Item.Properties().stacksTo(1).rarity(Rarity.EPIC)));
 
+    public static final DeferredItem<Item> WRENCH_ITEM = ITEMS.register("wrench",
+            () -> new WrenchItem(new Item.Properties().stacksTo(1)));
+
     // Entropy Glasses: lets the wearer see EntropyInfoProvider block entities' state; no defense,
     // worn only in Curios' head slot rather than as vanilla armor.
 
@@ -205,13 +209,13 @@ public class Registration {
             () -> new ChronoBlockItem(CHRONODIAL_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredBlock<Chronosphere> CHRONOSPHERE_BLOCK = BLOCKS.register("chronosphere",
-            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().lightLevel(state -> 5)));
+            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).requiresCorrectToolForDrops().noOcclusion().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> CHRONOSPHERE_ITEM = ITEMS.register("chronosphere",
             () -> new ChronoBlockItem(CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
 
     public static final DeferredBlock<Chronosphere> CREATIVE_CHRONOSPHERE_BLOCK = BLOCKS.register("creative_chronosphere",
-            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).lightLevel(state -> 5)));
+            () -> new Chronosphere(BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_LIGHT_BLUE).strength(4.5F, 8.0F).sound(SoundType.AMETHYST).noOcclusion().lightLevel(state -> 5)));
 
     public static final DeferredItem<Item> CREATIVE_CHRONOSPHERE_ITEM = ITEMS.register("creative_chronosphere",
             () -> new ChronoBlockItem(CREATIVE_CHRONOSPHERE_BLOCK.get(), new Item.Properties().rarity(Rarity.EPIC)));
@@ -571,6 +575,7 @@ public class Registration {
                         output.accept(TEMPORAL_GLUE_ITEM);
                         output.accept(TIME_DILATOR_ITEM);
                         output.accept(CHRONOSCOPE_ITEM);
+                        output.accept(WRENCH_ITEM);
                         output.accept(ENTROPY_GLASSES_ITEM);
                         output.accept(DUAL_ENTROPY_CELL_ITEM);
                         output.accept(ORDER_CELL_ITEM);

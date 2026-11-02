@@ -34,6 +34,7 @@ import net.minecraft.world.inventory.AbstractContainerMenu;
 import net.minecraft.world.inventory.ContainerData;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.neoforged.neoforge.fluids.FluidStack;
@@ -257,10 +258,20 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         return missing;
     }
 
+    /** Middle layer positions that still need a Tinted Glass block. */
+    public List<BlockPos> findMissingGlass() {
+        List<BlockPos> missing = new ArrayList<>();
+        if (level == null) return missing;
+        for (BlockPos pos : WithergenicReactorStructure.glassPositions(worldPosition, getBlockState().getValue(WithergenicReactor.FACING))) {
+            if (!level.getBlockState(pos).is(Blocks.TINTED_GLASS)) missing.add(pos);
+        }
+        return missing;
+    }
+
     /** Re-scans the shell, updating {@link #formed} and the controller's block state. */
     public boolean checkStructure() {
         boolean wasFormed = formed;
-        formed = findMissingFrames().isEmpty();
+        formed = findMissingFrames().isEmpty() && findMissingGlass().isEmpty();
         if (formed != wasFormed) {
             setChanged();
             syncToClients();
@@ -286,7 +297,6 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
     private void spawnFormedParticles(ServerLevel serverLevel) {
         Direction facing = getBlockState().getValue(WithergenicReactor.FACING);
         List<BlockPos> corners = new ArrayList<>(WithergenicReactorStructure.framePositions(worldPosition, facing));
-        corners.add(worldPosition);
 
         int minX = corners.stream().mapToInt(BlockPos::getX).min().orElseThrow();
         int minY = corners.stream().mapToInt(BlockPos::getY).min().orElseThrow();

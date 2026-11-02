@@ -7,6 +7,7 @@ import io.github.tofithepuppycat.temporalindustries.block.MachineFrame;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyFluids;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyInfoProvider;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
+import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
@@ -43,13 +44,13 @@ import java.util.List;
 
 /** Transfers liquid Order/Chaos between marked blocks. */
 @SuppressWarnings("null")
-public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController, EntropyInfoProvider {
+public class EntropicPylonBlockEntity extends BlockEntity implements MachineFrameController, EntropyInfoProvider, WrenchConfigurable {
     private static final int STRUCTURE_RECHECK_INTERVAL = 20;
+    /** Most machine frames below the pylon that count towards its range. */
+    public static final int MAX_FRAMES = 8;
     /** mB of whichever fluid is present, moved per input->output pair each tick. */
     private static final int TRANSFER_RATE_MB = 50;
 
-    private static final DustParticleOptions MISSING_FRAME_PARTICLE = new DustParticleOptions(new Vector3f(1.0F, 0.35F, 0.35F), 0.6F);
-    private static final double MISSING_EDGE_PARTICLE_SPACING = 0.2;
     private static final double FORMED_EDGE_PARTICLE_SPACING = 0.3;
     /**
      * Spark texture so the flow of fluid along a leg reads as distinct from the structure outlines.
@@ -81,8 +82,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
     private List<BlockPos> inputs = new ArrayList<>();
     private List<BlockPos> outputs = new ArrayList<>();
-    private boolean formed = false;
-    private int ticksSinceStructureCheck = 0;
+    /** Number of machine frames stacked directly below, each of which multiplies the link range. */
+    private int frames = 0;
+    private int ticksSinceStructureCheck = STRUCTURE_RECHECK_INTERVAL;
     private int outputCursor = 0;
 
     /**
@@ -111,20 +113,29 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return outputs;
     }
 
-    public boolean isFormed() {
-        return formed;
+    public int getFrames() {
+        return frames;
+    }
+
+    /** Half-width of the cube around the pylon that links must fall inside. */
+    public int getRange() {
+        return EntropicPylonItem.RANGE * Math.max(1, frames);
+    }
+
+    private boolean inRange(BlockPos target) {
+        int range = getRange();
+        return Math.abs(target.getX() - worldPosition.getX()) <= range
+                && Math.abs(target.getY() - worldPosition.getY()) <= range
+                && Math.abs(target.getZ() - worldPosition.getZ()) <= range;
     }
 
     @Override
     public List<Component> getEntropyTooltip() {
         ResourceLocation key = BuiltInRegistries.BLOCK.getKey(getBlockState().getBlock());
         String prefix = "block." + key.getNamespace() + "." + key.getPath();
-        Component formedComponent = formed
-                ? Component.translatable(prefix + ".formed").withStyle(ChatFormatting.GREEN)
-                : Component.translatable(prefix + ".unformed").withStyle(ChatFormatting.RED);
         return List.of(
                 Component.translatable(prefix).withStyle(ChatFormatting.WHITE),
-                Component.translatable(prefix + ".status", inputs.size(), outputs.size(), formedComponent).withStyle(ChatFormatting.GRAY));
+                Component.translatable(prefix + ".status", inputs.size(), outputs.size(), getRange() * 2 + 1).withStyle(ChatFormatting.GRAY));
     }
 
     /** Called once, right as the placing item hands off whatever marks are still in range. */
@@ -135,80 +146,120 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         syncToClients();
     }
 
-    private BlockPos framePos() {
-        return worldPosition.below();
-    }
-
-    /**
-     * The frame position below this pylon if it still needs a {@link MachineFrame} block; empty
-     * once one's present.
-     */
-    public List<BlockPos> findMissing() {
-        if (level == null) return List.of();
-        BlockPos framePos = framePos();
-        if (level.getBlockEntity(framePos) instanceof MachineFrameBlockEntity frameBe) {
-            frameBe.setController(worldPosition);
-            return List.of();
+    @Override
+    public Component wrenchLink(BlockPos target, boolean output) {
+        String prefix = "item.temporalindustries.wrench.pylon.";
+        String role = output ? "output" : "input";
+        int range = getRange();
+        if (level == null || target.equals(worldPosition)
+                || level.getCapability(Capabilities.FluidHandler.BLOCK, target, null) == null) {
+            return Component.translatable(prefix + "invalid");
         }
-        return level.getBlockState(framePos).is(Registration.MACHINE_FRAME_BLOCK.get()) ? List.of() : List.of(framePos);
-    }
+        if (!inRange(target)) {
+            return Component.translatable(prefix + "too_far", range);
+        }
 
-    /**
-     * Re-checks for a {@link MachineFrame} directly below and updates {@link #formed}, syncing to
-     * clients and pushing {@link EntropicPylon#FORMED} into the block state if it changed.
-     */
-    public boolean checkStructure() {
-        if (level == null) return formed;
-        boolean wasFormed = formed;
-        BlockPos framePos = framePos();
-        boolean present;
-        if (level.getBlockEntity(framePos) instanceof MachineFrameBlockEntity frameBe) {
-            frameBe.setController(worldPosition);
-            present = true;
+        List<BlockPos> same = output ? outputs : inputs;
+        List<BlockPos> opposite = output ? inputs : outputs;
+        Component result;
+        if (same.remove(target)) {
+            result = Component.translatable(prefix + "removed_" + role, same.size());
         } else {
-            present = level.getBlockState(framePos).is(Registration.MACHINE_FRAME_BLOCK.get());
+            opposite.remove(target);
+            if (same.size() >= EntropicPylonItem.MAX_MARKS) same.remove(0);
+            same.add(target.immutable());
+            result = Component.translatable(prefix + "added_" + role, same.size(), EntropicPylonItem.MAX_MARKS);
         }
-        formed = present;
-        if (formed != wasFormed) {
-            setChanged();
-            syncToClients();
-            if (!level.isClientSide) {
-                BlockState state = getBlockState();
-                if (state.hasProperty(EntropicPylon.FORMED)) {
-                    level.setBlock(worldPosition, state.setValue(EntropicPylon.FORMED, formed), Block.UPDATE_CLIENTS);
+        setChanged();
+        syncToClients();
+        return result;
+    }
+
+    @Override
+    public List<BlockPos> wrenchInputs() {
+        return inputs;
+    }
+
+    @Override
+    public List<BlockPos> wrenchOutputs() {
+        return outputs;
+    }
+
+    @Override
+    public Component wrenchClear() {
+        inputs.clear();
+        outputs.clear();
+        setChanged();
+        syncToClients();
+        return Component.translatable("item.temporalindustries.wrench.pylon.cleared");
+    }
+
+    private MachineFrame.PylonStyle pylonStyle() {
+        if (filter == EntropyType.CHAOS) return MachineFrame.PylonStyle.CHAOS;
+        if (filter == EntropyType.ORDER) return MachineFrame.PylonStyle.ORDER;
+        return MachineFrame.PylonStyle.ENTROPIC;
+    }
+
+    /**
+     * Re-counts the {@link MachineFrame}s stacked directly below, restyles them as the pylon's
+     * column and updates {@link EntropicPylon#EXTENDED} on the pylon; syncs to clients if the
+     * count changed. Returns the frame count.
+     */
+    public int checkStructure() {
+        if (level == null) return frames;
+        int wasFrames = frames;
+        int count = 0;
+        BlockPos pos = worldPosition.below();
+        while (count < MAX_FRAMES && level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get())) {
+            count++;
+            pos = pos.below();
+        }
+        frames = count;
+
+        if (!level.isClientSide) {
+            for (int i = 1; i <= count; i++) {
+                BlockPos framePos = worldPosition.below(i);
+                if (level.getBlockEntity(framePos) instanceof MachineFrameBlockEntity frameBe) {
+                    frameBe.setController(worldPosition);
                 }
-                MachineFrame.setConnected(level, framePos, formed);
-                if (formed && level instanceof ServerLevel serverLevel) {
-                    spawnFormedParticles(serverLevel, framePos);
-                }
+                MachineFrame.setPylon(level, framePos, pylonStyle(), i == count);
+            }
+            BlockState state = getBlockState();
+            if (state.hasProperty(EntropicPylon.EXTENDED) && state.getValue(EntropicPylon.EXTENDED) != (count > 0)) {
+                level.setBlock(worldPosition, state.setValue(EntropicPylon.EXTENDED, count > 0), Block.UPDATE_CLIENTS);
             }
         }
-        return formed;
+
+        if (frames != wasFrames) {
+            setChanged();
+            syncToClients();
+            if (!level.isClientSide && frames > wasFrames && level instanceof ServerLevel serverLevel) {
+                spawnFormedParticles(serverLevel);
+            }
+        }
+        return frames;
     }
 
     /**
-     * Order-colored outline traced along the edges of the pylon and its completing frame's bounding
-     * box, fired once when the structure transitions from unformed to formed.
+     * Re-checks the pylon above {@code from}, if a run of machine frames leads up to one; called when
+     * a frame is placed or removed.
      */
-    private void spawnFormedParticles(ServerLevel serverLevel, BlockPos framePos) {
-        int minX = Math.min(worldPosition.getX(), framePos.getX());
-        int minY = Math.min(worldPosition.getY(), framePos.getY());
-        int minZ = Math.min(worldPosition.getZ(), framePos.getZ());
-        int maxX = Math.max(worldPosition.getX(), framePos.getX());
-        int maxY = Math.max(worldPosition.getY(), framePos.getY());
-        int maxZ = Math.max(worldPosition.getZ(), framePos.getZ());
-
-        for (Vector3f point : BoxEdgeParticles.outline(minX, minY, minZ, maxX + 1, maxY + 1, maxZ + 1, FORMED_EDGE_PARTICLE_SPACING)) {
-            serverLevel.sendParticles(formedParticle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+    public static void refreshAbove(Level level, BlockPos from) {
+        BlockPos pos = from.above();
+        for (int i = 0; i < MAX_FRAMES && level.getBlockState(pos).is(Registration.MACHINE_FRAME_BLOCK.get()); i++) {
+            pos = pos.above();
+        }
+        if (level.getBlockEntity(pos) instanceof EntropicPylonBlockEntity be) {
+            be.checkStructure();
         }
     }
 
-    /** Red outline traced along the edges of the still-missing frame position directly below. */
-    private void highlightMissing(ServerLevel serverLevel) {
-        BlockPos pos = framePos();
-        for (Vector3f point : BoxEdgeParticles.outline(pos.getX(), pos.getY(), pos.getZ(),
-                pos.getX() + 1, pos.getY() + 1, pos.getZ() + 1, MISSING_EDGE_PARTICLE_SPACING)) {
-            serverLevel.sendParticles(MISSING_FRAME_PARTICLE, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
+    /** Outline traced along the edges of the pylon and the frames beneath it. */
+    private void spawnFormedParticles(ServerLevel serverLevel) {
+        int minY = worldPosition.getY() - frames;
+        for (Vector3f point : BoxEdgeParticles.outline(worldPosition.getX(), minY, worldPosition.getZ(),
+                worldPosition.getX() + 1, worldPosition.getY() + 1, worldPosition.getZ() + 1, FORMED_EDGE_PARTICLE_SPACING)) {
+            serverLevel.sendParticles(formedParticle, point.x(), point.y(), point.z(), 1, 0.0D, 0.0D, 0.0D, 0.0D);
         }
     }
 
@@ -222,7 +273,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
             ticksSinceStructureCheck = 0;
             checkStructure();
         }
-        if (!formed || inputs.isEmpty() || outputs.isEmpty()) return;
+        if (inputs.isEmpty() || outputs.isEmpty()) return;
         transferOnce();
     }
 
@@ -230,13 +281,19 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * One transfer attempt per marked input, against the next marked output in rotation, so every
      * pair gets visited over time instead of always favoring the first output.
      */
+    private boolean isReachable(BlockPos target) {
+        return inRange(target) && level.isLoaded(target);
+    }
+
     private void transferOnce() {
         for (BlockPos inPos : inputs) {
+            if (!isReachable(inPos)) continue;
             IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
             if (source == null) continue;
 
             BlockPos outPos = outputs.get(outputCursor % outputs.size());
             outputCursor++;
+            if (!isReachable(outPos)) continue;
             IFluidHandler dest = level.getCapability(Capabilities.FluidHandler.BLOCK, outPos, null);
             if (dest == null) continue;
 
@@ -272,9 +329,8 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
             EntropyType type = EntropyFluids.typeOf(drained.getFluid());
             if (type != null && level instanceof ServerLevel serverLevel) {
-                BlockPos framePos = framePos();
-                spawnTransmitParticles(serverLevel, type, inPos, framePos);
-                spawnTransmitParticles(serverLevel, type, framePos, outPos);
+                spawnTransmitParticles(serverLevel, type, inPos, worldPosition);
+                spawnTransmitParticles(serverLevel, type, worldPosition, outPos);
             }
         }
     }
@@ -350,20 +406,11 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
 
     @Override
     public InteractionResult onFrameInteract(Level level, BlockPos controllerPos, ServerPlayer player) {
-        if (!checkStructure()) {
-            MachineFrame.fillFromInventory(level, findMissing(), player);
-            checkStructure();
-        }
-        if (!formed && level instanceof ServerLevel serverLevel) {
-            highlightMissing(serverLevel);
-        }
+        checkStructure();
         ResourceLocation key = BuiltInRegistries.BLOCK.getKey(getBlockState().getBlock());
         String prefix = "block." + key.getNamespace() + "." + key.getPath();
-        Component formedComponent = formed
-                ? Component.translatable(prefix + ".formed").withStyle(ChatFormatting.GREEN)
-                : Component.translatable(prefix + ".unformed").withStyle(ChatFormatting.RED);
         player.displayClientMessage(Component.translatable(prefix + ".status",
-                inputs.size(), outputs.size(), formedComponent), true);
+                inputs.size(), outputs.size(), getRange() * 2 + 1), true);
         return InteractionResult.CONSUME;
     }
 
@@ -394,7 +441,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         super.saveAdditional(tag, registries);
         tag.put("Inputs", posListTag(inputs));
         tag.put("Outputs", posListTag(outputs));
-        tag.putBoolean("Formed", formed);
+        tag.putInt("Frames", frames);
     }
 
     @Override
@@ -402,7 +449,7 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         super.loadAdditional(tag, registries);
         inputs = readPosList(tag, "Inputs");
         outputs = readPosList(tag, "Outputs");
-        formed = tag.getBoolean("Formed");
+        frames = tag.getInt("Frames");
     }
 
     private static LongArrayTag posListTag(List<BlockPos> list) {

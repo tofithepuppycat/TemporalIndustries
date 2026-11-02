@@ -39,7 +39,7 @@ import java.util.List;
  * balanced middle in the same 0.01 units the GUIs display, so 0 is perfectly balanced.
  */
 @SuppressWarnings("null")
-public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvider, EntropyInfoProvider {
+public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvider, EntropyInfoProvider, WrenchConfigurable {
     public static final int TANK_CAPACITY = 8_000;
     /** The target offset is limited to +-MAX_TARGET, i.e. +-50.00 on the displayed scale. */
     public static final int MAX_TARGET = 5_000;
@@ -177,6 +177,32 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
         status = OutputStatus.UNBOUND;
         setChanged();
         syncToClients();
+    }
+
+    @Override
+    public List<BlockPos> wrenchOutputs() {
+        return outputPos == null ? List.of() : List.of(outputPos);
+    }
+
+    @Override
+    public Component wrenchLink(BlockPos target, boolean output) {
+        String prefix = "item.temporalindustries.wrench.balancer.";
+        if (target.equals(outputPos)) {
+            clearOutput();
+            return Component.translatable(prefix + "unbound");
+        }
+        boolean valid = level != null && level.getBlockEntity(target) instanceof EntropyInfoProvider provider
+                && provider.hasEntropyBalance()
+                && level.getCapability(Capabilities.FluidHandler.BLOCK, target, null) != null;
+        if (!valid) return Component.translatable(prefix + "invalid");
+        if (!bindOutput(target)) return Component.translatable(prefix + "too_far", BIND_RANGE);
+        return Component.translatable(prefix + "bound", target.getX(), target.getY(), target.getZ());
+    }
+
+    @Override
+    public Component wrenchClear() {
+        clearOutput();
+        return Component.translatable("item.temporalindustries.wrench.balancer.unbound");
     }
 
     public static void tick(Level level, BlockPos pos, BlockState state, EntropyBalancerBlockEntity be) {

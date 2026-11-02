@@ -1,0 +1,14 @@
+{
+  "type": "minecraft:crafting_shaped",
+  "pattern": [
+    "G G",
+    " A ",
+    " D "
+  ],
+  "key": {
+    "G": { "item": "minecraft:gold_ingot" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "D": { "item": "minecraft:deepslate" }
+  },
+  "result": { "id": "temporalindustries:wrench", "count": 1 }
+}

@@ -62,8 +62,8 @@ public class EntropyBalancerScreen extends AbstractContainerScreen<EntropyBalanc
     private static final int GAUGE_MARKER_OVERHANG = 2;
     private static final int ENERGY_BAR_X = 56;
     private static final int ENERGY_BAR_Y = 73;
-    private static final int ENERGY_BAR_WIDTH = 64;
-    private static final int ENERGY_BAR_HEIGHT = 5;
+    private static final int ENERGY_BAR_WIDTH = 65;
+    private static final int ENERGY_BAR_HEIGHT = 6;
     private static final int ENERGY_COLOR = 0xFF3BFB98;
     private static final int STATUS_Y = 15;
 

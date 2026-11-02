@@ -49,8 +49,11 @@ public class EntropicPylonMarkRenderer {
             return;
         }
 
-        List<BlockPos> inputs = EntropicPylonItem.getInputs(heldStack);
-        List<BlockPos> outputs = EntropicPylonItem.getOutputs(heldStack);
+        renderMarks(event, minecraft, EntropicPylonItem.getInputs(heldStack), EntropicPylonItem.getOutputs(heldStack));
+    }
+
+    /** Draws a red outline for each input and a blue one for each output. */
+    static void renderMarks(RenderLevelStageEvent event, Minecraft minecraft, List<BlockPos> inputs, List<BlockPos> outputs) {
         if (inputs.isEmpty() && outputs.isEmpty()) {
             return;
         }

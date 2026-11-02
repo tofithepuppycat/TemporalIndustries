@@ -14,10 +14,12 @@ import net.minecraft.world.InteractionResult;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.item.ItemStack;
+import net.minecraft.world.item.Items;
 import net.minecraft.world.item.context.BlockPlaceContext;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.BaseEntityBlock;
 import net.minecraft.world.level.block.Block;
+import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.Mirror;
 import net.minecraft.world.level.block.RenderShape;
 import net.minecraft.world.level.block.Rotation;
@@ -34,6 +36,7 @@ import org.jetbrains.annotations.NotNull;
 import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
+import java.util.ArrayList;
 import java.util.List;
 
 /**
@@ -139,9 +142,11 @@ public class WithergenicReactor extends BaseEntityBlock {
         }
 
         MachineFrame.fillFromInventory(level, be.findMissingFrames(), player);
+        MachineFrame.fillFromInventory(level, be.findMissingGlass(), player, Items.TINTED_GLASS, Blocks.TINTED_GLASS);
         if (be.checkStructure()) return InteractionResult.CONSUME;
 
-        List<BlockPos> missing = be.findMissingFrames();
+        List<BlockPos> missing = new ArrayList<>(be.findMissingFrames());
+        missing.addAll(be.findMissingGlass());
         highlight((ServerLevel) level, missing, player);
         player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame", missing.size()), true);
         return InteractionResult.CONSUME;

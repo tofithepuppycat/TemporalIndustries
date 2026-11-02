@@ -33,10 +33,10 @@ public class EntropyCondenserScreen extends AbstractContainerScreen<EntropyConde
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
 
-    private static final int ENERGY_BAR_X = 10;
-    private static final int ENERGY_BAR_Y = 8;
-    private static final int ENERGY_BAR_WIDTH = 4;
-    private static final int ENERGY_BAR_HEIGHT = 62;
+    private static final int ENERGY_BAR_X = 9;
+    private static final int ENERGY_BAR_Y = 7;
+    private static final int ENERGY_BAR_WIDTH = 6;
+    private static final int ENERGY_BAR_HEIGHT = 65;
     private static final int ENERGY_COLOR = 0xFF3BFB98;
 
     private static final int ORDER_BAR_X = 57;
