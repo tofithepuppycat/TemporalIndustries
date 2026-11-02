@@ -3,7 +3,7 @@
   "textures": {
     "particle": "temporalindustries:block/schrodinger_generator",
     "north": "temporalindustries:block/schrodinger_generator",
-    "south": "temporalindustries:block/machine_base_energy",
+    "south": "temporalindustries:block/machine_base",
     "west": "temporalindustries:block/machine_base",
     "east": "temporalindustries:block/machine_base",
     "up": "temporalindustries:block/machine_base_up",
