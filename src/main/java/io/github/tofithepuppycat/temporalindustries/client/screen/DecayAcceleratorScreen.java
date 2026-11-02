@@ -13,7 +13,7 @@ public class DecayAcceleratorScreen extends AbstractAcceleratorScreen<DecayAccel
             TemporalIndustries.MODID, "textures/gui/decay_progress.png");
 
     public DecayAcceleratorScreen(DecayAcceleratorMenu menu, Inventory playerInventory, Component title) {
-        super(menu, playerInventory, title, TEXTURE, PROGRESS_TEXTURE, 78, 21, 28);
+        super(menu, playerInventory, title, TEXTURE, PROGRESS_TEXTURE, 78, 21, 22);
     }
 
     @Override

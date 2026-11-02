@@ -21,11 +21,11 @@ public class EntropyBatteryScreen extends AbstractContainerScreen<EntropyBattery
     private static final int IMAGE_WIDTH = 176;
     private static final int IMAGE_HEIGHT = 166;
 
-    private static final int ORDER_BAR_X = 57;
-    private static final int CHAOS_BAR_X = 109;
-    private static final int TANK_BAR_Y = 20;
-    private static final int TANK_BAR_WIDTH = 9;
-    private static final int TANK_BAR_HEIGHT = 46;
+    private static final int ORDER_BAR_X = 56;
+    private static final int CHAOS_BAR_X = 108;
+    private static final int TANK_BAR_Y = 19;
+    private static final int TANK_BAR_WIDTH = 11;
+    private static final int TANK_BAR_HEIGHT = 48;
 
     public EntropyBatteryScreen(EntropyBatteryMenu menu, Inventory playerInventory, Component title) {
         super(menu, playerInventory, title);

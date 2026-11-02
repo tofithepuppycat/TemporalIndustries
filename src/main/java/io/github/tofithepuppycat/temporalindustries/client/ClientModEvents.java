@@ -64,6 +64,7 @@ public class ClientModEvents {
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event) {
         event.registerEntityRenderer(Registration.ENTROPY_ORB.get(), EntropyOrbRenderer::new);
+        event.registerBlockEntityRenderer(Registration.WITHERGENIC_REACTOR_BLOCK_ENTITY.get(), WithergenicReactorRenderer::new);
     }
 
     @SuppressWarnings("null")

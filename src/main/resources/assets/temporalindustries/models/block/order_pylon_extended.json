@@ -6,8 +6,7 @@
     "glow": "temporalindustries:block/order_pylon_e",
     "side": "temporalindustries:block/machine_base",
     "up": "temporalindustries:block/machine_base_up",
-    "down": "temporalindustries:block/machine_base_down",
-    "open": "temporalindustries:block/machine_open"
+    "down": "temporalindustries:block/machine_base_down"
   },
   "render_type": "minecraft:cutout",
   "elements": [
@@ -24,16 +23,16 @@
       ],
       "faces": {
         "north": {
-          "texture": "#open"
+          "texture": "#pylon"
         },
         "south": {
-          "texture": "#open"
+          "texture": "#pylon"
         },
         "east": {
-          "texture": "#open"
+          "texture": "#pylon"
         },
         "west": {
-          "texture": "#open"
+          "texture": "#pylon"
         }
       }
     },
@@ -50,16 +49,16 @@
       ],
       "faces": {
         "north": {
-          "texture": "#side"
+          "texture": "#pylon"
         },
         "south": {
-          "texture": "#side"
+          "texture": "#pylon"
         },
         "east": {
-          "texture": "#side"
+          "texture": "#pylon"
         },
         "west": {
-          "texture": "#side"
+          "texture": "#pylon"
         },
         "up": {
           "texture": "#up"

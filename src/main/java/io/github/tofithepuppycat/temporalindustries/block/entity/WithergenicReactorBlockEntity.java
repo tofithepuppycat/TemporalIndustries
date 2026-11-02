@@ -245,6 +245,11 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         return formed;
     }
 
+    /** Whether the reactor is currently turning out Chaos. */
+    public boolean isRunning() {
+        return formed && status == STATUS_RUNNING;
+    }
+
     public List<BlockPos> findMissingFrames() {
         List<BlockPos> missing = new ArrayList<>();
         if (level == null) return missing;
@@ -268,10 +273,20 @@ public class WithergenicReactorBlockEntity extends BlockEntity implements MenuPr
         return missing;
     }
 
+    /** Chamber positions that are not air. */
+    public List<BlockPos> findObstructions() {
+        List<BlockPos> blocked = new ArrayList<>();
+        if (level == null) return blocked;
+        for (BlockPos pos : WithergenicReactorStructure.interiorPositions(worldPosition, getBlockState().getValue(WithergenicReactor.FACING))) {
+            if (!level.getBlockState(pos).isAir()) blocked.add(pos);
+        }
+        return blocked;
+    }
+
     /** Re-scans the shell, updating {@link #formed} and the controller's block state. */
     public boolean checkStructure() {
         boolean wasFormed = formed;
-        formed = findMissingFrames().isEmpty() && findMissingGlass().isEmpty();
+        formed = findMissingFrames().isEmpty() && findMissingGlass().isEmpty() && findObstructions().isEmpty();
         if (formed != wasFormed) {
             setChanged();
             syncToClients();

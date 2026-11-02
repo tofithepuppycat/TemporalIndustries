@@ -147,6 +147,12 @@ public class WithergenicReactor extends BaseEntityBlock {
 
         List<BlockPos> missing = new ArrayList<>(be.findMissingFrames());
         missing.addAll(be.findMissingGlass());
+        if (missing.isEmpty()) {
+            List<BlockPos> blocked = be.findObstructions();
+            highlight((ServerLevel) level, blocked, player);
+            player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.obstructed", blocked.size()), true);
+            return InteractionResult.CONSUME;
+        }
         highlight((ServerLevel) level, missing, player);
         player.displayClientMessage(Component.translatable("block.temporalindustries.withergenic_reactor.missing_frame", missing.size()), true);
         return InteractionResult.CONSUME;
