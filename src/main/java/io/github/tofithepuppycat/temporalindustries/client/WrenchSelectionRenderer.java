@@ -15,7 +15,7 @@ import net.neoforged.neoforge.client.event.RenderLevelStageEvent;
 
 /**
  * While a {@link WrenchItem} is held with a block selected, draws that block's input and output
- * links the same way the block's own item draws them: red for inputs, blue for outputs.
+ * links the same way the block's own item draws them: red for inputs, blue for outputs, each joined to the selected block by a line of the same colour.
  */
 @EventBusSubscriber(modid = TemporalIndustries.MODID, value = Dist.CLIENT)
 public class WrenchSelectionRenderer {
@@ -42,7 +42,7 @@ public class WrenchSelectionRenderer {
             return;
         }
 
-        EntropicPylonMarkRenderer.renderMarks(event, minecraft, configurable.wrenchInputs(), configurable.wrenchOutputs());
+        EntropicPylonMarkRenderer.renderMarks(event, minecraft, selected, configurable.wrenchInputs(), configurable.wrenchOutputs());
     }
 
     private static ItemStack holdingWrench(Player player) {
