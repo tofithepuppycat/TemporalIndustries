@@ -2,9 +2,11 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "IEI",
-    "EGE"
+    "EGE",
+    "DDD"
   ],
   "key": {
+    "D": { "item": "minecraft:deepslate" },
     "I": { "item": "minecraft:iron_ingot" },
     "E": { "item": "minecraft:ender_pearl" },
     "G": { "item": "minecraft:gold_ingot" }

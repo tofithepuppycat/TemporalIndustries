@@ -3,7 +3,11 @@ package io.github.tofithepuppycat.temporalindustries.network;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState;
 import io.github.tofithepuppycat.temporalindustries.data.TemporalWorldData;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.core.registries.Registries;
 import net.minecraft.network.RegistryFriendlyByteBuf;
+import net.minecraft.resources.ResourceKey;
+import net.minecraft.world.level.Level;
 import net.minecraft.network.codec.StreamCodec;
 import net.minecraft.network.protocol.common.custom.CustomPacketPayload;
 import net.minecraft.resources.ResourceLocation;
@@ -11,7 +15,7 @@ import net.neoforged.neoforge.network.handling.IPayloadContext;
 import org.jetbrains.annotations.Nullable;
 
 /**
- * Server -> client: what the free repository named {@code query} holds, or that there is none, for
+ * Server -> client: what the free repository named {@code query} holds, or that there is none or it is taken, for
  * the Chrono Remote Control's repository picker.
  */
 public class RepositoryInfoSyncPacket implements CustomPacketPayload {
@@ -25,14 +29,25 @@ public class RepositoryInfoSyncPacket implements CustomPacketPayload {
 
     private final String query;
     @Nullable private final TemporalWorldData.RepositoryStats stats;
+    private final boolean unavailable;
+    @Nullable private final GlobalPos owner;
 
-    public RepositoryInfoSyncPacket(String query, @Nullable TemporalWorldData.RepositoryStats stats) {
+    public RepositoryInfoSyncPacket(String query, @Nullable TemporalWorldData.RepositoryStats stats, boolean unavailable,
+                                    @Nullable GlobalPos owner) {
         this.query = query;
         this.stats = stats;
+        this.unavailable = unavailable;
+        this.owner = owner;
     }
 
     public static void encode(RegistryFriendlyByteBuf buf, RepositoryInfoSyncPacket packet) {
         buf.writeUtf(packet.query, MAX_STRING_BYTES);
+        buf.writeBoolean(packet.unavailable);
+        buf.writeBoolean(packet.owner != null);
+        if (packet.owner != null) {
+            buf.writeResourceLocation(packet.owner.dimension().location());
+            buf.writeBlockPos(packet.owner.pos());
+        }
         buf.writeBoolean(packet.stats != null);
         if (packet.stats == null) return;
         buf.writeVarInt(packet.stats.commits());
@@ -44,13 +59,19 @@ public class RepositoryInfoSyncPacket implements CustomPacketPayload {
 
     public static RepositoryInfoSyncPacket decode(RegistryFriendlyByteBuf buf) {
         String query = buf.readUtf(MAX_STRING_BYTES);
-        if (!buf.readBoolean()) return new RepositoryInfoSyncPacket(query, null);
+        boolean unavailable = buf.readBoolean();
+        GlobalPos owner = null;
+        if (buf.readBoolean()) {
+            ResourceKey<Level> dimension = ResourceKey.create(Registries.DIMENSION, buf.readResourceLocation());
+            owner = GlobalPos.of(dimension, buf.readBlockPos());
+        }
+        if (!buf.readBoolean()) return new RepositoryInfoSyncPacket(query, null, unavailable, owner);
         return new RepositoryInfoSyncPacket(query, new TemporalWorldData.RepositoryStats(
-                buf.readVarInt(), buf.readVarInt(), buf.readUtf(MAX_STRING_BYTES), buf.readVarInt(), buf.readLong()));
+                buf.readVarInt(), buf.readVarInt(), buf.readUtf(MAX_STRING_BYTES), buf.readVarInt(), buf.readLong()), unavailable, owner);
     }
 
     public static void handle(RepositoryInfoSyncPacket packet, IPayloadContext context) {
-        context.enqueueWork(() -> ChronoRemoteClientState.updateRepositoryInfo(packet.query, packet.stats));
+        context.enqueueWork(() -> ChronoRemoteClientState.updateRepositoryInfo(packet.query, packet.stats, packet.unavailable, packet.owner));
     }
 
     @Override

@@ -7,7 +7,11 @@ import io.github.tofithepuppycat.temporalindustries.network.ChronoRemoteReposito
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.screens.Screen;
+import net.minecraft.locale.Language;
+import net.minecraft.network.chat.CommonComponents;
 import net.minecraft.network.chat.Component;
+import net.minecraft.network.chat.FormattedText;
+import net.minecraft.util.FormattedCharSequence;
 import net.neoforged.neoforge.network.PacketDistributor;
 import org.jetbrains.annotations.NotNull;
 import org.lwjgl.glfw.GLFW;
@@ -28,17 +32,25 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     private static final int FOOTER_HEIGHT = 32;
     private static final int LINE_HEIGHT = 11;
     private static final int INPUT_HEIGHT = 18;
-    private static final int SUGGESTION_ROWS = 5;
-    private static final int SUGGESTION_HEIGHT = 14;
+    private static final int SUGGESTION_HEIGHT = 12;
     private static final int STATS_HEIGHT = 2 * LINE_HEIGHT + 8;
     private static final int PRIMARY_BUTTON_WIDTH = 112;
     private static final int SECONDARY_BUTTON_WIDTH = 64;
     private static final int BUTTON_GAP = 6;
 
-    private static final int SUGGESTION_HOVER_COLOR = 0xFFD8D8D8;
+    /** Just over the server's minimum gap between requests, so the last typed text is never dropped. */
+    private static final int REQUEST_INTERVAL_TICKS = 5;
+    private static final int SUGGESTION_BORDER = 0xFF000000;
+    private static final int SUGGESTION_FILL = 0xFF202020;
+    private static final int SUGGESTION_HIGHLIGHT_FILL = 0xFF3A3A5A;
+    private static final int SUGGESTION_TEXT = 0xFFAAAAAA;
+    private static final int SUGGESTION_HIGHLIGHT_TEXT = 0xFFFFFFFF;
 
     private EditBox nameBox;
     private String lastRequested = null;
+    private String acceptedName = null;
+    private int suggestionIndex = -1;
+    private int ticksSinceRequest = REQUEST_INTERVAL_TICKS;
 
     private int panelLeft;
     private int panelTop;
@@ -51,7 +63,7 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     @Override
     protected void init() {
         panelHeight = HEADER_HEIGHT + PADDING + LINE_HEIGHT * 2 + INPUT_HEIGHT + PADDING
-                + SUGGESTION_ROWS * SUGGESTION_HEIGHT + PADDING + STATS_HEIGHT + PADDING + FOOTER_HEIGHT;
+                + STATS_HEIGHT + PADDING + FOOTER_HEIGHT;
         panelLeft = (width - PANEL_WIDTH) / 2;
         panelTop = Math.max(0, (height - panelHeight) / 2);
 
@@ -61,24 +73,35 @@ public class ChronoRemoteRepositoryScreen extends Screen {
         nameBox.setMaxLength(TemporalWorldData.MAX_REPOSITORY_NAME_LENGTH);
         nameBox.setHint(Component.translatable("gui.temporalindustries.chrono_remote.repository.hint"));
         nameBox.setValue(previous);
-        nameBox.setResponder(text -> requestSuggestions());
+        nameBox.setResponder(text -> {
+            suggestionIndex = -1;
+            if (!text.equals(acceptedName)) acceptedName = null;
+        });
         addRenderableWidget(nameBox);
         setInitialFocus(nameBox);
 
         ChronosphereClientState.clearSuggestions();
-        requestSuggestions();
+        lastRequested = null;
+        ticksSinceRequest = REQUEST_INTERVAL_TICKS;
+    }
+
+    @Override
+    public void tick() {
+        super.tick();
+        ticksSinceRequest++;
+        if (ticksSinceRequest >= REQUEST_INTERVAL_TICKS) requestSuggestions();
     }
 
     private int inputTop() {
         return panelTop + HEADER_HEIGHT + PADDING + LINE_HEIGHT * 2;
     }
 
-    private int suggestionsTop() {
-        return inputTop() + INPUT_HEIGHT + PADDING;
+    private int suggestionRowY(int row) {
+        return inputTop() + INPUT_HEIGHT + row * SUGGESTION_HEIGHT;
     }
 
     private int statsTop() {
-        return suggestionsTop() + SUGGESTION_ROWS * SUGGESTION_HEIGHT + PADDING;
+        return inputTop() + INPUT_HEIGHT + PADDING;
     }
 
     private int footerTop() {
@@ -101,13 +124,35 @@ public class ChronoRemoteRepositoryScreen extends Screen {
         String query = nameBox.getValue();
         if (query.equals(lastRequested)) return;
         lastRequested = query;
+        ticksSinceRequest = 0;
         PacketDistributor.sendToServer(new ChronoRemoteRepositoryPacket(ChronoRemoteRepositoryPacket.Action.SUGGEST, query));
     }
 
     /** The matches for what is typed now; a late reply to older text is ignored. */
     private List<String> suggestions() {
-        return ChronosphereClientState.getSuggestionQuery().equals(nameBox.getValue())
-                ? ChronosphereClientState.getSuggestions() : List.of();
+        if (nameBox.getValue().equals(acceptedName)
+                || !ChronosphereClientState.getSuggestionQuery().equals(nameBox.getValue())) return List.of();
+        List<String> names = ChronosphereClientState.getSuggestions();
+        if (names.size() == 1 && names.get(0).equalsIgnoreCase(nameBox.getValue().trim())) return List.of();
+        return names;
+    }
+
+    private int suggestionRowAt(double mouseX, double mouseY) {
+        int count = suggestions().size();
+        for (int row = 0; row < count; row++) {
+            if (isOver(mouseX, mouseY, nameBox.getX(), suggestionRowY(row), nameBox.getWidth(), SUGGESTION_HEIGHT)) return row;
+        }
+        return -1;
+    }
+
+    private void acceptSuggestion(int row) {
+        List<String> names = suggestions();
+        if (row < 0 || row >= names.size()) return;
+        acceptedName = names.get(row);
+        nameBox.setValue(acceptedName);
+        nameBox.setFocused(true);
+        lastRequested = null;
+        ticksSinceRequest = REQUEST_INTERVAL_TICKS;
     }
 
     private boolean canChange() {
@@ -148,11 +193,10 @@ public class ChronoRemoteRepositoryScreen extends Screen {
         String current = ChronoRemoteClientState.getRepositoryName();
         text(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.repository.current"),
                 panelLeft + PADDING + 2, y, TEXT_MUTED);
-        text(guiGraphics, font, current.isEmpty()
+        text(guiGraphics, font, fit(current.isEmpty()
                         ? Component.translatable("gui.temporalindustries.chrono_remote.repository.none") : Component.literal(current),
-                panelLeft + PADDING + 2, y + LINE_HEIGHT, TEXT_PRIMARY);
+                PANEL_WIDTH - 2 * PADDING - 4), panelLeft + PADDING + 2, y + LINE_HEIGHT, TEXT_PRIMARY);
 
-        renderSuggestions(guiGraphics, mouseX, mouseY);
         renderStats(guiGraphics);
         guiGraphics.fill(panelLeft + 3, footerTop(), panelLeft + PANEL_WIDTH - 3, footerTop() + 1, DIVIDER_COLOR);
         drawButton(guiGraphics, font, closeButtonLeft(), buttonTop(), SECONDARY_BUTTON_WIDTH,
@@ -161,33 +205,29 @@ public class ChronoRemoteRepositoryScreen extends Screen {
                 Component.translatable("gui.temporalindustries.chrono_remote.repository.change"), canChange(), true, mouseX, mouseY);
 
         super.render(guiGraphics, mouseX, mouseY, partialTick);
+        renderSuggestions(guiGraphics, mouseX, mouseY);
     }
 
+    /** The matches as a dropdown under the name box, drawn over everything below it. */
     private void renderSuggestions(GuiGraphics guiGraphics, int mouseX, int mouseY) {
-        int top = suggestionsTop();
-        int left = panelLeft + PADDING;
-        int width = PANEL_WIDTH - 2 * PADDING;
-        drawInset(guiGraphics, left, top, width, SUGGESTION_ROWS * SUGGESTION_HEIGHT);
-
         List<String> names = suggestions();
-        if (names.isEmpty()) {
-            String typed = nameBox.getValue();
-            boolean exists = !typed.isBlank() && ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)
-                    && ChronoRemoteClientState.getRepositoryInfo() != null;
-            text(guiGraphics, font, Component.translatable(typed.isBlank()
-                            ? "gui.temporalindustries.chrono_remote.repository.type_hint"
-                            : exists ? "gui.temporalindustries.chrono_remote.repository.in_use"
-                            : "gui.temporalindustries.chrono_remote.repository.no_matches"),
-                    left + PADDING, top + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_MUTED);
-            return;
+        if (names.isEmpty()) return;
+
+        int hoveredRow = suggestionRowAt(mouseX, mouseY);
+        int x = nameBox.getX();
+        int boxWidth = nameBox.getWidth();
+        guiGraphics.pose().pushPose();
+        guiGraphics.pose().translate(0, 0, 200);
+        guiGraphics.fill(x - 1, suggestionRowY(0), x + boxWidth + 1, suggestionRowY(names.size()) + 1, SUGGESTION_BORDER);
+        for (int row = 0; row < names.size(); row++) {
+            int y = suggestionRowY(row);
+            boolean highlighted = row == hoveredRow || row == suggestionIndex;
+            guiGraphics.fill(x, y, x + boxWidth, y + SUGGESTION_HEIGHT, highlighted ? SUGGESTION_HIGHLIGHT_FILL : SUGGESTION_FILL);
+            guiGraphics.drawString(font, fit(Component.literal(names.get(row)), boxWidth - 6), x + 3,
+                    y + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1,
+                    highlighted ? SUGGESTION_HIGHLIGHT_TEXT : SUGGESTION_TEXT, false);
         }
-        for (int i = 0; i < Math.min(names.size(), SUGGESTION_ROWS); i++) {
-            int rowTop = top + i * SUGGESTION_HEIGHT;
-            if (isOver(mouseX, mouseY, left + 1, rowTop, width - 2, SUGGESTION_HEIGHT)) {
-                guiGraphics.fill(left + 1, rowTop, left + width - 1, rowTop + SUGGESTION_HEIGHT, SUGGESTION_HOVER_COLOR);
-            }
-            text(guiGraphics, font, names.get(i), left + PADDING, rowTop + (SUGGESTION_HEIGHT - font.lineHeight) / 2 + 1, TEXT_PRIMARY);
-        }
+        guiGraphics.pose().popPose();
     }
 
     /** What the typed repository holds, or that the name would create a new one. */
@@ -200,24 +240,37 @@ public class ChronoRemoteRepositoryScreen extends Screen {
         int x = left + PADDING;
         int y = top + 5;
         String typed = nameBox.getValue();
-        if (typed.isBlank() || !ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)) return;
+        if (typed.isBlank()) {
+            wrapped(guiGraphics, font, Component.translatable("gui.temporalindustries.chrono_remote.repository.type_hint"),
+                    x, y, width - 2 * PADDING, TEXT_MUTED);
+            return;
+        }
+        if (!ChronoRemoteClientState.getRepositoryInfoQuery().equals(typed)) return;
 
         TemporalWorldData.RepositoryStats stats = ChronoRemoteClientState.getRepositoryInfo();
         String prefix = "gui.temporalindustries.chrono_remote.repository.stats_";
+        int textWidth = width - 2 * PADDING;
         if (stats == null) {
-            text(guiGraphics, font, Component.translatable(prefix + "new"), x, y, TEXT_MUTED);
+            wrapped(guiGraphics, font, unavailableMessage(), x, y, textWidth, TEXT_MUTED);
             return;
         }
 
-        text(guiGraphics, font, Component.translatable(prefix + "counts", stats.commits(), stats.branches(), stats.chunks()),
-                x, y, TEXT_PRIMARY);
+        text(guiGraphics, font, fit(Component.translatable(prefix + "counts", stats.commits(), stats.branches(), stats.chunks()),
+                textWidth), x, y, TEXT_PRIMARY);
         long now = minecraft != null && minecraft.level != null ? minecraft.level.getGameTime() : 0L;
         Component last = stats.lastCommitTime() < 0L
                 ? Component.translatable(prefix + "no_commits")
                 : Component.translatable(prefix + "last", formatAge(now - stats.lastCommitTime()));
         Component detail = stats.currentBranch().isEmpty() ? last
                 : Component.translatable(prefix + "branch", stats.currentBranch(), last);
-        text(guiGraphics, font, detail, x, y + LINE_HEIGHT, TEXT_SECONDARY);
+        text(guiGraphics, font, fit(detail, textWidth), x, y + LINE_HEIGHT, TEXT_SECONDARY);
+    }
+
+    /** The text cut to maxWidth pixels, ending in an ellipsis if it had to be shortened. */
+    private FormattedCharSequence fit(Component text, int maxWidth) {
+        if (font.width(text) <= maxWidth) return text.getVisualOrderText();
+        FormattedText head = font.substrByWidth(text, maxWidth - font.width(CommonComponents.ELLIPSIS));
+        return Language.getInstance().getVisualOrder(FormattedText.composite(head, CommonComponents.ELLIPSIS));
     }
 
     private static String formatAge(long ticks) {
@@ -234,6 +287,11 @@ public class ChronoRemoteRepositoryScreen extends Screen {
     @Override
     public boolean mouseClicked(double mouseX, double mouseY, int button) {
         if (button == GLFW.GLFW_MOUSE_BUTTON_LEFT) {
+            int row = suggestionRowAt(mouseX, mouseY);
+            if (row >= 0) {
+                acceptSuggestion(row);
+                return true;
+            }
             if (canChange() && isOver(mouseX, mouseY, changeButtonLeft(), buttonTop(), PRIMARY_BUTTON_WIDTH, BUTTON_HEIGHT)) {
                 change(nameBox.getValue());
                 return true;
@@ -242,24 +300,36 @@ public class ChronoRemoteRepositoryScreen extends Screen {
                 onClose();
                 return true;
             }
-
-            List<String> names = suggestions();
-            int left = panelLeft + PADDING;
-            for (int i = 0; i < Math.min(names.size(), SUGGESTION_ROWS); i++) {
-                if (isOver(mouseX, mouseY, left, suggestionsTop() + i * SUGGESTION_HEIGHT, PANEL_WIDTH - 2 * PADDING, SUGGESTION_HEIGHT)) {
-                    nameBox.setValue(names.get(i));
-                    return true;
-                }
-            }
         }
         return super.mouseClicked(mouseX, mouseY, button);
     }
 
     @Override
     public boolean keyPressed(int keyCode, int scanCode, int modifiers) {
-        if ((keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) && canChange()) {
-            change(nameBox.getValue());
-            return true;
+        int count = suggestions().size();
+        if (count > 0) {
+            if (keyCode == GLFW.GLFW_KEY_DOWN) {
+                suggestionIndex = (suggestionIndex + 1) % count;
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_UP) {
+                suggestionIndex = (suggestionIndex <= 0 ? count : suggestionIndex) - 1;
+                return true;
+            }
+            if (keyCode == GLFW.GLFW_KEY_TAB) {
+                acceptSuggestion(Math.max(suggestionIndex, 0));
+                return true;
+            }
+        }
+        if (keyCode == GLFW.GLFW_KEY_ENTER || keyCode == GLFW.GLFW_KEY_KP_ENTER) {
+            if (suggestionIndex >= 0 && suggestionIndex < count) {
+                acceptSuggestion(suggestionIndex);
+                return true;
+            }
+            if (canChange()) {
+                change(nameBox.getValue());
+                return true;
+            }
         }
         if (!nameBox.isFocused() && minecraft != null && minecraft.options.keyInventory.matches(keyCode, scanCode)) {
             ChronoRemoteWheelScreen.openSettings();

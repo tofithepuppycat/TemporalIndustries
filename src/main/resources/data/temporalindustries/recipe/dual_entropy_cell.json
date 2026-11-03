@@ -3,7 +3,9 @@
   "ingredients": [
     { "item": "temporalindustries:order_cell" },
     { "item": "temporalindustries:chaos_cell" },
-    { "item": "minecraft:gold_nugget" }
+    { "item": "minecraft:gold_ingot" },
+    { "item": "minecraft:amethyst_shard" },
+    { "item": "minecraft:gunpowder" }
   ],
   "result": { "id": "temporalindustries:dual_entropy_cell", "count": 1 }
 }

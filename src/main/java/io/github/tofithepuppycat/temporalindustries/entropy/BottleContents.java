@@ -7,12 +7,12 @@ import net.minecraft.network.codec.StreamCodec;
 
 /**
  * How many mB of a single {@link EntropyType}'s liquid form an Order/Chaos Cell is holding, stored
- * as a data component on the stack.
+ * as a data component on the stack. Capacities match the dual cells' per-type capacities.
  */
 public record BottleContents(int amount) {
     public static final BottleContents EMPTY = new BottleContents(0);
-    public static final int CAPACITY = 5_000;
-    public static final int RESONANT_CAPACITY = 20_000;
+    public static final int CAPACITY = EntropyContents.CAPACITY;
+    public static final int RESONANT_CAPACITY = EntropyContents.RESONANT_CAPACITY;
 
     public static final Codec<BottleContents> CODEC = Codec.INT.xmap(BottleContents::new, BottleContents::amount);
 

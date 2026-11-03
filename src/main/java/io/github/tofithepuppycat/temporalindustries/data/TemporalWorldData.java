@@ -16,6 +16,7 @@ import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
+import io.github.tofithepuppycat.temporalindustries.block.entity.AbstractTimelineMachineBlockEntity;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
@@ -402,6 +403,40 @@ public class TemporalWorldData extends SavedData {
         String branch = repo.getCurrentBranchName();
         return new RepositoryStats(repo.getAllCommits().size(), repo.getBranchTips().size(), branch == null ? "" : branch,
                 getClaimedChunks(id).size(), lastCommitTime);
+    }
+
+    /** Whether a repository called name exists but cannot be taken: another machine uses it, or it lies in another dimension. */
+    public boolean isRepositoryUnavailable(String name, ResourceLocation dimension) {
+        UUID id = findRepositoryByName(name.trim());
+        if (id == null) return false;
+        return repositoryOwners.containsKey(id) || !repositories.get(id).getDimension().equals(dimension);
+    }
+
+    /**
+     * Drops every recorded owner whose position is loaded but no longer holds a machine bound to
+     * that repository, e.g. a machine removed without being broken in play. Owners in unloaded
+     * chunks are kept, as they cannot be checked.
+     */
+    public void pruneStaleOwners(MinecraftServer server) {
+        boolean changed = false;
+        for (Iterator<Map.Entry<UUID, GlobalPos>> it = repositoryOwners.entrySet().iterator(); it.hasNext(); ) {
+            Map.Entry<UUID, GlobalPos> entry = it.next();
+            ServerLevel level = server.getLevel(entry.getValue().dimension());
+            BlockPos pos = entry.getValue().pos();
+            if (level == null || !level.isLoaded(pos)) continue;
+            if (level.getBlockEntity(pos) instanceof AbstractTimelineMachineBlockEntity machine
+                    && entry.getKey().equals(machine.peekRepositoryId())) continue;
+            it.remove();
+            changed = true;
+        }
+        if (changed) setDirty();
+    }
+
+    /** Where the machine using the repository called name is, or null if there is none or nothing uses it. */
+    @Nullable
+    public GlobalPos repositoryOwnerOf(String name) {
+        UUID id = findRepositoryByName(name.trim());
+        return id == null ? null : repositoryOwners.get(id);
     }
 
     /** Creates a fresh, empty repository called name. */

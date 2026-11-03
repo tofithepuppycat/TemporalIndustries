@@ -371,7 +371,7 @@ public class ChronosphereScreen extends AbstractContainerScreen<ChronosphereMenu
         TemporalWorldData.RepositoryStats stats = ChronoRemoteClientState.getRepositoryInfo();
         String prefix = "gui.temporalindustries.chrono_remote.repository.stats_";
         if (stats == null) {
-            guiGraphics.drawString(font, Component.translatable(prefix + "new"), x, y, TEXT_MUTED, false);
+            drawWordWrapNoShadow(guiGraphics, RemoteUi.unavailableMessage(), x, y, CONTENT_SIZE - 2 * BIND_TEXT_INSET, TEXT_MUTED);
             return;
         }
 

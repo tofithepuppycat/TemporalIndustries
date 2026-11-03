@@ -7,7 +7,7 @@
   "key": {
     "D": { "item": "minecraft:deepslate" },
     "G": { "item": "minecraft:gold_ingot" },
-    "A": { "item": "minecraft:ender_pearl" }
+    "A": { "item": "temporalindustries:dual_entropy_cell" }
   },
   "result": { "id": "temporalindustries:entropic_pylon", "count": 1 }
 }

@@ -5,7 +5,8 @@
     "up": "temporalindustries:block/machine_base_up",
     "down": "temporalindustries:block/machine_base_down",
     "energy": "temporalindustries:block/machine_base_energy",
-    "particle": "temporalindustries:block/machine_base"
+    "particle": "temporalindustries:block/machine_base",
+    "frame": "temporalindustries:block/machine_frame"
   },
   "elements": [
     {
@@ -35,18 +36,10 @@
           }
         },
         "east": {
-          "texture": "#energy",
-          "neoforge_data": {
-            "block_light": 15,
-            "sky_light": 15
-          }
+          "texture": "#frame"
         },
         "west": {
-          "texture": "#energy",
-          "neoforge_data": {
-            "block_light": 15,
-            "sky_light": 15
-          }
+          "texture": "#frame"
         },
         "up": {
           "texture": "#side"

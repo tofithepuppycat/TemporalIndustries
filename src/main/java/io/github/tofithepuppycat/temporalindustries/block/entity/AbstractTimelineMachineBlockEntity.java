@@ -391,6 +391,12 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         return repositoryId;
     }
 
+    /** The bound repository's id, without minting one. */
+    @Nullable
+    public UUID peekRepositoryId() {
+        return repositoryId;
+    }
+
     public boolean isRepositoryBound() {
         return getRepositoryId() != null;
     }
@@ -621,6 +627,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (name == null) return BindResult.INVALID_NAME;
 
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        data.pruneStaleOwners(level.getServer());
         UUID existingId = data.findRepositoryByName(name);
         if (existingId == null) {
             UUID created = data.createRepository(name, level.dimension().location());
@@ -654,6 +661,7 @@ public abstract class AbstractTimelineMachineBlockEntity extends BlockEntity
         if (name == null) return BindResult.INVALID_NAME;
 
         TemporalWorldData data = TemporalWorldData.get(level.getServer());
+        data.pruneStaleOwners(level.getServer());
         UUID existingId = data.findRepositoryByName(name);
         if (existingId != null) {
             if (existingId.equals(repositoryId)) return BindResult.ALREADY_BOUND;

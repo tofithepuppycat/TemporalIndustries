@@ -1,0 +1,8 @@
+{
+  "type": "minecraft:crafting_shapeless",
+  "ingredients": [
+    { "item": "temporalindustries:order_pylon" },
+    { "item": "temporalindustries:chaos_pylon" }
+  ],
+  "result": { "id": "temporalindustries:entropic_pylon", "count": 1 }
+}

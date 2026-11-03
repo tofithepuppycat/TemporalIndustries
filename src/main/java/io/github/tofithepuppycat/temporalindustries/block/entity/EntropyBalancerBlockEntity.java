@@ -10,6 +10,10 @@ import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.level.ChunkPos;
+import net.neoforged.neoforge.network.PacketDistributor;
+import io.github.tofithepuppycat.temporalindustries.network.PylonBoltPacket;
 import net.minecraft.network.chat.Component;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
@@ -252,6 +256,10 @@ public class EntropyBalancerBlockEntity extends BlockEntity implements MenuProvi
         if (filled > 0) {
             tank.drain(filled, IFluidHandler.FluidAction.EXECUTE);
             energyStorage.consumeInternal(filled * FE_PER_MB);
+            if (level instanceof ServerLevel serverLevel) {
+                PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition),
+                        new PylonBoltPacket(worldPosition, out, type.color()));
+            }
         }
     }
 

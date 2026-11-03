@@ -57,11 +57,13 @@ public class RepositorySuggestRequestPacket implements CustomPacketPayload {
             if (machine.isRepositoryBound()) return;
 
             TemporalWorldData data = TemporalWorldData.get(sender.server);
+            data.pruneStaleOwners(sender.server);
             List<String> names = data.suggestAvailableRepositoryNames(
                     packet.query, sender.level().dimension().location(), MAX_SUGGESTIONS);
             PacketDistributor.sendToPlayer(sender, new RepositorySuggestSyncPacket(packet.query, names));
             PacketDistributor.sendToPlayer(sender, new RepositoryInfoSyncPacket(packet.query,
-                    data.availableRepositoryStats(packet.query, sender.level().dimension().location())));
+                    data.availableRepositoryStats(packet.query, sender.level().dimension().location()),
+                    data.isRepositoryUnavailable(packet.query, sender.level().dimension().location()), data.repositoryOwnerOf(packet.query)));
         });
     }
 

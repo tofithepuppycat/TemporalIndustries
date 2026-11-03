@@ -1,13 +1,16 @@
 {
   "type": "minecraft:crafting_shaped",
   "pattern": [
-    "GAG",
-    "DDD"
+    "OAH",
+    "CFC",
+    "CCC"
   ],
   "key": {
-    "D": { "item": "minecraft:deepslate" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "A": { "item": "minecraft:amethyst_shard" }
+    "C": { "item": "minecraft:copper_ingot" },
+    "O": { "item": "temporalindustries:order_cell" },
+    "H": { "item": "temporalindustries:chaos_cell" },
+    "A": { "item": "minecraft:amethyst_shard" },
+    "F": { "item": "temporalindustries:machine_frame" }
   },
   "result": { "id": "temporalindustries:entropic_battery", "count": 1 }
 }

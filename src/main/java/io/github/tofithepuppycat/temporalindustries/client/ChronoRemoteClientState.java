@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.client;
 
+import net.minecraft.core.GlobalPos;
 import io.github.tofithepuppycat.temporalindustries.block.entity.TimelineViewProvider;
 import io.github.tofithepuppycat.temporalindustries.client.screen.ChronoRemoteChunkScreen;
 import io.github.tofithepuppycat.temporalindustries.client.timeline.TimelineProjectionManager;
@@ -30,6 +31,8 @@ public final class ChronoRemoteClientState {
 
     private static String repositoryInfoQuery = "";
     @Nullable private static TemporalWorldData.RepositoryStats repositoryInfo;
+    private static boolean repositoryUnavailable;
+    @Nullable private static GlobalPos repositoryOwner;
 
     private ChronoRemoteClientState() {}
 
@@ -44,9 +47,27 @@ public final class ChronoRemoteClientState {
         return repositoryInfo;
     }
 
+    /** Whether the last query names a repository that exists but cannot be taken. */
+    public static boolean isRepositoryUnavailable() {
+        return repositoryUnavailable;
+    }
+
+    /** Where the machine using the last query's repository is, or null if unknown. */
+    @Nullable
+    public static GlobalPos getRepositoryOwner() {
+        return repositoryOwner;
+    }
+
     public static void updateRepositoryInfo(String query, @Nullable TemporalWorldData.RepositoryStats stats) {
+        updateRepositoryInfo(query, stats, false, null);
+    }
+
+    public static void updateRepositoryInfo(String query, @Nullable TemporalWorldData.RepositoryStats stats, boolean unavailable,
+                                            @Nullable GlobalPos owner) {
         repositoryInfoQuery = query;
         repositoryInfo = stats;
+        repositoryUnavailable = unavailable;
+        repositoryOwner = owner;
     }
 
     public static boolean isChunkPreview() {

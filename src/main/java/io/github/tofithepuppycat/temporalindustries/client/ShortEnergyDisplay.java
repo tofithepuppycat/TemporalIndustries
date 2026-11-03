@@ -20,6 +20,20 @@ public final class ShortEnergyDisplay {
         return format(fe, true, decimals);
     }
 
+    /** Both amounts scaled to the prefix of max with one unit after them, e.g. "120.0/150.0 kFE". */
+    public static String formatOutOf(long fe, long max) {
+        double scale = 1.0;
+        int unit = 0;
+        double value = Math.abs((double) max);
+        while (value >= 1000 && unit < PREFIXES.length - 1) {
+            value /= 1000;
+            scale *= 1000;
+            unit++;
+        }
+        String pattern = unit == 0 ? "%.0f" : "%.1f";
+        return String.format(Locale.ROOT, pattern + "/" + pattern + " %sFE", fe / scale, max / scale, PREFIXES[unit]);
+    }
+
     /** Shortened amount with the prefix but no FE unit, e.g. "17.0k". */
     public static String formatPlain(long fe) {
         return format(fe, false, 1);

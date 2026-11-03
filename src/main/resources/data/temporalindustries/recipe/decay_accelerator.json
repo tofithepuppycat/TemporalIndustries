@@ -2,9 +2,11 @@
   "type": "minecraft:crafting_shaped",
   "pattern": [
     "GCG",
-    "WWW"
+    "WWW",
+    "DDD"
   ],
   "key": {
+    "D": { "item": "minecraft:deepslate" },
     "W": { "item": "minecraft:oak_planks" },
     "G": { "item": "minecraft:gold_nugget" },
     "C": { "item": "minecraft:composter" }

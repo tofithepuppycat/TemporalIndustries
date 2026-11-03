@@ -14,6 +14,7 @@ import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.item.Item;
+import net.minecraft.world.Clearable;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.LevelHeightAccessor;
 import net.minecraft.world.level.chunk.LevelChunk;
@@ -954,7 +955,12 @@ public final class TemporalRepository {
     private static void applyChangesUnguarded(ResolvedChunk state, List<BlockPos> positions, ServerLevel level, LongConsumer onBlockSet) {
         for (BlockPos pos : positions) {
             BlockState desiredState = state.targetState(pos);
-            if (!level.getBlockState(pos).equals(desiredState)) {
+            BlockState currentState = level.getBlockState(pos);
+            if (!currentState.equals(desiredState)) {
+                if (currentState.getBlock() != desiredState.getBlock()) {
+                    // The jump takes the contents of a replaced container, so they must not spill when it is removed.
+                    Clearable.tryClear(level.getBlockEntity(pos));
+                }
                 level.setBlock(pos, desiredState, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
                 onBlockSet.accept(pos.asLong());
             }

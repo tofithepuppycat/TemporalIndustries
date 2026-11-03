@@ -1,5 +1,6 @@
 package io.github.tofithepuppycat.temporalindustries.item;
 
+import io.github.tofithepuppycat.temporalindustries.block.entity.EntropicBatteryBlockEntity;
 import io.github.tofithepuppycat.temporalindustries.client.ShortEnergyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyDisplay;
 import io.github.tofithepuppycat.temporalindustries.entropy.EntropyType;
@@ -31,9 +32,13 @@ public class EntropicBatteryItem extends BlockItem {
         int energy = tag.getInt("Energy");
         int order = tag.getCompound("OrderTank").getInt("amount");
         int chaos = tag.getCompound("ChaosTank").getInt("amount");
-        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_energy", ShortEnergyDisplay.formatPlain(energy)));
-        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_order", EntropyDisplay.formatFluid(order)));
-        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_chaos", EntropyDisplay.formatFluid(chaos)));
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_energy", ShortEnergyDisplay.formatOutOf(energy, EntropicBatteryBlockEntity.ENERGY_CAPACITY)));
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_order", outOf(order)));
+        tooltip.add(stored("block.temporalindustries.entropic_battery.stored_chaos", outOf(chaos)));
+    }
+
+    private static String outOf(int amount) {
+        return EntropyDisplay.formatFluid(amount) + "/" + EntropyDisplay.formatFluid(EntropicBatteryBlockEntity.TANK_CAPACITY);
     }
 
     private static Component stored(String key, String amount) {

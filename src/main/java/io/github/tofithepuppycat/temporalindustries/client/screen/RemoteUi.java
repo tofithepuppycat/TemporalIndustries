@@ -3,7 +3,11 @@ package io.github.tofithepuppycat.temporalindustries.client.screen;
 import io.github.tofithepuppycat.temporalindustries.TemporalIndustries;
 import io.github.tofithepuppycat.temporalindustries.client.IconButtonRenderer;
 import io.github.tofithepuppycat.temporalindustries.client.window.VanillaBackground;
+import io.github.tofithepuppycat.temporalindustries.client.ChronoRemoteClientState;
+import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.Font;
+import net.minecraft.core.GlobalPos;
+import net.minecraft.world.level.Level;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceLocation;
@@ -34,20 +38,34 @@ final class RemoteUi {
 
     private static final ResourceLocation MACHINE_BUTTON_TEXTURE = ResourceLocation.fromNamespaceAndPath(
             TemporalIndustries.MODID, "textures/gui/menu_button_small.png");
-    private static final ResourceLocation BUTTON_SPRITE = ResourceLocation.withDefaultNamespace("widget/button");
-    private static final ResourceLocation BUTTON_HOVER_SPRITE = ResourceLocation.withDefaultNamespace("widget/button_highlighted");
-    private static final ResourceLocation BUTTON_DISABLED_SPRITE = ResourceLocation.withDefaultNamespace("widget/button_disabled");
+    /** The colours of menu_button_small.png. */
+    private static final int BUTTON_BORDER = 0xFF000000;
+    private static final int BUTTON_FILL = 0xFF666666;
+    private static final int BUTTON_HIGHLIGHT = 0xFF999999;
+    private static final int BUTTON_SHADOW = 0xFF4C4C4C;
 
     private RemoteUi() {}
 
-    /** A vanilla button; {@code primary} is accepted for call sites that distinguish the main action. */
+    /**
+     * A button in the style of menu_button_small.png at any size; {@code primary} is accepted for call
+     * sites that distinguish the main action.
+     */
     static void drawButton(GuiGraphics guiGraphics, Font font, int x, int y, int width, Component label, boolean enabled,
                            boolean primary, int mouseX, int mouseY) {
-        boolean hovered = enabled && isOver(mouseX, mouseY, x, y, width, BUTTON_HEIGHT);
-        guiGraphics.blitSprite(!enabled ? BUTTON_DISABLED_SPRITE : hovered ? BUTTON_HOVER_SPRITE : BUTTON_SPRITE,
-                x, y, width, BUTTON_HEIGHT);
-        guiGraphics.drawCenteredString(font, label, x + width / 2, y + (BUTTON_HEIGHT - font.lineHeight) / 2,
-                enabled ? 0xFFFFFFFF : 0xFFA0A0A0);
+        int right = x + width;
+        int bottom = y + BUTTON_HEIGHT;
+        guiGraphics.fill(x, y, right, bottom, BUTTON_BORDER);
+        guiGraphics.fill(x + 1, y + 1, right - 1, bottom - 1, BUTTON_FILL);
+        guiGraphics.fill(x + 1, y + 1, right - 1, y + 2, BUTTON_HIGHLIGHT);
+        guiGraphics.fill(x + 1, y + 1, x + 2, bottom - 1, BUTTON_HIGHLIGHT);
+        guiGraphics.fill(x + 2, bottom - 2, right - 1, bottom - 1, BUTTON_SHADOW);
+        guiGraphics.fill(right - 2, y + 2, right - 1, bottom - 1, BUTTON_SHADOW);
+        if (!enabled) {
+            guiGraphics.fill(x, y, right, bottom, 0x80000000);
+        } else if (isOver(mouseX, mouseY, x, y, width, BUTTON_HEIGHT)) {
+            guiGraphics.fill(x, y, right, bottom, 0x40FFFFFF);
+        }
+        centered(guiGraphics, font, label, x + width / 2, y + (BUTTON_HEIGHT - font.lineHeight) / 2 + 1, MACHINE_BUTTON_TEXT);
     }
 
     /**
@@ -71,6 +89,23 @@ final class RemoteUi {
         }
         text(guiGraphics, font, label, x + MACHINE_BUTTON_TEXT_PADDING, textY, MACHINE_BUTTON_TEXT);
         IconButtonRenderer.renderIcon(guiGraphics, icon, x + MACHINE_BUTTON_WIDTH - IconButtonRenderer.SIZE, y);
+    }
+
+    /**
+     * What the last repository lookup says about a name no free repository has: where the machine
+     * using it is, or that typing it would create a new repository.
+     */
+    static Component unavailableMessage() {
+        String base = "gui.temporalindustries.chrono_remote.repository.";
+        if (!ChronoRemoteClientState.isRepositoryUnavailable()) return Component.translatable(base + "stats_new");
+        GlobalPos owner = ChronoRemoteClientState.getRepositoryOwner();
+        if (owner == null) return Component.translatable(base + "in_use");
+
+        String where = owner.pos().getX() + " " + owner.pos().getY() + " " + owner.pos().getZ();
+        Level level = Minecraft.getInstance().level;
+        return level != null && !level.dimension().equals(owner.dimension())
+                ? Component.translatable(base + "in_use_at_dimension", where, owner.dimension().location().toString())
+                : Component.translatable(base + "in_use_at", where);
     }
 
     /** The screen's main panel, in the vanilla container style. */
