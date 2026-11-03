@@ -5,10 +5,21 @@
     "DGD"
   ],
   "key": {
-    "D": { "item": "minecraft:deepslate" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "T": { "item": "minecraft:totem_of_undying" },
-    "C": { "item": "temporalindustries:chronodial" }
+    "D": {
+      "item": "minecraft:deepslate"
+    },
+    "G": {
+      "item": "temporalindustries:ether_ingot"
+    },
+    "T": {
+      "item": "minecraft:totem_of_undying"
+    },
+    "C": {
+      "item": "temporalindustries:chronodial"
+    }
   },
-  "result": { "id": "temporalindustries:temporal_lifeline", "count": 1 }
+  "result": {
+    "id": "temporalindustries:temporal_lifeline",
+    "count": 1
+  }
 }

@@ -301,6 +301,8 @@
 	"item.temporalindustries.cell.tooltip": "Condenses nearby entropy orbs.\n{rmb}: Pours ORD/CHS into a machine\n{sneak} + {scroll}: Changes the amount",
 	"item.temporalindustries.order_bucket": "Bucket of Order",
 	"item.temporalindustries.chaos_bucket": "Bucket of Chaos",
+	"item.temporalindustries.unstable_gem": "Unstable Gem",
+	"item.temporalindustries.ether_ingot": "Ether Ingot",
 	"fluid.temporalindustries.order_fluid": "Order",
 	"fluid.temporalindustries.chaos_fluid": "Chaos",
 	"block.temporalindustries.entropy_condenser": "Entropy Condenser",

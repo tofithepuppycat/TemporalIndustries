@@ -3,15 +3,33 @@
   "pattern": [
     "AEA",
     "GCG",
-    "NP "
+    "NPX"
   ],
   "key": {
-    "A": { "item": "minecraft:amethyst_shard" },
-    "E": { "item": "minecraft:echo_shard" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "C": { "item": "minecraft:clock" },
-    "N": { "item": "minecraft:netherite_ingot" },
-    "P": { "item": "minecraft:ender_pearl" }
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "E": {
+      "item": "minecraft:echo_shard"
+    },
+    "G": {
+      "item": "temporalindustries:ether_ingot"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "P": {
+      "item": "minecraft:ender_pearl"
+    },
+    "X": {
+      "item": "temporalindustries:unstable_gem"
+    }
   },
-  "result": { "id": "temporalindustries:chronoscope", "count": 1 }
+  "result": {
+    "id": "temporalindustries:chronoscope",
+    "count": 1
+  }
 }

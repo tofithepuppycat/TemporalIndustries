@@ -6,12 +6,27 @@
     "DSD"
   ],
   "key": {
-    "A": { "item": "minecraft:amethyst_shard" },
-    "N": { "item": "minecraft:netherite_ingot" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "C": { "item": "minecraft:chest" },
-    "D": { "item": "minecraft:deepslate" },
-    "S": { "item": "temporalindustries:chronoscope" }
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "G": {
+      "item": "temporalindustries:unstable_gem"
+    },
+    "C": {
+      "item": "minecraft:chest"
+    },
+    "D": {
+      "item": "minecraft:deepslate"
+    },
+    "S": {
+      "item": "temporalindustries:chronoscope"
+    }
   },
-  "result": { "id": "temporalindustries:loot_generator", "count": 1 }
+  "result": {
+    "id": "temporalindustries:loot_generator",
+    "count": 1
+  }
 }

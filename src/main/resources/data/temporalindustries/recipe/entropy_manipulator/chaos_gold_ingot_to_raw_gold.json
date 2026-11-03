@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "tag": "c:ingots/gold"
+  },
+  "result": {
+    "id": "minecraft:raw_gold",
+    "count": 1
+  },
+  "entropy_cost": 200
+}

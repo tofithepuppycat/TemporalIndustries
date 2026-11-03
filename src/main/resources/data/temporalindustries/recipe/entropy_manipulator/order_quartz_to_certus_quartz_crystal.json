@@ -1,0 +1,18 @@
+{
+  "neoforge:conditions": [
+    {
+      "type": "neoforge:mod_loaded",
+      "modid": "ae2"
+    }
+  ],
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:quartz"
+  },
+  "result": {
+    "id": "ae2:certus_quartz_crystal",
+    "count": 1
+  },
+  "entropy_cost": 600
+}

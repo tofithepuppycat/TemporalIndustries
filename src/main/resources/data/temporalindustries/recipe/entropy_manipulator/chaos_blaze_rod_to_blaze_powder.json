@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:blaze_rod"
+  },
+  "result": {
+    "id": "minecraft:blaze_powder",
+    "count": 2
+  },
+  "entropy_cost": 150
+}

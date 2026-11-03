@@ -3,20 +3,23 @@
   "pattern": [
     "EAE",
     "ECE",
-    " S "
+    "ISI"
   ],
   "key": {
     "E": {
       "item": "minecraft:echo_shard"
     },
     "A": {
-      "item": "minecraft:amethyst_shard"
+      "item": "temporalindustries:unstable_gem"
     },
     "C": {
       "item": "temporalindustries:chronovault"
     },
     "S": {
       "item": "minecraft:nether_star"
+    },
+    "I": {
+      "item": "temporalindustries:ether_ingot"
     }
   },
   "result": {

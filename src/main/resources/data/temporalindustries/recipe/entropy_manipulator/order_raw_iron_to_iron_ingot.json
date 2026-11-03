@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "tag": "c:raw_materials/iron"
+  },
+  "result": {
+    "id": "minecraft:iron_ingot",
+    "count": 1
+  },
+  "entropy_cost": 200
+}

@@ -6,11 +6,24 @@
     "GRG"
   ],
   "key": {
-    "E": { "item": "minecraft:echo_shard" },
-    "A": { "item": "minecraft:amethyst_shard" },
-    "C": { "item": "minecraft:clock" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "R": { "item": "minecraft:redstone" }
+    "E": {
+      "item": "minecraft:echo_shard"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "G": {
+      "item": "temporalindustries:ether_ingot"
+    },
+    "R": {
+      "item": "minecraft:redstone"
+    }
   },
-  "result": { "id": "temporalindustries:time_dilator", "count": 1 }
+  "result": {
+    "id": "temporalindustries:time_dilator",
+    "count": 1
+  }
 }

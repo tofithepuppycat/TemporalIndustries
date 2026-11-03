@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:deepslate"
+  },
+  "result": {
+    "id": "minecraft:cobbled_deepslate",
+    "count": 1
+  },
+  "entropy_cost": 150
+}

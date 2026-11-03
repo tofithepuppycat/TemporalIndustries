@@ -50,6 +50,7 @@ import io.github.tofithepuppycat.temporalindustries.item.DescribedBlockItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicBatteryItem;
 import io.github.tofithepuppycat.temporalindustries.item.EchoRecordItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
+import io.github.tofithepuppycat.temporalindustries.item.EntropyColoredItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyCellItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyGlassesItem;
 import io.github.tofithepuppycat.temporalindustries.item.EntropyItemFluidHandler;
@@ -327,6 +328,12 @@ public class Registration {
             () -> new LiquidBlock(CHAOS_FLUID.get(), BlockBehaviour.Properties.of().mapColor(MapColor.COLOR_PURPLE).replaceable()
                     .noCollission().strength(100.0F).pushReaction(PushReaction.DESTROY).noLootTable()
                     .liquid().sound(SoundType.EMPTY)));
+
+    public static final DeferredItem<Item> UNSTABLE_GEM_ITEM = ITEMS.register("unstable_gem",
+            () -> new EntropyColoredItem(new Item.Properties(), EntropyType.CHAOS));
+
+    public static final DeferredItem<Item> ETHER_INGOT_ITEM = ITEMS.register("ether_ingot",
+            () -> new EntropyColoredItem(new Item.Properties(), EntropyType.ORDER));
 
     public static final DeferredItem<Item> ORDER_BUCKET_ITEM = ITEMS.register("order_bucket",
             () -> new BucketItem(ORDER_FLUID.get(), new Item.Properties().craftRemainder(net.minecraft.world.item.Items.BUCKET).stacksTo(1)));
@@ -618,6 +625,8 @@ public class Registration {
                         output.accept(fullResonantChaos);
                         output.accept(ORDER_BUCKET_ITEM);
                         output.accept(CHAOS_BUCKET_ITEM);
+                        output.accept(UNSTABLE_GEM_ITEM);
+                        output.accept(ETHER_INGOT_ITEM);
                     })
                     .build());
 

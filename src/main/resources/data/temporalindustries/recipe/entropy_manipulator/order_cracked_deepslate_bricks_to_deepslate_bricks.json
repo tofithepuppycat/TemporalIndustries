@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "order",
+  "input_item": {
+    "item": "minecraft:cracked_deepslate_bricks"
+  },
+  "result": {
+    "id": "minecraft:deepslate_bricks",
+    "count": 1
+  },
+  "entropy_cost": 150
+}

@@ -3,13 +3,27 @@
   "pattern": [
     "SAS",
     "NFN",
-    "NNN"
+    "NGN"
   ],
   "key": {
-    "N": { "item": "minecraft:netherite_ingot" },
-    "F": { "item": "temporalindustries:machine_frame" },
-    "S": { "item": "minecraft:wither_skeleton_skull" },
-    "A": { "item": "minecraft:nether_star" }
+    "N": {
+      "item": "minecraft:netherite_ingot"
+    },
+    "F": {
+      "item": "temporalindustries:machine_frame"
+    },
+    "S": {
+      "item": "minecraft:wither_skeleton_skull"
+    },
+    "A": {
+      "item": "minecraft:nether_star"
+    },
+    "G": {
+      "item": "temporalindustries:unstable_gem"
+    }
   },
-  "result": { "id": "temporalindustries:withergenic_reactor", "count": 1 }
+  "result": {
+    "id": "temporalindustries:withergenic_reactor",
+    "count": 1
+  }
 }

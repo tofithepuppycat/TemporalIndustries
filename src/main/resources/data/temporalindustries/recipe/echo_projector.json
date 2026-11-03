@@ -5,10 +5,21 @@
     "GAG"
   ],
   "key": {
-    "E": { "item": "minecraft:echo_shard" },
-    "G": { "item": "minecraft:gold_ingot" },
-    "J": { "item": "minecraft:jukebox" },
-    "A": { "item": "minecraft:amethyst_shard" }
+    "E": {
+      "item": "minecraft:echo_shard"
+    },
+    "G": {
+      "item": "temporalindustries:ether_ingot"
+    },
+    "J": {
+      "item": "minecraft:jukebox"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    }
   },
-  "result": { "id": "temporalindustries:echo_projector", "count": 1 }
+  "result": {
+    "id": "temporalindustries:echo_projector",
+    "count": 1
+  }
 }

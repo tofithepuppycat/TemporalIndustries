@@ -5,10 +5,21 @@
     "DCD"
   ],
   "key": {
-    "G": { "item": "minecraft:gold_ingot" },
-    "D": { "item": "minecraft:deepslate" },
-    "C": { "item": "minecraft:clock" },
-    "A": { "item": "minecraft:amethyst_shard" }
+    "G": {
+      "item": "temporalindustries:ether_ingot"
+    },
+    "D": {
+      "item": "minecraft:deepslate"
+    },
+    "C": {
+      "item": "minecraft:clock"
+    },
+    "A": {
+      "item": "minecraft:amethyst_shard"
+    }
   },
-  "result": { "id": "temporalindustries:chrono_remote_control", "count": 1 }
+  "result": {
+    "id": "temporalindustries:chrono_remote_control",
+    "count": 1
+  }
 }

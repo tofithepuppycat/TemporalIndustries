@@ -1,0 +1,12 @@
+{
+  "type": "temporalindustries:entropy_manipulator",
+  "entropy_type": "chaos",
+  "input_item": {
+    "item": "minecraft:dirt"
+  },
+  "result": {
+    "id": "minecraft:coarse_dirt",
+    "count": 1
+  },
+  "entropy_cost": 100
+}
