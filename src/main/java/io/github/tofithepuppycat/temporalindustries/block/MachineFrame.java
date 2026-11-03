@@ -92,6 +92,9 @@ public class MachineFrame extends BaseEntityBlock {
      */
     public static void setConnected(Level level, BlockPos pos, boolean connected) {
         BlockState state = level.getBlockState(pos);
+        if (!connected && level.getBlockEntity(pos) instanceof MachineFrameBlockEntity frame) {
+            frame.clearController();
+        }
         if (state.is(Registration.MACHINE_FRAME_BLOCK.get())
                 && (state.getValue(CONNECTED) != connected || state.getValue(PYLON) != PylonStyle.NONE)) {
             level.setBlock(pos, state.setValue(CONNECTED, connected).setValue(PYLON, PylonStyle.NONE).setValue(PYLON_BASE, false), Block.UPDATE_CLIENTS);
@@ -106,6 +109,9 @@ public class MachineFrame extends BaseEntityBlock {
     public static void setPylon(Level level, BlockPos pos, PylonStyle style, boolean base) {
         BlockState state = level.getBlockState(pos);
         boolean connected = style != PylonStyle.NONE;
+        if (!connected && level.getBlockEntity(pos) instanceof MachineFrameBlockEntity frame) {
+            frame.clearController();
+        }
         boolean baseValue = connected && base;
         if (state.is(Registration.MACHINE_FRAME_BLOCK.get())
                 && (state.getValue(PYLON) != style || state.getValue(CONNECTED) != connected || state.getValue(PYLON_BASE) != baseValue)) {
@@ -191,6 +197,7 @@ public class MachineFrame extends BaseEntityBlock {
     @Override
     protected InteractionResult useWithoutItem(@NotNull BlockState state, @NotNull Level level, @NotNull BlockPos pos, @NotNull Player player, @NotNull BlockHitResult hitResult) {
         if (level.isClientSide) return InteractionResult.SUCCESS;
+        if (!state.getValue(CONNECTED)) return InteractionResult.PASS;
         if (!(level.getBlockEntity(pos) instanceof MachineFrameBlockEntity frameBe)) return InteractionResult.PASS;
 
         BlockPos controllerPos = frameBe.getController();

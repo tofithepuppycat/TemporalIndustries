@@ -37,6 +37,15 @@ public class MachineFrameBlockEntity extends BlockEntity {
         }
     }
 
+    /** Forgets the multiblock this frame belonged to, so clicks and capabilities no longer reach it. */
+    public void clearController() {
+        if (controller != null) {
+            controller = null;
+            setChanged();
+            invalidateCapabilities();
+        }
+    }
+
     @Nullable
     private MachineFrameController getControllerBlockEntity() {
         if (controller == null || level == null) return null;
