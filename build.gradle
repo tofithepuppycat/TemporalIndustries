@@ -194,6 +194,15 @@ dependencies {
     localRuntime "dev.engine-room.flywheel:flywheel-neoforge-${minecraft_version}:${flywheel_version}"
     localRuntime "com.tterrag.registrate:Registrate:${registrate_version}"
 
+    // Tempad (plus Resourceful Lib, Resourceful Config and Kotlin for Forge, which it requires),
+    // for the dev/test environment only: its Time Steel is what Ether Ingots stand in for. Not
+    // compiled against, so it is localRuntime rather than implementation -- no dependency is
+    // published on it with the built mod.
+    localRuntime "maven.modrinth:tempad:${tempad_version}"
+    localRuntime "maven.modrinth:resourceful-lib:${resourceful_lib_version}"
+    localRuntime "maven.modrinth:resourceful-config:${resourceful_config_version}"
+    localRuntime "maven.modrinth:kotlin-for-forge:${kotlin_for_forge_version}"
+
     // Jade, for the dev/test environment only: tooltip overlay for inspecting blocks/entities in
     // runClient. Not compiled against and not published as a dependency.
     localRuntime "maven.modrinth:jade:${jade_version}"
