@@ -41,7 +41,9 @@ import org.jetbrains.annotations.Nullable;
 import org.joml.Vector3f;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 /** Transfers liquid Order/Chaos between marked blocks. */
 @SuppressWarnings("null")
@@ -66,6 +68,9 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         float b = (color & 0xFF) / 255F;
         return new DustParticleOptions(new Vector3f(r, g, b), scale);
     }
+
+    /** When each link's bolt of each colour was last sent, so every active link is refreshed on its own schedule. */
+    private final Map<Long, Long> lastBoltSent = new HashMap<>();
 
     private List<BlockPos> inputs = new ArrayList<>();
     private List<BlockPos> outputs = new ArrayList<>();
@@ -348,7 +353,11 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
      * {@code from} to {@code to}; sent every few ticks while a transfer keeps moving something.
      */
     protected void sendBolt(ServerLevel serverLevel, int color, BlockPos from, BlockPos to) {
-        if (serverLevel.getGameTime() % BOLT_INTERVAL_TICKS != 0) return;
+        long now = serverLevel.getGameTime();
+        long key = (from.asLong() * 31L + to.asLong()) * 31L + color;
+        Long last = lastBoltSent.get(key);
+        if (last != null && now - last < BOLT_INTERVAL_TICKS) return;
+        lastBoltSent.put(key, now);
         PacketDistributor.sendToPlayersTrackingChunk(serverLevel, new ChunkPos(worldPosition), new PylonBoltPacket(from, to, color));
     }
 
