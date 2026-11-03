@@ -11,6 +11,7 @@ import io.github.tofithepuppycat.temporalindustries.item.EntropicPylonItem;
 import io.github.tofithepuppycat.temporalindustries.network.PylonBoltPacket;
 import net.minecraft.ChatFormatting;
 import net.minecraft.core.BlockPos;
+import net.minecraft.core.Direction;
 import net.minecraft.core.HolderLookup;
 import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -30,6 +31,7 @@ import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.entity.BlockEntityType;
 import net.minecraft.world.level.block.state.BlockState;
+import net.neoforged.neoforge.capabilities.BlockCapability;
 import net.neoforged.neoforge.capabilities.Capabilities;
 import net.neoforged.neoforge.fluids.FluidStack;
 import net.neoforged.neoforge.fluids.FluidUtil;
@@ -44,6 +46,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.function.Predicate;
 
 /** Transfers liquid Order/Chaos between marked blocks. */
 @SuppressWarnings("null")
@@ -190,9 +193,31 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
         return Component.translatable("item.temporalindustries.wrench.pylon.cleared");
     }
 
+    /**
+     * Looks up a block capability at target, trying the sideless handler first and then each face,
+     * so machines that only expose a handler on certain sides are still found. The first handler
+     * accepted by {@code usable} is returned.
+     */
+    @Nullable
+    protected <T> T findCapability(BlockCapability<T, @Nullable Direction> capability, BlockPos target,
+                                   Predicate<T> usable) {
+        T found = level.getCapability(capability, target, null);
+        if (found != null && usable.test(found)) return found;
+        for (Direction side : Direction.values()) {
+            found = level.getCapability(capability, target, side);
+            if (found != null && usable.test(found)) return found;
+        }
+        return null;
+    }
+
+    @Nullable
+    protected IFluidHandler findFluidHandler(BlockPos target) {
+        return findCapability(Capabilities.FluidHandler.BLOCK, target, handler -> true);
+    }
+
     /** Whether the block at target holds what this pylon routes. */
     protected boolean isLinkable(BlockPos target) {
-        return level.getCapability(Capabilities.FluidHandler.BLOCK, target, null) != null;
+        return findFluidHandler(target) != null;
     }
 
     /** Wrench message key, under the pylon prefix, for a link target that holds nothing this pylon routes. */
@@ -301,13 +326,13 @@ public class EntropicPylonBlockEntity extends BlockEntity implements MachineFram
     protected void transferOnce() {
         for (BlockPos inPos : inputs) {
             if (!isReachable(inPos)) continue;
-            IFluidHandler source = level.getCapability(Capabilities.FluidHandler.BLOCK, inPos, null);
+            IFluidHandler source = findFluidHandler(inPos);
             if (source == null) continue;
 
             BlockPos outPos = outputs.get(outputCursor % outputs.size());
             outputCursor++;
             if (!isReachable(outPos)) continue;
-            IFluidHandler dest = level.getCapability(Capabilities.FluidHandler.BLOCK, outPos, null);
+            IFluidHandler dest = findFluidHandler(outPos);
             if (dest == null) continue;
 
             transferAnyTank(source, dest, inPos, outPos);

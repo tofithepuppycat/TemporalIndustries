@@ -23,7 +23,7 @@ public class EnergyPylonBlockEntity extends EntropicPylonBlockEntity {
 
     @Override
     protected boolean isLinkable(BlockPos target) {
-        return level.getCapability(Capabilities.EnergyStorage.BLOCK, target, null) != null;
+        return findCapability(Capabilities.EnergyStorage.BLOCK, target, storage -> true) != null;
     }
 
     @Override
@@ -40,13 +40,13 @@ public class EnergyPylonBlockEntity extends EntropicPylonBlockEntity {
     protected void transferOnce() {
         for (BlockPos inPos : getInputs()) {
             if (!isReachable(inPos)) continue;
-            IEnergyStorage source = level.getCapability(Capabilities.EnergyStorage.BLOCK, inPos, null);
-            if (source == null || !source.canExtract()) continue;
+            IEnergyStorage source = findCapability(Capabilities.EnergyStorage.BLOCK, inPos, IEnergyStorage::canExtract);
+            if (source == null) continue;
 
             BlockPos outPos = nextOutput();
             if (outPos == null || !isReachable(outPos)) continue;
-            IEnergyStorage dest = level.getCapability(Capabilities.EnergyStorage.BLOCK, outPos, null);
-            if (dest == null || !dest.canReceive()) continue;
+            IEnergyStorage dest = findCapability(Capabilities.EnergyStorage.BLOCK, outPos, IEnergyStorage::canReceive);
+            if (dest == null) continue;
 
             int offered = source.extractEnergy(TRANSFER_RATE_FE, true);
             if (offered <= 0) continue;
