@@ -110,10 +110,18 @@
           }
         },
         "east": {
-          "texture": "#frame"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "west": {
-          "texture": "#frame"
+          "texture": "#energy",
+          "neoforge_data": {
+            "block_light": 15,
+            "sky_light": 15
+          }
         },
         "up": {
           "texture": "#side"
